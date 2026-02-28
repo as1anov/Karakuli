@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Karakuli: Digital Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        :root {
+            --bg-color: #e8e8e8;
+            --canvas-bg: #e8e8e8;
+            --panel-bg: rgba(188, 188, 188, 0.4); 
+            --text-color: #000000;
+            --icon-color: #000000;
+            --ui-accent: rgba(0, 0, 0, 0.1);
+            --glass-blur: blur(12px);
+            --border-color: rgba(0, 0, 0, 0.1);
+            
+            --nav-cursor-color: #FF6666;
+            --draw-cursor-color: #404040; 
+            --active-key-color: #000000;
+            --border-radius: 12px;
+            --stat-font-size: 11px;
+            --key-font-size: 10px;
+            --main-font: 'Sora', sans-serif;
+            --mono-font: 'JetBrains Mono', monospace;
+            --header-height: 43px;
+            --dot-color: 0, 0, 0;
+            --dot-opacity: 0.25; 
+            --icon-stroke: 2px;
+            --menu-icon-fill: #000000;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #111111;
+            --canvas-bg: #111111;
+            --panel-bg: rgba(34, 34, 34, 0.3);
+            --text-color: #FFFFFF;
+            --icon-color: #FFFFFF;
+            --ui-accent: rgba(255, 255, 255, 0.1);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --nav-cursor-color: #FF8888;
+            --draw-cursor-color: #E8E8E8;
+            --active-key-color: #FFFFFF;
+            --dot-color: 255, 255, 255;
+            --dot-opacity: 0.15;
+            --menu-icon-fill: #FFFFFF;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; height: 100svh; 
+            background-color: var(--bg-color);
+            overflow: hidden; 
+            font-family: var(--main-font);
+            touch-action: none;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .top-right-panel { position: absolute; top: 20px; right: 20px; z-index: 500; display: flex; gap: 12px; }
+        .top-nav-wrapper { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 500; pointer-events: none; }
+        
+        .mode-header, .control-btn, .option-btn { 
+            height: var(--header-height); 
+            border-radius: var(--border-radius); 
+            color: var(--text-color); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            cursor: pointer; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            user-select: none; 
+            font-weight: 600; 
+            pointer-events: auto; 
+            gap: 8px;
+        }
+        
+        .mode-header { width: 168px; font-size: 13px; }
+        .control-btn, .option-btn { width: var(--header-height); aspect-ratio: 1 / 1; padding: 0; }
+        
+        .export-option { font-size: 11.2px; letter-spacing: 0.2px; font-weight: 700; }
+
+        /* ИЗМЕНЕНИЯ ЗДЕСЬ: Радиус контекстного меню до 20px */
+        #context-menu { 
+            position: absolute; 
+            display: none; 
+            border-radius: 20px; 
+            padding: 6px; 
+            z-index: 1000; 
+            flex-direction: column; 
+            gap: 2px; 
+            width: 190px; 
+        }
+        
+        /* Радиус кнопок внутри меню адаптирован под 12px (как в остальном UI) */
+        .menu-btn { 
+            background: transparent; 
+            border: none; 
+            color: var(--text-color); 
+            padding: 10px 14px; 
+            width: 100%; 
+            text-align: left; 
+            cursor: pointer; 
+            font-family: var(--main-font); 
+            font-size: 13px; 
+            border-radius: 12px; 
+            display: flex; 
+            align-items: center; 
+            gap: 14px;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+        .menu-btn:hover { background: var(--ui-accent); }
+        .menu-btn svg { width: 18px; height: 18px; flex-shrink: 0; stroke-width: var(--icon-stroke); }
+        
+        /* FOOTER OPTIMIZATION */
+        .footer-hint { 
+            position: absolute; bottom: 0; width: 100%; height: 40px; 
+            color: var(--text-color); 
+            font-size: var(--stat-font-size); 
+            display: flex; justify-content: center; align-items: center; 
+            z-index: 600; font-weight: 400; gap: 4px;
+            border-top: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+        
+        .footer-item { display: flex; align-items: center; gap: 6px; margin: 0 12px; white-space: nowrap; transition: inherit; }
+        
+        /* Адаптивность для средних и маленьких экранов */
+        @media (max-width: 900px) {
+            .footer-hint { height: 36px; gap: 2px; }
+            .footer-item { margin: 0 6px; gap: 4px; }
+            .footer-item span:not(.key-box):not(.stat-val):not(.key-box span) {
+                display: none;
+            }
+            .separator { margin: 0 2px; }
+        }
+
+        @media (max-width: 600px) {
+            .footer-hint { font-size: 9px; }
+            .footer-item { margin: 0 3px; }
+            .key-box { height: 15px; width: 15px; font-size: 8px; }
+            .key-box.wide { min-width: 32px; padding: 0 3px; }
+            .stat-val { width: auto; min-width: 50px; font-size: 9px; }
+            .separator { opacity: 0.1; }
+        }
+
+        @media (max-width: 400px) {
+            .separator { display: none; }
+            .footer-item { margin: 0 2px; }
+            .footer-hint { justify-content: space-evenly; padding: 0 5px; box-sizing: border-box; }
+        }
+
+        .separator { opacity: 0.15; }
+        
+        .stat-val { 
+            font-family: var(--main-font); 
+            font-weight: 600;
+            font-variant-numeric: tabular-nums; 
+            width: auto; 
+            min-width: 65px; 
+            display: inline-block; 
+            text-align: right; 
+            letter-spacing: 0.5px; 
+        }
+        
+        .key-box { display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(0,0,0,0.15); color: var(--text-color); border-radius: 4px; height: 18px; width: 18px; font-size: var(--key-font-size); font-weight: 600; background: rgba(255, 255, 255, 0.3); position: relative; overflow: hidden; transition: all 0.2s ease; }
+        [data-theme="dark"] .key-box { border-color: rgba(255,255,255,0.2); background: rgba(255, 255, 255, 0.1); }
+        .key-box span { display: inline-block; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s ease; transform-origin: center; }
+        .key-box.active span { transform: scale(1.4); color: var(--active-key-color); }
+        .key-box.wide { width: auto; min-width: 45px; padding: 0 6px; }
+
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; overflow: hidden; touch-action: none; }
+        .status-labels { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .indicator-text { font-size: 13.2px; font-weight: 600; color: var(--text-color); opacity: 0; transition: all 0.2s ease; height: 0; overflow: hidden; text-align: center; }
+        .indicator-text.visible { opacity: 0.8; height: auto; margin-top: 4px; }
+        .dropdown-options { display: flex; flex-direction: column; gap: 8px; opacity: 0; pointer-events: none; transform: translateY(-10px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: absolute; top: 53px; }
+        .dropdown-options.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .theme-svg { display: none; }
+        [data-theme="light"] .sun-icon { display: block; }
+        [data-theme="dark"] .moon-icon { display: block; }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+    <div class="top-right-panel">
+        <div class="dropdown-container" style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div class="control-btn glass-panel" id="theme-trigger">
+                <svg viewBox="0 0 24 24" class="theme-svg sun-icon" style="width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;">
+                    <circle cx="12" cy="12" r="5" />
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+                <svg viewBox="0 0 24 24" class="theme-svg moon-icon" style="width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </div>
+            <div class="dropdown-options" id="theme-menu">
+                <div class="option-btn theme-option glass-panel" onclick="setTheme('light')" title="Light Mode">
+                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;">
+                        <circle cx="12" cy="12" r="5" />
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    </svg>
+                </div>
+                <div class="option-btn theme-option glass-panel" onclick="setTheme('dark')" title="Dark Mode">
+                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="dropdown-container" style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div class="control-btn glass-panel" id="export-trigger">
+                <svg viewBox="0 0 24 24" style="width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                </svg>
+            </div>
+            <div class="dropdown-options" id="export-menu">
+                <div class="option-btn glass-panel export-option" onclick="exportFile('svg')">SVG</div>
+                <div class="option-btn glass-panel export-option" onclick="exportFile('png')">PNG</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="top-nav-wrapper">
+        <div class="mode-header glass-panel" id="mode-button" onclick="toggleMode()">
+            <span id="mode-text">Navigation</span>
+        </div>
+        <div class="status-labels">
+            <div id="eraser-label" class="indicator-text">Eraser</div>
+            <div id="zoom-indicator" class="indicator-text">100%</div>
+            <div id="action-indicator" class="indicator-text">Action</div>
+        </div>
+    </div>
+    
+    <div id="canvas-container">
+        <div id="context-menu" class="glass-panel">
+            <button class="menu-btn" onclick="applyContextChoice(true)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                Drawing
+            </button>
+            <button class="menu-btn" onclick="applyContextChoice(false)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                </svg>
+                Navigation
+            </button>
+        </div>
+    </div>
+
+    <div class="footer-hint glass-panel">
+        <div class="footer-item"><span>Line:</span> <span id="stat-length" class="stat-val">00000000</span></div>
+        <span class="separator">|</span>
+        <div class="footer-item"><span class="key-box wide" data-key=" "><span>Space</span></span> <span>Mode</span></div>
+        <span class="separator">|</span>
+        <div class="footer-item"><span class="key-box" data-key="e"><span>E</span></span> <span>Eraser</span></div>
+        <span class="separator">|</span>
+        <div class="footer-item"><span class="key-box" data-key="u"><span>U</span></span> <span>Undo</span></div>
+        <span class="separator">|</span>
+        <div class="footer-item"><span class="key-box" data-key="r"><span>R</span></span> <span>Redo</span></div>
+        <span class="separator">|</span>
+        <div class="footer-item">
+            <span class="key-box" id="move-key-start"><span>1</span></span><span style="margin:0 2px">-</span><span class="key-box" id="move-key-end"><span>9</span></span> 
+            <span>Move</span>
+        </div>
+        <span class="separator">|</span>
+        <div class="footer-item"><span class="key-box" data-key="5"><span>5</span></span> <span>Node</span></div>
+        <span class="separator">|</span>
+        <div class="footer-item"><span class="key-box" data-key="0"><span>0</span></span> <span>Diamond</span></div>
+        <span class="separator">|</span>
+        <div class="footer-item"><span class="key-box" data-key="x"><span>X</span></span> <span>Reset</span></div>
+    </div>
+
+    <script>
+        let BASE_STEP = 60; 
+        let STEP = BASE_STEP / 2; 
+        let LINE_WEIGHT = BASE_STEP; 
+        let segments = []; 
+        let specialElements = {}; 
+        let curI = 0, curJ = 0;
+        let lastDirection = {di: 0, dj: 1}; 
+        let isDrawingMode = false;
+        let isEraserActive = false;
+        let eraserRadius = 30; 
+        let offsetX = 0, offsetY = 0; 
+        let zoom = 0.4; 
+        let history = [], redoStack = [];
+        let isExporting = false;
+        let zoomTimeout = null;
+        let actionTimeout = null;
+
+        let lastContextPos = { x: 0, y: 0 };
+
+        const themeConfig = {
+            light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000' },
+            dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8' }
+        };
+        let currentTheme = 'light';
+        document.body.setAttribute('data-theme', currentTheme);
+
+        let repeatTimer = null;
+        let activeKey = null;
+        let isDiagonalMove = false; 
+
+        const exportMenu = document.getElementById('export-menu');
+        const themeMenu = document.getElementById('theme-menu');
+        const contextMenu = document.getElementById('context-menu');
+
+        document.getElementById('export-trigger').onclick = (e) => { 
+            e.stopPropagation(); 
+            exportMenu.classList.toggle('open'); 
+            themeMenu.classList.remove('open'); 
+        };
+        document.getElementById('theme-trigger').onclick = (e) => { 
+            e.stopPropagation(); 
+            themeMenu.classList.toggle('open'); 
+            exportMenu.classList.remove('open'); 
+        };
+        
+        window.onclick = () => { 
+            exportMenu.classList.remove('open'); 
+            themeMenu.classList.remove('open'); 
+            hideContextMenu();
+        };
+
+        window.oncontextmenu = (e) => {
+            e.preventDefault();
+            lastContextPos.x = (mouseX - offsetX) / zoom;
+            lastContextPos.y = (mouseY - offsetY) / zoom;
+            
+            contextMenu.style.display = 'flex';
+            let x = e.pageX, y = e.pageY;
+            if (x + 190 > window.innerWidth) x -= 190;
+            if (y + 120 > window.innerHeight) y -= 120;
+            contextMenu.style.left = x + 'px';
+            contextMenu.style.top = y + 'px';
+            return false;
+        };
+
+        function hideContextMenu() { contextMenu.style.display = 'none'; }
+
+        function applyContextChoice(drawMode) {
+            curI = Math.round(lastContextPos.x / STEP);
+            curJ = Math.round(lastContextPos.y / STEP);
+            setMode(drawMode);
+            hideContextMenu();
+        }
+
+        function setTheme(m) { 
+            currentTheme = m;
+            document.body.setAttribute('data-theme', m); 
+            showActionHint(`Theme: ${m === 'dark' ? 'Dark' : 'Light'}`);
+            themeMenu.classList.remove('open');
+            redraw();
+        }
+
+        function showActionHint(t) { 
+            let a = document.getElementById('action-indicator'); 
+            a.innerText = t; 
+            a.classList.add('visible'); 
+            if(actionTimeout) clearTimeout(actionTimeout);
+            actionTimeout = setTimeout(()=>a.classList.remove('visible'), 1200); 
+        }
+
+        function showZoomIndicator() {
+            let z = document.getElementById('zoom-indicator');
+            let percentage = Math.round(zoom * 250);
+            z.innerText = `${percentage}%`;
+            z.classList.add('visible');
+            if(zoomTimeout) clearTimeout(zoomTimeout);
+            zoomTimeout = setTimeout(() => z.classList.remove('visible'), 1000);
+        }
+
+        function animateStatusKey(k) {
+            let el;
+            const dirKeys = ['1','2','3','4','6','7','8','9'];
+            if (k === ' ') el = document.querySelector('.key-box[data-key=" "]');
+            else if (dirKeys.includes(k)) {
+                el = document.getElementById('move-key-start');
+                let endEl = document.getElementById('move-key-end');
+                if(endEl) {
+                    endEl.classList.add('active');
+                    setTimeout(() => endEl.classList.remove('active'), 150);
+                }
+            } else el = document.querySelector(`.key-box[data-key="${k}"]`);
+
+            if (el) {
+                el.classList.add('active');
+                setTimeout(() => el.classList.remove('active'), 150);
+            }
+        }
+
+        function saveState() { 
+            history.push(JSON.parse(JSON.stringify({
+                segments, specialElements, curI, curJ, isDiagonalMove, lastDirection
+            }))); 
+            if(history.length > 50) history.shift(); 
+            redoStack = []; 
+        }
+
+        function undo() { 
+            if(history.length > 0) { 
+                redoStack.push(JSON.parse(JSON.stringify({
+                    segments, specialElements, curI, curJ, isDiagonalMove, lastDirection
+                }))); 
+                let s = history.pop(); 
+                if (s) {
+                    segments = s.segments || []; 
+                    specialElements = s.specialElements || {}; 
+                    curI = s.curI; curJ = s.curJ; 
+                    isDiagonalMove = !!s.isDiagonalMove;
+                    lastDirection = s.lastDirection || {di: 0, dj: 1};
+                }
+                showActionHint('Undo'); animateStatusKey('u'); 
+            }
+        }
+
+        function redo() { 
+            if(redoStack.length > 0) { 
+                history.push(JSON.parse(JSON.stringify({
+                    segments, specialElements, curI, curJ, isDiagonalMove, lastDirection
+                }))); 
+                let s = redoStack.pop(); 
+                if (s) {
+                    segments = s.segments || []; 
+                    specialElements = s.specialElements || {}; 
+                    curI = s.curI; curJ = s.curJ; 
+                    isDiagonalMove = !!s.isDiagonalMove;
+                    lastDirection = s.lastDirection || {di: 0, dj: 1};
+                }
+                showActionHint('Redo'); animateStatusKey('r'); 
+            }
+        }
+        
+        function updateModeUI() {
+            const textEl = document.getElementById('mode-text');
+            const eraserEl = document.getElementById('eraser-label');
+            textEl.innerText = isDrawingMode ? "Drawing" : "Navigation";
+            if (isEraserActive) {
+                eraserEl.classList.add('visible');
+                eraserEl.innerText = `Eraser: ${Math.round(eraserRadius)}%`;
+            } else {
+                eraserEl.classList.remove('visible');
+            }
+        }
+
+        function toggleEraser() {
+            isEraserActive = !isEraserActive;
+            if (isEraserActive) isDrawingMode = true; 
+            updateModeUI(); animateStatusKey('e');
+        }
+
+        function toggleMode() { 
+            isDrawingMode = !isDrawingMode; 
+            isEraserActive = false;
+            updateModeUI(); animateStatusKey(' ');
+        }
+        
+        function setMode(d) { 
+            isDrawingMode = d; 
+            isEraserActive = false;
+            updateModeUI();
+        }
+
+        function setup() { 
+            let c = createCanvas(windowWidth, windowHeight); 
+            c.parent('canvas-container'); 
+            offsetX = width/2; offsetY = height/2; 
+        }
+
+        function handleEraserLogic() {
+            if (!isEraserActive || !mouseIsPressed || mouseButton !== LEFT || mouseY > height - 40) return;
+            let worldX = (mouseX - offsetX) / zoom;
+            let worldY = (mouseY - offsetY) / zoom;
+            segments = segments.filter(seg => {
+                let d = distToSegment(worldX, worldY, seg.p1.x * STEP, seg.p1.y * STEP, seg.p2.x * STEP, seg.p2.y * STEP);
+                return d > eraserRadius;
+            });
+            for (let key in specialElements) {
+                let [i, j] = key.split(',').map(Number);
+                let d = dist(worldX, worldY, i * STEP, j * STEP);
+                if (d < eraserRadius) delete specialElements[key];
+            }
+        }
+
+        function distToSegment(px, py, x1, y1, x2, y2) {
+            let l2 = Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2);
+            if (l2 === 0) return dist(px, py, x1, y1);
+            let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return dist(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
+        }
+
+        function draw() {
+            let colors = themeConfig[currentTheme];
+            if (isExporting) clear();
+            else background(colors.canvasBg);
+
+            if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isEraserActive && mouseY < height-40) { 
+                offsetX += mouseX-pmouseX; offsetY += mouseY-pmouseY; 
+            }
+            
+            handleEraserLogic();
+            
+            push(); 
+            translate(offsetX, offsetY); 
+            scale(zoom);
+            if (!isExporting) drawGrid(colors.dotColor, colors.dotAlpha);
+            drawGeometry(colors.geomColor);
+            if (!isExporting) drawCursor();
+            pop();
+
+            if (!isExporting && isEraserActive) {
+                noFill(); stroke("#FF5555"); strokeWeight(2);
+                let screenRadius = eraserRadius * zoom * 2;
+                ellipse(mouseX, mouseY, screenRadius, screenRadius);
+                fill("#FF5555"); noStroke(); circle(mouseX, mouseY, 4);
+            }
+
+            if (!isExporting) updateStats();
+        }
+
+        function drawGrid(dotRGB, alpha) {
+            fill(`rgba(${dotRGB}, ${alpha})`); noStroke();
+            let startI = floor((-offsetX/zoom)/STEP)-2, endI = ceil(((width-offsetX)/zoom)/STEP)+2;
+            let startJ = floor((-offsetY/zoom)/STEP)-2, endJ = ceil(((height-offsetY)/zoom)/STEP)+2;
+            for(let i=startI; i<=endI; i++) for(let j=startJ; j<=endJ; j++) circle(i*STEP, j*STEP, 1.5/zoom);
+        }
+
+        function getPathGroups() {
+            let groups = []; let remaining = [...segments];
+            while (remaining.length > 0) {
+                let group = [remaining.shift()]; let added = true;
+                while (added) {
+                    added = false;
+                    for (let i = 0; i < remaining.length; i++) {
+                        let last = group[group.length - 1], first = group[0], current = remaining[i];
+                        if (current.p1.x === last.p2.x && current.p1.y === last.p2.y) { group.push(remaining.splice(i, 1)[0]); added = true; break; }
+                        else if (current.p2.x === last.p2.x && current.p2.y === last.p2.y) { group.push({p1: current.p2, p2: current.p1}); remaining.splice(i, 1); added = true; break; }
+                        else if (current.p2.x === first.p1.x && current.p2.y === first.p1.y) { group.unshift(remaining.splice(i, 1)[0]); added = true; break; }
+                        else if (current.p1.x === first.p1.x && current.p1.y === first.p1.y) { group.unshift({p1: current.p2, p2: current.p1}); remaining.splice(i, 1); added = true; break; }
+                    }
+                }
+                groups.push(group);
+            }
+            return groups;
+        }
+
+        function drawGeometry(colValue) {
+            let col = isExporting ? 0 : colValue; 
+            let ringD = BASE_STEP * 2.23;
+            let innerHoleR = (ringD - LINE_WEIGHT) / 2;
+            push(); let ctx = drawingContext; ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
+            for (let id in specialElements) {
+                if (specialElements[id].isNode) {
+                    let [i, j] = id.split(',').map(Number);
+                    ctx.moveTo(i * STEP + innerHoleR, j * STEP); ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
+                }
+            }
+            ctx.clip(); 
+            stroke(col); strokeWeight(LINE_WEIGHT); strokeCap(SQUARE); strokeJoin(MITER); noFill();
+            getPathGroups().forEach(group => {
+                beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP);
+                group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape();
+            });
+            ctx.restore(); pop();
+            for(let id in specialElements) {
+                let [i, j] = id.split(',').map(Number); let el = specialElements[id], x = i*STEP, y = j*STEP;
+                if(el.isNode) { noFill(); stroke(col); strokeWeight(LINE_WEIGHT); ellipse(x, y, ringD, ringD); }
+                if(el.isDiamond) { fill(col); noStroke(); push(); translate(x, y + LINE_WEIGHT/2); rotate(QUARTER_PI); rectMode(CENTER); rect(0,0, LINE_WEIGHT, LINE_WEIGHT); pop(); }
+            }
+        }
+
+        function drawCursor() {
+            let navC = getComputedStyle(document.documentElement).getPropertyValue('--nav-cursor-color').trim();
+            let drawC = getComputedStyle(document.documentElement).getPropertyValue('--draw-cursor-color').trim();
+            let finalColor = isEraserActive ? "#FF5555" : (isDrawingMode ? drawC : navC);
+            push(); translate(curI*STEP, curJ*STEP); fill(finalColor); noStroke();
+            if (!isDiagonalMove) rotate(QUARTER_PI); rectMode(CENTER);
+            rect(0, 0, (isEraserActive ? 6 : 12)/zoom, (isEraserActive ? 6 : 12)/zoom); pop();
+        }
+
+        function handleSegmentAction(x1, y1, x2, y2) {
+            let sp1 = {x:x1, y:y1}, sp2 = {x:x2, y:y2};
+            if(sp1.x > sp2.x || (sp1.x===sp2.x && sp1.y>sp2.y)) { let tmp=sp1; sp1=sp2; sp2=tmp; }
+            let idx = segments.findIndex(seg=>seg.p1.x===sp1.x && seg.p1.y===sp1.y && seg.p2.x===sp2.x && seg.p2.y===sp2.y);
+            if (isDrawingMode && !isEraserActive) { if(idx !== -1) segments.splice(idx, 1); else segments.push({p1:sp1, p2:sp2}); }
+        }
+
+        function move(k) {
+            const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]};
+            if(m[k]) {
+                animateStatusKey(k); let [di, dj] = m[k]; lastDirection = {di, dj}; 
+                let curId = `${curI},${curJ}`;
+                let hasRing = specialElements[curId] && specialElements[curId].isNode;
+                let hasDiamond = specialElements[curId] && specialElements[curId].isDiamond;
+                if (hasRing || hasDiamond) {
+                    if(isDrawingMode) { 
+                        handleSegmentAction(curI, curJ, curI+di, curJ+dj); handleSegmentAction(curI+di, curJ+dj, curI+di*2, curJ+dj*2); handleSegmentAction(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); 
+                    }
+                    curI += di * 3; curJ += dj * 3;
+                } else { if(isDrawingMode) handleSegmentAction(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; }
+            }
+        }
+
+        function resetCanvas() {
+            saveState();
+            segments = [];
+            specialElements = {};
+            curI = Math.round(((width/2) - offsetX) / (zoom * STEP));
+            curJ = Math.round(((height/2) - offsetY) / (zoom * STEP));
+            showActionHint('Reset');
+            animateStatusKey('x');
+        }
+
+        function keyPressed() {
+            let k = key.toLowerCase();
+            if(key === ' ') { toggleMode(); return false; }
+            if(k === 'e') { toggleEraser(); return; }
+            if(k === 'u') undo(); if(k === 'r') redo();
+            if(k === 'x') { resetCanvas(); }
+            if(k === '5') toggleSpecial('isNode');
+            if(k === '0') toggleSpecial('isDiamond');
+            const dirKeys = ['1','2','3','4','6','7','8','9'];
+            if(dirKeys.includes(k)) {
+                isDiagonalMove = ['1','3','7','9'].includes(k);
+                if (activeKey === k) return;
+                stopAutoMove(); activeKey = k;
+                if (isDrawingMode) saveState(); move(k);
+                repeatTimer = setTimeout(() => { repeatTimer = setInterval(() => move(k), 80); }, 300);
+            }
+        }
+
+        function keyReleased() { if (activeKey === key.toLowerCase()) stopAutoMove(); }
+        function stopAutoMove() { if (repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } activeKey = null; }
+
+        function toggleSpecial(t) {
+            saveState(); let id = `${curI},${curJ}`; animateStatusKey(t === 'isNode' ? '5' : '0');
+            if (t === 'isNode') {
+                for(let j=segments.length-1; j>=0; j--) {
+                    let s = segments[j]; if ((s.p1.x === curI && s.p1.y === curJ) || (s.p2.x === curI && s.p2.y === curJ)) segments.splice(j, 1);
+                }
+            }
+            if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
+            if (t === 'isDiamond' && !specialElements[id].isDiamond) {
+                specialElements[id].isDiamond = true; curI += lastDirection.di * 3; curJ += lastDirection.dj * 3;
+                showActionHint('Diamond Created');
+            } else if (t === 'isNode') {
+                specialElements[id].isNode = !specialElements[id].isNode;
+                showActionHint(specialElements[id].isNode ? 'Node Created' : 'Node Removed');
+            } else { specialElements[id][t] = !specialElements[id][t]; showActionHint(specialElements[id][t] ? 'Element Added' : 'Element Removed'); }
+            if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
+        }
+
+        function updateStats() { document.getElementById('stat-length').innerText = (segments.length * STEP).toString().padStart(8,'0'); }
+
+        function exportFile(fmt) {
+            if(fmt==='svg') {
+                let ringD = BASE_STEP * 2.23; let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+                if(segments.length === 0 && Object.keys(specialElements).length === 0) { minX=-100; minY=-100; maxX=100; maxY=100; }
+                else {
+                    segments.forEach(s => { minX = Math.min(minX, s.p1.x*STEP, s.p2.x*STEP); maxX = Math.max(maxX, s.p1.x*STEP, s.p2.x*STEP); minY = Math.min(minY, s.p1.y*STEP, s.p2.y*STEP); maxY = Math.max(maxY, s.p1.y*STEP, s.p2.y*STEP); });
+                    for(let id in specialElements) { let [i,j] = id.split(',').map(Number); minX = Math.min(minX, i*STEP - ringD); maxX = Math.max(maxX, i*STEP + ringD); minY = Math.min(minY, j*STEP - ringD); maxY = Math.max(maxY, j*STEP + ringD); }
+                }
+                let padding = BASE_STEP, w = (maxX - minX) + padding*2, h = (maxY - minY) + padding*2;
+                let vbX = minX - padding, vbY = minY - padding;
+                let exportGeomColor = themeConfig[currentTheme].geomColor;
+                let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vbX} ${vbY} ${w} ${h}"><defs><mask id="hole"><rect x="${vbX}" y="${vbY}" width="${w}" height="${h}" fill="white"/>`;
+                for(let id in specialElements) if(specialElements[id].isNode) { let [i,j] = id.split(',').map(Number); svg += `<circle cx="${i*STEP}" cy="${j*STEP}" r="${(ringD-LINE_WEIGHT)/2}" fill="black"/>`; }
+                svg += `</mask></defs><g mask="url(#hole)" fill="none" stroke="${exportGeomColor}" stroke-width="${LINE_WEIGHT}" stroke-linecap="square" stroke-linejoin="miter">`;
+                getPathGroups().forEach(group => { let d = `M ${group[0].p1.x*STEP} ${group[0].p1.y*STEP}`; group.forEach(s => d += ` L ${s.p2.x*STEP} ${s.p2.y*STEP}`); svg += `<path d="${d}"/>`; });
+                for(let id in specialElements) {
+                    let [i,j] = id.split(',').map(Number); if(specialElements[id].isNode) svg += `<circle cx="${i*STEP}" cy="${j*STEP}" r="${ringD/2}"/>`;
+                    if(specialElements[id].isDiamond) { let x = i*STEP, y = j*STEP + LINE_WEIGHT/2; svg += `<rect x="${x-LINE_WEIGHT/2}" y="${y-LINE_WEIGHT/2}" width="${LINE_WEIGHT}" height="${LINE_WEIGHT}" transform="rotate(45 ${x} ${y})" fill="${exportGeomColor}" stroke="none"/>`; }
+                }
+                svg += `</g></svg>`;
+                let b = new Blob([svg], {type:'image/svg+xml'}); let a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download='karakuli.svg'; a.click();
+            } else { isExporting = true; redraw(); setTimeout(() => { saveCanvas('karakuli', 'png'); isExporting = false; redraw(); }, 100); }
+        }
+        
+        function mouseWheel(e) {
+            if (keyIsDown(CONTROL)) { eraserRadius = constrain(eraserRadius - e.delta/20, 5, 150); updateModeUI(); return false; }
+            else { zoom = constrain(zoom - e.delta/1000, 0.1, 5); showZoomIndicator(); }
+            return false; 
+        }
+        function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+    </script>
+</body>
+</html>
