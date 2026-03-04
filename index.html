@@ -12,15 +12,15 @@
         :root {
             --bg-color: #e8e8e8;
             --canvas-bg: #e8e8e8;
-            --panel-bg: transparent; /* Полностью прозрачный фон для зон 1 и 2 */
+            --panel-bg: rgba(188, 188, 188, 0.4); 
             --text-color: #000000; 
             --icon-color: #000000;
             --kbd-text-color: #6D6E71;
             --kbd-icon-color: #6D6E71;
             --kbd-label-color: #6D6E71;
-            --ui-accent: rgba(0, 0, 0, 0.05);
-            --glass-blur: none; /* Убрано размытие для прозрачности */
-            --border-color: transparent; /* Убраны границы для чистоты */
+            --ui-accent: rgba(0, 0, 0, 0.08);
+            --glass-blur: blur(12px);
+            --border-color: rgba(0, 0, 0, 0.1);
             --nav-cursor-color: #FF6666;
             --draw-cursor-color: #404040; 
             --active-key-color: #000000;
@@ -30,38 +30,41 @@
             --dot-color: 0, 0, 0;
             --dot-opacity: 0.25; 
             --icon-stroke: 3.5; 
-            --active-btn-bg: rgba(0, 0, 0, 0.1);
-            --btn-bg: rgba(0, 0, 0, 0.05); /* Легкий фон для кнопок, чтобы они выделялись */
+            --active-btn-bg: rgba(0, 0, 0, 0.15);
         }
 
         [data-theme="dark"] {
             --bg-color: #111111;
             --canvas-bg: #111111;
-            --panel-bg: transparent;
+            --panel-bg: rgba(34, 34, 34, 0.3);
             --text-color: #E8E8E8;
             --icon-color: #E8E8E8;
-            --kbd-text-color: #888888;
-            --kbd-icon-color: #888888;
-            --ui-accent: rgba(255, 255, 255, 0.05);
-            --border-color: transparent;
+            --kbd-text-color: #6D6E71;
+            --kbd-icon-color: #6D6E71;
+            --ui-accent: rgba(255, 255, 255, 0.1);
+            --border-color: rgba(255, 255, 255, 0.1);
             --dot-color: 255, 255, 255;
             --dot-opacity: 0.15;
             --active-btn-bg: rgba(255, 255, 255, 0.15);
-            --btn-bg: rgba(255, 255, 255, 0.08);
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: var(--bg-color);
         }
 
         body {
-            margin: 0; padding: 0;
             display: flex; justify-content: center; align-items: center; 
-            height: 100vh; height: 100svh; 
-            background-color: var(--bg-color);
             overflow: hidden; font-family: var(--main-font);
             touch-action: none;
             transition: background-color 0.3s ease, color 0.3s ease;
             -webkit-tap-highlight-color: transparent;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
-        /* Общий стиль для прозрачных панелей */
         .glass-panel {
             background: var(--panel-bg);
             backdrop-filter: var(--glass-blur);
@@ -70,10 +73,11 @@
         }
 
         .top-nav-container {
-            position: absolute; top: 20px; left: 0; right: 0;
+            position: absolute; 
+            top: calc(20px + env(safe-area-inset-top)); 
+            left: 0; right: 0;
             z-index: 500; display: flex; justify-content: space-between;
             align-items: flex-start; padding: 0 20px; pointer-events: none;
-            /* Зона 1 на скриншоте теперь прозрачна */
         }
 
         .top-nav-wrapper { 
@@ -82,14 +86,13 @@
             width: fit-content;
         }
         
-        /* Кнопки сохраняют небольшую подложку для видимости на фоне точек */
         .mode-header, .control-btn, .option-btn { 
             height: var(--header-height); border-radius: var(--border-radius); 
             color: var(--text-color); display: flex; justify-content: center; 
             align-items: center; cursor: pointer; transition: all 0.2s ease; 
             user-select: none; font-weight: 600; pointer-events: auto; 
-            background: var(--btn-bg); 
-            border: 1px solid rgba(128, 128, 128, 0.1);
+            background: var(--panel-bg); backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color);
         }
         
         .mode-header { width: 140px; font-size: 13px; text-align: center; }
@@ -109,17 +112,17 @@
         .dropdown-options.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
         .option-btn { width: 43px; font-size: 11px; font-weight: 500; flex-direction: column; }
 
-        /* Зона 2 (клавиатура) теперь прозрачна */
         #mobile-keyboard {
-            position: fixed; bottom: 20px; left: 50%;
+            position: fixed; 
+            bottom: calc(20px + env(safe-area-inset-bottom)); 
+            left: 50%;
             transform: translate(-50%, calc(100% - 25px)); 
             width: calc(100% - 40px); max-width: 400px; 
             z-index: 2000; border-radius: 28px; padding: 12px 12px 14px 12px;
             display: flex; flex-direction: column; gap: 6px;
             transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
             pointer-events: auto;
-            /* Убрана тень и фон для эффекта полной прозрачности */
-            background: var(--panel-bg);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
 
         #mobile-keyboard.open { transform: translate(-50%, 0); }
@@ -138,10 +141,10 @@
 
         .v-key {
             aspect-ratio: 2.3 / 1; 
-            background: var(--btn-bg); border-radius: 12px;
+            background: var(--ui-accent); border-radius: 12px;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             color: var(--kbd-text-color); position: relative;
-            border: 1px solid rgba(128, 128, 128, 0.05); user-select: none; 
+            border: 1.5px solid transparent; user-select: none; 
             transition: background 0.2s; touch-action: none;
             overflow: hidden;
         }
@@ -204,10 +207,10 @@
     
     <div class="top-nav-container">
         <div class="left-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-            <div class="control-btn" onclick="performReset()" title="Reset Canvas">
+            <div class="control-btn glass-panel" onclick="performReset()" title="Reset Canvas">
                 <svg viewBox="0 0 24 24" class="theme-svg"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" /></svg>
             </div>
-            <div class="control-btn" id="eraser-btn" onclick="toggleEraser()" title="Eraser (E)">
+            <div class="control-btn glass-panel" id="eraser-btn" onclick="toggleEraser()" title="Eraser (E)">
                 <svg viewBox="0 0 24 24" class="theme-svg">
                     <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
                     <path d="m22 21H7" />
@@ -217,7 +220,7 @@
         </div>
 
         <div class="top-nav-wrapper">
-            <div class="mode-header" onclick="toggleMode()">
+            <div class="mode-header glass-panel" onclick="toggleMode()">
                 <span id="mode-text">Navigation</span>
             </div>
             <div id="eraser-hint" class="eraser-size-hint">SIZE: 25%</div>
@@ -228,26 +231,26 @@
 
         <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
             <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn" id="theme-trigger">
+                <div class="control-btn glass-panel" id="theme-trigger">
                     <svg viewBox="0 0 24 24" class="theme-svg sun-icon"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
                     <svg viewBox="0 0 24 24" class="theme-svg moon-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 </div>
                 <div class="dropdown-options" id="theme-menu">
-                    <div class="option-btn" onclick="setTheme('light')">
+                    <div class="option-btn glass-panel" onclick="setTheme('light')">
                         <svg viewBox="0 0 24 24" class="theme-svg"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
                     </div>
-                    <div class="option-btn" onclick="setTheme('dark')">
+                    <div class="option-btn glass-panel" onclick="setTheme('dark')">
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                     </div>
                 </div>
             </div>
             <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn" id="export-trigger">
+                <div class="control-btn glass-panel" id="export-trigger">
                     <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 </div>
                 <div class="dropdown-options" id="export-menu">
-                    <div class="option-btn" onclick="exportFile('svg')">SVG</div>
-                    <div class="option-btn" onclick="exportFile('png')">PNG</div>
+                    <div class="option-btn glass-panel" onclick="exportFile('svg')">SVG</div>
+                    <div class="option-btn glass-panel" onclick="exportFile('png')">PNG</div>
                 </div>
             </div>
         </div>
@@ -255,7 +258,7 @@
     
     <div id="canvas-container"></div>
 
-    <div id="mobile-keyboard">
+    <div id="mobile-keyboard" class="glass-panel">
         <div class="keyboard-handle" onclick="document.getElementById('mobile-keyboard').classList.toggle('open')">
             <div class="handle-bar"></div>
         </div>
