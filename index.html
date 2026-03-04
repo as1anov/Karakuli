@@ -12,21 +12,15 @@
         :root {
             --bg-color: #e8e8e8;
             --canvas-bg: #e8e8e8;
-            --panel-bg: rgba(188, 188, 188, 0.4); 
-            
-            /* Цвета интерфейса (Верхняя панель) */
+            --panel-bg: transparent; /* Полностью прозрачный фон для зон 1 и 2 */
             --text-color: #000000; 
             --icon-color: #000000;
-            
-            /* Цвета клавиатуры (Обновлено на #6D6E71) */
             --kbd-text-color: #6D6E71;
             --kbd-icon-color: #6D6E71;
             --kbd-label-color: #6D6E71;
-            
-            --ui-accent: rgba(0, 0, 0, 0.08);
-            --glass-blur: blur(12px);
-            --border-color: rgba(0, 0, 0, 0.1);
-            
+            --ui-accent: rgba(0, 0, 0, 0.05);
+            --glass-blur: none; /* Убрано размытие для прозрачности */
+            --border-color: transparent; /* Убраны границы для чистоты */
             --nav-cursor-color: #FF6666;
             --draw-cursor-color: #404040; 
             --active-key-color: #000000;
@@ -36,23 +30,24 @@
             --dot-color: 0, 0, 0;
             --dot-opacity: 0.25; 
             --icon-stroke: 3.5; 
+            --active-btn-bg: rgba(0, 0, 0, 0.1);
+            --btn-bg: rgba(0, 0, 0, 0.05); /* Легкий фон для кнопок, чтобы они выделялись */
         }
 
         [data-theme="dark"] {
             --bg-color: #111111;
             --canvas-bg: #111111;
-            --panel-bg: rgba(34, 34, 34, 0.3);
+            --panel-bg: transparent;
             --text-color: #E8E8E8;
             --icon-color: #E8E8E8;
-            
-            /* Клавиатура в темной теме остается серой согласно запросу */
-            --kbd-text-color: #6D6E71;
-            --kbd-icon-color: #6D6E71;
-            
-            --ui-accent: rgba(255, 255, 255, 0.1);
-            --border-color: rgba(255, 255, 255, 0.1);
+            --kbd-text-color: #888888;
+            --kbd-icon-color: #888888;
+            --ui-accent: rgba(255, 255, 255, 0.05);
+            --border-color: transparent;
             --dot-color: 255, 255, 255;
             --dot-opacity: 0.15;
+            --active-btn-bg: rgba(255, 255, 255, 0.15);
+            --btn-bg: rgba(255, 255, 255, 0.08);
         }
 
         body {
@@ -66,6 +61,7 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        /* Общий стиль для прозрачных панелей */
         .glass-panel {
             background: var(--panel-bg);
             backdrop-filter: var(--glass-blur);
@@ -77,6 +73,7 @@
             position: absolute; top: 20px; left: 0; right: 0;
             z-index: 500; display: flex; justify-content: space-between;
             align-items: flex-start; padding: 0 20px; pointer-events: none;
+            /* Зона 1 на скриншоте теперь прозрачна */
         }
 
         .top-nav-wrapper { 
@@ -85,18 +82,23 @@
             width: fit-content;
         }
         
+        /* Кнопки сохраняют небольшую подложку для видимости на фоне точек */
         .mode-header, .control-btn, .option-btn { 
             height: var(--header-height); border-radius: var(--border-radius); 
             color: var(--text-color); display: flex; justify-content: center; 
-            align-items: center; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            align-items: center; cursor: pointer; transition: all 0.2s ease; 
             user-select: none; font-weight: 600; pointer-events: auto; 
-            background: var(--panel-bg); backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color);
+            background: var(--btn-bg); 
+            border: 1px solid rgba(128, 128, 128, 0.1);
         }
         
         .mode-header { width: 140px; font-size: 13px; text-align: center; }
         .control-btn { width: var(--header-height); aspect-ratio: 1 / 1; }
-        .control-btn.active { border-color: #FF6666; background: rgba(255, 102, 102, 0.1); }
+        
+        .control-btn.active { 
+            background: var(--active-btn-bg);
+            border-color: var(--text-color);
+        }
         
         .dropdown-options { 
             display: flex; flex-direction: column; gap: 8px; opacity: 0; 
@@ -107,6 +109,7 @@
         .dropdown-options.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
         .option-btn { width: 43px; font-size: 11px; font-weight: 500; flex-direction: column; }
 
+        /* Зона 2 (клавиатура) теперь прозрачна */
         #mobile-keyboard {
             position: fixed; bottom: 20px; left: 50%;
             transform: translate(-50%, calc(100% - 25px)); 
@@ -115,7 +118,8 @@
             display: flex; flex-direction: column; gap: 6px;
             transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
             pointer-events: auto;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            /* Убрана тень и фон для эффекта полной прозрачности */
+            background: var(--panel-bg);
         }
 
         #mobile-keyboard.open { transform: translate(-50%, 0); }
@@ -128,27 +132,21 @@
 
         .handle-bar { width: 36px; height: 4px; background: var(--kbd-text-color); opacity: 0.15; border-radius: 10px; }
 
-        .keyboard-row {
-            display: grid;
-            gap: 6px;
-        }
-
+        .keyboard-row { display: grid; gap: 6px; }
         .row-3-col { grid-template-columns: repeat(3, 1fr); }
         .row-4-col { grid-template-columns: repeat(4, 1fr); align-items: stretch; }
 
         .v-key {
             aspect-ratio: 2.3 / 1; 
-            background: var(--ui-accent); border-radius: 12px;
+            background: var(--btn-bg); border-radius: 12px;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             color: var(--kbd-text-color); position: relative;
-            border: 1.5px solid transparent; user-select: none; 
+            border: 1px solid rgba(128, 128, 128, 0.05); user-select: none; 
             transition: background 0.2s; touch-action: none;
             overflow: hidden;
         }
 
         .row-4-col .v-key { aspect-ratio: 1.8 / 1; }
-        .v-key:active { transform: none; }
-
         .v-key svg { 
             width: 26%; height: auto; 
             stroke: var(--kbd-icon-color); 
@@ -162,36 +160,27 @@
         .v-key.key-2 svg { transform: translateY(-1px); } 
         .v-key.key-4 svg { transform: translateX(-1px); }
         .v-key.key-6 svg { transform: translateX(1px); }
-        
-        /* Ромб на клавиатуре остается серым */
         .v-key.key-0 svg { width: 29%; fill: var(--kbd-icon-color); stroke: var(--kbd-icon-color); stroke-width: 3; stroke-linejoin: round; }
 
         .v-key .key-label {
             position: absolute; bottom: 5px; right: 7px;
             font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
-            color: var(--kbd-label-color);
-            opacity: 0.8;
+            color: var(--kbd-label-color); opacity: 0.8;
         }
         
         .v-key.mode-key { justify-content: center; align-items: center; }
         .v-key .mode-label { 
             font-size: 12px; font-weight: 700; 
-            text-transform: uppercase; 
-            letter-spacing: 0.8px;
-            display: inline-block;
-            color: var(--kbd-icon-color);
-            transform: scaleY(1.3); 
-            transform-origin: center;
+            text-transform: uppercase; letter-spacing: 0.8px;
+            display: inline-block; color: var(--kbd-icon-color);
+            transform: scaleY(1.3); transform-origin: center;
         }
 
         .v-key .mode-sub { 
             position: absolute; bottom: 5px; right: 8px; 
-            font-size: 16px; 
-            font-weight: 950;
-            color: var(--kbd-label-color); 
-            opacity: 0.9; 
-            line-height: 1;
-            letter-spacing: -1.5px;
+            font-size: 16px; font-weight: 950;
+            color: var(--kbd-label-color); opacity: 0.9; 
+            line-height: 1; letter-spacing: -1.5px;
         }
 
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; overflow: hidden; touch-action: none; }
@@ -215,10 +204,10 @@
     
     <div class="top-nav-container">
         <div class="left-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-            <div class="control-btn glass-panel" onclick="performReset()" title="Reset Canvas">
+            <div class="control-btn" onclick="performReset()" title="Reset Canvas">
                 <svg viewBox="0 0 24 24" class="theme-svg"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" /></svg>
             </div>
-            <div class="control-btn glass-panel" id="eraser-btn" onclick="toggleEraser()" title="Eraser (E)">
+            <div class="control-btn" id="eraser-btn" onclick="toggleEraser()" title="Eraser (E)">
                 <svg viewBox="0 0 24 24" class="theme-svg">
                     <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
                     <path d="m22 21H7" />
@@ -228,7 +217,7 @@
         </div>
 
         <div class="top-nav-wrapper">
-            <div class="mode-header glass-panel" onclick="toggleMode()">
+            <div class="mode-header" onclick="toggleMode()">
                 <span id="mode-text">Navigation</span>
             </div>
             <div id="eraser-hint" class="eraser-size-hint">SIZE: 25%</div>
@@ -239,26 +228,26 @@
 
         <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
             <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn glass-panel" id="theme-trigger">
+                <div class="control-btn" id="theme-trigger">
                     <svg viewBox="0 0 24 24" class="theme-svg sun-icon"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
                     <svg viewBox="0 0 24 24" class="theme-svg moon-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 </div>
                 <div class="dropdown-options" id="theme-menu">
-                    <div class="option-btn glass-panel" onclick="setTheme('light')">
+                    <div class="option-btn" onclick="setTheme('light')">
                         <svg viewBox="0 0 24 24" class="theme-svg"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
                     </div>
-                    <div class="option-btn glass-panel" onclick="setTheme('dark')">
+                    <div class="option-btn" onclick="setTheme('dark')">
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                     </div>
                 </div>
             </div>
             <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn glass-panel" id="export-trigger">
+                <div class="control-btn" id="export-trigger">
                     <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 </div>
                 <div class="dropdown-options" id="export-menu">
-                    <div class="option-btn glass-panel" onclick="exportFile('svg')">SVG</div>
-                    <div class="option-btn glass-panel" onclick="exportFile('png')">PNG</div>
+                    <div class="option-btn" onclick="exportFile('svg')">SVG</div>
+                    <div class="option-btn" onclick="exportFile('png')">PNG</div>
                 </div>
             </div>
         </div>
@@ -266,7 +255,7 @@
     
     <div id="canvas-container"></div>
 
-    <div id="mobile-keyboard" class="glass-panel">
+    <div id="mobile-keyboard">
         <div class="keyboard-handle" onclick="document.getElementById('mobile-keyboard').classList.toggle('open')">
             <div class="handle-bar"></div>
         </div>
@@ -318,9 +307,7 @@
         
         <div class="keyboard-row row-4-col">
             <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 5L19 12L12 19L5 12Z"/>
-                </svg>
+                <svg viewBox="0 0 24 24"><path d="M12 5L19 12L12 19L5 12Z"/></svg>
                 <span class="key-label">0</span>
             </div>
             <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')">
@@ -342,95 +329,44 @@
         const BASE_STEP_VAL = 60; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
         let curI = 0, curJ = 0; let lastDirection = {di: 0, dj: 1}; 
-        let isDrawingMode = false; 
-        let isEraserActive = false;
-        
-        const DEFAULT_ERASER_RADIUS = 40;
-        let eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
-
+        let isDrawingMode = false; let isEraserActive = false;
+        const DEFAULT_ERASER_RADIUS = 40; let eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
         let offsetX = 0, offsetY = 0; let zoom = 0.48; 
         let history = [], redoStack = []; let isExporting = false;
-        let actionTimeout = null;
-        let currentTheme = 'light';
+        let actionTimeout = null; let currentTheme = 'light';
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000' },
             dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8' }
         };
 
-        function vKeyStart(e, k) {
-            if (e) { e.preventDefault(); e.stopPropagation(); }
-            handleActionDown(k);
-        }
-
-        function vKeyEnd(e, k) {
-            if (e) { e.preventDefault(); e.stopPropagation(); }
-            handleActionUp(k);
-        }
+        function vKeyStart(e, k) { if (e) { e.preventDefault(); e.stopPropagation(); } handleActionDown(k); }
+        function vKeyEnd(e, k) { if (e) { e.preventDefault(); e.stopPropagation(); } handleActionUp(k); }
 
         const exportMenu = document.getElementById('export-menu');
         const themeMenu = document.getElementById('theme-menu');
-        
-        document.getElementById('export-trigger').onclick = (e) => { 
-            e.stopPropagation(); 
-            exportMenu.classList.toggle('open'); 
-            themeMenu.classList.remove('open'); 
-        };
-        
-        document.getElementById('theme-trigger').onclick = (e) => { 
-            e.stopPropagation(); 
-            themeMenu.classList.toggle('open'); 
-            exportMenu.classList.remove('open'); 
-        };
-        
-        window.onclick = () => { 
-            exportMenu.classList.remove('open'); 
-            themeMenu.classList.remove('open'); 
-        };
+        document.getElementById('export-trigger').onclick = (e) => { e.stopPropagation(); exportMenu.classList.toggle('open'); themeMenu.classList.remove('open'); };
+        document.getElementById('theme-trigger').onclick = (e) => { e.stopPropagation(); themeMenu.classList.toggle('open'); exportMenu.classList.remove('open'); };
+        window.onclick = () => { exportMenu.classList.remove('open'); themeMenu.classList.remove('open'); };
 
-        function setTheme(m) { 
-            currentTheme = m; 
-            document.body.setAttribute('data-theme', m); 
-            themeMenu.classList.remove('open'); 
-            redraw(); 
-        }
-
+        function setTheme(m) { currentTheme = m; document.body.setAttribute('data-theme', m); themeMenu.classList.remove('open'); redraw(); }
         function showActionHint(t) { 
             let a = document.getElementById('action-indicator'); a.innerText = t; a.classList.add('visible'); 
             if(actionTimeout) clearTimeout(actionTimeout);
             actionTimeout = setTimeout(()=>a.classList.remove('visible'), 1200); 
         }
 
-        function saveState() { 
-            history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-            if(history.length > 50) history.shift(); redoStack = []; 
-        }
-
+        function saveState() { history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); if(history.length > 50) history.shift(); redoStack = []; }
         function undo() { 
             if(history.length > 0) { 
                 redoStack.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-                let s = history.pop(); 
-                segments = s.segments;
-                specialElements = s.specialElements;
-                curI = s.curI;
-                curJ = s.curJ;
-                lastDirection = s.lastDirection;
-                showActionHint('Undo');
-                redraw();
+                let s = history.pop(); segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; showActionHint('Undo'); redraw();
             }
         }
-
         function redo() { 
             if(redoStack.length > 0) { 
                 history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-                let s = redoStack.pop();
-                segments = s.segments;
-                specialElements = s.specialElements;
-                curI = s.curI;
-                curJ = s.curJ;
-                lastDirection = s.lastDirection;
-                showActionHint('Redo');
-                redraw();
+                let s = redoStack.pop(); segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; showActionHint('Redo'); redraw();
             }
         }
         
@@ -438,113 +374,52 @@
             const modeHeader = document.getElementById('mode-text');
             const eraserHint = document.getElementById('eraser-hint');
             const eraserBtn = document.getElementById('eraser-btn');
+            
+            modeHeader.innerText = isDrawingMode ? "Drawing" : "Navigation";
 
-            if (isEraserActive) {
-                modeHeader.innerText = "Eraser";
-                eraserHint.classList.add('visible');
-                eraserBtn.classList.add('active');
-                let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100);
-                eraserHint.innerText = `SIZE: ${percent}%`;
-            } else {
-                modeHeader.innerText = isDrawingMode ? "Drawing" : "Navigation";
-                eraserHint.classList.remove('visible');
-                eraserBtn.classList.remove('active');
+            if (isEraserActive) { 
+                eraserHint.classList.add('visible'); 
+                eraserBtn.classList.add('active'); 
+                let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100); 
+                eraserHint.innerText = `SIZE: ${percent}%`; 
+            } else { 
+                eraserHint.classList.remove('visible'); 
+                eraserBtn.classList.remove('active'); 
             }
         }
 
-        function toggleMode() { 
-            if (isEraserActive) {
-                isEraserActive = false;
-            } else {
-                isDrawingMode = !isDrawingMode; 
-            }
-            updateModeUI(); 
-            redraw();
-        }
+        function toggleMode() { if (isEraserActive) isEraserActive = false; else isDrawingMode = !isDrawingMode; updateModeUI(); redraw(); }
+        function toggleEraser() { isEraserActive = !isEraserActive; if (isEraserActive) { if (eraserRadius === DEFAULT_ERASER_RADIUS) eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; } updateModeUI(); redraw(); }
 
-        function toggleEraser() {
-            isEraserActive = !isEraserActive;
-            if (isEraserActive) {
-                isDrawingMode = false; 
-                if (eraserRadius === DEFAULT_ERASER_RADIUS) {
-                   eraserRadius = DEFAULT_ERASER_RADIUS * 0.25;
-                }
-            }
-            updateModeUI();
-            redraw();
-        }
-
-        function performReset() {
-            saveState(); 
-            segments = []; 
-            specialElements = {}; 
-            curI = 0; 
-            curJ = 0; 
-            offsetX = width / 2;
-            offsetY = height / 2;
-            showActionHint('Reset'); 
-            redraw();
-        }
+        function performReset() { saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; offsetX = width / 2; offsetY = height / 2; showActionHint('Reset'); redraw(); }
 
         function performEraserActionAt(worldX, worldY) {
-            const rWorld = eraserRadius / zoom;
-            const rSq = rWorld * rWorld;
-            let changed = false;
-
+            const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
             for (let id in specialElements) {
-                let [i, j] = id.split(',').map(Number);
-                let dx = i * STEP - worldX;
-                let dy = j * STEP - worldY;
-                if (dx * dx + dy * dy <= rSq) {
-                    if (!changed) saveState();
-                    delete specialElements[id];
-                    changed = true;
-                }
+                let [i, j] = id.split(',').map(Number); let dx = i * STEP - worldX; let dy = j * STEP - worldY;
+                if (dx * dx + dy * dy <= rSq) { if (!changed) saveState(); delete specialElements[id]; changed = true; }
             }
-
             let initialLength = segments.length;
             let newSegments = segments.filter(s => {
-                let dx1 = s.p1.x * STEP - worldX;
-                let dy1 = s.p1.y * STEP - worldY;
-                let dx2 = s.p2.x * STEP - worldX;
-                let dy2 = s.p2.y * STEP - worldY;
+                let dx1 = s.p1.x * STEP - worldX; let dy1 = s.p1.y * STEP - worldY; let dx2 = s.p2.x * STEP - worldX; let dy2 = s.p2.y * STEP - worldY;
                 return !(dx1 * dx1 + dy1 * dy1 <= rSq || dx2 * dx2 + dy2 * dy2 <= rSq);
             });
-
-            if (newSegments.length !== initialLength) {
-                if (!changed) saveState();
-                segments = newSegments;
-                changed = true;
-            }
-            
+            if (newSegments.length !== initialLength) { if (!changed) saveState(); segments = newSegments; changed = true; }
             if (changed) redraw();
         }
 
-        function setup() { 
-            let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); 
-            offsetX = width/2; offsetY = height/2; 
-        }
+        function setup() { let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); offsetX = width/2; offsetY = height/2; }
 
         function draw() {
             let colors = themeConfig[currentTheme];
             if (isExporting) clear(); else background(colors.canvasBg);
-            
-            let isOverUI = false;
-            const kb = document.getElementById('mobile-keyboard');
-            const kbRect = kb.getBoundingClientRect();
+            let isOverUI = false; const kb = document.getElementById('mobile-keyboard'); const kbRect = kb.getBoundingClientRect();
             if (mouseX >= kbRect.left && mouseX <= kbRect.right && mouseY >= kbRect.top) isOverUI = true;
             if (mouseY < 80) isOverUI = true;
-
             if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUI) {
-                if (isEraserActive) {
-                    let worldMX = (mouseX - offsetX) / zoom;
-                    let worldMY = (mouseY - offsetY) / zoom;
-                    performEraserActionAt(worldMX, worldMY);
-                } else {
-                    offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; 
-                }
+                if (isEraserActive) { let worldMX = (mouseX - offsetX) / zoom; let worldMY = (mouseY - offsetY) / zoom; performEraserActionAt(worldMX, worldMY); } 
+                else { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
             }
-
             push(); translate(offsetX, offsetY); scale(zoom);
             if (!isExporting) drawGrid(colors.dotColor, colors.dotAlpha);
             drawGeometry(colors.geomColor);
@@ -560,44 +435,18 @@
         }
 
         function drawGeometry(colValue) {
-            let col = isExporting ? 0 : colValue; 
-            let ringD = BASE_STEP_VAL * 2; 
-            let innerHoleR = (ringD - LINE_WEIGHT) / 2;
-            
-            push(); 
-            let ctx = drawingContext; 
-            ctx.save(); 
-            ctx.beginPath(); 
-            ctx.rect(-100000, -100000, 200000, 200000);
-            
+            let col = isExporting ? 0 : colValue; let ringD = BASE_STEP_VAL * 2; let innerHoleR = (ringD - LINE_WEIGHT) / 2;
+            push(); let ctx = drawingContext; ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
             for (let id in specialElements) if (specialElements[id].isNode) {
-                let [i, j] = id.split(',').map(Number); 
-                ctx.moveTo(i * STEP + innerHoleR, j * STEP); 
-                ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
+                let [i, j] = id.split(',').map(Number); ctx.moveTo(i * STEP + innerHoleR, j * STEP); ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
             }
-            ctx.clip(); 
-            stroke(col); strokeWeight(LINE_WEIGHT); strokeCap(SQUARE); strokeJoin(MITER); noFill();
-            getPathGroups().forEach(group => { 
-                beginShape(); 
-                vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); 
-                group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); 
-                endShape(); 
-            });
-            ctx.restore(); 
-            pop();
-
+            ctx.clip(); stroke(col); strokeWeight(LINE_WEIGHT); strokeCap(SQUARE); strokeJoin(MITER); noFill();
+            getPathGroups().forEach(group => { beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape(); });
+            ctx.restore(); pop();
             for(let id in specialElements) {
                 let [i, j] = id.split(',').map(Number); let x = i*STEP, y = j*STEP;
                 if(specialElements[id].isNode) { noFill(); stroke(col); strokeWeight(LINE_WEIGHT); ellipse(x, y, ringD, ringD); }
-                if(specialElements[id].isDiamond) { 
-                    fill(col); noStroke(); 
-                    push(); 
-                    translate(x, y + LINE_WEIGHT/2); 
-                    rotate(QUARTER_PI); 
-                    rectMode(CENTER);
-                    rect(0, 0, LINE_WEIGHT, LINE_WEIGHT); 
-                    pop(); 
-                }
+                if(specialElements[id].isDiamond) { fill(col); noStroke(); push(); translate(x, y + LINE_WEIGHT/2); rotate(QUARTER_PI); rectMode(CENTER); rect(0, 0, LINE_WEIGHT, LINE_WEIGHT); pop(); }
             }
         }
 
@@ -622,20 +471,12 @@
 
         function drawCursor() {
             if (isEraserActive) {
-                let worldMX = (mouseX - offsetX) / zoom;
-                let worldMY = (mouseY - offsetY) / zoom;
-                noFill();
-                stroke("#FF6666");
-                strokeWeight(2 / zoom);
-                fill("rgba(255, 102, 102, 0.15)");
-                ellipse(worldMX, worldMY, (eraserRadius * 2) / zoom);
-                return;
+                let worldMX = (mouseX - offsetX) / zoom; let worldMY = (mouseY - offsetY) / zoom;
+                noFill(); stroke("#FF6666"); strokeWeight(2 / zoom); fill("rgba(255, 102, 102, 0.15)"); ellipse(worldMX, worldMY, (eraserRadius * 2) / zoom); return;
             }
-
             let finalColor = isDrawingMode ? (currentTheme==='dark' ? "#E8E8E8" : "#404040") : "#FF6666";
             push(); translate(curI*STEP, curJ*STEP); fill(finalColor); noStroke(); 
-            if (lastDirection.di !== 0 && lastDirection.dj !== 0) rect(-10, -10, 20, 20); 
-            else { rotate(QUARTER_PI); rect(-10, -10, 20, 20); }
+            if (lastDirection.di !== 0 && lastDirection.dj !== 0) rect(-10, -10, 20, 20); else { rotate(QUARTER_PI); rect(-10, -10, 20, 20); }
             pop();
         }
 
@@ -644,13 +485,17 @@
             if(m[k]) {
                 let [di, dj] = m[k]; lastDirection = {di, dj}; 
                 let id = `${curI},${curJ}`;
-                if (isEraserActive) { curI += di; curJ += dj; } 
-                else if (specialElements[id]?.isDiamond) {
-                    if(isDrawingMode) { addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); }
-                    curI += di * 3; curJ += dj * 3;
-                } else { 
-                    if(isDrawingMode) addSeg(curI, curJ, curI + di, curJ + dj); 
-                    curI += di; curJ += dj; 
+                if (isEraserActive || !isDrawingMode) {
+                    if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } 
+                    else { curI += di; curJ += dj; }
+                } 
+                else if (isDrawingMode) {
+                    if (specialElements[id]?.isDiamond) {
+                        addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3);
+                        curI += di * 3; curJ += dj * 3;
+                    } else { 
+                        addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; 
+                    }
                 }
             }
         }
@@ -663,12 +508,8 @@
         }
 
         let repeatTimer = null, activeKey = null;
-
         function handleActionDown(k) {
-            k = k.toLowerCase(); 
-            if (activeKey === k) return; 
-            activeKey = k;
-            
+            k = k.toLowerCase(); if (activeKey === k) return; activeKey = k;
             if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
             if(k === 'e') { toggleEraser(); return; }
             if(k === 'u') { undo(); return; }
@@ -676,22 +517,12 @@
             if(k === 'x') { performReset(); return; } 
             if(k === '5') { toggleSpecial('isNode'); return; }
             if(k === '0') { toggleSpecial('isDiamond'); return; }
-            
-            if(['1','2','3','4','6','7','8','9'].includes(k)) {
-                move(k);
-                if(repeatTimer) clearInterval(repeatTimer); 
-                repeatTimer = setInterval(() => move(k), 120);
-            }
+            if(['1','2','3','4','6','7','8','9'].includes(k)) { move(k); if(repeatTimer) clearInterval(repeatTimer); repeatTimer = setInterval(() => move(k), 120); }
         }
-
-        function handleActionUp(k) {
-            if (activeKey === k.toLowerCase()) { 
-                if(repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; } 
-                activeKey = null; 
-            }
-        }
+        function handleActionUp(k) { if (activeKey === k.toLowerCase()) { if(repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; } activeKey = null; } }
 
         function toggleSpecial(t) {
+            if (!isDrawingMode || isEraserActive) return;
             saveState(); let id = `${curI},${curJ}`;
             if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
             specialElements[id][t] = !specialElements[id][t];
@@ -709,25 +540,15 @@
                     svg += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter"/>`;
                 });
                 svg += `</svg>`;
-                let b = new Blob([svg], {type:'image/svg+xml'}); let a = document.createElement('a');
-                a.href = URL.createObjectURL(b); a.download='karakuli.svg'; a.click();
+                let b = new Blob([svg], {type:'image/svg+xml'}); let a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download='karakuli.svg'; a.click();
             } else { isExporting = true; redraw(); setTimeout(() => { saveCanvas('karakuli', 'png'); isExporting = false; redraw(); }, 100); }
         }
         
         function mouseWheel(e) {
             if (e.ctrlKey) {
-                if (isEraserActive) {
-                    if (e.delta > 0) {
-                        eraserRadius = Math.max(2, eraserRadius - 2);
-                    } else {
-                        eraserRadius = Math.min(300, eraserRadius + 2);
-                    }
-                    updateModeUI();
-                    redraw();
-                }
+                if (isEraserActive) { if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); else eraserRadius = Math.min(300, eraserRadius + 2); updateModeUI(); redraw(); }
                 return false;
             }
-
             let oldZoom = zoom; let worldX = (mouseX - offsetX) / oldZoom, worldY = (mouseY - offsetY) / oldZoom;
             if (e.delta > 0) zoom /= 1.1; else zoom *= 1.1;
             zoom = constrain(zoom, 0.05, 5); offsetX = mouseX - worldX * zoom; offsetY = mouseY - worldY * zoom;
