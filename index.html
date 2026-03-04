@@ -13,9 +13,17 @@
             --bg-color: #e8e8e8;
             --canvas-bg: #e8e8e8;
             --panel-bg: rgba(188, 188, 188, 0.4); 
-            --text-color: #000000;
+            
+            /* Цвета интерфейса (Верхняя панель) */
+            --text-color: #000000; 
             --icon-color: #000000;
-            --ui-accent: rgba(0, 0, 0, 0.1);
+            
+            /* Цвета клавиатуры (Обновлено на #6D6E71) */
+            --kbd-text-color: #6D6E71;
+            --kbd-icon-color: #6D6E71;
+            --kbd-label-color: #6D6E71;
+            
+            --ui-accent: rgba(0, 0, 0, 0.08);
             --glass-blur: blur(12px);
             --border-color: rgba(0, 0, 0, 0.1);
             
@@ -23,43 +31,36 @@
             --draw-cursor-color: #404040; 
             --active-key-color: #000000;
             --border-radius: 12px;
-            --stat-font-size: 11px;
-            --key-font-size: 10px;
             --main-font: 'Sora', sans-serif;
-            --mono-font: 'JetBrains Mono', monospace;
             --header-height: 43px;
             --dot-color: 0, 0, 0;
             --dot-opacity: 0.25; 
-            --icon-stroke: 2;
+            --icon-stroke: 3.5; 
         }
-
-        body[data-theme="light"] .sun-icon { display: block; }
-        body[data-theme="dark"] .moon-icon { display: block; }
 
         [data-theme="dark"] {
             --bg-color: #111111;
             --canvas-bg: #111111;
             --panel-bg: rgba(34, 34, 34, 0.3);
-            --text-color: #FFFFFF;
-            --icon-color: #FFFFFF;
+            --text-color: #E8E8E8;
+            --icon-color: #E8E8E8;
+            
+            /* Клавиатура в темной теме остается серой согласно запросу */
+            --kbd-text-color: #6D6E71;
+            --kbd-icon-color: #6D6E71;
+            
             --ui-accent: rgba(255, 255, 255, 0.1);
             --border-color: rgba(255, 255, 255, 0.1);
-            --nav-cursor-color: #FF8888;
-            --draw-cursor-color: #E8E8E8;
-            --active-key-color: #FFFFFF;
             --dot-color: 255, 255, 255;
             --dot-opacity: 0.15;
         }
 
         body {
             margin: 0; padding: 0;
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
+            display: flex; justify-content: center; align-items: center; 
             height: 100vh; height: 100svh; 
             background-color: var(--bg-color);
-            overflow: hidden; 
-            font-family: var(--main-font);
+            overflow: hidden; font-family: var(--main-font);
             touch-action: none;
             transition: background-color 0.3s ease, color 0.3s ease;
             -webkit-tap-highlight-color: transparent;
@@ -70,174 +71,194 @@
             backdrop-filter: var(--glass-blur);
             -webkit-backdrop-filter: var(--glass-blur);
             border: 1px solid var(--border-color);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
 
         .top-nav-container {
-            position: absolute;
-            top: 20px;
-            left: 0;
-            right: 0;
-            z-index: 500;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding: 0 20px;
-            pointer-events: none;
+            position: absolute; top: 20px; left: 0; right: 0;
+            z-index: 500; display: flex; justify-content: space-between;
+            align-items: flex-start; padding: 0 20px; pointer-events: none;
         }
 
         .top-nav-wrapper { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            gap: 6px; 
-            pointer-events: none; 
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
-        .right-controls-group {
-            display: flex;
-            gap: 8px;
-            pointer-events: none;
-            margin-left: auto;
+            display: flex; flex-direction: column; align-items: center; gap: 6px; 
+            pointer-events: none; position: absolute; left: 50%; transform: translateX(-50%);
+            width: fit-content;
         }
         
         .mode-header, .control-btn, .option-btn { 
-            height: var(--header-height); 
-            border-radius: var(--border-radius); 
-            color: var(--text-color); 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            cursor: pointer; 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            user-select: none; 
-            font-weight: 600; 
-            pointer-events: auto; 
-            background: var(--panel-bg);
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border: 1px solid var(--border-color);
+            height: var(--header-height); border-radius: var(--border-radius); 
+            color: var(--text-color); display: flex; justify-content: center; 
+            align-items: center; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            user-select: none; font-weight: 600; pointer-events: auto; 
+            background: var(--panel-bg); backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color);
         }
         
-        .mode-header { width: 140px; font-size: 13px; }
+        .mode-header { width: 140px; font-size: 13px; text-align: center; }
         .control-btn { width: var(--header-height); aspect-ratio: 1 / 1; }
+        .control-btn.active { border-color: #FF6666; background: rgba(255, 102, 102, 0.1); }
         
         .dropdown-options { 
-            display: flex; 
-            flex-direction: column; 
-            gap: 8px; 
-            opacity: 0; 
-            pointer-events: none; 
-            transform: translateY(-10px); 
+            display: flex; flex-direction: column; gap: 8px; opacity: 0; 
+            pointer-events: none; transform: translateY(-10px); 
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            position: absolute; 
-            top: 53px; 
-            right: 0;
-            z-index: 1001; 
+            position: absolute; top: 53px; right: 0; z-index: 1001; 
         }
         .dropdown-options.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
-        .option-btn { width: var(--header-height); aspect-ratio: 1 / 1; }
+        .option-btn { width: 43px; font-size: 11px; font-weight: 500; flex-direction: column; }
 
         #mobile-keyboard {
-            position: fixed;
-            bottom: 20px; 
-            left: 50%;
-            transform: translate(-50%, calc(100% + 20px)); 
-            width: calc(100% - 40px);
-            max-width: 340px; 
-            height: auto;
-            z-index: 2000;
-            border-radius: 28px;
-            padding: 16px;
-            padding-top: 32px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translate(-50%, calc(100% - 25px)); 
+            width: calc(100% - 40px); max-width: 400px; 
+            z-index: 2000; border-radius: 28px; padding: 12px 12px 14px 12px;
+            display: flex; flex-direction: column; gap: 6px;
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
             pointer-events: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
 
         #mobile-keyboard.open { transform: translate(-50%, 0); }
 
         .keyboard-handle {
-            position: absolute;
-            top: -20px; left: 0; right: 0; height: 40px;
+            width: 100%; height: 20px;
             display: flex; justify-content: center; align-items: center;
-            cursor: pointer; pointer-events: auto; z-index: 2001;
+            cursor: pointer; pointer-events: auto;
         }
 
-        .handle-bar { width: 40px; height: 4px; background: var(--text-color); opacity: 0.25; border-radius: 10px; transition: 0.3s; }
-        #mobile-keyboard.open .handle-bar { opacity: 0.15; width: 24px; transform: translateY(24px); }
+        .handle-bar { width: 36px; height: 4px; background: var(--kbd-text-color); opacity: 0.15; border-radius: 10px; }
 
-        .keyboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; justify-items: center; }
+        .keyboard-row {
+            display: grid;
+            gap: 6px;
+        }
+
+        .row-3-col { grid-template-columns: repeat(3, 1fr); }
+        .row-4-col { grid-template-columns: repeat(4, 1fr); align-items: stretch; }
 
         .v-key {
-            width: 100%; aspect-ratio: 1.2 / 1; max-height: 50px;
-            background: var(--ui-accent); border-radius: 10px;
+            aspect-ratio: 2.3 / 1; 
+            background: var(--ui-accent); border-radius: 12px;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: var(--text-color); font-weight: 700; font-size: 14px;
-            border: 1px solid var(--border-color); user-select: none; transition: 0.1s; touch-action: none;
+            color: var(--kbd-text-color); position: relative;
+            border: 1.5px solid transparent; user-select: none; 
+            transition: background 0.2s; touch-action: none;
+            overflow: hidden;
         }
 
-        .v-key:active { transform: scale(0.92); background: var(--text-color); color: var(--bg-color); }
-        .v-key span { font-size: 8px; font-weight: 500; opacity: 0.6; margin-top: 1px; }
+        .row-4-col .v-key { aspect-ratio: 1.8 / 1; }
+        .v-key:active { transform: none; }
 
-        .keyboard-row { display: flex; gap: 8px; width: 100%; }
-        .v-key.wide { flex: 2; }
-        .v-key.action { background: rgba(255, 102, 102, 0.08); border-color: rgba(255, 102, 102, 0.15); }
+        .v-key svg { 
+            width: 26%; height: auto; 
+            stroke: var(--kbd-icon-color); 
+            stroke-width: var(--icon-stroke); 
+            fill: none; 
+            stroke-linecap: round; 
+            stroke-linejoin: round; 
+        }
+
+        .v-key.key-8 svg { transform: translateY(2px); } 
+        .v-key.key-2 svg { transform: translateY(-1px); } 
+        .v-key.key-4 svg { transform: translateX(-1px); }
+        .v-key.key-6 svg { transform: translateX(1px); }
+        
+        /* Ромб на клавиатуре остается серым */
+        .v-key.key-0 svg { width: 29%; fill: var(--kbd-icon-color); stroke: var(--kbd-icon-color); stroke-width: 3; stroke-linejoin: round; }
+
+        .v-key .key-label {
+            position: absolute; bottom: 5px; right: 7px;
+            font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+            color: var(--kbd-label-color);
+            opacity: 0.8;
+        }
+        
+        .v-key.mode-key { justify-content: center; align-items: center; }
+        .v-key .mode-label { 
+            font-size: 12px; font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 0.8px;
+            display: inline-block;
+            color: var(--kbd-icon-color);
+            transform: scaleY(1.3); 
+            transform-origin: center;
+        }
+
+        .v-key .mode-sub { 
+            position: absolute; bottom: 5px; right: 8px; 
+            font-size: 16px; 
+            font-weight: 950;
+            color: var(--kbd-label-color); 
+            opacity: 0.9; 
+            line-height: 1;
+            letter-spacing: -1.5px;
+        }
 
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; overflow: hidden; touch-action: none; }
         .indicator-text { font-size: 13.2px; font-weight: 600; color: var(--text-color); opacity: 0; transition: all 0.2s ease; height: 0; overflow: hidden; }
         .indicator-text.visible { opacity: 0.8; height: auto; margin-top: 4px; }
         
-        .theme-svg { display: none; width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; }
+        .eraser-size-hint { font-size: 11px; font-weight: 700; color: var(--text-color); opacity: 0; margin-top: 2px; transition: opacity 0.3s; }
+        .eraser-size-hint.visible { opacity: 1; }
+
+        .theme-svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; }
         
+        body[data-theme="light"] .sun-icon { display: block; }
+        body[data-theme="light"] .moon-icon { display: none; }
+        body[data-theme="dark"] .sun-icon { display: none; }
+        body[data-theme="dark"] .moon-icon { display: block; }
+
+        .option-btn svg { width: 18px; height: 18px; }
     </style>
 </head>
 <body data-theme="light"> 
     
     <div class="top-nav-container">
+        <div class="left-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
+            <div class="control-btn glass-panel" onclick="performReset()" title="Reset Canvas">
+                <svg viewBox="0 0 24 24" class="theme-svg"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" /></svg>
+            </div>
+            <div class="control-btn glass-panel" id="eraser-btn" onclick="toggleEraser()" title="Eraser (E)">
+                <svg viewBox="0 0 24 24" class="theme-svg">
+                    <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+                    <path d="m22 21H7" />
+                    <path d="m5 11 9 9" />
+                </svg>
+            </div>
+        </div>
+
         <div class="top-nav-wrapper">
-            <div class="mode-header glass-panel" id="mode-button" onclick="toggleMode()">
+            <div class="mode-header glass-panel" onclick="toggleMode()">
                 <span id="mode-text">Navigation</span>
             </div>
+            <div id="eraser-hint" class="eraser-size-hint">SIZE: 25%</div>
             <div class="status-labels" style="display:flex; flex-direction:column; align-items:center;">
-                <div id="eraser-label" class="indicator-text">Eraser</div>
-                <div id="zoom-indicator" class="indicator-text">100%</div>
                 <div id="action-indicator" class="indicator-text">Action</div>
             </div>
         </div>
 
-        <div class="right-controls-group">
+        <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
             <div class="dropdown-container" style="position: relative;">
                 <div class="control-btn glass-panel" id="theme-trigger">
-                    <!-- Возвращенная к исходному размеру иконка солнца -->
-                    <svg viewBox="0 0 24 24" class="theme-svg sun-icon">
-                        <circle cx="12" cy="12" r="5" />
-                        <path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" />
-                    </svg>
+                    <svg viewBox="0 0 24 24" class="theme-svg sun-icon"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
                     <svg viewBox="0 0 24 24" class="theme-svg moon-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 </div>
                 <div class="dropdown-options" id="theme-menu">
                     <div class="option-btn glass-panel" onclick="setTheme('light')">
-                        <svg viewBox="0 0 24 24" style="width:18px; height:18px; stroke:currentColor; stroke-width:2; fill:none;"><circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>
+                        <svg viewBox="0 0 24 24" class="theme-svg"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
                     </div>
                     <div class="option-btn glass-panel" onclick="setTheme('dark')">
-                        <svg viewBox="0 0 24 24" style="width:18px; height:18px; stroke:currentColor; stroke-width:2; fill:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                        <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                     </div>
                 </div>
             </div>
-
             <div class="dropdown-container" style="position: relative;">
                 <div class="control-btn glass-panel" id="export-trigger">
-                    <svg viewBox="0 0 24 24" style="width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 </div>
                 <div class="dropdown-options" id="export-menu">
-                    <div class="option-btn glass-panel" onclick="exportFile('svg')" style="font-size:10px; font-weight:800;">SVG</div>
-                    <div class="option-btn glass-panel" onclick="exportFile('png')" style="font-size:10px; font-weight:800;">PNG</div>
+                    <div class="option-btn glass-panel" onclick="exportFile('svg')">SVG</div>
+                    <div class="option-btn glass-panel" onclick="exportFile('png')">PNG</div>
                 </div>
             </div>
         </div>
@@ -246,32 +267,74 @@
     <div id="canvas-container"></div>
 
     <div id="mobile-keyboard" class="glass-panel">
-        <div class="keyboard-handle" id="kb-handle">
+        <div class="keyboard-handle" onclick="document.getElementById('mobile-keyboard').classList.toggle('open')">
             <div class="handle-bar"></div>
         </div>
 
-        <div class="keyboard-row">
-            <div class="v-key action" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')">MODE <span>Spc</span></div>
-            <div class="v-key action" onpointerdown="vKeyStart(event, 'e')" onpointerup="vKeyEnd(event, 'e')">ERASE <span>Era</span></div>
-            <div class="v-key action" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')">UNDO <span>Und</span></div>
-            <div class="v-key action" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')">REDO <span>Red</span></div>
+        <div class="keyboard-row row-3-col">
+            <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')">
+                <svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg>
+                <span class="key-label">7</span>
+            </div>
+            <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')">
+                <svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg>
+                <span class="key-label">8</span>
+            </div>
+            <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')">
+                <svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg>
+                <span class="key-label">9</span>
+            </div>
         </div>
-
-        <div class="keyboard-grid">
-            <div class="v-key" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')">7</div>
-            <div class="v-key" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')">8</div>
-            <div class="v-key" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')">9</div>
-            <div class="v-key" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')">4</div>
-            <div class="v-key" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')">5 <span>Nd</span></div>
-            <div class="v-key" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')">6</div>
-            <div class="v-key" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')">1</div>
-            <div class="v-key" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')">2</div>
-            <div class="v-key" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')">3</div>
+        
+        <div class="keyboard-row row-3-col">
+            <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')">
+                <svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg>
+                <span class="key-label">4</span>
+            </div>
+            <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg>
+                <span class="key-label">5</span>
+            </div>
+            <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')">
+                <svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg>
+                <span class="key-label">6</span>
+            </div>
         </div>
-
-        <div class="keyboard-row">
-            <div class="v-key wide" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')">DIAMOND <span>0</span></div>
-            <div class="v-key wide" onpointerdown="vKeyStart(event, 'x')" onpointerup="vKeyEnd(event, 'x')">RESET <span>X</span></div>
+        
+        <div class="keyboard-row row-3-col">
+            <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')">
+                <svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg>
+                <span class="key-label">1</span>
+            </div>
+            <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')">
+                <svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg>
+                <span class="key-label">2</span>
+            </div>
+            <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')">
+                <svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg>
+                <span class="key-label">3</span>
+            </div>
+        </div>
+        
+        <div class="keyboard-row row-4-col">
+            <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 5L19 12L12 19L5 12Z"/>
+                </svg>
+                <span class="key-label">0</span>
+            </div>
+            <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')">
+                <svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg>
+                <span class="key-label">U</span>
+            </div>
+            <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')">
+                <svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg>
+                <span class="key-label">R</span>
+            </div>
+            <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')">
+                <span class="mode-label">MODE</span>
+                <span class="mode-sub">⎽⎽</span>
+            </div>
         </div>
     </div>
 
@@ -279,20 +342,24 @@
         const BASE_STEP_VAL = 60; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
         let curI = 0, curJ = 0; let lastDirection = {di: 0, dj: 1}; 
-        let isDrawingMode = false; let isEraserActive = false; let eraserRadius = 30; 
+        let isDrawingMode = false; 
+        let isEraserActive = false;
+        
+        const DEFAULT_ERASER_RADIUS = 40;
+        let eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
+
         let offsetX = 0, offsetY = 0; let zoom = 0.48; 
         let history = [], redoStack = []; let isExporting = false;
-        let zoomTimeout = null, actionTimeout = null;
+        let actionTimeout = null;
+        let currentTheme = 'light';
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000' },
             dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8' }
         };
-        let currentTheme = 'light';
 
         function vKeyStart(e, k) {
             if (e) { e.preventDefault(); e.stopPropagation(); }
-            if (window.navigator.vibrate) window.navigator.vibrate(8);
             handleActionDown(k);
         }
 
@@ -301,24 +368,25 @@
             handleActionUp(k);
         }
 
-        const kb = document.getElementById('mobile-keyboard');
-        const handle = document.getElementById('kb-handle');
-        let startY = 0;
-
-        handle.onclick = (e) => { e.stopPropagation(); kb.classList.toggle('open'); };
-
-        document.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, {passive: true});
-        document.addEventListener('touchend', e => {
-            let endY = e.changedTouches[0].clientY;
-            if (startY - endY > 50 && !kb.classList.contains('open')) kb.classList.add('open');
-            if (endY - startY > 50 && kb.classList.contains('open')) kb.classList.remove('open');
-        }, {passive: true});
-
         const exportMenu = document.getElementById('export-menu');
         const themeMenu = document.getElementById('theme-menu');
-        document.getElementById('export-trigger').onclick = (e) => { e.stopPropagation(); exportMenu.classList.toggle('open'); themeMenu.classList.remove('open'); };
-        document.getElementById('theme-trigger').onclick = (e) => { e.stopPropagation(); themeMenu.classList.toggle('open'); exportMenu.classList.remove('open'); };
-        window.onclick = () => { exportMenu.classList.remove('open'); themeMenu.classList.remove('open'); };
+        
+        document.getElementById('export-trigger').onclick = (e) => { 
+            e.stopPropagation(); 
+            exportMenu.classList.toggle('open'); 
+            themeMenu.classList.remove('open'); 
+        };
+        
+        document.getElementById('theme-trigger').onclick = (e) => { 
+            e.stopPropagation(); 
+            themeMenu.classList.toggle('open'); 
+            exportMenu.classList.remove('open'); 
+        };
+        
+        window.onclick = () => { 
+            exportMenu.classList.remove('open'); 
+            themeMenu.classList.remove('open'); 
+        };
 
         function setTheme(m) { 
             currentTheme = m; 
@@ -333,12 +401,6 @@
             actionTimeout = setTimeout(()=>a.classList.remove('visible'), 1200); 
         }
 
-        function showZoomIndicator() {
-            let z = document.getElementById('zoom-indicator'); z.innerText = `${Math.round(zoom * 250)}%`; z.classList.add('visible');
-            if(zoomTimeout) clearTimeout(zoomTimeout);
-            zoomTimeout = setTimeout(() => z.classList.remove('visible'), 1000);
-        }
-
         function saveState() { 
             history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
             if(history.length > 50) history.shift(); redoStack = []; 
@@ -347,26 +409,116 @@
         function undo() { 
             if(history.length > 0) { 
                 redoStack.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-                let s = history.pop(); Object.assign(window, s); showActionHint('Undo');
+                let s = history.pop(); 
+                segments = s.segments;
+                specialElements = s.specialElements;
+                curI = s.curI;
+                curJ = s.curJ;
+                lastDirection = s.lastDirection;
+                showActionHint('Undo');
+                redraw();
             }
         }
 
         function redo() { 
             if(redoStack.length > 0) { 
                 history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-                let s = redoStack.pop(); Object.assign(window, s); showActionHint('Redo');
+                let s = redoStack.pop();
+                segments = s.segments;
+                specialElements = s.specialElements;
+                curI = s.curI;
+                curJ = s.curJ;
+                lastDirection = s.lastDirection;
+                showActionHint('Redo');
+                redraw();
             }
         }
         
         function updateModeUI() {
-            document.getElementById('mode-text').innerText = isDrawingMode ? "Drawing" : "Navigation";
-            const eraserEl = document.getElementById('eraser-label');
-            if (isEraserActive) { eraserEl.classList.add('visible'); eraserEl.innerText = `Eraser: ${Math.round(eraserRadius)}%`; }
-            else eraserEl.classList.remove('visible');
+            const modeHeader = document.getElementById('mode-text');
+            const eraserHint = document.getElementById('eraser-hint');
+            const eraserBtn = document.getElementById('eraser-btn');
+
+            if (isEraserActive) {
+                modeHeader.innerText = "Eraser";
+                eraserHint.classList.add('visible');
+                eraserBtn.classList.add('active');
+                let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100);
+                eraserHint.innerText = `SIZE: ${percent}%`;
+            } else {
+                modeHeader.innerText = isDrawingMode ? "Drawing" : "Navigation";
+                eraserHint.classList.remove('visible');
+                eraserBtn.classList.remove('active');
+            }
         }
 
-        function toggleMode() { isDrawingMode = !isDrawingMode; isEraserActive = false; updateModeUI(); }
-        function toggleEraser() { isEraserActive = !isEraserActive; if (isEraserActive) isDrawingMode = true; updateModeUI(); }
+        function toggleMode() { 
+            if (isEraserActive) {
+                isEraserActive = false;
+            } else {
+                isDrawingMode = !isDrawingMode; 
+            }
+            updateModeUI(); 
+            redraw();
+        }
+
+        function toggleEraser() {
+            isEraserActive = !isEraserActive;
+            if (isEraserActive) {
+                isDrawingMode = false; 
+                if (eraserRadius === DEFAULT_ERASER_RADIUS) {
+                   eraserRadius = DEFAULT_ERASER_RADIUS * 0.25;
+                }
+            }
+            updateModeUI();
+            redraw();
+        }
+
+        function performReset() {
+            saveState(); 
+            segments = []; 
+            specialElements = {}; 
+            curI = 0; 
+            curJ = 0; 
+            offsetX = width / 2;
+            offsetY = height / 2;
+            showActionHint('Reset'); 
+            redraw();
+        }
+
+        function performEraserActionAt(worldX, worldY) {
+            const rWorld = eraserRadius / zoom;
+            const rSq = rWorld * rWorld;
+            let changed = false;
+
+            for (let id in specialElements) {
+                let [i, j] = id.split(',').map(Number);
+                let dx = i * STEP - worldX;
+                let dy = j * STEP - worldY;
+                if (dx * dx + dy * dy <= rSq) {
+                    if (!changed) saveState();
+                    delete specialElements[id];
+                    changed = true;
+                }
+            }
+
+            let initialLength = segments.length;
+            let newSegments = segments.filter(s => {
+                let dx1 = s.p1.x * STEP - worldX;
+                let dy1 = s.p1.y * STEP - worldY;
+                let dx2 = s.p2.x * STEP - worldX;
+                let dy2 = s.p2.y * STEP - worldY;
+                return !(dx1 * dx1 + dy1 * dy1 <= rSq || dx2 * dx2 + dy2 * dy2 <= rSq);
+            });
+
+            if (newSegments.length !== initialLength) {
+                if (!changed) saveState();
+                segments = newSegments;
+                changed = true;
+            }
+            
+            if (changed) redraw();
+        }
 
         function setup() { 
             let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); 
@@ -377,9 +529,20 @@
             let colors = themeConfig[currentTheme];
             if (isExporting) clear(); else background(colors.canvasBg);
             
-            if(!isExporting && mouseIsPressed && mouseButton===LEFT && !kb.contains(event?.target)) { 
-                if (isEraserActive) performEraserAction();
-                else { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
+            let isOverUI = false;
+            const kb = document.getElementById('mobile-keyboard');
+            const kbRect = kb.getBoundingClientRect();
+            if (mouseX >= kbRect.left && mouseX <= kbRect.right && mouseY >= kbRect.top) isOverUI = true;
+            if (mouseY < 80) isOverUI = true;
+
+            if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUI) {
+                if (isEraserActive) {
+                    let worldMX = (mouseX - offsetX) / zoom;
+                    let worldMY = (mouseY - offsetY) / zoom;
+                    performEraserActionAt(worldMX, worldMY);
+                } else {
+                    offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; 
+                }
             }
 
             push(); translate(offsetX, offsetY); scale(zoom);
@@ -387,29 +550,6 @@
             drawGeometry(colors.geomColor);
             if (!isExporting) drawCursor();
             pop();
-
-            if (!isExporting && isEraserActive) {
-                noFill(); stroke("#FF5555"); strokeWeight(2);
-                ellipse(mouseX, mouseY, eraserRadius*zoom*2, eraserRadius*zoom*2);
-            }
-        }
-
-        function performEraserAction() {
-            let mx = (mouseX - offsetX) / zoom, my = (mouseY - offsetY) / zoom;
-            let changed = false;
-            for (let i = segments.length - 1; i >= 0; i--) {
-                let s = segments[i];
-                if (dist(mx, my, s.p1.x*STEP, s.p1.y*STEP) < eraserRadius || dist(mx, my, s.p2.x*STEP, s.p2.y*STEP) < eraserRadius) {
-                    if(!changed) saveState(); segments.splice(i, 1); changed = true;
-                }
-            }
-            for (let id in specialElements) {
-                let [i, j] = id.split(',').map(Number);
-                if (dist(mx, my, i*STEP, j*STEP) < eraserRadius + 20) {
-                    if(!changed) saveState(); delete specialElements[id]; changed = true;
-                }
-            }
-            if(changed) showActionHint('Erasing...');
         }
 
         function drawGrid(dotRGB, alpha) {
@@ -421,7 +561,7 @@
 
         function drawGeometry(colValue) {
             let col = isExporting ? 0 : colValue; 
-            let ringD = BASE_STEP_VAL * 2.15; 
+            let ringD = BASE_STEP_VAL * 2; 
             let innerHoleR = (ringD - LINE_WEIGHT) / 2;
             
             push(); 
@@ -448,13 +588,14 @@
 
             for(let id in specialElements) {
                 let [i, j] = id.split(',').map(Number); let x = i*STEP, y = j*STEP;
-                if(specialElements[id].isNode) { 
-                    noFill(); stroke(col); strokeWeight(LINE_WEIGHT); ellipse(x, y, ringD, ringD); 
-                }
+                if(specialElements[id].isNode) { noFill(); stroke(col); strokeWeight(LINE_WEIGHT); ellipse(x, y, ringD, ringD); }
                 if(specialElements[id].isDiamond) { 
                     fill(col); noStroke(); 
-                    push(); translate(x, y + LINE_WEIGHT/2); rotate(QUARTER_PI); 
-                    rect(-LINE_WEIGHT/2,-LINE_WEIGHT/2, LINE_WEIGHT, LINE_WEIGHT); 
+                    push(); 
+                    translate(x, y + LINE_WEIGHT/2); 
+                    rotate(QUARTER_PI); 
+                    rectMode(CENTER);
+                    rect(0, 0, LINE_WEIGHT, LINE_WEIGHT); 
                     pop(); 
                 }
             }
@@ -480,20 +621,21 @@
         }
 
         function drawCursor() {
-            let finalColor = isEraserActive ? "#FF5555" : (isDrawingMode ? "#404040" : "#FF6666");
-            if (currentTheme==='dark' && !isEraserActive && isDrawingMode) finalColor = "#E8E8E8";
-            
-            push(); 
-            translate(curI*STEP, curJ*STEP); 
-            fill(finalColor); 
-            noStroke(); 
-            
-            if (lastDirection.di !== 0 && lastDirection.dj !== 0) {
-                rect(-10, -10, 20, 20); 
-            } else {
-                rotate(QUARTER_PI);
-                rect(-10, -10, 20, 20); 
+            if (isEraserActive) {
+                let worldMX = (mouseX - offsetX) / zoom;
+                let worldMY = (mouseY - offsetY) / zoom;
+                noFill();
+                stroke("#FF6666");
+                strokeWeight(2 / zoom);
+                fill("rgba(255, 102, 102, 0.15)");
+                ellipse(worldMX, worldMY, (eraserRadius * 2) / zoom);
+                return;
             }
+
+            let finalColor = isDrawingMode ? (currentTheme==='dark' ? "#E8E8E8" : "#404040") : "#FF6666";
+            push(); translate(curI*STEP, curJ*STEP); fill(finalColor); noStroke(); 
+            if (lastDirection.di !== 0 && lastDirection.dj !== 0) rect(-10, -10, 20, 20); 
+            else { rotate(QUARTER_PI); rect(-10, -10, 20, 20); }
             pop();
         }
 
@@ -502,10 +644,14 @@
             if(m[k]) {
                 let [di, dj] = m[k]; lastDirection = {di, dj}; 
                 let id = `${curI},${curJ}`;
-                if (specialElements[id]?.isDiamond) {
+                if (isEraserActive) { curI += di; curJ += dj; } 
+                else if (specialElements[id]?.isDiamond) {
                     if(isDrawingMode) { addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); }
                     curI += di * 3; curJ += dj * 3;
-                } else { if(isDrawingMode) addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; }
+                } else { 
+                    if(isDrawingMode) addSeg(curI, curJ, curI + di, curJ + dj); 
+                    curI += di; curJ += dj; 
+                }
             }
         }
 
@@ -519,33 +665,31 @@
         let repeatTimer = null, activeKey = null;
 
         function handleActionDown(k) {
-            k = k.toLowerCase();
+            k = k.toLowerCase(); 
             if (activeKey === k) return; 
             activeKey = k;
-            if(k === ' ') { toggleMode(); return; } 
+            
+            if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
             if(k === 'e') { toggleEraser(); return; }
-            if(k === 'u') undo(); 
-            if(k === 'r') redo();
-            if(k === 'x') { saveState(); segments = []; specialElements = {}; showActionHint('Reset'); }
-            if(k === '5') toggleSpecial('isNode'); 
-            if(k === '0') toggleSpecial('isDiamond');
+            if(k === 'u') { undo(); return; }
+            if(k === 'r') { redo(); return; }
+            if(k === 'x') { performReset(); return; } 
+            if(k === '5') { toggleSpecial('isNode'); return; }
+            if(k === '0') { toggleSpecial('isDiamond'); return; }
+            
             if(['1','2','3','4','6','7','8','9'].includes(k)) {
-                if (isDrawingMode) saveState(); 
                 move(k);
-                if(repeatTimer) clearInterval(repeatTimer);
+                if(repeatTimer) clearInterval(repeatTimer); 
                 repeatTimer = setInterval(() => move(k), 120);
             }
         }
 
         function handleActionUp(k) {
             if (activeKey === k.toLowerCase()) { 
-                if(repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; }
+                if(repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; } 
                 activeKey = null; 
             }
         }
-
-        window.addEventListener('keydown', e => { if (e.repeat) return; handleActionDown(e.key); });
-        window.addEventListener('keyup', e => { handleActionUp(e.key); });
 
         function toggleSpecial(t) {
             saveState(); let id = `${curI},${curJ}`;
@@ -554,6 +698,7 @@
             if (t==='isDiamond' && specialElements[id].isDiamond) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
             if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
             showActionHint(t === 'isNode' ? 'Node' : 'Diamond');
+            redraw();
         }
 
         function exportFile(fmt) {
@@ -570,13 +715,28 @@
         }
         
         function mouseWheel(e) {
+            if (e.ctrlKey) {
+                if (isEraserActive) {
+                    if (e.delta > 0) {
+                        eraserRadius = Math.max(2, eraserRadius - 2);
+                    } else {
+                        eraserRadius = Math.min(300, eraserRadius + 2);
+                    }
+                    updateModeUI();
+                    redraw();
+                }
+                return false;
+            }
+
             let oldZoom = zoom; let worldX = (mouseX - offsetX) / oldZoom, worldY = (mouseY - offsetY) / oldZoom;
             if (e.delta > 0) zoom /= 1.1; else zoom *= 1.1;
             zoom = constrain(zoom, 0.05, 5); offsetX = mouseX - worldX * zoom; offsetY = mouseY - worldY * zoom;
-            showZoomIndicator(); return false; 
+            return false; 
         }
 
         function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+        window.addEventListener('keydown', e => { if (e.repeat) return; handleActionDown(e.key); });
+        window.addEventListener('keyup', e => { handleActionUp(e.key); });
     </script>
 </body>
 </html>
