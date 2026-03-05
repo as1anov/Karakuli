@@ -102,7 +102,14 @@
             position: absolute; top: 53px; right: 0; z-index: 1001; 
         }
         .dropdown-options.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
-        .option-btn { width: 60px; font-size: 11px; font-weight: 500; flex-direction: column; }
+        
+        .option-btn { 
+            width: var(--header-height); 
+            aspect-ratio: 1 / 1;
+            font-size: 11px; 
+            font-weight: 700; 
+            flex-direction: column; 
+        }
 
         #mobile-keyboard {
             position: fixed; 
@@ -245,13 +252,11 @@
                     <svg viewBox="0 0 24 24" class="theme-svg moon-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 </div>
                 <div class="dropdown-options" id="theme-menu">
-                    <div class="option-btn glass-panel" onclick="setTheme('light')">
+                    <div class="option-btn glass-panel" onclick="setTheme('light')" title="Light Mode">
                         <svg viewBox="0 0 24 24" class="theme-svg"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
-                        <span>Light</span>
                     </div>
-                    <div class="option-btn glass-panel" onclick="setTheme('dark')">
+                    <div class="option-btn glass-panel" onclick="setTheme('dark')" title="Dark Mode">
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                        <span>Dark</span>
                     </div>
                 </div>
             </div>
@@ -340,9 +345,9 @@
     </div>
 
     <script>
-        // Параметры скорости рисования
-        const INITIAL_DELAY = 450; 
-        const REPEAT_INTERVAL = 140; 
+        // Регулировка скорости: задержка перед повтором и интервал между шагами
+        const INITIAL_DELAY = 520;  // Было 450
+        const REPEAT_INTERVAL = 180; // Было 140
 
         const BASE_STEP_VAL = 60; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
@@ -558,7 +563,6 @@
                 const prev = lastDirection;
                 const isReversing = (di === -prev.di && dj === -prev.dj);
                 
-                // Стирание в режиме рисования: если движемся в обратном направлении, удаляем линию
                 if (isReversing) {
                     let segIdx = findSegment(curI, curJ, curI + di, curJ + dj);
                     if (segIdx !== -1) {
@@ -567,7 +571,6 @@
                         curI += di;
                         curJ += dj;
                         
-                        // Проверяем, есть ли еще линии в этом направлении дальше (для остановки на стыках)
                         let nextSegIdx = findSegment(curI, curJ, curI + di, curJ + dj);
                         if(nextSegIdx === -1) {
                            if(repeatTimer) {
@@ -581,7 +584,6 @@
                         redraw();
                         return;
                     } else {
-                        // Остановка на "стыке" или если линии больше нет
                         if(repeatTimer) {
                             clearTimeout(repeatTimer);
                             clearInterval(repeatTimer);
@@ -591,7 +593,6 @@
                     }
                 }
 
-                // Логические ограничения на повороты и пересечения
                 if (prev.di === -1 && prev.dj === 0 && (k === '9' || k === '3')) return; 
                 if (prev.di === 1 && prev.dj === 0 && (k === '7' || k === '1')) return; 
                 if (prev.di === 0 && prev.dj === -1 && (k === '1' || k === '3')) return; 
@@ -605,12 +606,10 @@
             let id = `${curI},${curJ}`;
             
             if (isEraserActive || !isDrawingMode) {
-                // Навигация (перемещение курсора без рисования)
                 if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } 
                 else { curI += di; curJ += dj; }
                 lastDirection = {di, dj};
             } else {
-                // Рисование (создание новых сегментов)
                 saveState();
                 if (specialElements[id]?.isDiamond) {
                     addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3);
@@ -624,7 +623,6 @@
             redraw();
         }
 
-        // Вспомогательная функция для обновления направления после стирания
         function updateLastMoveAfterErase() {
             let connected = segments.filter(s => 
                 (s.p1.x === curI && s.p1.y === curJ) || (s.p2.x === curI && s.p2.y === curJ)
@@ -638,20 +636,11 @@
             }
         }
 
-        function addSeg(x1, y1, x2, y2) {
-            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2};
-            if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
-            let idx = segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
-            if(idx !== -1) segments.splice(idx, 1); else segments.push({p1, p2});
-        }
-
         let repeatTimer = null, activeKey = null;
         function handleActionDown(k) {
             k = k.toLowerCase(); 
             if (activeKey === k) return;
-            
             activeKey = k;
-
             if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
             if(k === 'e') { toggleEraser(); return; }
             if(k === 'u') { undo(); return; }
@@ -659,10 +648,12 @@
             if(k === 'x') { performReset(); return; } 
             if(k === '5') { toggleSpecial('isNode'); return; }
             if(k === '0') { toggleSpecial('isDiamond'); return; }
-
             if(['1','2','3','4','6','7','8','9'].includes(k)) { 
                 move(k); 
-                if(repeatTimer) clearTimeout(repeatTimer); 
+                if(repeatTimer) {
+                    clearTimeout(repeatTimer);
+                    clearInterval(repeatTimer);
+                }
                 repeatTimer = setTimeout(() => {
                     repeatTimer = setInterval(() => move(k), REPEAT_INTERVAL);
                 }, INITIAL_DELAY);
@@ -689,6 +680,13 @@
             if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
             if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
             showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw();
+        }
+
+        function addSeg(x1, y1, x2, y2) {
+            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2};
+            if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
+            let idx = segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
+            if(idx !== -1) segments.splice(idx, 1); else segments.push({p1, p2});
         }
 
         function performEraserActionAt(worldX, worldY) {
