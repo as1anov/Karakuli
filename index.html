@@ -115,10 +115,7 @@
             transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
             pointer-events: auto;
             background: transparent;
-            backdrop-filter: none;
-            -webkit-backdrop-filter: none;
             border: none;
-            box-shadow: none;
         }
 
         #mobile-keyboard.open { transform: translate(-50%, 0); }
@@ -171,7 +168,7 @@
         
         .v-key.key-0 svg { 
             width: 29%; 
-            fill: var(--kbd-icon-color); /* Закрашиваем иконку */
+            fill: var(--kbd-icon-color); 
             stroke: var(--kbd-icon-color); 
             stroke-width: var(--icon-stroke); 
             stroke-linejoin: round; 
@@ -185,7 +182,7 @@
         
         .v-key.mode-key { justify-content: center; align-items: center; }
         .v-key .mode-label { 
-            font-size: 12px; font-weight: 700; 
+            font-size: 11px; font-weight: 700; 
             text-transform: uppercase; letter-spacing: 0.8px;
             display: inline-block; color: var(--kbd-icon-color);
             transform: scaleY(1.3); transform-origin: center;
@@ -243,7 +240,7 @@
 
         <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
             <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn glass-panel" id="theme-trigger">
+                <div class="control-btn glass-panel" id="theme-trigger" title="Change Theme">
                     <svg viewBox="0 0 24 24" class="theme-svg sun-icon"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
                     <svg viewBox="0 0 24 24" class="theme-svg moon-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 </div>
@@ -257,7 +254,7 @@
                 </div>
             </div>
             <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn glass-panel" id="export-trigger">
+                <div class="control-btn glass-panel" id="export-trigger" title="Export">
                     <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 </div>
                 <div class="dropdown-options" id="export-menu">
@@ -343,12 +340,13 @@
     <script>
         const BASE_STEP_VAL = 60; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
-        let curI = 0, curJ = 0; let lastDirection = {di: 0, dj: 1}; 
+        let curI = 0, curJ = 0; let lastDirection = null; 
         let isDrawingMode = false; let isEraserActive = false;
         const DEFAULT_ERASER_RADIUS = 40; let eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
         let offsetX = 0, offsetY = 0; let zoom = 0.48; 
         let history = [], redoStack = []; let isExporting = false;
         let actionTimeout = null; let currentTheme = 'light';
+        let lastPinchDist = 0;
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000' },
@@ -365,6 +363,7 @@
         window.onclick = () => { exportMenu.classList.remove('open'); themeMenu.classList.remove('open'); };
 
         function setTheme(m) { currentTheme = m; document.body.setAttribute('data-theme', m); themeMenu.classList.remove('open'); redraw(); }
+        
         function showActionHint(t) { 
             let a = document.getElementById('action-indicator'); a.innerText = t; a.classList.add('visible'); 
             if(actionTimeout) clearTimeout(actionTimeout);
@@ -411,38 +410,68 @@
             }
         }
 
-        function toggleMode() { if (isEraserActive) isEraserActive = false; else isDrawingMode = !isDrawingMode; updateModeUI(); redraw(); }
+        function toggleMode() { 
+            if (isEraserActive) isEraserActive = false; 
+            else {
+                isDrawingMode = !isDrawingMode;
+                lastDirection = null; // Сброс направления при смене режима
+            }
+            updateModeUI(); 
+            redraw(); 
+        }
+        
         function toggleEraser() { isEraserActive = !isEraserActive; if (isEraserActive) { if (eraserRadius === DEFAULT_ERASER_RADIUS) eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; } updateModeUI(); redraw(); }
 
-        function performReset() { saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; offsetX = width / 2; offsetY = height / 2; showActionHint('Reset'); redraw(); }
+        function performReset() { saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; offsetX = width / 2; offsetY = height / 2; lastDirection = null; showActionHint('Reset'); redraw(); }
 
-        function performEraserActionAt(worldX, worldY) {
-            const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
-            for (let id in specialElements) {
-                let [i, j] = id.split(',').map(Number); let dx = i * STEP - worldX; let dy = j * STEP - worldY;
-                if (dx * dx + dy * dy <= rSq) { if (!changed) saveState(); delete specialElements[id]; changed = true; }
-            }
-            let initialLength = segments.length;
-            let newSegments = segments.filter(s => {
-                let dx1 = s.p1.x * STEP - worldX; let dy1 = s.p1.y * STEP - worldY; let dx2 = s.p2.x * STEP - worldX; let dy2 = s.p2.y * STEP - worldY;
-                return !(dx1 * dx1 + dy1 * dy1 <= rSq || dx2 * dx2 + dy2 * dy2 <= rSq);
-            });
-            if (newSegments.length !== initialLength) { if (!changed) saveState(); segments = newSegments; changed = true; }
-            if (changed) redraw();
+        function setup() { 
+            let c = createCanvas(windowWidth, windowHeight); 
+            c.parent('canvas-container'); 
+            offsetX = width/2; offsetY = height/2; 
+
+            // Настройка зума для тача
+            const canvasElem = document.getElementById('defaultCanvas0');
+            canvasElem.addEventListener('touchstart', (e) => { if (e.touches.length === 2) lastPinchDist = getDist(e.touches[0], e.touches[1]); }, { passive: false });
+            canvasElem.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    let currentDist = getDist(e.touches[0], e.touches[1]);
+                    let midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                    let midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                    applyZoom(currentDist / lastPinchDist, midX, midY);
+                    lastPinchDist = currentDist;
+                    redraw();
+                }
+            }, { passive: false });
         }
 
-        function setup() { let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); offsetX = width/2; offsetY = height/2; }
+        function getDist(t1, t2) { return Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2)); }
+
+        function applyZoom(factor, centerX, centerY) {
+            let oldZoom = zoom; zoom = constrain(zoom * factor, 0.05, 5);
+            let worldX = (centerX - offsetX) / oldZoom; let worldY = (centerY - offsetY) / oldZoom;
+            offsetX = centerX - worldX * zoom; offsetY = centerY - worldY * zoom;
+        }
 
         function draw() {
             let colors = themeConfig[currentTheme];
             if (isExporting) clear(); else background(colors.canvasBg);
-            let isOverUI = false; const kb = document.getElementById('mobile-keyboard'); const kbRect = kb.getBoundingClientRect();
-            if (mouseX >= kbRect.left && mouseX <= kbRect.right && mouseY >= kbRect.top) isOverUI = true;
+            
+            let isOverUI = false; 
+            const kb = document.getElementById('mobile-keyboard'); 
+            const kbRect = kb.getBoundingClientRect();
+            const interactionY = kb.classList.contains('open') ? kbRect.top : windowHeight - 25;
+            if (mouseX >= kbRect.left && mouseX <= kbRect.right && mouseY >= interactionY) isOverUI = true;
             if (mouseY < 80) isOverUI = true;
-            if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUI) {
-                if (isEraserActive) { let worldMX = (mouseX - offsetX) / zoom; let worldMY = (mouseY - offsetY) / zoom; performEraserActionAt(worldMX, worldMY); } 
-                else { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
+
+            if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUI && (!touches || touches.length < 2)) {
+                if (isEraserActive) { 
+                    performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
+                } else { 
+                    offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; 
+                }
             }
+
             push(); translate(offsetX, offsetY); scale(zoom);
             if (!isExporting) drawGrid(colors.dotColor, colors.dotAlpha);
             drawGeometry(colors.geomColor);
@@ -499,30 +528,46 @@
             }
             let finalColor = isDrawingMode ? (currentTheme==='dark' ? "#E8E8E8" : "#404040") : "#FF6666";
             push(); translate(curI*STEP, curJ*STEP); fill(finalColor); noStroke(); 
-            if (lastDirection.di !== 0 && lastDirection.dj !== 0) rect(-10, -10, 20, 20); else { rotate(QUARTER_PI); rect(-10, -10, 20, 20); }
+            if (lastDirection && lastDirection.di !== 0 && lastDirection.dj !== 0) rect(-10, -10, 20, 20); else { rotate(QUARTER_PI); rect(-10, -10, 20, 20); }
             pop();
         }
 
         function move(k) {
             const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]};
-            if(m[k]) {
-                let [di, dj] = m[k]; lastDirection = {di, dj}; 
-                let id = `${curI},${curJ}`;
-                if (isDrawingMode && !isEraserActive) saveState();
-                if (isEraserActive || !isDrawingMode) {
-                    if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } 
-                    else { curI += di; curJ += dj; }
-                } 
-                else if (isDrawingMode) {
-                    if (specialElements[id]?.isDiamond) {
-                        addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3);
-                        curI += di * 3; curJ += dj * 3;
-                    } else { 
-                        addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; 
-                    }
+            if(!m[k]) return;
+            let [di, dj] = m[k];
+
+            // ВАЛИДАЦИЯ НАПРАВЛЕНИЙ ПРИ РИСОВАНИИ
+            if (isDrawingMode && !isEraserActive && lastDirection !== null) {
+                const prev = lastDirection;
+                const isReversing = (di === -prev.di && dj === -prev.dj);
+                if (!isReversing) {
+                    // Блокировка 135 градусов для прямых осей
+                    if (prev.di === -1 && prev.dj === 0 && (k === '9' || k === '3')) return; 
+                    if (prev.di === 1 && prev.dj === 0 && (k === '7' || k === '1')) return; 
+                    if (prev.di === 0 && prev.dj === -1 && (k === '1' || k === '3')) return; 
+                    if (prev.di === 0 && prev.dj === 1 && (k === '7' || k === '9')) return; 
+                    // Блокировка 135 градусов для диагоналей
+                    if (prev.di === 1 && prev.dj === 1 && (k === '8' || k === '4')) return; 
+                    if (prev.di === 1 && prev.dj === -1 && (k === '4' || k === '2')) return; 
+                    if (prev.di === -1 && prev.dj === -1 && (k === '2' || k === '6')) return; 
+                    if (prev.di === -1 && prev.dj === 1 && (k === '8' || k === '6')) return;
                 }
-                redraw();
             }
+
+            let id = `${curI},${curJ}`;
+            if (isDrawingMode && !isEraserActive) saveState();
+            
+            if (isEraserActive || !isDrawingMode) {
+                if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } 
+                else { curI += di; curJ += dj; }
+            } else {
+                if (specialElements[id]?.isDiamond) {
+                    addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3);
+                    curI += di * 3; curJ += dj * 3;
+                } else { addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; }
+            }
+            lastDirection = {di, dj}; redraw();
         }
 
         function addSeg(x1, y1, x2, y2) {
@@ -534,37 +579,44 @@
 
         let repeatTimer = null, activeKey = null;
         function handleActionDown(k) {
-            k = k.toLowerCase(); if (activeKey === k) return; activeKey = k;
-            if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
-            if(k === 'e') { toggleEraser(); return; }
-            if(k === 'u') { undo(); return; }
-            if(k === 'r') { redo(); return; }
-            if(k === 'x') { performReset(); return; } 
-            if(k === '5') { toggleSpecial('isNode'); return; }
-            if(k === '0') { toggleSpecial('isDiamond'); return; }
+            k = k.toLowerCase(); if (activeKey === k) return; 
+            if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); activeKey = k; return; } 
+            if(k === 'e') { toggleEraser(); activeKey = k; return; }
+            if(k === 'u') { undo(); activeKey = k; return; }
+            if(k === 'r') { redo(); activeKey = k; return; }
+            if(k === 'x') { performReset(); activeKey = k; return; } 
+            if(k === '5') { toggleSpecial('isNode'); activeKey = k; return; }
+            if(k === '0') { toggleSpecial('isDiamond'); activeKey = k; return; }
             if(['1','2','3','4','6','7','8','9'].includes(k)) { 
-                move(k); 
-                if(repeatTimer) clearInterval(repeatTimer); 
-                repeatTimer = setInterval(() => move(k), 120); 
+                activeKey = k; move(k); 
+                if(repeatTimer) clearInterval(repeatTimer); repeatTimer = setInterval(() => move(k), 120); 
             }
         }
-        function handleActionUp(k) { 
-            if (activeKey === k.toLowerCase()) { 
-                if(repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; } 
-                activeKey = null; 
-            } 
-        }
+        function handleActionUp(k) { if (activeKey === k.toLowerCase()) { if(repeatTimer) clearInterval(repeatTimer); repeatTimer = null; activeKey = null; } }
 
         function toggleSpecial(t) {
             if (!isDrawingMode || isEraserActive) return;
-            saveState(); 
-            let id = `${curI},${curJ}`;
+            saveState(); let id = `${curI},${curJ}`;
             if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
             specialElements[id][t] = !specialElements[id][t];
-            if (t==='isDiamond' && specialElements[id].isDiamond) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
+            if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
             if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
-            showActionHint(t === 'isNode' ? 'Node' : 'Diamond');
-            redraw();
+            showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw();
+        }
+
+        function performEraserActionAt(worldX, worldY) {
+            const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
+            for (let id in specialElements) {
+                let [i, j] = id.split(',').map(Number); let dx = i * STEP - worldX; let dy = j * STEP - worldY;
+                if (dx * dx + dy * dy <= rSq) { if (!changed) saveState(); delete specialElements[id]; changed = true; }
+            }
+            let initialLength = segments.length;
+            let newSegments = segments.filter(s => {
+                let dx1 = s.p1.x * STEP - worldX; let dy1 = s.p1.y * STEP - worldY; let dx2 = s.p2.x * STEP - worldX; let dy2 = s.p2.y * STEP - worldY;
+                return !(dx1 * dx1 + dy1 * dy1 <= rSq || dx2 * dx2 + dy2 * dy2 <= rSq);
+            });
+            if (newSegments.length !== initialLength) { if (!changed) saveState(); segments = newSegments; changed = true; }
+            if (changed) redraw();
         }
 
         function exportFile(fmt) {
@@ -580,14 +632,8 @@
         }
         
         function mouseWheel(e) {
-            if (e.ctrlKey) {
-                if (isEraserActive) { if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); else eraserRadius = Math.min(300, eraserRadius + 2); updateModeUI(); redraw(); }
-                return false;
-            }
-            let oldZoom = zoom; let worldX = (mouseX - offsetX) / oldZoom, worldY = (mouseY - offsetY) / oldZoom;
-            if (e.delta > 0) zoom /= 1.1; else zoom *= 1.1;
-            zoom = constrain(zoom, 0.05, 5); offsetX = mouseX - worldX * zoom; offsetY = mouseY - worldY * zoom;
-            return false; 
+            if (e.ctrlKey) { if (isEraserActive) { if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); else eraserRadius = Math.min(300, eraserRadius + 2); updateModeUI(); redraw(); } return false; }
+            applyZoom(e.delta > 0 ? 1/1.1 : 1.1, mouseX, mouseY); return false; 
         }
 
         function windowResized() { resizeCanvas(windowWidth, windowHeight); }
