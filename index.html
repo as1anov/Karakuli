@@ -102,7 +102,7 @@
             position: absolute; top: 53px; right: 0; z-index: 1001; 
         }
         .dropdown-options.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
-        .option-btn { width: 43px; font-size: 11px; font-weight: 500; flex-direction: column; }
+        .option-btn { width: 60px; font-size: 11px; font-weight: 500; flex-direction: column; }
 
         #mobile-keyboard {
             position: fixed; 
@@ -247,9 +247,11 @@
                 <div class="dropdown-options" id="theme-menu">
                     <div class="option-btn glass-panel" onclick="setTheme('light')">
                         <svg viewBox="0 0 24 24" class="theme-svg"><circle cx="12" cy="12" r="5" /><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
+                        <span>Light</span>
                     </div>
                     <div class="option-btn glass-panel" onclick="setTheme('dark')">
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                        <span>Dark</span>
                     </div>
                 </div>
             </div>
@@ -273,22 +275,22 @@
         </div>
 
         <div class="keyboard-row row-3-col">
-            <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')">
+            <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')" onpointerleave="vKeyEnd(event, '7')">
                 <svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg>
                 <span class="key-label">7</span>
             </div>
-            <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')">
+            <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')" onpointerleave="vKeyEnd(event, '8')">
                 <svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg>
                 <span class="key-label">8</span>
             </div>
-            <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')">
+            <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')" onpointerleave="vKeyEnd(event, '9')">
                 <svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg>
                 <span class="key-label">9</span>
             </div>
         </div>
         
         <div class="keyboard-row row-3-col">
-            <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')">
+            <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')" onpointerleave="vKeyEnd(event, '4')">
                 <svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg>
                 <span class="key-label">4</span>
             </div>
@@ -296,22 +298,22 @@
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg>
                 <span class="key-label">5</span>
             </div>
-            <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')">
+            <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')" onpointerleave="vKeyEnd(event, '6')">
                 <svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg>
                 <span class="key-label">6</span>
             </div>
         </div>
         
         <div class="keyboard-row row-3-col">
-            <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')">
+            <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')" onpointerleave="vKeyEnd(event, '1')">
                 <svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg>
                 <span class="key-label">1</span>
             </div>
-            <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')">
+            <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')" onpointerleave="vKeyEnd(event, '2')">
                 <svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg>
                 <span class="key-label">2</span>
             </div>
-            <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')">
+            <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')" onpointerleave="vKeyEnd(event, '3')">
                 <svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg>
                 <span class="key-label">3</span>
             </div>
@@ -338,6 +340,10 @@
     </div>
 
     <script>
+        // Параметры скорости рисования
+        const INITIAL_DELAY = 450; 
+        const REPEAT_INTERVAL = 140; 
+
         const BASE_STEP_VAL = 60; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
         let curI = 0, curJ = 0; let lastDirection = null; 
@@ -353,8 +359,14 @@
             dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8' }
         };
 
-        function vKeyStart(e, k) { if (e) { e.preventDefault(); e.stopPropagation(); } handleActionDown(k); }
-        function vKeyEnd(e, k) { if (e) { e.preventDefault(); e.stopPropagation(); } handleActionUp(k); }
+        function vKeyStart(e, k) { 
+            if (e) { e.preventDefault(); e.stopPropagation(); } 
+            handleActionDown(k); 
+        }
+        function vKeyEnd(e, k) { 
+            if (e) { e.preventDefault(); e.stopPropagation(); } 
+            handleActionUp(k); 
+        }
 
         const exportMenu = document.getElementById('export-menu');
         const themeMenu = document.getElementById('theme-menu');
@@ -414,7 +426,7 @@
             if (isEraserActive) isEraserActive = false; 
             else {
                 isDrawingMode = !isDrawingMode;
-                lastDirection = null; // Сброс направления при смене режима
+                lastDirection = null;
             }
             updateModeUI(); 
             redraw(); 
@@ -429,7 +441,6 @@
             c.parent('canvas-container'); 
             offsetX = width/2; offsetY = height/2; 
 
-            // Настройка зума для тача
             const canvasElem = document.getElementById('defaultCanvas0');
             canvasElem.addEventListener('touchstart', (e) => { if (e.touches.length === 2) lastPinchDist = getDist(e.touches[0], e.touches[1]); }, { passive: false });
             canvasElem.addEventListener('touchmove', (e) => {
@@ -532,42 +543,99 @@
             pop();
         }
 
+        function findSegment(x1, y1, x2, y2) {
+            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2};
+            if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
+            return segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
+        }
+
         function move(k) {
             const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]};
             if(!m[k]) return;
             let [di, dj] = m[k];
 
-            // ВАЛИДАЦИЯ НАПРАВЛЕНИЙ ПРИ РИСОВАНИИ
             if (isDrawingMode && !isEraserActive && lastDirection !== null) {
                 const prev = lastDirection;
                 const isReversing = (di === -prev.di && dj === -prev.dj);
-                if (!isReversing) {
-                    // Блокировка 135 градусов для прямых осей
-                    if (prev.di === -1 && prev.dj === 0 && (k === '9' || k === '3')) return; 
-                    if (prev.di === 1 && prev.dj === 0 && (k === '7' || k === '1')) return; 
-                    if (prev.di === 0 && prev.dj === -1 && (k === '1' || k === '3')) return; 
-                    if (prev.di === 0 && prev.dj === 1 && (k === '7' || k === '9')) return; 
-                    // Блокировка 135 градусов для диагоналей
-                    if (prev.di === 1 && prev.dj === 1 && (k === '8' || k === '4')) return; 
-                    if (prev.di === 1 && prev.dj === -1 && (k === '4' || k === '2')) return; 
-                    if (prev.di === -1 && prev.dj === -1 && (k === '2' || k === '6')) return; 
-                    if (prev.di === -1 && prev.dj === 1 && (k === '8' || k === '6')) return;
+                
+                // Стирание в режиме рисования: если движемся в обратном направлении, удаляем линию
+                if (isReversing) {
+                    let segIdx = findSegment(curI, curJ, curI + di, curJ + dj);
+                    if (segIdx !== -1) {
+                        saveState();
+                        segments.splice(segIdx, 1);
+                        curI += di;
+                        curJ += dj;
+                        
+                        // Проверяем, есть ли еще линии в этом направлении дальше (для остановки на стыках)
+                        let nextSegIdx = findSegment(curI, curJ, curI + di, curJ + dj);
+                        if(nextSegIdx === -1) {
+                           if(repeatTimer) {
+                               clearTimeout(repeatTimer);
+                               clearInterval(repeatTimer);
+                               repeatTimer = null;
+                           }
+                        }
+                        
+                        updateLastMoveAfterErase();
+                        redraw();
+                        return;
+                    } else {
+                        // Остановка на "стыке" или если линии больше нет
+                        if(repeatTimer) {
+                            clearTimeout(repeatTimer);
+                            clearInterval(repeatTimer);
+                            repeatTimer = null;
+                        }
+                        return;
+                    }
                 }
+
+                // Логические ограничения на повороты и пересечения
+                if (prev.di === -1 && prev.dj === 0 && (k === '9' || k === '3')) return; 
+                if (prev.di === 1 && prev.dj === 0 && (k === '7' || k === '1')) return; 
+                if (prev.di === 0 && prev.dj === -1 && (k === '1' || k === '3')) return; 
+                if (prev.di === 0 && prev.dj === 1 && (k === '7' || k === '9')) return; 
+                if (prev.di === 1 && prev.dj === 1 && (k === '8' || k === '4')) return; 
+                if (prev.di === 1 && prev.dj === -1 && (k === '4' || k === '2')) return; 
+                if (prev.di === -1 && prev.dj === -1 && (k === '2' || k === '6')) return; 
+                if (prev.di === -1 && prev.dj === 1 && (k === '8' || k === '6')) return;
             }
 
             let id = `${curI},${curJ}`;
-            if (isDrawingMode && !isEraserActive) saveState();
             
             if (isEraserActive || !isDrawingMode) {
+                // Навигация (перемещение курсора без рисования)
                 if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } 
                 else { curI += di; curJ += dj; }
+                lastDirection = {di, dj};
             } else {
+                // Рисование (создание новых сегментов)
+                saveState();
                 if (specialElements[id]?.isDiamond) {
                     addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3);
                     curI += di * 3; curJ += dj * 3;
-                } else { addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; }
+                } else { 
+                    addSeg(curI, curJ, curI + di, curJ + dj); 
+                    curI += di; curJ += dj; 
+                }
+                lastDirection = {di, dj};
             }
-            lastDirection = {di, dj}; redraw();
+            redraw();
+        }
+
+        // Вспомогательная функция для обновления направления после стирания
+        function updateLastMoveAfterErase() {
+            let connected = segments.filter(s => 
+                (s.p1.x === curI && s.p1.y === curJ) || (s.p2.x === curI && s.p2.y === curJ)
+            );
+            if (connected.length >= 1) {
+                let s = connected[connected.length - 1]; 
+                let other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1;
+                lastDirection = {di: curI - other.x, dj: curJ - other.y};
+            } else {
+                lastDirection = null;
+            }
         }
 
         function addSeg(x1, y1, x2, y2) {
@@ -579,20 +647,39 @@
 
         let repeatTimer = null, activeKey = null;
         function handleActionDown(k) {
-            k = k.toLowerCase(); if (activeKey === k) return; 
-            if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); activeKey = k; return; } 
-            if(k === 'e') { toggleEraser(); activeKey = k; return; }
-            if(k === 'u') { undo(); activeKey = k; return; }
-            if(k === 'r') { redo(); activeKey = k; return; }
-            if(k === 'x') { performReset(); activeKey = k; return; } 
-            if(k === '5') { toggleSpecial('isNode'); activeKey = k; return; }
-            if(k === '0') { toggleSpecial('isDiamond'); activeKey = k; return; }
+            k = k.toLowerCase(); 
+            if (activeKey === k) return;
+            
+            activeKey = k;
+
+            if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
+            if(k === 'e') { toggleEraser(); return; }
+            if(k === 'u') { undo(); return; }
+            if(k === 'r') { redo(); return; }
+            if(k === 'x') { performReset(); return; } 
+            if(k === '5') { toggleSpecial('isNode'); return; }
+            if(k === '0') { toggleSpecial('isDiamond'); return; }
+
             if(['1','2','3','4','6','7','8','9'].includes(k)) { 
-                activeKey = k; move(k); 
-                if(repeatTimer) clearInterval(repeatTimer); repeatTimer = setInterval(() => move(k), 120); 
+                move(k); 
+                if(repeatTimer) clearTimeout(repeatTimer); 
+                repeatTimer = setTimeout(() => {
+                    repeatTimer = setInterval(() => move(k), REPEAT_INTERVAL);
+                }, INITIAL_DELAY);
             }
         }
-        function handleActionUp(k) { if (activeKey === k.toLowerCase()) { if(repeatTimer) clearInterval(repeatTimer); repeatTimer = null; activeKey = null; } }
+        
+        function handleActionUp(k) { 
+            const key = k.toLowerCase();
+            if (activeKey === key) { 
+                if(repeatTimer) {
+                    clearTimeout(repeatTimer);
+                    clearInterval(repeatTimer);
+                    repeatTimer = null;
+                }
+                activeKey = null; 
+            } 
+        }
 
         function toggleSpecial(t) {
             if (!isDrawingMode || isEraserActive) return;
