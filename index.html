@@ -157,7 +157,7 @@
 
         .row-4-col .v-key { aspect-ratio: 1.8 / 1; }
         
-        /* Уменьшение иконок клавиатуры на 10% (с 26% до ~23%) */
+        /* Icons reduced by 10% (from 26% to 23.4%) */
         .v-key svg { 
             width: 23.4%; height: auto; 
             stroke: var(--kbd-icon-color); 
@@ -172,7 +172,7 @@
         .v-key.key-4 svg { transform: translateX(-1px); }
         .v-key.key-6 svg { transform: translateX(1px); }
         
-        /* Уменьшение иконки ромба на 10% (с 29% до ~26%) */
+        /* Diamond icon reduced by 10% (from 29% to 26.1%) */
         .v-key.key-0 svg { 
             width: 26.1%; 
             fill: var(--kbd-icon-color); 
@@ -189,7 +189,7 @@
         
         .v-key.mode-key { justify-content: center; align-items: center; }
         .v-key .mode-label { 
-            font-size: 10px; /* Уменьшено на ~10% */
+            font-size: 10px; 
             font-weight: 700; 
             text-transform: uppercase; letter-spacing: 0.8px;
             display: inline-block; color: var(--kbd-icon-color);
@@ -198,7 +198,7 @@
 
         .v-key .mode-sub { 
             position: absolute; bottom: 5px; right: 8px; 
-            font-size: 14px; /* Уменьшено на ~10% */
+            font-size: 14px; 
             font-weight: 950;
             color: var(--kbd-label-color); opacity: 0.9; 
             line-height: 1; letter-spacing: -1.5px;
@@ -221,14 +221,9 @@
             transform: translateY(5px); 
         }
 
-        /* Уменьшение иконок верхней панели на 10% (с 22px до ~20px) */
+        /* Top Nav icons reduced by 10% (from 22px to 19.8px) */
         .theme-svg { width: 19.8px; height: 19.8px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; }
         
-        /* Moon Icon - More rounded */
-        .moon-path {
-            d: path("M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z");
-        }
-
         body[data-theme="light"] .sun-icon { display: block; }
         body[data-theme="light"] .moon-icon { display: none; }
         body[data-theme="dark"] .sun-icon { display: none; }
@@ -268,23 +263,21 @@
                         <circle cx="12" cy="12" r="4" />
                         <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
                     </svg>
-                    <!-- Moon Main -->
+                    <!-- Moon Main - Fixed path for mobile compatibility -->
                     <svg viewBox="0 0 24 24" class="theme-svg moon-icon">
-                        <path class="moon-path" />
+                        <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
                     </svg>
                 </div>
                 <div class="dropdown-options" id="theme-menu">
                     <div class="option-btn glass-panel" onclick="setTheme('light')" title="Light Mode">
-                        <!-- Sun Dropdown -->
                         <svg viewBox="0 0 24 24" class="theme-svg">
                             <circle cx="12" cy="12" r="4" />
                             <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
                         </svg>
                     </div>
                     <div class="option-btn glass-panel" onclick="setTheme('dark')" title="Dark Mode">
-                        <!-- Moon Dropdown -->
                         <svg viewBox="0 0 24 24" class="theme-svg">
-                            <path class="moon-path" />
+                            <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
                         </svg>
                     </div>
                 </div>
