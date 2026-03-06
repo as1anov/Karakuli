@@ -379,9 +379,10 @@
         let actionTimeout = null; let currentTheme = 'light';
         let lastPinchDist = 0;
 
-        // Переменные для обработки одиночного клика vs перетаскивания
+        // Переменные для обработки панорамирования и тапа
         let touchStartTime = 0;
         let touchStartPos = { x: 0, y: 0 };
+        let isPanning = false;
         const CLICK_THRESHOLD_TIME = 200; 
         const CLICK_THRESHOLD_DIST = 10;
 
@@ -496,20 +497,22 @@
             canvasElem.addEventListener('touchstart', (e) => { 
                 if (e.touches.length === 2) {
                     lastPinchDist = getDist(e.touches[0], e.touches[1]); 
+                    isPanning = false;
                 } else if (e.touches.length === 1) {
                     touchStartTime = millis();
                     touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    isPanning = true; 
                 }
             }, { passive: false });
             
             canvasElem.addEventListener('touchend', (e) => {
-                // Если это был короткий тап без движения
-                if (millis() - touchStartTime < CLICK_THRESHOLD_TIME) {
+                if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
                     let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY);
                     if (d < CLICK_THRESHOLD_DIST) {
                         handleInstantJump(mouseX, mouseY);
                     }
                 }
+                isPanning = false;
             }, { passive: false });
 
             canvasElem.addEventListener('touchmove', (e) => {
@@ -526,33 +529,29 @@
         }
 
         function mousePressed() {
+            if (touches && touches.length > 0) return; // Игнорируем в p5, если есть тач
             touchStartTime = millis();
             touchStartPos = { x: mouseX, y: mouseY };
+            isPanning = true;
         }
 
         function mouseReleased() {
-            // Если это был клик мышкой (не тач)
-            if (millis() - touchStartTime < CLICK_THRESHOLD_TIME) {
+            if (touches && touches.length > 0) return;
+            if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
                 let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY);
                 if (d < CLICK_THRESHOLD_DIST) {
                     handleInstantJump(mouseX, mouseY);
                 }
             }
+            isPanning = false;
         }
 
         function handleInstantJump(mx, my) {
-            // Проверка на попадание по UI
             if (isOverUIElement(mx, my)) return;
-
-            // Расчет мировых координат
             let worldX = (mx - offsetX) / zoom;
             let worldY = (my - offsetY) / zoom;
-            
-            // Привязка к сетке
             curI = Math.round(worldX / STEP);
             curJ = Math.round(worldY / STEP);
-            
-            // Сброс направления, так как мы "телепортировались"
             lastDirection = null;
             redraw();
         }
@@ -578,13 +577,17 @@
             let colors = themeConfig[currentTheme];
             if (isExporting) clear(); else background(colors.canvasBg);
             
+            // Логика перемещения или ластика
             if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUIElement(mouseX, mouseY) && (!touches || touches.length < 2)) {
-                // Только если мы сдвинулись достаточно сильно (перетаскивание)
-                if (dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY) > CLICK_THRESHOLD_DIST) {
-                    if (isEraserActive) performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
-                    else { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
+                if (isEraserActive) {
+                    performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
+                } else if (isPanning) {
+                    // Перемещаем холст на разницу координат между кадрами
+                    offsetX += mouseX - pmouseX; 
+                    offsetY += mouseY - pmouseY;
                 }
             }
+            
             push(); translate(offsetX, offsetY); scale(zoom);
             if (!isExporting) drawGrid(colors.dotColor, colors.dotAlpha);
             drawGeometry(colors.geomColor);
