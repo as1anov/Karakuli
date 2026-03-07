@@ -31,7 +31,6 @@
             --dot-opacity: 0.25; 
             --icon-stroke: 2; 
             --active-btn-bg: rgba(0, 0, 0, 0.15); 
-            /* Новый цвет для иконки управления */
             --handle-icon-color: #939598;
         }
 
@@ -120,7 +119,8 @@
             position: fixed; 
             bottom: 0px; 
             left: 50%;
-            transform: translate(-50%, calc(100% - 70px)); 
+            /* Опущено на 10px ниже: было 70px, стало 60px (так как 100% - 60px оставляет меньше видимой части снизу) */
+            transform: translate(-50%, calc(100% - 60px)); 
             width: calc(100% - 40px); max-width: 400px; 
             z-index: 2000; padding: 0px 12px 14px 12px;
             display: flex; flex-direction: column; gap: 8px;
@@ -130,7 +130,8 @@
             border: none;
         }
 
-        #mobile-keyboard.open { transform: translate(-50%, -10px); pointer-events: auto; }
+        /* При открытии опускаем на 10px: было -10px, стало 0px */
+        #mobile-keyboard.open { transform: translate(-50%, 0px); pointer-events: auto; }
 
         .keyboard-trigger-area {
             width: 100%; height: 70px;
@@ -142,7 +143,7 @@
 
         .handle-arrow { 
             width: 50px; height: 50px;
-            stroke: var(--handle-icon-color); /* ОБНОВЛЕННЫЙ ЦВЕТ */
+            stroke: var(--handle-icon-color); 
             stroke-width: 2.5; 
             fill: none; 
             stroke-linecap: round; 
@@ -610,7 +611,8 @@
         function isOverUIElement(mx, my) {
             const kb = document.getElementById('mobile-keyboard'); 
             const kbRect = kb.getBoundingClientRect();
-            const interactionY = kb.classList.contains('open') ? kbRect.top : windowHeight - 70;
+            /* Обновлено с учетом смещения на 10px вниз */
+            const interactionY = kb.classList.contains('open') ? kbRect.top : windowHeight - 60;
             if (mx >= kbRect.left && mx <= kbRect.right && my >= interactionY) return true;
             if (my < 80) return true;
             return false;
