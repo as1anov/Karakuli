@@ -3,11 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Karakuli: Digital Editor</title>
+    <title>Karakuli: Cloud Editor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'karakuli-painter';
+
+        window.cloudStorage = { db, auth, appId };
+
+        // Auth Logic (Rule 3: Auth Before Queries)
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth failed", error);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                window.currentUser = user;
+                // Инициализация подписки после авторизации
+                subscribeToDrawing('main-canvas');
+            }
+        });
+
+        function subscribeToDrawing(drawingId) {
+            // ФИКС: Путь должен иметь четное количество сегментов (6)
+            // artifacts (1) / {appId} (2) / public (3) / data (4) / entries (5) / {drawingId} (6)
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'entries', drawingId);
+            
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists() && !window.isLocalUpdate) {
+                    const data = docSnap.data();
+                    if (window.applyCloudState) window.applyCloudState(data);
+                }
+            }, (error) => {
+                console.error("Firestore sync error:", error);
+            });
+        }
+
+        window.saveToCloud = async (state) => {
+            if (!window.currentUser) return;
+            window.isLocalUpdate = true;
+            
+            // ФИКС: Тот же путь для сохранения (6 сегментов)
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'entries', 'main-canvas');
+            try {
+                await setDoc(docRef, {
+                    segments: state.segments,
+                    specialElements: state.specialElements,
+                    curI: state.curI,
+                    curJ: state.curJ,
+                    lastDirection: state.lastDirection,
+                    updatedAt: Date.now(),
+                    author: window.currentUser.uid
+                });
+            } catch (e) {
+                console.error("Error saving to cloud:", e);
+            } finally {
+                // Небольшая задержка, чтобы избежать конфликтов при мгновенном обновлении
+                setTimeout(() => { window.isLocalUpdate = false; }, 500);
+            }
+        };
+
+        initAuth();
+    </script>
+
     <style>
         :root {
             --bg-color: #e8e8e8;
@@ -144,7 +223,6 @@
             fill: none; 
             stroke-linecap: round; 
             stroke-linejoin: round;
-            /* Сделано на 20% прозрачнее (opacity: 0.8) */
             opacity: 0.8; 
             transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
             animation: arrow-float 2.5s ease-in-out infinite;
@@ -201,8 +279,6 @@
             transform: scale(0.96);
         }
 
-        .row-4-col .v-key { aspect-ratio: 1.8 / 1; }
-        
         .v-key svg { 
             width: 23.4%; height: auto; 
             stroke: var(--kbd-icon-color); 
@@ -211,19 +287,6 @@
             stroke-linecap: round; 
             stroke-linejoin: round; 
             pointer-events: none;
-        }
-
-        .v-key.key-8 svg { transform: translateY(2px); } 
-        .v-key.key-2 svg { transform: translateY(-1px); } 
-        .v-key.key-4 svg { transform: translateX(-1px); }
-        .v-key.key-6 svg { transform: translateX(1px); }
-        
-        .v-key.key-0 svg { 
-            width: 26.1%; 
-            fill: var(--kbd-icon-color); 
-            stroke: var(--kbd-icon-color); 
-            stroke-width: var(--icon-stroke); 
-            stroke-linejoin: round; 
         }
 
         .v-key .key-label {
@@ -272,6 +335,14 @@
         body[data-theme="light"] .moon-icon { display: none; }
         body[data-theme="dark"] .sun-icon { display: none; }
         body[data-theme="dark"] .moon-icon { display: block; }
+        
+        .cloud-status {
+            position: fixed; bottom: 20px; right: 20px;
+            font-size: 10px; font-weight: 700; opacity: 0.6;
+            color: var(--text-color); z-index: 1000;
+            display: flex; align-items: center; gap: 5px;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
     </style>
 </head>
 <body data-theme="light"> 
@@ -300,26 +371,12 @@
         <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
             <div class="dropdown-container" style="position: relative;">
                 <div class="control-btn glass-panel" id="theme-trigger" onpointerdown="event.stopPropagation(); document.getElementById('theme-menu').classList.toggle('open'); document.getElementById('export-menu').classList.remove('open');">
-                    <svg viewBox="0 0 24 24" class="theme-svg sun-icon">
-                        <circle cx="12" cy="12" r="4" />
-                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                    </svg>
-                    <svg viewBox="0 0 24 24" class="theme-svg moon-icon">
-                        <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
-                    </svg>
+                    <svg viewBox="0 0 24 24" class="theme-svg sun-icon"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>
+                    <svg viewBox="0 0 24 24" class="theme-svg moon-icon"><path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" /></svg>
                 </div>
                 <div class="dropdown-options" id="theme-menu">
-                    <div class="option-btn glass-panel" onpointerdown="setTheme('light')">
-                        <svg viewBox="0 0 24 24" class="theme-svg">
-                            <circle cx="12" cy="12" r="4" />
-                            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                        </svg>
-                    </div>
-                    <div class="option-btn glass-panel" onpointerdown="setTheme('dark')">
-                        <svg viewBox="0 0 24 24" class="theme-svg">
-                            <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
-                        </svg>
-                    </div>
+                    <div class="option-btn glass-panel" onpointerdown="setTheme('light')"><svg viewBox="0 0 24 24" class="theme-svg"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg></div>
+                    <div class="option-btn glass-panel" onpointerdown="setTheme('dark')"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" /></svg></div>
                 </div>
             </div>
             <div class="dropdown-container" style="position: relative;">
@@ -336,116 +393,80 @@
     
     <div id="canvas-container"></div>
 
+    <div class="cloud-status">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19c2.5 0 4.5-2 4.5-4.5 0-2.3-1.7-4.2-3.9-4.5C17.6 6.5 14.7 4 11.2 4 8.2 4 5.7 6 5.1 8.8 2.8 9.4 1 11.5 1 14c0 2.8 2.2 5 5 5h11.5z"/></svg>
+        <span id="sync-text">Synched</span>
+    </div>
+
     <div id="mobile-keyboard">
         <div class="keyboard-trigger-area" onpointerdown="document.getElementById('mobile-keyboard').classList.toggle('open')">
-            <svg class="handle-arrow" viewBox="0 0 24 24">
-                <path d="M18 15l-6-6-6 6" />
-            </svg>
+            <svg class="handle-arrow" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6" /></svg>
             <div class="keyboard-close-bar"></div>
         </div>
-
+        <!-- Ряды виртуальной клавиатуры -->
         <div class="keyboard-row row-3-col">
-            <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')" onpointerleave="vKeyEnd(event, '7')">
-                <svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg>
-                <span class="key-label">7</span>
-            </div>
-            <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')" onpointerleave="vKeyEnd(event, '8')">
-                <svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg>
-                <span class="key-label">8</span>
-            </div>
-            <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')" onpointerleave="vKeyEnd(event, '9')">
-                <svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg>
-                <span class="key-label">9</span>
-            </div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')"><svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg><span class="key-label">7</span></div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')"><svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg><span class="key-label">8</span></div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')"><svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg><span class="key-label">9</span></div>
         </div>
-        
         <div class="keyboard-row row-3-col">
-            <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')" onpointerleave="vKeyEnd(event, '4')">
-                <svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg>
-                <span class="key-label">4</span>
-            </div>
-            <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg>
-                <span class="key-label">5</span>
-            </div>
-            <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')" onpointerleave="vKeyEnd(event, '6')">
-                <svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg>
-                <span class="key-label">6</span>
-            </div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')"><svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg><span class="key-label">4</span></div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg><span class="key-label">5</span></div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')"><svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg><span class="key-label">6</span></div>
         </div>
-        
         <div class="keyboard-row row-3-col">
-            <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')" onpointerleave="vKeyEnd(event, '1')">
-                <svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg>
-                <span class="key-label">1</span>
-            </div>
-            <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')" onpointerleave="vKeyEnd(event, '2')">
-                <svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg>
-                <span class="key-label">2</span>
-            </div>
-            <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')" onpointerleave="vKeyEnd(event, '3')">
-                <svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg>
-                <span class="key-label">3</span>
-            </div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')"><svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg><span class="key-label">1</span></div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')"><svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg><span class="key-label">2</span></div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')"><svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg><span class="key-label">3</span></div>
         </div>
-        
         <div class="keyboard-row row-4-col">
-            <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')">
-                <svg viewBox="0 0 24 24"><path d="M12 5L19 12L12 19L5 12Z"/></svg>
-                <span class="key-label">0</span>
-            </div>
-            <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')">
-                <svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg>
-                <span class="key-label">U</span>
-            </div>
-            <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')">
-                <svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg>
-                <span class="key-label">R</span>
-            </div>
-            <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')">
-                <span class="mode-label">MODE</span>
-                <span class="mode-sub">⎽⎽</span>
-            </div>
+            <div class="v-key" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')"><svg viewBox="0 0 24 24"><path d="M12 5L19 12L12 19L5 12Z"/></svg><span class="key-label">0</span></div>
+            <div class="v-key" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')"><svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg><span class="key-label">U</span></div>
+            <div class="v-key" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')"><svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg><span class="key-label">R</span></div>
+            <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')"><span class="mode-label">MODE</span><span class="mode-sub">⎽⎽</span></div>
         </div>
     </div>
 
     <script>
-        const INITIAL_DELAY = 520;  
-        const REPEAT_INTERVAL = 180; 
-
-        const BASE_STEP_VAL = 60; let STEP = 30; let LINE_WEIGHT = 58; 
-        let segments = []; let specialElements = {}; 
-        let curI = 0, curJ = 0; let lastDirection = null; 
-        let isDrawingMode = false; let isEraserActive = false;
+        const INITIAL_DELAY = 520, REPEAT_INTERVAL = 180, BASE_STEP_VAL = 60; 
+        let STEP = 30, LINE_WEIGHT = 58, segments = [], specialElements = {}; 
+        let curI = 0, curJ = 0, lastDirection = null, isDrawingMode = false, isEraserActive = false;
         const DEFAULT_ERASER_RADIUS = 40; let eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
-        let offsetX = 0, offsetY = 0; let zoom = 0.48; 
-        let history = [], redoStack = []; let isExporting = false;
-        let actionTimeout = null; let currentTheme = 'light';
-        let lastPinchDist = 0;
-
-        let touchStartTime = 0;
-        let touchStartPos = { x: 0, y: 0 };
-        let isPanning = false;
-        const CLICK_THRESHOLD_TIME = 200; 
-        const CLICK_THRESHOLD_DIST = 10;
+        let offsetX = 0, offsetY = 0, zoom = 0.48, history = [], redoStack = [], isExporting = false;
+        let actionTimeout = null, currentTheme = 'light', lastPinchDist = 0;
+        let touchStartTime = 0, touchStartPos = { x: 0, y: 0 }, isPanning = false;
+        const CLICK_THRESHOLD_TIME = 200, CLICK_THRESHOLD_DIST = 10;
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
             dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#414042', cursorColor: '#FF6666', drawCursor: '#58595B' }
         };
 
-        function vKeyStart(e, k) { 
-            if (e) { e.preventDefault(); e.stopPropagation(); } 
-            handleActionDown(k); 
-        }
-        function vKeyEnd(e, k) { 
-            if (e) { e.preventDefault(); e.stopPropagation(); } 
-            handleActionUp(k); 
+        window.applyCloudState = (data) => {
+            segments = data.segments || [];
+            specialElements = data.specialElements || {};
+            curI = data.curI || 0;
+            curJ = data.curJ || 0;
+            lastDirection = data.lastDirection || null;
+            redraw();
+            showActionHint('Облачная синхронизация');
+        };
+
+        function triggerCloudSave() {
+            if (window.saveToCloud) {
+                document.getElementById('sync-text').innerText = "Сохранение...";
+                window.saveToCloud({segments, specialElements, curI, curJ, lastDirection}).then(() => {
+                    document.getElementById('sync-text').innerText = "Синхронизировано";
+                });
+            }
         }
 
+        // Обработка виртуальной клавиатуры
+        function vKeyStart(e, k) { if (e) { e.preventDefault(); e.stopPropagation(); } handleActionDown(k); }
+        function vKeyEnd(e, k) { if (e) { e.preventDefault(); e.stopPropagation(); } handleActionUp(k); }
+
         window.onpointerdown = (e) => { 
-            const exportMenu = document.getElementById('export-menu');
-            const themeMenu = document.getElementById('theme-menu');
+            const exportMenu = document.getElementById('export-menu'), themeMenu = document.getElementById('theme-menu');
             if (!e.target.closest('.dropdown-container')) {
                 if (exportMenu) exportMenu.classList.remove('open'); 
                 if (themeMenu) themeMenu.classList.remove('open'); 
@@ -453,161 +474,106 @@
         };
 
         function setTheme(m) { 
-            currentTheme = m; 
-            document.body.setAttribute('data-theme', m); 
+            currentTheme = m; document.body.setAttribute('data-theme', m); 
             document.getElementById('theme-menu').classList.remove('open'); 
-            showActionHint(m === 'light' ? 'Light Theme' : 'Dark Theme');
-            redraw(); 
+            showActionHint(m === 'light' ? 'Светлая тема' : 'Темная тема'); redraw(); 
         }
         
         function showActionHint(t, persistent = false) { 
-            let a = document.getElementById('action-indicator'); 
-            a.innerText = t; 
-            a.classList.add('visible'); 
+            let a = document.getElementById('action-indicator'); a.innerText = t; a.classList.add('visible'); 
             if(actionTimeout) { clearTimeout(actionTimeout); actionTimeout = null; }
-            if (!persistent) {
-                actionTimeout = setTimeout(() => {
-                    if (!isEraserActive) a.classList.remove('visible');
-                    else updateModeUI(); 
-                }, 1200); 
-            }
+            if (!persistent) actionTimeout = setTimeout(() => { if (!isEraserActive) a.classList.remove('visible'); else updateModeUI(); }, 1200); 
         }
 
         function saveState() {
             history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-            if(history.length > 200) history.shift(); 
-            redoStack = []; 
+            if(history.length > 200) history.shift(); redoStack = []; 
         }
 
         function undo() { 
             if(history.length > 0) { 
                 redoStack.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-                let s = history.pop(); 
-                segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
-                showActionHint('Undo'); redraw();
+                let s = history.pop(); segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
+                showActionHint('Отмена'); redraw(); triggerCloudSave();
             }
         }
 
         function redo() { 
             if(redoStack.length > 0) { 
                 history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-                let s = redoStack.pop(); 
-                segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
-                showActionHint('Redo'); redraw();
+                let s = redoStack.pop(); segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
+                showActionHint('Повтор'); redraw(); triggerCloudSave();
             }
         }
         
         function updateModeUI() {
-            const modeHeader = document.getElementById('mode-text');
-            const indicator = document.getElementById('action-indicator');
-            const eraserBtn = document.getElementById('eraser-btn');
-            modeHeader.innerText = isDrawingMode ? "Drawing" : "Navigation";
+            const modeHeader = document.getElementById('mode-text'), indicator = document.getElementById('action-indicator'), eraserBtn = document.getElementById('eraser-btn');
+            modeHeader.innerText = isDrawingMode ? "Рисование" : "Навигация";
             if (isEraserActive) { 
-                eraserBtn.classList.add('active'); 
-                let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100); 
-                showActionHint(`Size: ${percent}%`, true);
-            } else { 
-                eraserBtn.classList.remove('active'); 
-                if (!actionTimeout) indicator.classList.remove('visible');
-            }
+                eraserBtn.classList.add('active'); let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100); 
+                showActionHint(`Размер: ${percent}%`, true);
+            } else { eraserBtn.classList.remove('active'); if (!actionTimeout) indicator.classList.remove('visible'); }
         }
 
         function toggleMode() { 
-            if (isEraserActive) isEraserActive = false; 
-            else { isDrawingMode = !isDrawingMode; lastDirection = null; }
-            updateModeUI(); 
-            redraw(); 
+            if (isEraserActive) isEraserActive = false; else { isDrawingMode = !isDrawingMode; lastDirection = null; }
+            updateModeUI(); redraw(); 
         }
         
-        function toggleEraser() { 
-            isEraserActive = !isEraserActive; 
-            if (isEraserActive && eraserRadius === DEFAULT_ERASER_RADIUS) eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
-            updateModeUI(); 
-            redraw(); 
-        }
+        function toggleEraser() { isEraserActive = !isEraserActive; if (isEraserActive && eraserRadius === DEFAULT_ERASER_RADIUS) eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; updateModeUI(); redraw(); }
 
         function performReset() { 
-            saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; 
-            offsetX = width / 2; offsetY = height / 2; lastDirection = null; 
-            showActionHint('Reset'); redraw(); 
+            saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; offsetX = width / 2; offsetY = height / 2; lastDirection = null; 
+            showActionHint('Сброс'); redraw(); triggerCloudSave();
         }
 
         function setup() { 
-            let c = createCanvas(windowWidth, windowHeight); 
-            c.parent('canvas-container'); 
+            let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); 
             offsetX = width/2; offsetY = height/2; 
             const canvasElem = document.getElementById('defaultCanvas0');
             
+            // Поддержка жестов тачпада/экрана
             canvasElem.addEventListener('touchstart', (e) => { 
-                if (e.touches.length === 2) {
-                    lastPinchDist = getDist(e.touches[0], e.touches[1]); 
-                    isPanning = false;
-                } else if (e.touches.length === 1) {
-                    touchStartTime = millis();
-                    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                    isPanning = true; 
-                }
+                if (e.touches.length === 2) { lastPinchDist = getDist(e.touches[0], e.touches[1]); isPanning = false; }
+                else if (e.touches.length === 1) { touchStartTime = millis(); touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY }; isPanning = true; }
             }, { passive: false });
             
             canvasElem.addEventListener('touchend', (e) => {
                 if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
-                    let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY);
-                    if (d < CLICK_THRESHOLD_DIST) handleInstantJump(mouseX, mouseY);
+                    let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY); if (d < CLICK_THRESHOLD_DIST) handleInstantJump(mouseX, mouseY);
                 }
                 isPanning = false;
             }, { passive: false });
-
+            
             canvasElem.addEventListener('touchmove', (e) => {
                 if (e.touches.length === 2) {
-                    e.preventDefault();
-                    let currentDist = getDist(e.touches[0], e.touches[1]);
-                    let midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                    let midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                    applyZoom(currentDist / lastPinchDist, midX, midY);
-                    lastPinchDist = currentDist;
-                    redraw();
+                    e.preventDefault(); let currentDist = getDist(e.touches[0], e.touches[1]);
+                    let midX = (e.touches[0].clientX + e.touches[1].clientX) / 2; let midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                    applyZoom(currentDist / lastPinchDist, midX, midY); lastPinchDist = currentDist; redraw();
                 }
             }, { passive: false });
         }
 
-        function mousePressed() {
-            if (touches && touches.length > 0) return; 
-            touchStartTime = millis();
-            touchStartPos = { x: mouseX, y: mouseY };
-            isPanning = true;
-        }
-
-        function mouseReleased() {
-            if (touches && touches.length > 0) return;
-            if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
-                let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY);
-                if (d < CLICK_THRESHOLD_DIST) handleInstantJump(mouseX, mouseY);
-            }
-            isPanning = false;
-        }
+        function mousePressed() { if (touches && touches.length > 0) return; touchStartTime = millis(); touchStartPos = { x: mouseX, y: mouseY }; isPanning = true; }
+        function mouseReleased() { if (touches && touches.length > 0) return; if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
+            let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY); if (d < CLICK_THRESHOLD_DIST) handleInstantJump(mouseX, mouseY);
+        } isPanning = false; }
 
         function handleInstantJump(mx, my) {
-            if (isOverUIElement(mx, my)) return;
-            let worldX = (mx - offsetX) / zoom;
-            let worldY = (my - offsetY) / zoom;
-            curI = Math.round(worldX / STEP);
-            curJ = Math.round(worldY / STEP);
-            lastDirection = null;
-            redraw();
+            if (isOverUIElement(mx, my)) return; let worldX = (mx - offsetX) / zoom; let worldY = (my - offsetY) / zoom;
+            curI = Math.round(worldX / STEP); curJ = Math.round(worldY / STEP); lastDirection = null; redraw(); triggerCloudSave();
         }
 
         function isOverUIElement(mx, my) {
-            const kb = document.getElementById('mobile-keyboard'); 
-            const kbRect = kb.getBoundingClientRect();
+            const kb = document.getElementById('mobile-keyboard'), kbRect = kb.getBoundingClientRect();
             const triggerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--kbd-trigger-height'));
             const interactionY = kb.classList.contains('open') ? kbRect.top : windowHeight - triggerH;
             if (mx >= kbRect.left && mx <= kbRect.right && my >= interactionY) return true;
-            if (my < 80) return true;
-            return false;
+            if (my < 80) return true; return false;
         }
 
         function getDist(t1, t2) { return Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2)); }
-
+        
         function applyZoom(factor, centerX, centerY) {
             let oldZoom = zoom; zoom = constrain(zoom * factor, 0.05, 5);
             let worldX = (centerX - offsetX) / oldZoom; let worldY = (centerY - offsetY) / oldZoom;
@@ -615,19 +581,14 @@
         }
 
         function draw() {
-            let colors = themeConfig[currentTheme];
-            if (isExporting) clear(); else background(colors.canvasBg);
-            
+            let colors = themeConfig[currentTheme]; if (isExporting) clear(); else background(colors.canvasBg);
             if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUIElement(mouseX, mouseY) && (!touches || touches.length < 2)) {
                 if (isEraserActive) performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
                 else if (isPanning) { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
             }
-            
             push(); translate(offsetX, offsetY); scale(zoom);
-            if (!isExporting) drawGrid(colors.dotColor, colors.dotAlpha);
-            drawGeometry(colors.geomColor);
-            if (!isExporting) drawCursor();
-            pop();
+            if (!isExporting) drawGrid(colors.dotColor, colors.dotAlpha); drawGeometry(colors.geomColor);
+            if (!isExporting) drawCursor(); pop();
         }
 
         function drawGrid(dotRGB, alpha) {
@@ -638,23 +599,21 @@
         }
 
         function drawGeometry(colValue) {
-            let col = isExporting ? 0 : colValue; let ringD = BASE_STEP_VAL * 2; let innerHoleR = (ringD - LINE_WEIGHT) / 2;
+            let col = isExporting ? 0 : colValue, ringD = BASE_STEP_VAL * 2, innerHoleR = (ringD - LINE_WEIGHT) / 2;
             push(); let ctx = drawingContext; ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
-            for (let id in specialElements) if (specialElements[id].isNode) {
-                let [i, j] = id.split(',').map(Number); ctx.moveTo(i * STEP + innerHoleR, j * STEP); ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
-            }
+            for (let id in specialElements) if (specialElements[id].isNode) { let [i, j] = id.split(',').map(Number); ctx.moveTo(i * STEP + innerHoleR, j * STEP); ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true); }
             ctx.clip(); stroke(col); strokeWeight(LINE_WEIGHT); strokeCap(SQUARE); strokeJoin(MITER); noFill();
             getPathGroups().forEach(group => { beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape(); });
             ctx.restore(); pop();
             for(let id in specialElements) {
-                let [i, j] = id.split(',').map(Number); let x = i*STEP, y = j*STEP;
+                let [i, j] = id.split(',').map(Number), x = i*STEP, y = j*STEP;
                 if(specialElements[id].isNode) { noFill(); stroke(col); strokeWeight(LINE_WEIGHT); ellipse(x, y, ringD, ringD); }
                 if(specialElements[id].isDiamond) { fill(col); noStroke(); push(); translate(x, y + LINE_WEIGHT/2); rotate(QUARTER_PI); rectMode(CENTER); rect(0, 0, LINE_WEIGHT, LINE_WEIGHT); pop(); }
             }
         }
 
         function getPathGroups() {
-            let groups = []; let remaining = [...segments];
+            let groups = [], remaining = [...segments];
             while (remaining.length > 0) {
                 let group = [remaining.shift()], added = true;
                 while (added) {
@@ -674,152 +633,87 @@
 
         function drawCursor() {
             if (isEraserActive) {
-                let worldMX = (mouseX - offsetX) / zoom; let worldMY = (mouseY - offsetY) / zoom;
+                let worldMX = (mouseX - offsetX) / zoom, worldMY = (mouseY - offsetY) / zoom;
                 noFill(); stroke("#FF6666"); strokeWeight(2 / zoom); fill("rgba(255, 102, 102, 0.15)"); ellipse(worldMX, worldMY, (eraserRadius * 2) / zoom); return;
             }
-            let colors = themeConfig[currentTheme];
-            let finalColor = isDrawingMode ? colors.drawCursor : colors.cursorColor;
+            let colors = themeConfig[currentTheme], finalColor = isDrawingMode ? colors.drawCursor : colors.cursorColor;
             push(); translate(curI*STEP, curJ*STEP); fill(finalColor); noStroke(); 
             if (lastDirection && lastDirection.di !== 0 && lastDirection.dj !== 0) rect(-10, -10, 20, 20); else { rotate(QUARTER_PI); rect(-10, -10, 20, 20); }
             pop();
         }
 
         function findSegment(x1, y1, x2, y2) {
-            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2};
-            if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
+            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2}; if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
             return segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
         }
 
         function move(k) {
-            const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]};
-            if(!m[k]) return;
-            let [di, dj] = m[k];
-            
+            const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]}; if(!m[k]) return;
+            let [di, dj] = m[k], id = `${curI},${curJ}`;
             if (isDrawingMode && !isEraserActive && lastDirection !== null) {
-                const prev = lastDirection;
-                const isReversing = (di === -prev.di && dj === -prev.dj);
-                
-                if (isReversing) {
+                const prev = lastDirection; if (di === -prev.di && dj === -prev.dj) {
                     let segIdx = findSegment(curI, curJ, curI + di, curJ + dj);
-                    if (segIdx !== -1) {
-                        saveState(); segments.splice(segIdx, 1); curI += di; curJ += dj;
-                        updateLastMoveAfterErase(); redraw(); return;
-                    } else if(repeatTimer) { stopRepeat(); return; }
+                    if (segIdx !== -1) { saveState(); segments.splice(segIdx, 1); curI += di; curJ += dj; updateLastMoveAfterErase(); redraw(); triggerCloudSave(); return; }
+                    else if(repeatTimer) { stopRepeat(); return; }
                 }
-
-                let dot = di * prev.di + dj * prev.dj;
-                if (dot < 0) { 
-                    if(repeatTimer) stopRepeat();
-                    return; 
-                }
+                if (di * prev.di + dj * prev.dj < 0) { if(repeatTimer) stopRepeat(); return; }
             }
-
-            let id = `${curI},${curJ}`;
-            if (isEraserActive || !isDrawingMode) {
-                if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } else { curI += di; curJ += dj; }
-                lastDirection = {di, dj};
-            } else {
-                saveState();
-                if (specialElements[id]?.isDiamond) { 
-                    addSeg(curI, curJ, curI+di, curJ+dj); 
-                    addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); 
-                    addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); 
-                    curI += di * 3; curJ += dj * 3; 
-                }
-                else { addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; }
-                lastDirection = {di, dj};
-            }
-            redraw();
+            if (isEraserActive || !isDrawingMode) { if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } else { curI += di; curJ += dj; } lastDirection = {di, dj}; }
+            else { saveState(); if (specialElements[id]?.isDiamond) { addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); curI += di * 3; curJ += dj * 3; }
+            else { addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; } lastDirection = {di, dj}; }
+            redraw(); triggerCloudSave();
         }
 
         function updateLastMoveAfterErase() {
             let connected = segments.filter(s => (s.p1.x === curI && s.p1.y === curJ) || (s.p2.x === curI && s.p2.y === curJ));
-            if (connected.length >= 1) { 
-                let s = connected[connected.length - 1]; 
-                let other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1; 
-                lastDirection = {di: curI - other.x, dj: curJ - other.y}; 
-            }
+            if (connected.length >= 1) { let s = connected[connected.length - 1], other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1; lastDirection = {di: curI - other.x, dj: curJ - other.y}; }
             else lastDirection = null;
         }
 
         let repeatTimer = null, activeKey = null;
         function handleActionDown(k) {
             k = k.toLowerCase(); if (activeKey === k) return; activeKey = k;
-            if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
-            if(k === 'e') { toggleEraser(); return; }
-            if(k === 'u') { undo(); return; }
-            if(k === 'r') { redo(); return; }
-            if(k === 'x') { performReset(); return; } 
-            if(k === '5') { toggleSpecial('isNode'); return; }
-            if(k === '0') { toggleSpecial('isDiamond'); return; }
-            if(['1','2','3','4','6','7','8','9'].includes(k)) { 
-                move(k); if(repeatTimer) stopRepeat();
-                repeatTimer = setTimeout(() => { repeatTimer = setInterval(() => move(k), REPEAT_INTERVAL); }, INITIAL_DELAY);
-            }
+            if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } if(k === 'e') { toggleEraser(); return; } if(k === 'u') { undo(); return; } if(k === 'r') { redo(); return; }
+            if(k === 'x') { performReset(); return; } if(k === '5') { toggleSpecial('isNode'); return; } if(k === '0') { toggleSpecial('isDiamond'); return; }
+            if(['1','2','3','4','6','7','8','9'].includes(k)) { move(k); if(repeatTimer) stopRepeat(); repeatTimer = setTimeout(() => { repeatTimer = setInterval(() => move(k), REPEAT_INTERVAL); }, INITIAL_DELAY); }
         }
-        
-        function handleActionUp(k) { 
-            const key = k.toLowerCase();
-            if (activeKey === key) { stopRepeat(); activeKey = null; } 
-        }
-
+        function handleActionUp(k) { if (activeKey === k.toLowerCase()) { stopRepeat(); activeKey = null; } }
         function stopRepeat() { if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } }
 
         function toggleSpecial(t) {
-            if (!isDrawingMode || isEraserActive) return;
-            saveState(); let id = `${curI},${curJ}`;
-            if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
-            specialElements[id][t] = !specialElements[id][t];
+            if (!isDrawingMode || isEraserActive) return; saveState(); let id = `${curI},${curJ}`;
+            if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false}; specialElements[id][t] = !specialElements[id][t];
             if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
-            if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
-            showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw();
+            if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id]; showActionHint(t === 'isNode' ? 'Узел' : 'Ромб'); redraw(); triggerCloudSave();
         }
 
         function addSeg(x1, y1, x2, y2) {
-            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2};
-            if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
-            let idx = segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
-            if(idx !== -1) segments.splice(idx, 1); else segments.push({p1, p2});
+            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2}; if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
+            let idx = segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y); if(idx !== -1) segments.splice(idx, 1); else segments.push({p1, p2});
         }
 
         function performEraserActionAt(worldX, worldY) {
-            const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
-            for (let id in specialElements) {
-                let [i, j] = id.split(',').map(Number); let dx = i * STEP - worldX; let dy = j * STEP - worldY;
-                if (dx * dx + dy * dy <= rSq) { if (!changed) saveState(); delete specialElements[id]; changed = true; }
-            }
-            let initialLength = segments.length;
-            let newSegments = segments.filter(s => {
-                let dx1 = s.p1.x * STEP - worldX; let dy1 = s.p1.y * STEP - worldY; let dx2 = s.p2.x * STEP - worldX; let dy2 = s.p2.y * STEP - worldY;
+            const rWorld = eraserRadius / zoom, rSq = rWorld * rWorld; let changed = false;
+            for (let id in specialElements) { let [i, j] = id.split(',').map(Number); let dx = i * STEP - worldX, dy = j * STEP - worldY; if (dx * dx + dy * dy <= rSq) { if (!changed) saveState(); delete specialElements[id]; changed = true; } }
+            let initialLength = segments.length, newSegments = segments.filter(s => {
+                let dx1 = s.p1.x * STEP - worldX, dy1 = s.p1.y * STEP - worldY, dx2 = s.p2.x * STEP - worldX, dy2 = s.p2.y * STEP - worldY;
                 return !(dx1 * dx1 + dy1 * dy1 <= rSq || dx2 * dx2 + dy2 * dy2 <= rSq);
             });
             if (newSegments.length !== initialLength) { if (!changed) saveState(); segments = newSegments; changed = true; }
-            if (changed) redraw();
+            if (changed) { redraw(); triggerCloudSave(); }
         }
 
         function exportFile(fmt) {
-            const exportMenu = document.getElementById('export-menu');
-            if (exportMenu) exportMenu.classList.remove('open');
+            const exportMenu = document.getElementById('export-menu'); if (exportMenu) exportMenu.classList.remove('open');
             if(fmt==='svg') {
                 let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1000 -1000 2000 2000">`;
-                getPathGroups().forEach(g => {
-                    let d = `M ${g[0].p1.x*STEP} ${g[0].p1.y*STEP}`; g.forEach(s => d += ` L ${s.p2.x*STEP} ${s.p2.y*STEP}`);
-                    svg += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter"/>`;
-                });
-                svg += `</svg>`;
-                let b = new Blob([svg], {type:'image/svg+xml'}); let a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download='karakuli.svg'; a.click();
+                getPathGroups().forEach(g => { let d = `M ${g[0].p1.x*STEP} ${g[0].p1.y*STEP}`; g.forEach(s => d += ` L ${s.p2.x*STEP} ${s.p2.y*STEP}`); svg += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter"/>`; });
+                svg += `</svg>`; let b = new Blob([svg], {type:'image/svg+xml'}), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download='karakuli.svg'; a.click();
             } else { isExporting = true; redraw(); setTimeout(() => { saveCanvas('karakuli', 'png'); isExporting = false; redraw(); }, 100); }
         }
         
         function mouseWheel(e) {
-            if (e.ctrlKey) { 
-                if (isEraserActive) { 
-                    if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); 
-                    else eraserRadius = Math.min(300, eraserRadius + 2); 
-                    updateModeUI(); redraw(); 
-                } 
-                return false; 
-            }
+            if (e.ctrlKey) { if (isEraserActive) { if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); else eraserRadius = Math.min(300, eraserRadius + 2); updateModeUI(); redraw(); } return false; }
             applyZoom(e.delta > 0 ? 1/1.1 : 1.1, mouseX, mouseY); return false; 
         }
 
