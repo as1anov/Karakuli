@@ -6,7 +6,7 @@
     <title>Karakuli: Digital Editor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         :root {
@@ -32,6 +32,7 @@
             --icon-stroke: 2; 
             --active-btn-bg: rgba(0, 0, 0, 0.15); 
             --handle-icon-color: #939598;
+            --kbd-trigger-height: 23px; 
         }
 
         [data-theme="dark"] {
@@ -50,6 +51,7 @@
             --handle-icon-color: #939598;
         }
 
+        /* Basic resets to prevent text selection and browser gestures */
         * {
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none; 
@@ -75,6 +77,7 @@
             border: 1px solid var(--border-color);
         }
 
+        /* Top Nav Container */
         .top-nav-container {
             position: absolute; top: 20px; left: 0; right: 0;
             z-index: 500; display: flex; justify-content: space-between;
@@ -104,6 +107,7 @@
             border-color: var(--text-color);
         }
         
+        /* Dropdown Menus */
         .dropdown-options { 
             display: flex; flex-direction: column; gap: 8px; opacity: 0; 
             pointer-events: none; transform: translateY(-10px); 
@@ -114,13 +118,12 @@
         
         .option-btn { width: var(--header-height); aspect-ratio: 1 / 1; }
 
-        /* --- Keyboard Interface --- */
+        /* Mobile Keyboard UI */
         #mobile-keyboard {
             position: fixed; 
             bottom: 0px; 
             left: 50%;
-            /* Опущено на 10px ниже: было 70px, стало 60px (так как 100% - 60px оставляет меньше видимой части снизу) */
-            transform: translate(-50%, calc(100% - 60px)); 
+            transform: translate(-50%, calc(100% - var(--kbd-trigger-height))); 
             width: calc(100% - 40px); max-width: 400px; 
             z-index: 2000; padding: 0px 12px 14px 12px;
             display: flex; flex-direction: column; gap: 8px;
@@ -130,44 +133,43 @@
             border: none;
         }
 
-        /* При открытии опускаем на 10px: было -10px, стало 0px */
-        #mobile-keyboard.open { transform: translate(-50%, 0px); pointer-events: auto; }
+        #mobile-keyboard.open { transform: translate(-50%, -10px); pointer-events: auto; }
 
         .keyboard-trigger-area {
-            width: 100%; height: 70px;
+            width: 100%; height: var(--kbd-trigger-height);
             display: flex; justify-content: center; align-items: flex-end; 
             cursor: pointer; pointer-events: auto;
             position: relative;
-            padding-bottom: 15px; 
+            padding-bottom: 5px; 
         }
 
         .handle-arrow { 
-            width: 50px; height: 50px;
-            stroke: var(--handle-icon-color); 
-            stroke-width: 2.5; 
+            width: 45px; height: 45px; 
+            stroke: var(--handle-icon-color);
+            stroke-width: 2; /* Updated to 2px */
             fill: none; 
             stroke-linecap: round; 
             stroke-linejoin: round;
             transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
             animation: arrow-float 2.5s ease-in-out infinite;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
         }
 
         @keyframes arrow-float {
             0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-12px); }
+            50% { transform: translateY(-8px); }
         }
 
         #mobile-keyboard.open .handle-arrow {
             opacity: 0;
-            transform: scale(0.5) translateY(20px);
+            transform: scale(0.5) translateY(10px);
             pointer-events: none;
             animation: none;
         }
 
         .keyboard-close-bar {
             position: absolute;
-            bottom: 12px; 
+            bottom: 8px; 
             width: 45px; height: 5px;
             background: var(--kbd-text-color);
             border-radius: 10px;
@@ -179,10 +181,6 @@
         #mobile-keyboard.open .keyboard-close-bar {
             opacity: 0.35;
             transform: scaleX(1);
-        }
-        
-        #mobile-keyboard.open .keyboard-close-bar:hover {
-            opacity: 0.7;
         }
 
         .keyboard-row { display: grid; gap: 6px; pointer-events: auto; }
@@ -344,7 +342,7 @@
     
     <div id="canvas-container"></div>
 
-    <!-- Mobile Keyboard Centered Bottom -->
+    <!-- Virtual Keyboard -->
     <div id="mobile-keyboard">
         <div class="keyboard-trigger-area" onpointerdown="document.getElementById('mobile-keyboard').classList.toggle('open')">
             <svg class="handle-arrow" viewBox="0 0 24 24">
@@ -419,9 +417,11 @@
     </div>
 
     <script>
+        // Global constants and state
         const INITIAL_DELAY = 520;  
         const REPEAT_INTERVAL = 180; 
 
+        // Grid Settings
         const BASE_STEP_VAL = 60; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
         let curI = 0, curJ = 0; let lastDirection = null; 
@@ -465,15 +465,12 @@
             currentTheme = m; 
             document.body.setAttribute('data-theme', m); 
             document.getElementById('theme-menu').classList.remove('open'); 
-            showActionHint(m === 'light' ? 'Light mode' : 'Dark mode');
+            showActionHint(m === 'light' ? 'Light Theme' : 'Dark Theme');
             redraw(); 
         }
         
         function showActionHint(t, persistent = false) { 
             let a = document.getElementById('action-indicator'); 
-            if (t.length > 0) {
-                t = t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
-            }
             a.innerText = t; 
             a.classList.add('visible'); 
             if(actionTimeout) { clearTimeout(actionTimeout); actionTimeout = null; }
@@ -538,7 +535,11 @@
             redraw(); 
         }
 
-        function performReset() { saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; offsetX = width / 2; offsetY = height / 2; lastDirection = null; showActionHint('Reset'); redraw(); }
+        function performReset() { 
+            saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; 
+            offsetX = width / 2; offsetY = height / 2; lastDirection = null; 
+            showActionHint('Reset'); redraw(); 
+        }
 
         function setup() { 
             let c = createCanvas(windowWidth, windowHeight); 
@@ -560,9 +561,7 @@
             canvasElem.addEventListener('touchend', (e) => {
                 if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
                     let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY);
-                    if (d < CLICK_THRESHOLD_DIST) {
-                        handleInstantJump(mouseX, mouseY);
-                    }
+                    if (d < CLICK_THRESHOLD_DIST) handleInstantJump(mouseX, mouseY);
                 }
                 isPanning = false;
             }, { passive: false });
@@ -591,9 +590,7 @@
             if (touches && touches.length > 0) return;
             if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
                 let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY);
-                if (d < CLICK_THRESHOLD_DIST) {
-                    handleInstantJump(mouseX, mouseY);
-                }
+                if (d < CLICK_THRESHOLD_DIST) handleInstantJump(mouseX, mouseY);
             }
             isPanning = false;
         }
@@ -611,8 +608,8 @@
         function isOverUIElement(mx, my) {
             const kb = document.getElementById('mobile-keyboard'); 
             const kbRect = kb.getBoundingClientRect();
-            /* Обновлено с учетом смещения на 10px вниз */
-            const interactionY = kb.classList.contains('open') ? kbRect.top : windowHeight - 60;
+            const triggerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--kbd-trigger-height'));
+            const interactionY = kb.classList.contains('open') ? kbRect.top : windowHeight - triggerH;
             if (mx >= kbRect.left && mx <= kbRect.right && my >= interactionY) return true;
             if (my < 80) return true;
             return false;
@@ -631,12 +628,8 @@
             if (isExporting) clear(); else background(colors.canvasBg);
             
             if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUIElement(mouseX, mouseY) && (!touches || touches.length < 2)) {
-                if (isEraserActive) {
-                    performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
-                } else if (isPanning) {
-                    offsetX += mouseX - pmouseX; 
-                    offsetY += mouseY - pmouseY;
-                }
+                if (isEraserActive) performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
+                else if (isPanning) { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
             }
             
             push(); translate(offsetX, offsetY); scale(zoom);
@@ -706,36 +699,51 @@
             return segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
         }
 
+        /**
+         * Move Logic with "No Acute Angles" constraint 
+         */
         function move(k) {
             const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]};
             if(!m[k]) return;
             let [di, dj] = m[k];
+            
+            // Logic for Drawing mode: check for reversal and acute angles
             if (isDrawingMode && !isEraserActive && lastDirection !== null) {
-                const prev = lastDirection; const isReversing = (di === -prev.di && dj === -prev.dj);
+                const prev = lastDirection;
+                const isReversing = (di === -prev.di && dj === -prev.dj);
+                
+                // If reversing, erase segment
                 if (isReversing) {
                     let segIdx = findSegment(curI, curJ, curI + di, curJ + dj);
                     if (segIdx !== -1) {
                         saveState(); segments.splice(segIdx, 1); curI += di; curJ += dj;
-                        if(findSegment(curI, curJ, curI + di, curJ + dj) === -1 && repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; }
                         updateLastMoveAfterErase(); redraw(); return;
-                    } else if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; return; }
+                    } else if(repeatTimer) { stopRepeat(); return; }
                 }
-                if (prev.di === -1 && prev.dj === 0 && (k === '9' || k === '3')) return; 
-                if (prev.di === 1 && prev.dj === 0 && (k === '7' || k === '1')) return; 
-                if (prev.di === 0 && prev.dj === -1 && (k === '1' || k === '3')) return; 
-                if (prev.di === 0 && prev.dj === 1 && (k === '7' || k === '9')) return; 
-                if (prev.di === 1 && prev.dj === 1 && (k === '8' || k === '4')) return; 
-                if (prev.di === 1 && prev.dj === -1 && (k === '4' || k === '2')) return; 
-                if (prev.di === -1 && prev.dj === -1 && (k === '2' || k === '6')) return; 
-                if (prev.di === -1 && prev.dj === 1 && (k === '8' || k === '6')) return;
+
+                // ACUTE ANGLE PREVENTION:
+                // Dot product < 0 means angle > 90. But on our grid, 
+                // "acute" relative to previous direction means trying to turn more than 90 degrees.
+                // The directions allowed are those where angle between last move and next move >= 90 deg.
+                let dot = di * prev.di + dj * prev.dj;
+                if (dot < 0) { // Acute angle attempted
+                    if(repeatTimer) stopRepeat();
+                    return; 
+                }
             }
+
             let id = `${curI},${curJ}`;
             if (isEraserActive || !isDrawingMode) {
                 if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } else { curI += di; curJ += dj; }
                 lastDirection = {di, dj};
             } else {
                 saveState();
-                if (specialElements[id]?.isDiamond) { addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); curI += di * 3; curJ += dj * 3; }
+                if (specialElements[id]?.isDiamond) { 
+                    addSeg(curI, curJ, curI+di, curJ+dj); 
+                    addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); 
+                    addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); 
+                    curI += di * 3; curJ += dj * 3; 
+                }
                 else { addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; }
                 lastDirection = {di, dj};
             }
@@ -744,7 +752,11 @@
 
         function updateLastMoveAfterErase() {
             let connected = segments.filter(s => (s.p1.x === curI && s.p1.y === curJ) || (s.p2.x === curI && s.p2.y === curJ));
-            if (connected.length >= 1) { let s = connected[connected.length - 1]; let other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1; lastDirection = {di: curI - other.x, dj: curJ - other.y}; }
+            if (connected.length >= 1) { 
+                let s = connected[connected.length - 1]; 
+                let other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1; 
+                lastDirection = {di: curI - other.x, dj: curJ - other.y}; 
+            }
             else lastDirection = null;
         }
 
@@ -759,15 +771,17 @@
             if(k === '5') { toggleSpecial('isNode'); return; }
             if(k === '0') { toggleSpecial('isDiamond'); return; }
             if(['1','2','3','4','6','7','8','9'].includes(k)) { 
-                move(k); if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); }
+                move(k); if(repeatTimer) stopRepeat();
                 repeatTimer = setTimeout(() => { repeatTimer = setInterval(() => move(k), REPEAT_INTERVAL); }, INITIAL_DELAY);
             }
         }
         
         function handleActionUp(k) { 
             const key = k.toLowerCase();
-            if (activeKey === key) { if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } activeKey = null; } 
+            if (activeKey === key) { stopRepeat(); activeKey = null; } 
         }
+
+        function stopRepeat() { if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } }
 
         function toggleSpecial(t) {
             if (!isDrawingMode || isEraserActive) return;
@@ -816,7 +830,14 @@
         }
         
         function mouseWheel(e) {
-            if (e.ctrlKey) { if (isEraserActive) { if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); else eraserRadius = Math.min(300, eraserRadius + 2); updateModeUI(); redraw(); } return false; }
+            if (e.ctrlKey) { 
+                if (isEraserActive) { 
+                    if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); 
+                    else eraserRadius = Math.min(300, eraserRadius + 2); 
+                    updateModeUI(); redraw(); 
+                } 
+                return false; 
+            }
             applyZoom(e.delta > 0 ? 1/1.1 : 1.1, mouseX, mouseY); return false; 
         }
 
