@@ -33,6 +33,8 @@
             --active-btn-bg: rgba(0, 0, 0, 0.15); 
             --handle-icon-color: #939598;
             --kbd-trigger-height: 23px; 
+            /* Динамическая высота для фикса на iPad/iOS */
+            --app-height: 100%;
         }
 
         [data-theme="dark"] {
@@ -61,19 +63,18 @@
         }
 
         html, body {
-            width: 100%;
-            height: 100%;
-            position: fixed; /* Предотвращает скролл на iOS */
+            margin: 0; padding: 0;
+            width: 100vw;
+            height: var(--app-height); /* Использование переменной высоты */
             overflow: hidden;
-            overscroll-behavior: none;
+            position: fixed; /* Предотвращает "подпрыгивание" на iOS */
+            background-color: var(--bg-color);
+            touch-action: none;
         }
 
         body {
-            margin: 0; padding: 0;
             display: flex; justify-content: center; align-items: center; 
-            background-color: var(--bg-color);
             font-family: var(--main-font);
-            touch-action: none;
             transition: background-color 0.3s ease, color 0.3s ease;
         }
 
@@ -85,7 +86,9 @@
         }
 
         .top-nav-container {
-            position: absolute; top: 20px; left: 0; right: 0;
+            position: absolute; 
+            top: max(20px, env(safe-area-inset-top)); /* Учет челки/динамического острова */
+            left: 0; right: 0;
             z-index: 500; display: flex; justify-content: space-between;
             align-items: flex-start; padding: 0 20px; pointer-events: none;
         }
@@ -124,7 +127,7 @@
 
         #mobile-keyboard {
             position: fixed; 
-            bottom: 0px; 
+            bottom: env(safe-area-inset-bottom, 0px); /* Учет безопасной зоны внизу */
             left: 50%;
             transform: translate(-50%, calc(100% - var(--kbd-trigger-height))); 
             width: calc(100% - 40px); max-width: 400px; 
@@ -261,10 +264,7 @@
             pointer-events: none;
         }
 
-        #canvas-container { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            z-index: 1; overflow: hidden; touch-action: none; 
-        }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100%; z-index: 1; overflow: hidden; touch-action: none; }
         
         .indicator-text { 
             font-size: 11.2px; 
@@ -422,6 +422,15 @@
     </div>
 
     <script>
+        /* Фикс для iPadOS: Динамический расчет высоты вьюпорта */
+        const appHeight = () => {
+            const doc = document.documentElement;
+            doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+        };
+        window.addEventListener('resize', appHeight);
+        window.addEventListener('orientationchange', appHeight);
+        appHeight();
+
         const INITIAL_DELAY = 520;  
         const REPEAT_INTERVAL = 180; 
 
@@ -547,8 +556,6 @@
             showActionHint('Reset'); redraw(); 
         }
 
-        // Фикс для iPadOS: предотвращение сбоя при изменении размера
-        let resizeTimer;
         function setup() { 
             let c = createCanvas(windowWidth, windowHeight); 
             c.parent('canvas-container'); 
@@ -743,6 +750,7 @@
                         updateLastMoveAfterErase(); redraw(); return;
                     } else if(repeatTimer) { stopRepeat(); return; }
                 }
+
                 let dot = di * prev.di + dj * prev.dj;
                 if (dot < 0) { 
                     if(repeatTimer) stopRepeat();
@@ -780,7 +788,6 @@
 
         let repeatTimer = null, activeKey = null;
         function handleActionDown(k) {
-            if (!k) return;
             k = k.toLowerCase(); if (activeKey === k) return; activeKey = k;
             if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
             if(k === 'e') { toggleEraser(); return; }
@@ -796,7 +803,6 @@
         }
         
         function handleActionUp(k) { 
-            if (!k) return;
             const key = k.toLowerCase();
             if (activeKey === key) { stopRepeat(); activeKey = null; } 
         }
@@ -862,12 +868,9 @@
         }
 
         function windowResized() { 
-            if (resizeTimer) clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(() => {
-                resizeCanvas(window.innerWidth, window.innerHeight); 
-            }, 100);
+            resizeCanvas(windowWidth, windowHeight); 
+            appHeight(); // Обновление высоты при ресайзе
         }
-
         window.addEventListener('keydown', e => { if (e.repeat) return; handleActionDown(e.key); });
         window.addEventListener('keyup', e => { handleActionUp(e.key); });
     </script>
