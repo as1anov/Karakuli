@@ -57,14 +57,22 @@
             -webkit-user-select: none;   
             user-select: none;
             outline: none;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            position: fixed; /* Предотвращает скролл на iOS */
+            overflow: hidden;
+            overscroll-behavior: none;
         }
 
         body {
             margin: 0; padding: 0;
             display: flex; justify-content: center; align-items: center; 
-            height: 100vh; height: 100svh; 
             background-color: var(--bg-color);
-            overflow: hidden; font-family: var(--main-font);
+            font-family: var(--main-font);
             touch-action: none;
             transition: background-color 0.3s ease, color 0.3s ease;
         }
@@ -144,7 +152,6 @@
             fill: none; 
             stroke-linecap: round; 
             stroke-linejoin: round;
-            /* Сделано на 20% прозрачнее (opacity: 0.8) */
             opacity: 0.8; 
             transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
             animation: arrow-float 2.5s ease-in-out infinite;
@@ -229,7 +236,8 @@
         .v-key .key-label {
             position: absolute; bottom: 5px; right: 7px;
             font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
-            color: var(--kbd-label-color); opacity: 0.8;
+            color: var(--kbd-label-color); 
+            opacity: 0.56; 
             pointer-events: none;
         }
         
@@ -247,12 +255,16 @@
             position: absolute; bottom: 5px; right: 8px; 
             font-size: 14px; 
             font-weight: 950;
-            color: var(--kbd-label-color); opacity: 0.9; 
+            color: var(--kbd-label-color); 
+            opacity: 0.63; 
             line-height: 1; letter-spacing: -1.5px;
             pointer-events: none;
         }
 
-        #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; overflow: hidden; touch-action: none; }
+        #canvas-container { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 1; overflow: hidden; touch-action: none; 
+        }
         
         .indicator-text { 
             font-size: 11.2px; 
@@ -514,7 +526,10 @@
 
         function toggleMode() { 
             if (isEraserActive) isEraserActive = false; 
-            else { isDrawingMode = !isDrawingMode; lastDirection = null; }
+            else { 
+                isDrawingMode = !isDrawingMode; 
+                lastDirection = null; 
+            }
             updateModeUI(); 
             redraw(); 
         }
@@ -532,6 +547,8 @@
             showActionHint('Reset'); redraw(); 
         }
 
+        // Фикс для iPadOS: предотвращение сбоя при изменении размера
+        let resizeTimer;
         function setup() { 
             let c = createCanvas(windowWidth, windowHeight); 
             c.parent('canvas-container'); 
@@ -679,8 +696,28 @@
             }
             let colors = themeConfig[currentTheme];
             let finalColor = isDrawingMode ? colors.drawCursor : colors.cursorColor;
-            push(); translate(curI*STEP, curJ*STEP); fill(finalColor); noStroke(); 
-            if (lastDirection && lastDirection.di !== 0 && lastDirection.dj !== 0) rect(-10, -10, 20, 20); else { rotate(QUARTER_PI); rect(-10, -10, 20, 20); }
+            
+            push(); 
+            translate(curI * STEP, curJ * STEP); 
+            fill(finalColor); 
+            noStroke(); 
+            rectMode(CENTER);
+
+            if (!isDrawingMode) {
+                if (lastDirection && lastDirection.di !== 0 && lastDirection.dj !== 0) {
+                    rect(0, 0, 20, 20);
+                } else {
+                    rotate(QUARTER_PI);
+                    rect(0, 0, 20, 20);
+                }
+            } else {
+                if (lastDirection && lastDirection.di !== 0 && lastDirection.dj !== 0) {
+                    rect(0, 0, 20, 20); 
+                } else { 
+                    rotate(QUARTER_PI); 
+                    rect(0, 0, 20, 20); 
+                }
+            }
             pop();
         }
 
@@ -706,7 +743,6 @@
                         updateLastMoveAfterErase(); redraw(); return;
                     } else if(repeatTimer) { stopRepeat(); return; }
                 }
-
                 let dot = di * prev.di + dj * prev.dj;
                 if (dot < 0) { 
                     if(repeatTimer) stopRepeat();
@@ -744,6 +780,7 @@
 
         let repeatTimer = null, activeKey = null;
         function handleActionDown(k) {
+            if (!k) return;
             k = k.toLowerCase(); if (activeKey === k) return; activeKey = k;
             if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
             if(k === 'e') { toggleEraser(); return; }
@@ -759,6 +796,7 @@
         }
         
         function handleActionUp(k) { 
+            if (!k) return;
             const key = k.toLowerCase();
             if (activeKey === key) { stopRepeat(); activeKey = null; } 
         }
@@ -823,7 +861,13 @@
             applyZoom(e.delta > 0 ? 1/1.1 : 1.1, mouseX, mouseY); return false; 
         }
 
-        function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+        function windowResized() { 
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                resizeCanvas(window.innerWidth, window.innerHeight); 
+            }, 100);
+        }
+
         window.addEventListener('keydown', e => { if (e.repeat) return; handleActionDown(e.key); });
         window.addEventListener('keyup', e => { handleActionUp(e.key); });
     </script>
