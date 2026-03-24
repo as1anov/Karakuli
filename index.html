@@ -223,11 +223,26 @@
             transform: scaleX(1);
         }
 
-        .keyboard-row { display: grid; gap: 6px; pointer-events: auto; }
+        /* Keyboard Grid Structure */
+        #kbd-main-grid {
+            display: grid;
+            grid-template-rows: repeat(4, 1fr); /* 4 одинаковых ряда */
+            gap: 8px;
+            width: 100%;
+        }
+
+        .keyboard-row { 
+            display: grid; 
+            gap: 6px; 
+            pointer-events: auto; 
+            width: 100%;
+        }
+        
         .row-3-col { grid-template-columns: repeat(3, 1fr); }
-        .row-4-col { grid-template-columns: repeat(4, 1fr); align-items: stretch; }
+        .row-4-col { grid-template-columns: repeat(4, 1fr); }
 
         .v-key {
+            /* Базовая пропорция для всех кнопок */
             aspect-ratio: 2.3 / 1; 
             background: var(--panel-bg); 
             backdrop-filter: var(--glass-blur);
@@ -238,6 +253,13 @@
             color: var(--kbd-text-color); position: relative;
             transition: background 0.2s, transform 0.1s; touch-action: none;
             overflow: hidden;
+        }
+
+        /* Для нижнего ряда с 4 колонками сбрасываем aspect-ratio, 
+           чтобы высота наследовалась от родительского ряда */
+        .row-4-col .v-key {
+            aspect-ratio: auto;
+            height: 100%;
         }
 
         .v-key:active {
@@ -307,6 +329,7 @@
             letter-spacing: 0.5px;
             pointer-events: none;
             transform: translateY(3px);
+            text-align: center;
         }
         .indicator-text.visible { opacity: 1; transform: translateY(5px); }
 
@@ -387,67 +410,69 @@
             </div>
         </div>
 
-        <div class="keyboard-row row-3-col">
-            <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')">
-                <svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg>
-                <span class="key-label">7</span>
+        <div id="kbd-main-grid">
+            <div class="keyboard-row row-3-col">
+                <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')">
+                    <svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg>
+                    <span class="key-label">7</span>
+                </div>
+                <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')">
+                    <svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg>
+                    <span class="key-label">8</span>
+                </div>
+                <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')">
+                    <svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg>
+                    <span class="key-label">9</span>
+                </div>
             </div>
-            <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')">
-                <svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg>
-                <span class="key-label">8</span>
+            
+            <div class="keyboard-row row-3-col">
+                <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')">
+                    <svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg>
+                    <span class="key-label">4</span>
+                </div>
+                <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg>
+                    <span class="key-label">5</span>
+                </div>
+                <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')">
+                    <svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg>
+                    <span class="key-label">6</span>
+                </div>
             </div>
-            <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')">
-                <svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg>
-                <span class="key-label">9</span>
+            
+            <div class="keyboard-row row-3-col">
+                <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')">
+                    <svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg>
+                    <span class="key-label">1</span>
+                </div>
+                <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')">
+                    <svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg>
+                    <span class="key-label">2</span>
+                </div>
+                <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')">
+                    <svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg>
+                    <span class="key-label">3</span>
+                </div>
             </div>
-        </div>
-        
-        <div class="keyboard-row row-3-col">
-            <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')">
-                <svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg>
-                <span class="key-label">4</span>
-            </div>
-            <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg>
-                <span class="key-label">5</span>
-            </div>
-            <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')">
-                <svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg>
-                <span class="key-label">6</span>
-            </div>
-        </div>
-        
-        <div class="keyboard-row row-3-col">
-            <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')">
-                <svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg>
-                <span class="key-label">1</span>
-            </div>
-            <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')">
-                <svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg>
-                <span class="key-label">2</span>
-            </div>
-            <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')">
-                <svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg>
-                <span class="key-label">3</span>
-            </div>
-        </div>
-        
-        <div class="keyboard-row row-4-col">
-            <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')">
-                <svg viewBox="0 0 24 24"><path d="M12 5L19 12L12 19L5 12Z"/></svg>
-                <span class="key-label">0</span>
-            </div>
-            <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')">
-                <svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg>
-                <span class="key-label">U</span>
-            </div>
-            <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')">
-                <svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg>
-                <span class="key-label">R</span>
-            </div>
-            <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')">
-                <span class="mode-label">MODE</span>
-                <span class="mode-sub">⎽⎽</span>
+            
+            <div class="keyboard-row row-4-col" id="bottom-row">
+                <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')">
+                    <svg viewBox="0 0 24 24"><path d="M12 5L19 12L12 19L5 12Z"/></svg>
+                    <span class="key-label">0</span>
+                </div>
+                <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')">
+                    <svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg>
+                    <span class="key-label">U</span>
+                </div>
+                <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')">
+                    <svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg>
+                    <span class="key-label">R</span>
+                </div>
+                <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')">
+                    <span class="mode-label">MODE</span>
+                    <span class="mode-sub">⎽⎽</span>
+                </div>
             </div>
         </div>
     </div>
@@ -595,7 +620,6 @@
             c.parent('canvas-container'); 
             offsetX = width/2; offsetY = height/2; 
             
-            // Замена p5-функций mousePressed/Released на нативные события для холста
             const canvas = document.getElementById('defaultCanvas0');
             
             canvas.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
@@ -635,7 +659,6 @@
 
         function handleEnd(x, y) {
             if (isPanning && millis() - lastClickTime < 200) {
-                // Прыгаем, только если это был короткий клик по ХОЛСТУ (не UI)
                 if (!isOverUI(x, y)) {
                     let worldX = (x - offsetX) / zoom;
                     let worldY = (y - offsetY) / zoom;
@@ -649,28 +672,20 @@
         }
 
         function isOverUI(x, y) {
-            // Проверка верхней панели
             if (y < 80) return true;
-            
-            // Проверка клавиатуры
             const kbd = document.getElementById('mobile-keyboard');
             if (kbd.classList.contains('open')) {
                 const rect = kbd.getBoundingClientRect();
                 if (x >= rect.left && x <= rect.right && y >= rect.top) return true;
             }
-
-            // Проверка открытых меню (Темы и Экспорт)
             const menus = document.querySelectorAll('.dropdown-options.open');
             for (let menu of menus) {
                 const rect = menu.getBoundingClientRect();
                 if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true;
             }
-
-            // Проверка стрелки-триггера
             const handle = document.querySelector('.handle-arrow');
             const hRect = handle.getBoundingClientRect();
             if (x >= hRect.left - 20 && x <= hRect.right + 20 && y >= hRect.top - 20) return true;
-
             return false;
         }
 
@@ -829,8 +844,9 @@
 
         function toggleSpecial(t) {
             if (!isDrawingMode || isEraserActive) return;
+            // Only diamond downward check
             if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) {
-                showActionHint('Diamond: Only Downward Move Allowed'); return;
+                return;
             }
             saveState(); let id = `${curI},${curJ}`;
             if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
