@@ -118,11 +118,20 @@
         
         .dropdown-options { 
             display: flex; flex-direction: column; gap: 8px; opacity: 0; 
-            pointer-events: none; transform: translateY(-10px); 
+            pointer-events: none; 
+            visibility: hidden;
+            transform: translateY(-10px); 
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
             position: absolute; top: 53px; right: 0; z-index: 1001; 
         }
-        .dropdown-options.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        
+        .dropdown-options.open { 
+            opacity: 1; 
+            pointer-events: auto; 
+            visibility: visible;
+            transform: translateY(0); 
+        }
+
         .option-btn { width: var(--header-height); aspect-ratio: 1 / 1; }
 
         #mobile-keyboard {
@@ -168,11 +177,6 @@
             z-index: 1999;
             cursor: pointer; 
             pointer-events: auto;
-        }
-
-        .handle-arrow:hover {
-            opacity: 0.8;
-            stroke: var(--handle-icon-color);
         }
 
         @keyframes arrow-float {
@@ -241,8 +245,6 @@
             transform: scale(0.96);
         }
 
-        .row-4-col .v-key { aspect-ratio: 1.8 / 1; }
-        
         .v-key svg { 
             width: 23.4%; height: auto; 
             stroke: var(--kbd-icon-color); 
@@ -320,10 +322,10 @@
     
     <div class="top-nav-container">
         <div class="left-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-            <div class="control-btn glass-panel" onpointerdown="performReset()" title="Reset Canvas">
+            <div class="control-btn glass-panel" onpointerdown="event.stopPropagation(); performReset()" title="Reset Canvas">
                 <svg viewBox="0 0 24 24" class="theme-svg"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" /></svg>
             </div>
-            <div class="control-btn glass-panel" id="eraser-btn" onpointerdown="toggleEraser()" title="Eraser (E)">
+            <div class="control-btn glass-panel" id="eraser-btn" onpointerdown="event.stopPropagation(); toggleEraser()" title="Eraser (E)">
                 <svg viewBox="0 0 24 24" class="theme-svg">
                     <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
                     <path d="m22 21H7" />
@@ -333,7 +335,7 @@
         </div>
 
         <div class="top-nav-wrapper">
-            <div class="mode-header glass-panel" onpointerdown="toggleMode()">
+            <div class="mode-header glass-panel" onpointerdown="event.stopPropagation(); toggleMode()">
                 <span id="mode-text">Navigation</span>
             </div>
             <div id="action-indicator" class="indicator-text">Action</div>
@@ -341,7 +343,7 @@
 
         <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
             <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn glass-panel" id="theme-trigger" onpointerdown="event.stopPropagation(); document.getElementById('theme-menu').classList.toggle('open'); document.getElementById('export-menu').classList.remove('open');">
+                <div class="control-btn glass-panel" id="theme-trigger" onpointerdown="event.stopPropagation(); toggleThemeMenu()">
                     <svg viewBox="0 0 24 24" class="theme-svg sun-icon">
                         <circle cx="12" cy="12" r="4" />
                         <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
@@ -351,13 +353,13 @@
                     </svg>
                 </div>
                 <div class="dropdown-options" id="theme-menu">
-                    <div class="option-btn glass-panel" onpointerdown="setTheme('light')">
+                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); setTheme('light')">
                         <svg viewBox="0 0 24 24" class="theme-svg">
                             <circle cx="12" cy="12" r="4" />
                             <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
                         </svg>
                     </div>
-                    <div class="option-btn glass-panel" onpointerdown="setTheme('dark')">
+                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); setTheme('dark')">
                         <svg viewBox="0 0 24 24" class="theme-svg">
                             <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
                         </svg>
@@ -365,12 +367,12 @@
                 </div>
             </div>
             <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn glass-panel" id="export-trigger" onpointerdown="event.stopPropagation(); document.getElementById('export-menu').classList.toggle('open'); document.getElementById('theme-menu').classList.remove('open');">
+                <div class="control-btn glass-panel" id="export-trigger" onpointerdown="event.stopPropagation(); toggleExportMenu()">
                     <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 </div>
                 <div class="dropdown-options" id="export-menu">
-                    <div class="option-btn glass-panel" onpointerdown="exportFile('svg')" style="font-size: 10px; font-weight: 700;">SVG</div>
-                    <div class="option-btn glass-panel" onpointerdown="exportFile('png')" style="font-size: 10px; font-weight: 700;">PNG</div>
+                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); exportFile('svg')" style="font-size: 10px; font-weight: 700;">SVG</div>
+                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); exportFile('png')" style="font-size: 10px; font-weight: 700;">PNG</div>
                 </div>
             </div>
         </div>
@@ -459,10 +461,6 @@
             e.preventDefault();
         }, { passive: false });
 
-        document.addEventListener('gesturestart', function (e) {
-            e.preventDefault();
-        });
-
         const INITIAL_DELAY = 520;  
         const REPEAT_INTERVAL = 180; 
 
@@ -476,16 +474,23 @@
         let actionTimeout = null; let currentTheme = 'light';
         let lastPinchDist = 0;
 
-        let touchStartTime = 0;
-        let touchStartPos = { x: 0, y: 0 };
+        let lastClickTime = 0;
         let isPanning = false;
-        const CLICK_THRESHOLD_TIME = 200; 
-        const CLICK_THRESHOLD_DIST = 10;
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
             dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#414042', cursorColor: '#FF6666', drawCursor: '#58595B' }
         };
+
+        function toggleThemeMenu() {
+            document.getElementById('theme-menu').classList.toggle('open');
+            document.getElementById('export-menu').classList.remove('open');
+        }
+
+        function toggleExportMenu() {
+            document.getElementById('export-menu').classList.toggle('open');
+            document.getElementById('theme-menu').classList.remove('open');
+        }
 
         function handleKbdTrigger(action) {
             const kbd = document.getElementById('mobile-keyboard');
@@ -589,28 +594,27 @@
             let c = createCanvas(windowWidth, windowHeight); 
             c.parent('canvas-container'); 
             offsetX = width/2; offsetY = height/2; 
-            const canvasElem = document.getElementById('defaultCanvas0');
             
-            canvasElem.addEventListener('touchstart', (e) => { 
-                if (e.touches.length === 2) {
-                    lastPinchDist = getDist(e.touches[0], e.touches[1]); 
+            // Замена p5-функций mousePressed/Released на нативные события для холста
+            const canvas = document.getElementById('defaultCanvas0');
+            
+            canvas.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
+            canvas.addEventListener('mouseup', (e) => handleEnd(e.clientX, e.clientY));
+            
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) handleStart(e.touches[0].clientX, e.touches[0].clientY);
+                else if (e.touches.length === 2) {
+                    lastPinchDist = getDist(e.touches[0], e.touches[1]);
                     isPanning = false;
-                } else if (e.touches.length === 1) {
-                    touchStartTime = millis();
-                    touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-                    isPanning = true; 
                 }
             }, { passive: false });
-            
-            canvasElem.addEventListener('touchend', (e) => {
-                if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
-                    let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY);
-                    if (d < CLICK_THRESHOLD_DIST) handleInstantJump(mouseX, mouseY);
-                }
+
+            canvas.addEventListener('touchend', (e) => {
+                if (e.changedTouches.length === 1) handleEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
                 isPanning = false;
             }, { passive: false });
 
-            canvasElem.addEventListener('touchmove', (e) => {
+            canvas.addEventListener('touchmove', (e) => {
                 if (e.touches.length === 2) {
                     e.preventDefault();
                     let currentDist = getDist(e.touches[0], e.touches[1]);
@@ -623,41 +627,50 @@
             }, { passive: false });
         }
 
-        function mousePressed() {
-            if (touches && touches.length > 0) return; 
-            touchStartTime = millis();
-            touchStartPos = { x: mouseX, y: mouseY };
+        function handleStart(x, y) {
+            if (isOverUI(x, y)) return;
+            lastClickTime = millis();
             isPanning = true;
         }
 
-        function mouseReleased() {
-            if (touches && touches.length > 0) return;
-            if (isPanning && (millis() - touchStartTime < CLICK_THRESHOLD_TIME)) {
-                let d = dist(touchStartPos.x, touchStartPos.y, mouseX, mouseY);
-                if (d < CLICK_THRESHOLD_DIST) handleInstantJump(mouseX, mouseY);
+        function handleEnd(x, y) {
+            if (isPanning && millis() - lastClickTime < 200) {
+                // Прыгаем, только если это был короткий клик по ХОЛСТУ (не UI)
+                if (!isOverUI(x, y)) {
+                    let worldX = (x - offsetX) / zoom;
+                    let worldY = (y - offsetY) / zoom;
+                    curI = Math.round(worldX / STEP);
+                    curJ = Math.round(worldY / STEP);
+                    lastDirection = null;
+                    redraw();
+                }
             }
             isPanning = false;
         }
 
-        function handleInstantJump(mx, my) {
-            if (isOverUIElement(mx, my)) return;
-            let worldX = (mx - offsetX) / zoom;
-            let worldY = (my - offsetY) / zoom;
-            curI = Math.round(worldX / STEP);
-            curJ = Math.round(worldY / STEP);
-            lastDirection = null;
-            redraw();
-        }
-
-        function isOverUIElement(mx, my) {
-            const kb = document.getElementById('mobile-keyboard'); 
-            const kbRect = kb.getBoundingClientRect();
-            if (kb.classList.contains('open')) {
-                if (mx >= kbRect.left && mx <= kbRect.right && my >= kbRect.top) return true;
-            } else {
-                if (my >= windowHeight - 60) return true;
+        function isOverUI(x, y) {
+            // Проверка верхней панели
+            if (y < 80) return true;
+            
+            // Проверка клавиатуры
+            const kbd = document.getElementById('mobile-keyboard');
+            if (kbd.classList.contains('open')) {
+                const rect = kbd.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right && y >= rect.top) return true;
             }
-            if (my < 80) return true;
+
+            // Проверка открытых меню (Темы и Экспорт)
+            const menus = document.querySelectorAll('.dropdown-options.open');
+            for (let menu of menus) {
+                const rect = menu.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true;
+            }
+
+            // Проверка стрелки-триггера
+            const handle = document.querySelector('.handle-arrow');
+            const hRect = handle.getBoundingClientRect();
+            if (x >= hRect.left - 20 && x <= hRect.right + 20 && y >= hRect.top - 20) return true;
+
             return false;
         }
 
@@ -673,7 +686,7 @@
             let colors = themeConfig[currentTheme];
             if (isExporting) clear(); else background(colors.canvasBg);
             
-            if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUIElement(mouseX, mouseY) && (!touches || touches.length < 2)) {
+            if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUI(mouseX, mouseY) && (!touches || touches.length < 2)) {
                 if (isEraserActive) performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
                 else if (isPanning) { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
             }
@@ -816,25 +829,13 @@
 
         function toggleSpecial(t) {
             if (!isDrawingMode || isEraserActive) return;
-            
-            // Проверка для ромба: разрешаем только если последнее движение было вниз (di=0, dj=1)
-            if (t === 'isDiamond') {
-                if (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1) {
-                    showActionHint('Diamond: Only Downward Move Allowed');
-                    return;
-                }
+            if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) {
+                showActionHint('Diamond: Only Downward Move Allowed'); return;
             }
-
             saveState(); let id = `${curI},${curJ}`;
             if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
-            
-            // Если мы уже имеем ромб и пытаемся его выключить, или включаем новый
             specialElements[id][t] = !specialElements[id][t];
-            
-            if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { 
-                curI += lastDirection.di*3; curJ += lastDirection.dj*3; 
-            }
-            
+            if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
             if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
             showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw();
         }
@@ -862,8 +863,7 @@
         }
 
         function exportFile(fmt) {
-            const exportMenu = document.getElementById('export-menu');
-            if (exportMenu) exportMenu.classList.remove('open');
+            document.getElementById('export-menu').classList.remove('open');
             if(fmt==='svg') {
                 let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1000 -1000 2000 2000">`;
                 getPathGroups().forEach(g => {
