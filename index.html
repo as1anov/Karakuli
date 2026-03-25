@@ -51,6 +51,24 @@
             --handle-icon-color: #939598;
         }
 
+        [data-theme="blue"] {
+            --bg-color: #0f172a;
+            --canvas-bg: #0f172a;
+            --panel-bg: rgba(30, 58, 138, 0.4);
+            --text-color: #93c5fd;
+            --icon-color: #60a5fa;
+            --kbd-text-color: #60a5fa;
+            --kbd-icon-color: #3b82f6;
+            --kbd-label-color: #1e40af;
+            --ui-accent: rgba(59, 130, 246, 0.2);
+            --border-color: rgba(59, 130, 246, 0.3);
+            --dot-color: 59, 130, 246;
+            --dot-opacity: 0.3;
+            --active-btn-bg: rgba(37, 99, 235, 0.4);
+            --handle-icon-color: #3b82f6;
+            --draw-cursor-color: #60a5fa;
+        }
+
         * {
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none; 
@@ -75,7 +93,7 @@
         body {
             display: flex; justify-content: center; align-items: center; 
             font-family: var(--main-font);
-            transition: background-color 0.3s ease, color 0.3s ease;
+            transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
         }
 
         .glass-panel {
@@ -226,7 +244,7 @@
         /* Keyboard Grid Structure */
         #kbd-main-grid {
             display: grid;
-            grid-template-rows: repeat(4, 1fr); /* 4 одинаковых ряда */
+            grid-template-rows: repeat(4, 1fr); 
             gap: 8px;
             width: 100%;
         }
@@ -242,7 +260,6 @@
         .row-4-col { grid-template-columns: repeat(4, 1fr); }
 
         .v-key {
-            /* Базовая пропорция для всех кнопок */
             aspect-ratio: 2.3 / 1; 
             background: var(--panel-bg); 
             backdrop-filter: var(--glass-blur);
@@ -251,12 +268,10 @@
             border-radius: 12px;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             color: var(--kbd-text-color); position: relative;
-            transition: background 0.2s, transform 0.1s; touch-action: none;
+            transition: background 0.2s, transform 0.1s, border-color 0.2s; touch-action: none;
             overflow: hidden;
         }
 
-        /* Для нижнего ряда с 4 колонками сбрасываем aspect-ratio, 
-           чтобы высота наследовалась от родительского ряда */
         .row-4-col .v-key {
             aspect-ratio: auto;
             height: 100%;
@@ -336,9 +351,13 @@
         .theme-svg { width: 19.8px; height: 19.8px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
         
         body[data-theme="light"] .sun-icon { display: block; }
-        body[data-theme="light"] .moon-icon { display: none; }
-        body[data-theme="dark"] .sun-icon { display: none; }
+        body[data-theme="light"] .moon-icon, body[data-theme="light"] .monitor-icon { display: none; }
+        
         body[data-theme="dark"] .moon-icon { display: block; }
+        body[data-theme="dark"] .sun-icon, body[data-theme="dark"] .monitor-icon { display: none; }
+
+        body[data-theme="blue"] .monitor-icon { display: block; }
+        body[data-theme="blue"] .sun-icon, body[data-theme="blue"] .moon-icon { display: none; }
     </style>
 </head>
 <body data-theme="light"> 
@@ -374,6 +393,9 @@
                     <svg viewBox="0 0 24 24" class="theme-svg moon-icon">
                         <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
                     </svg>
+                    <svg viewBox="0 0 24 24" class="theme-svg monitor-icon">
+                        <rect width="16" height="11" x="4" y="4" rx="2"/><path d="M12 15v4M8 19h8"/>
+                    </svg>
                 </div>
                 <div class="dropdown-options" id="theme-menu">
                     <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); setTheme('light')">
@@ -385,6 +407,11 @@
                     <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); setTheme('dark')">
                         <svg viewBox="0 0 24 24" class="theme-svg">
                             <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
+                        </svg>
+                    </div>
+                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); setTheme('blue')">
+                        <svg viewBox="0 0 24 24" class="theme-svg">
+                            <rect width="16" height="11" x="4" y="4" rx="2"/><path d="M12 15v4M8 19h8"/>
                         </svg>
                     </div>
                 </div>
@@ -504,7 +531,8 @@
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
-            dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#414042', cursorColor: '#FF6666', drawCursor: '#58595B' }
+            dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#414042', cursorColor: '#FF6666', drawCursor: '#58595B' },
+            blue: { canvasBg: '#0f172a', dotColor: '59, 130, 246', dotAlpha: 0.3, geomColor: '#3b82f6', cursorColor: '#60a5fa', drawCursor: '#93c5fd' }
         };
 
         function toggleThemeMenu() {
@@ -536,7 +564,12 @@
             currentTheme = m; 
             document.body.setAttribute('data-theme', m); 
             document.getElementById('theme-menu').classList.remove('open'); 
-            showActionHint(m === 'light' ? 'Light Theme' : 'Dark Theme');
+            
+            let hint = 'Light Theme';
+            if(m === 'dark') hint = 'Dark Theme';
+            if(m === 'blue') hint = 'System Theme';
+            
+            showActionHint(hint);
             redraw(); 
         }
         
@@ -844,7 +877,6 @@
 
         function toggleSpecial(t) {
             if (!isDrawingMode || isEraserActive) return;
-            // Only diamond downward check
             if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) {
                 return;
             }
