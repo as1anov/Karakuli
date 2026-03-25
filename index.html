@@ -152,13 +152,15 @@
 
         .option-btn { width: var(--header-height); aspect-ratio: 1 / 1; }
 
+        /* KEYBOARD CONTAINER - ADJUSTED TO MATCH NAV WIDTH */
         #mobile-keyboard {
             position: fixed; 
             bottom: 0;
             left: 50%;
             transform: translate(-50%, calc(100% + 50px)); 
-            width: calc(100% - 40px); max-width: 400px; 
-            z-index: 2000; padding: 0px 12px 14px 12px;
+            width: calc(100% - 40px); /* Matches padding of top nav (20px each side) */
+            max-width: 500px; /* Optional cap, but fits standard phone widths better now */
+            z-index: 2000; padding: 0px 0px 14px 0px; /* Removed side padding to align with edge markers */
             display: flex; flex-direction: column; gap: 8px;
             transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
             pointer-events: none; 
@@ -245,13 +247,13 @@
         #kbd-main-grid {
             display: grid;
             grid-template-rows: repeat(4, 1fr); 
-            gap: 8px;
+            gap: 8px; /* Adjusted gap to be slightly more compact if needed */
             width: 100%;
         }
 
         .keyboard-row { 
             display: grid; 
-            gap: 6px; 
+            gap: 8px; 
             pointer-events: auto; 
             width: 100%;
         }
@@ -283,7 +285,7 @@
         }
 
         .v-key svg { 
-            width: 23.4%; height: auto; 
+            width: 24%; height: auto; 
             stroke: var(--kbd-icon-color); 
             stroke-width: var(--icon-stroke); 
             fill: none; 
