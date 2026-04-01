@@ -36,6 +36,11 @@
             --tl-track-bg: rgba(0, 0, 0, 0.1);
             --tl-progress-fill: #000000;
             
+            /* Цвета для Google-кнопки */
+            --google-blue: #4285F4;
+            --google-blue-hover: #3367d6;
+            --google-blue-active: #2a56ad;
+            
             --kbd-max-width: 500px;
             --kbd-margin: 20px;
             --sidebar-width: 300px;
@@ -179,10 +184,11 @@
         .dash-btn {
             width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);
             background: var(--panel-bg); color: var(--text-color); display: flex; align-items: center; gap: 10px;
-            margin-bottom: 10px; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 600;
+            margin-bottom: 10px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-size: 13px; font-weight: 600;
         }
         .dash-btn:last-child { margin-bottom: 0; }
-        .dash-btn:active { transform: scale(0.98); background: var(--active-btn-bg); }
+        .dash-btn:hover { background: var(--active-btn-bg); }
+        .dash-btn:active { transform: scale(0.97); }
         .dash-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; flex-shrink: 0; }
 
         .theme-container {
@@ -195,8 +201,35 @@
         }
         .theme-opt.active { background: var(--bg-color); color: var(--text-color); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
 
+        /* --- LOGIN BOX ADJUSTMENT --- */
         .login-box {
-            margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);
+            margin-top: auto; 
+            padding-top: 20px; 
+            padding-bottom: max(40px, env(safe-area-inset-bottom)); 
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Центрируем содержимое по горизонтали */
+            gap: 12px;
+        }
+
+        .google-btn {
+            background: var(--google-blue) !important;
+            color: white !important;
+            border: none !important;
+            box-shadow: 0 4px 12px rgba(66, 133, 244, 0.25);
+            transition: all 0.2s ease;
+            justify-content: center; /* Центрируем иконку и текст внутри кнопки */
+            width: 100%;
+        }
+        .google-btn:hover {
+            background: var(--google-blue-hover) !important;
+            box-shadow: 0 6px 16px rgba(66, 133, 244, 0.35);
+        }
+        .google-btn:active {
+            background: var(--google-blue-active) !important;
+            transform: scale(0.96);
+            box-shadow: 0 2px 4px rgba(66, 133, 244, 0.2);
         }
 
         /* --- TIMELINE PANEL --- */
@@ -330,11 +363,11 @@
         </div>
 
         <div class="login-box">
-            <div class="dash-btn" style="background: #4285F4; color: white; border: none; margin-bottom: 10px;">
+            <div class="dash-btn google-btn">
                 <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
                 Login with Google
             </div>
-            <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 11px; color: var(--disabled-color); margin-bottom: 0; padding: 6px;">
+            <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 11px; color: var(--disabled-color); margin-bottom: 0; padding: 6px; width: auto;">
                 Continue as Guest
             </div>
         </div>
@@ -682,7 +715,6 @@
         }
 
         function performReset() { 
-            // Если мы в режиме таймлапса, принудительно выходим и чистим ВСЁ
             if (isTimelapseUIOpen) {
                 isTimelapseUIOpen = false;
                 const toolbar = document.getElementById('timelapse-toolbar');
@@ -691,26 +723,10 @@
                 stopTlPlayback();
                 updateUIState();
             }
-            
-            // Глубокая очистка данных
-            segments = []; 
-            specialElements = {}; 
-            curI = 0; 
-            curJ = 0; 
-            lastDirection = null;
-            history = [];
-            redoStack = [];
-            tlHistory = []; // Очистка истории таймлапса
-            tlCurrentFrame = 0;
-            
-            // Центрирование камеры
-            offsetX = width / 2; 
-            offsetY = height / 2; 
-            
-            showActionHint('New Canvas'); 
-            updateModeUI();
-            redraw(); 
-            captureState(); // Захватываем начальное пустое состояние для нового таймлапса
+            segments = []; specialElements = {}; curI = 0; curJ = 0; lastDirection = null;
+            history = []; redoStack = []; tlHistory = []; tlCurrentFrame = 0;
+            offsetX = width / 2; offsetY = height / 2; 
+            showActionHint('New Canvas'); updateModeUI(); redraw(); captureState(); 
         }
 
         function setup() { 
