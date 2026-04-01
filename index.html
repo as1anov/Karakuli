@@ -88,7 +88,6 @@
             margin: 0; padding: 0;
             width: 100vw;
             height: 100%;
-            height: -webkit-fill-available;
             overflow: hidden;
             position: fixed; 
             top: 0; left: 0; right: 0; bottom: 0;
@@ -165,27 +164,26 @@
             position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width);
             background: var(--bg-color); z-index: 2600; transform: translateX(-100%);
             transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
-            display: flex; flex-direction: column; padding: max(30px, env(safe-area-inset-top)) 20px 20px 20px;
+            display: flex; flex-direction: column; padding: max(40px, env(safe-area-inset-top)) 24px 24px 24px;
             box-shadow: 20px 0 50px rgba(0,0,0,0.1);
         }
         #dashboard.open { transform: translateX(0); }
 
-        /* Reduced margins for compact layout */
-        .dash-section { margin-bottom: 18px; } 
+        .dash-section { margin-bottom: 24px; } 
         .dash-label { 
             font-size: 10px; font-weight: 700; text-transform: uppercase; 
             letter-spacing: 0.8px; color: var(--disabled-color); 
-            margin-bottom: 8px; display: block; 
+            margin-bottom: 12px; display: block; 
         }
         
         .dash-btn {
             width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);
             background: var(--panel-bg); color: var(--text-color); display: flex; align-items: center; gap: 10px;
-            margin-bottom: 6px; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 600;
+            margin-bottom: 10px; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 600;
         }
         .dash-btn:last-child { margin-bottom: 0; }
         .dash-btn:active { transform: scale(0.98); background: var(--active-btn-bg); }
-        .dash-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; }
+        .dash-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; flex-shrink: 0; }
 
         .theme-container {
             display: flex; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border-color);
@@ -198,36 +196,19 @@
         .theme-opt.active { background: var(--bg-color); color: var(--text-color); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
 
         .login-box {
-            margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border-color);
+            margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);
         }
 
         /* --- TIMELINE PANEL --- */
         #timelapse-toolbar {
-            position: fixed;
-            bottom: 20px; 
-            left: 50%;
-            transform: translateX(-50%) translateY(200px);
-            width: calc(100% - 40px); 
-            max-width: var(--kbd-max-width); 
-            z-index: 2100;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            padding: 15px; 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(200px);
+            width: calc(100% - 40px); max-width: var(--kbd-max-width); z-index: 2100;
+            display: flex; flex-direction: column; gap: 12px; padding: 15px; 
             transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
-            pointer-events: none;
-            background: var(--panel-bg);
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
+            pointer-events: none; background: var(--panel-bg); backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); border-radius: 20px;
         }
-
-        #timelapse-toolbar.visible {
-            transform: translateX(-50%) translateY(0);
-            pointer-events: auto;
-        }
-
+        #timelapse-toolbar.visible { transform: translateX(-50%) translateY(0); pointer-events: auto; }
         .tl-row-top { width: 100%; }
         .tl-progress-container { width: 100%; height: 12px; display: flex; align-items: center; cursor: pointer; }
         .tl-progress-track { width: 100%; height: 4px; background: var(--tl-track-bg); border-radius: 2px; position: relative; overflow: hidden; }
@@ -313,9 +294,15 @@
 
         <div class="dash-section">
             <span class="dash-label">Export</span>
-            <div style="display: flex; gap: 8px;">
-                <div class="dash-btn" onclick="exportFile('png')" style="flex: 1; justify-content: center; margin-bottom: 0;">PNG</div>
-                <div class="dash-btn" onclick="exportFile('svg')" style="flex: 1; justify-content: center; margin-bottom: 0;">SVG</div>
+            <div style="display: flex; gap: 10px;">
+                <div class="dash-btn" onclick="exportFile('png')" style="flex: 1; justify-content: center; margin-bottom: 0;">
+                    <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    PNG
+                </div>
+                <div class="dash-btn" onclick="exportFile('svg')" style="flex: 1; justify-content: center; margin-bottom: 0;">
+                    <svg viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>
+                    SVG
+                </div>
             </div>
         </div>
 
@@ -343,7 +330,7 @@
         </div>
 
         <div class="login-box">
-            <div class="dash-btn" style="background: #4285F4; color: white; border: none; margin-bottom: 8px;">
+            <div class="dash-btn" style="background: #4285F4; color: white; border: none; margin-bottom: 10px;">
                 <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
                 Login with Google
             </div>
@@ -445,6 +432,7 @@
     </div>
 
     <script>
+        // Блокировка стандартных жестов браузера
         document.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
 
         const INITIAL_DELAY = 520;  
@@ -694,9 +682,35 @@
         }
 
         function performReset() { 
-            if (isTimelapseUIOpen) return;
-            saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; offsetX = width / 2; offsetY = height / 2; lastDirection = null; 
-            showActionHint('New Canvas'); redraw(); captureState();
+            // Если мы в режиме таймлапса, принудительно выходим и чистим ВСЁ
+            if (isTimelapseUIOpen) {
+                isTimelapseUIOpen = false;
+                const toolbar = document.getElementById('timelapse-toolbar');
+                toolbar.classList.remove('visible');
+                document.body.classList.remove('timelapse-active');
+                stopTlPlayback();
+                updateUIState();
+            }
+            
+            // Глубокая очистка данных
+            segments = []; 
+            specialElements = {}; 
+            curI = 0; 
+            curJ = 0; 
+            lastDirection = null;
+            history = [];
+            redoStack = [];
+            tlHistory = []; // Очистка истории таймлапса
+            tlCurrentFrame = 0;
+            
+            // Центрирование камеры
+            offsetX = width / 2; 
+            offsetY = height / 2; 
+            
+            showActionHint('New Canvas'); 
+            updateModeUI();
+            redraw(); 
+            captureState(); // Захватываем начальное пустое состояние для нового таймлапса
         }
 
         function setup() { 
