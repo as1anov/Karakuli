@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=none, viewport-fit=cover">
     <title>Karakuli: Digital Editor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500&swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700;800&swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         :root {
@@ -32,7 +32,13 @@
             --icon-stroke: 2; 
             --active-btn-bg: rgba(0, 0, 0, 0.15); 
             --handle-icon-color: #939598;
-            --kbd-trigger-height: 14px;
+            --disabled-color: #555555;
+            --tl-track-bg: rgba(0, 0, 0, 0.1);
+            --tl-progress-fill: #000000;
+            
+            --kbd-max-width: 500px;
+            --kbd-margin: 20px;
+            --sidebar-width: 300px;
         }
 
         [data-theme="dark"] {
@@ -41,32 +47,31 @@
             --panel-bg: rgba(34, 34, 34, 0.3);
             --text-color: #E8E8E8;
             --icon-color: #E8E8E8;
-            --kbd-text-color: #6D6E71;
-            --kbd-icon-color: #6D6E71;
             --ui-accent: rgba(255, 255, 255, 0.1);
             --border-color: rgba(255, 255, 255, 0.1);
             --dot-color: 255, 255, 255;
             --dot-opacity: 0.15;
             --active-btn-bg: rgba(255, 255, 255, 0.15);
-            --handle-icon-color: #939598;
+            --disabled-color: #666666;
+            --tl-track-bg: rgba(255, 255, 255, 0.1);
+            --tl-progress-fill: #FFFFFF;
         }
 
-        [data-theme="blue"] {
+        [data-theme="system"] {
             --bg-color: #0f172a;
             --canvas-bg: #0f172a;
             --panel-bg: rgba(30, 58, 138, 0.4);
             --text-color: #93c5fd;
             --icon-color: #60a5fa;
-            --kbd-text-color: #60a5fa;
-            --kbd-icon-color: #3b82f6;
-            --kbd-label-color: #1e40af;
             --ui-accent: rgba(59, 130, 246, 0.2);
             --border-color: rgba(59, 130, 246, 0.3);
             --dot-color: 59, 130, 246;
             --dot-opacity: 0.3;
             --active-btn-bg: rgba(37, 99, 235, 0.4);
-            --handle-icon-color: #3b82f6;
             --draw-cursor-color: #60a5fa;
+            --disabled-color: #334155;
+            --tl-track-bg: rgba(255,255,255,0.1);
+            --tl-progress-fill: #60a5fa;
         }
 
         * {
@@ -103,6 +108,7 @@
             border: 1px solid var(--border-color);
         }
 
+        /* --- TOP NAV --- */
         .top-nav-container {
             position: fixed; 
             top: max(20px, env(safe-area-inset-top)); 
@@ -117,7 +123,7 @@
             width: fit-content;
         }
         
-        .mode-header, .control-btn, .option-btn { 
+        .mode-header, .control-btn { 
             height: var(--header-height); border-radius: var(--border-radius); 
             color: var(--text-color); display: flex; justify-content: center; 
             align-items: center; cursor: pointer; transition: all 0.2s ease; 
@@ -133,390 +139,301 @@
             background: var(--active-btn-bg);
             border-color: var(--text-color);
         }
-        
-        .dropdown-options { 
-            display: flex; flex-direction: column; gap: 8px; opacity: 0; 
-            pointer-events: none; 
-            visibility: hidden;
-            transform: translateY(-10px); 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            position: absolute; top: 53px; right: 0; z-index: 1001; 
+
+        /* --- DASHBOARD / SIDEBAR --- */
+        #dashboard-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.2); z-index: 2500; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
         }
+        #dashboard-overlay.open { opacity: 1; pointer-events: auto; }
+
+        #dashboard {
+            position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width);
+            background: var(--bg-color); z-index: 2600; transform: translateX(-100%);
+            transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            display: flex; flex-direction: column; padding: max(40px, env(safe-area-inset-top)) 24px 24px 24px;
+            box-shadow: 20px 0 50px rgba(0,0,0,0.1);
+        }
+        #dashboard.open { transform: translateX(0); }
+
+        .dash-section { margin-bottom: 32px; }
+        .dash-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--disabled-color); margin-bottom: 16px; display: block; }
         
-        .dropdown-options.open { 
-            opacity: 1; 
-            pointer-events: auto; 
-            visibility: visible;
-            transform: translateY(0); 
+        .dash-btn {
+            width: 100%; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--border-color);
+            background: var(--panel-bg); color: var(--text-color); display: flex; align-items: center; gap: 12px;
+            margin-bottom: 10px; cursor: pointer; transition: all 0.2s; font-size: 14px; font-weight: 600;
+        }
+        .dash-btn:active { transform: scale(0.98); background: var(--active-btn-bg); }
+        .dash-btn svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+        /* Theme Toggle in Dash */
+        .theme-container {
+            display: flex; background: var(--panel-bg); border-radius: 14px; border: 1px solid var(--border-color);
+            padding: 4px; gap: 4px;
+        }
+        .theme-opt {
+            flex: 1; height: 40px; display: flex; align-items: center; justify-content: center;
+            border-radius: 10px; cursor: pointer; transition: all 0.2s; color: var(--disabled-color);
+        }
+        .theme-opt.active { background: var(--bg-color); color: var(--text-color); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+        /* Login Section */
+        .login-box {
+            margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);
         }
 
-        .option-btn { width: var(--header-height); aspect-ratio: 1 / 1; }
-
-        /* KEYBOARD CONTAINER - ADJUSTED TO MATCH NAV WIDTH */
-        #mobile-keyboard {
-            position: fixed; 
-            bottom: 0;
+        /* --- TIMELINE PANEL --- */
+        #timelapse-toolbar {
+            position: fixed;
+            bottom: 20px; 
             left: 50%;
-            transform: translate(-50%, calc(100% + 50px)); 
-            width: calc(100% - 40px); /* Matches padding of top nav (20px each side) */
-            max-width: 500px; /* Optional cap, but fits standard phone widths better now */
-            z-index: 2000; padding: 0px 0px 14px 0px; /* Removed side padding to align with edge markers */
-            display: flex; flex-direction: column; gap: 8px;
+            transform: translateX(-50%) translateY(200px);
+            width: calc(100% - 40px); 
+            max-width: var(--kbd-max-width); 
+            z-index: 2100;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 15px; 
             transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
-            pointer-events: none; 
-            background: transparent;
-            border: none;
+            pointer-events: none;
+            background: var(--panel-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
         }
 
-        #mobile-keyboard.open { 
-            transform: translate(-50%, -10px); 
-            pointer-events: auto; 
+        #timelapse-toolbar.visible {
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
         }
 
-        .keyboard-trigger-area {
-            width: 100%; height: var(--kbd-trigger-height);
-            display: flex; justify-content: center; align-items: center; 
-            cursor: pointer; pointer-events: auto;
-            position: relative;
+        .tl-row-top { width: 100%; }
+        .tl-progress-container { width: 100%; height: 12px; display: flex; align-items: center; cursor: pointer; }
+        .tl-progress-track { width: 100%; height: 4px; background: var(--tl-track-bg); border-radius: 2px; position: relative; overflow: hidden; }
+        .tl-progress-fill { width: 0%; height: 100%; background: var(--tl-progress-fill); transition: width 0.05s linear; }
+        .tl-row-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .tl-left-group { display: flex; align-items: center; gap: 12px; }
+        .tl-right-group { display: flex; align-items: center; gap: 8px; }
+        .tl-time-display { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-color); min-width: 100px; }
+        .tl-action-btn {
+            width: 44px; height: 44px; border-radius: 12px; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; color: var(--text-color); background: rgba(0, 0, 0, 0.05); transition: all 0.2s; border: 1px solid transparent;
         }
+        [data-theme="dark"] .tl-action-btn { background: rgba(255, 255, 255, 0.05); }
+        .tl-action-btn:active { background: var(--active-btn-bg); transform: scale(0.92); }
+        .tl-action-btn.speed-btn { font-family: 'JetBrains Mono', monospace; font-size: 12.65px; font-weight: 800; }
+
+        /* Keyboard */
+        #mobile-keyboard {
+            position: fixed; bottom: 0; left: 50%; transform: translate(-50%, calc(100% + 50px)); 
+            width: calc(100% - 40px); max-width: var(--kbd-max-width); z-index: 2000;
+            display: flex; flex-direction: column; transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+            pointer-events: none; background: transparent; border: none;
+        }
+        #mobile-keyboard.open { transform: translate(-50%, 0); pointer-events: auto; }
+        .keyboard-trigger-area { width: 100%; height: 30px; display: flex; justify-content: center; align-items: center; pointer-events: auto; cursor: pointer; }
+        .keyboard-close-bar { width: 50px; height: 4px; background: var(--kbd-text-color); border-radius: 2px; opacity: 0; transform: scaleX(0.5); transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
+        #mobile-keyboard.open .keyboard-close-bar { opacity: 0.6; transform: scaleX(1); }
 
         .handle-arrow { 
-            width: 45px; height: 45px; 
-            stroke: var(--handle-icon-color);
-            stroke-width: 2; 
-            fill: none; 
-            stroke-linecap: round; 
-            stroke-linejoin: round;
-            opacity: 0.6; 
-            transition: transform 0.4s ease, opacity 0.4s ease, stroke 0.2s ease;
-            animation: arrow-float 2.5s ease-in-out infinite;
-            position: fixed; 
-            bottom: 15px; 
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1999;
-            cursor: pointer; 
-            pointer-events: auto;
+            width: 45px; height: 45px; stroke: var(--handle-icon-color); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round;
+            opacity: 0.6; transition: transform 0.4s ease, opacity 0.4s ease, stroke 0.2s ease; animation: arrow-float 2.5s ease-in-out infinite;
+            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 1999; cursor: pointer; pointer-events: auto;
         }
-
-        @keyframes arrow-float {
-            0%, 100% { transform: translateX(-50%) translateY(0px); }
-            50% { transform: translateX(-50%) translateY(-8px); }
-        }
+        @keyframes arrow-float { 0%, 100% { transform: translateX(-50%) translateY(0px); } 50% { transform: translateX(-50%) translateY(-8px); } }
 
         #mobile-keyboard.open + .handle-arrow, 
-        #mobile-keyboard.open ~ .handle-arrow {
-            opacity: 0;
-            pointer-events: none;
-            visibility: hidden;
-        }
+        body.timelapse-active .handle-arrow,
+        body.dashboard-open .handle-arrow { opacity: 0; pointer-events: none; visibility: hidden; }
 
-        .keyboard-close-trigger {
-            position: absolute;
-            bottom: 0; 
-            width: 100px;
-            height: 12px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            pointer-events: none;
-            z-index: 2001;
-        }
-
-        .keyboard-close-bar {
-            width: 50px; 
-            height: 4px; 
-            background: var(--kbd-text-color);
-            border-radius: 2px;
-            opacity: 0;
-            transform: scaleX(0.5);
-            transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
-        }
-
-        #mobile-keyboard.open .keyboard-close-trigger {
-            pointer-events: auto;
-        }
-
-        #mobile-keyboard.open .keyboard-close-bar {
-            opacity: 0.6;
-            transform: scaleX(1);
-        }
-
-        /* Keyboard Grid Structure */
-        #kbd-main-grid {
-            display: grid;
-            grid-template-rows: repeat(4, 1fr); 
-            gap: 8px; /* Adjusted gap to be slightly more compact if needed */
-            width: 100%;
-        }
-
-        .keyboard-row { 
-            display: grid; 
-            gap: 8px; 
-            pointer-events: auto; 
-            width: 100%;
-        }
-        
+        #kbd-main-grid { display: grid; grid-template-rows: repeat(4, 60px); gap: 8px; width: 100%; padding-bottom: 20px; }
+        .keyboard-row { display: grid; gap: 8px; pointer-events: auto; width: 100%; height: 100%; }
         .row-3-col { grid-template-columns: repeat(3, 1fr); }
         .row-4-col { grid-template-columns: repeat(4, 1fr); }
 
         .v-key {
-            aspect-ratio: 2.3 / 1; 
-            background: var(--panel-bg); 
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            color: var(--kbd-text-color); position: relative;
-            transition: background 0.2s, transform 0.1s, border-color 0.2s; touch-action: none;
-            overflow: hidden;
+            height: 100%; background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: var(--kbd-text-color); position: relative; transition: background 0.2s, transform 0.1s, border-color 0.2s; touch-action: none; overflow: hidden;
         }
-
-        .row-4-col .v-key {
-            aspect-ratio: auto;
-            height: 100%;
-        }
-
-        .v-key:active {
-            background: var(--active-btn-bg);
-            transform: scale(0.96);
-        }
-
-        .v-key svg { 
-            width: 24%; height: auto; 
-            stroke: var(--kbd-icon-color); 
-            stroke-width: var(--icon-stroke); 
-            fill: none; 
-            stroke-linecap: round; 
-            stroke-linejoin: round; 
-            pointer-events: none;
-        }
-
-        .v-key.key-8 svg { transform: translateY(2px); } 
-        .v-key.key-2 svg { transform: translateY(-1px); } 
-        .v-key.key-4 svg { transform: translateX(-1px); }
-        .v-key.key-6 svg { transform: translateX(1px); }
-        
-        .v-key.key-0 svg { 
-            width: 26.1%; 
-            fill: var(--kbd-icon-color); 
-            stroke: var(--kbd-icon-color); 
-            stroke-width: var(--icon-stroke); 
-            stroke-linejoin: round; 
-        }
-
-        .v-key .key-label {
-            position: absolute; bottom: 5px; right: 7px;
-            font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
-            color: var(--kbd-label-color); 
-            opacity: 0.56; 
-            pointer-events: none;
-        }
-        
+        .v-key:active { background: var(--active-btn-bg); transform: scale(0.96); }
+        .v-key svg { width: 24px; height: 24px; stroke: var(--kbd-icon-color); stroke-width: var(--icon-stroke); fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+        .v-key .key-label { position: absolute; bottom: 5px; right: 7px; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: var(--kbd-label-color); opacity: 0.56; pointer-events: none; }
         .v-key.mode-key { justify-content: center; align-items: center; }
-        .v-key .mode-label { 
-            font-size: 10px; 
-            font-weight: 700; 
-            text-transform: uppercase; letter-spacing: 0.8px;
-            display: inline-block; color: var(--kbd-icon-color);
-            transform: scaleY(1.3); transform-origin: center;
-            pointer-events: none;
-        }
-
-        .v-key .mode-sub { 
-            position: absolute; bottom: 5px; right: 8px; 
-            font-size: 14px; 
-            font-weight: 950;
-            color: var(--kbd-label-color); 
-            opacity: 0.63; 
-            line-height: 1; letter-spacing: -1.5px;
-            pointer-events: none;
-        }
+        .v-key .mode-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; display: inline-block; color: var(--kbd-icon-color); transform: scaleY(1.3); transform-origin: center; pointer-events: none; }
+        .v-key .mode-sub { position: absolute; bottom: 5px; right: 8px; font-size: 14px; font-weight: 950; color: var(--kbd-label-color); opacity: 0.63; line-height: 1; letter-spacing: -1.5px; pointer-events: none; }
 
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100%; z-index: 1; overflow: hidden; touch-action: none; }
-        
-        .indicator-text { 
-            font-size: 11.2px; 
-            font-weight: 400; 
-            color: var(--text-color); 
-            opacity: 0; 
-            transition: opacity 0.3s ease, transform 0.2s ease; 
-            letter-spacing: 0.5px;
-            pointer-events: none;
-            transform: translateY(3px);
-            text-align: center;
-        }
+        .indicator-text { font-size: 11.2px; font-weight: 400; color: var(--text-color); opacity: 0; transition: opacity 0.3s ease, transform 0.2s ease; letter-spacing: 0.5px; pointer-events: none; transform: translateY(3px); text-align: center; }
         .indicator-text.visible { opacity: 1; transform: translateY(5px); }
 
         .theme-svg { width: 19.8px; height: 19.8px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-        
-        body[data-theme="light"] .sun-icon { display: block; }
-        body[data-theme="light"] .moon-icon, body[data-theme="light"] .monitor-icon { display: none; }
-        
-        body[data-theme="dark"] .moon-icon { display: block; }
-        body[data-theme="dark"] .sun-icon, body[data-theme="dark"] .monitor-icon { display: none; }
 
-        body[data-theme="blue"] .monitor-icon { display: block; }
-        body[data-theme="blue"] .sun-icon, body[data-theme="blue"] .moon-icon { display: none; }
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            --sidebar-width: 85vw;
+        }
     </style>
 </head>
 <body data-theme="light"> 
     
+    <!-- DASHBOARD OVERLAY -->
+    <div id="dashboard-overlay" onclick="toggleDashboard()"></div>
+    <div id="dashboard">
+        <div class="dash-section">
+            <span class="dash-label">Workspace</span>
+            <div class="dash-btn" onclick="performReset(); toggleDashboard()">
+                <!-- New Icon: Plus Document -->
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                New Canvas
+            </div>
+            <div class="dash-btn" style="opacity: 0.5; cursor: not-allowed;">
+                <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                My Projects
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <span class="dash-label">Export</span>
+            <div style="display: flex; gap: 10px;">
+                <div class="dash-btn" onclick="exportFile('png')" style="flex: 1; justify-content: center;">PNG</div>
+                <div class="dash-btn" onclick="exportFile('svg')" style="flex: 1; justify-content: center;">SVG</div>
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <span class="dash-label">Features</span>
+            <div class="dash-btn" onclick="toggleTimelapseUI(); toggleDashboard()">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                Time-lapse
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <span class="dash-label">Appearance</span>
+            <div class="theme-container">
+                <div class="theme-opt active" id="opt-light" onclick="setTheme('light')">
+                    <svg viewBox="0 0 24 24" class="theme-svg"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                </div>
+                <div class="theme-opt" id="opt-dark" onclick="setTheme('dark')">
+                    <svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z"/></svg>
+                </div>
+                <div class="theme-opt" id="opt-system" onclick="setTheme('system')">
+                    <svg viewBox="0 0 24 24" class="theme-svg"><rect width="18" height="13" x="3" y="4" rx="2"/><path d="M12 17v4M8 21h8"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="login-box">
+            <div class="dash-btn" style="background: #4285F4; color: white; border: none;">
+                <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
+                Login with Google
+            </div>
+            <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 12px; color: var(--disabled-color);">
+                Continue as Guest
+            </div>
+        </div>
+    </div>
+
     <div class="top-nav-container">
         <div class="left-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-            <div class="control-btn glass-panel" onpointerdown="event.stopPropagation(); performReset()" title="Reset Canvas">
-                <svg viewBox="0 0 24 24" class="theme-svg"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" /></svg>
-            </div>
-            <div class="control-btn glass-panel" id="eraser-btn" onpointerdown="event.stopPropagation(); toggleEraser()" title="Eraser (E)">
-                <svg viewBox="0 0 24 24" class="theme-svg">
-                    <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
-                    <path d="m22 21H7" />
-                    <path d="m5 11 9 9" />
-                </svg>
+            <div class="control-btn glass-panel" id="menu-btn" onpointerdown="event.stopPropagation(); toggleDashboard()" title="Menu">
+                <svg viewBox="0 0 24 24" class="theme-svg"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
             </div>
         </div>
 
         <div class="top-nav-wrapper">
-            <div class="mode-header glass-panel" onpointerdown="event.stopPropagation(); toggleMode()">
+            <div class="mode-header glass-panel" id="mode-header" onpointerdown="event.stopPropagation(); toggleMode()">
                 <span id="mode-text">Navigation</span>
             </div>
             <div id="action-indicator" class="indicator-text">Action</div>
         </div>
 
         <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-            <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn glass-panel" id="theme-trigger" onpointerdown="event.stopPropagation(); toggleThemeMenu()">
-                    <svg viewBox="0 0 24 24" class="theme-svg sun-icon">
-                        <circle cx="12" cy="12" r="4" />
-                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                    </svg>
-                    <svg viewBox="0 0 24 24" class="theme-svg moon-icon">
-                        <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
-                    </svg>
-                    <svg viewBox="0 0 24 24" class="theme-svg monitor-icon">
-                        <rect width="16" height="11" x="4" y="4" rx="2"/><path d="M12 15v4M8 19h8"/>
-                    </svg>
-                </div>
-                <div class="dropdown-options" id="theme-menu">
-                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); setTheme('light')">
-                        <svg viewBox="0 0 24 24" class="theme-svg">
-                            <circle cx="12" cy="12" r="4" />
-                            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                        </svg>
-                    </div>
-                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); setTheme('dark')">
-                        <svg viewBox="0 0 24 24" class="theme-svg">
-                            <path d="M12 3c.132 0 .263 0 .393.007a9 9 0 0 0 9.215 12.857 9 9 0 1 1-9.608-12.864Z" />
-                        </svg>
-                    </div>
-                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); setTheme('blue')">
-                        <svg viewBox="0 0 24 24" class="theme-svg">
-                            <rect width="16" height="11" x="4" y="4" rx="2"/><path d="M12 15v4M8 19h8"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            <div class="dropdown-container" style="position: relative;">
-                <div class="control-btn glass-panel" id="export-trigger" onpointerdown="event.stopPropagation(); toggleExportMenu()">
-                    <svg viewBox="0 0 24 24" class="theme-svg"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                </div>
-                <div class="dropdown-options" id="export-menu">
-                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); exportFile('svg')" style="font-size: 10px; font-weight: 700;">SVG</div>
-                    <div class="option-btn glass-panel" onpointerdown="event.stopPropagation(); exportFile('png')" style="font-size: 10px; font-weight: 700;">PNG</div>
-                </div>
+            <div class="control-btn glass-panel" id="eraser-btn" onpointerdown="event.stopPropagation(); toggleEraser()" title="Eraser (E)">
+                <svg viewBox="0 0 24 24" class="theme-svg">
+                    <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+                    <path d="m22 21H7" /><path d="m5 11 9 9" />
+                </svg>
             </div>
         </div>
     </div>
     
     <div id="canvas-container"></div>
 
-    <div id="mobile-keyboard">
-        <div class="keyboard-trigger-area">
-            <div class="keyboard-close-trigger" onpointerdown="handleKbdTrigger('close')">
-                <div class="keyboard-close-bar"></div>
+    <div id="timelapse-toolbar">
+        <div class="tl-row-top">
+            <div class="tl-progress-container" onclick="handleTimelineSeek(event)">
+                <div class="tl-progress-track">
+                    <div class="tl-progress-fill" id="tl-fill"></div>
+                </div>
             </div>
         </div>
-
-        <div id="kbd-main-grid">
-            <div class="keyboard-row row-3-col">
-                <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')">
-                    <svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg>
-                    <span class="key-label">7</span>
+        <div class="tl-row-bottom">
+            <div class="tl-left-group">
+                <div class="tl-action-btn" id="tl-play-btn" onclick="togglePlayTimelapse()" title="Play/Pause">
+                    <svg id="tl-play-icon" viewBox="0 0 24 24" width="22" height="22">
+                        <path d="M6.2,20.8 C5.4,21.3 4.4,20.8 4.4,19.9 L4.4,4.1 C4.4,3.2 5.4,2.7 6.2,3.2 L19.4,11.1 C20.2,11.5 20.2,12.5 19.4,12.9 L6.2,20.8 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                    </svg>
+                    <svg id="tl-pause-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style="display:none">
+                        <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+                    </svg>
                 </div>
-                <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')">
-                    <svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg>
-                    <span class="key-label">8</span>
-                </div>
-                <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')">
-                    <svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg>
-                    <span class="key-label">9</span>
-                </div>
+                <div class="tl-time-display" id="tl-current-time">0:00 / 0:00</div>
             </div>
-            
-            <div class="keyboard-row row-3-col">
-                <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')">
-                    <svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg>
-                    <span class="key-label">4</span>
+            <div class="tl-right-group">
+                <div class="tl-action-btn speed-btn" id="tl-cycle-speed" onclick="cycleTlSpeed()" title="Playback Speed">1x</div>
+                <div class="tl-action-btn" onclick="exportTimelapseVideo()" title="Export Video">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 </div>
-                <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg>
-                    <span class="key-label">5</span>
-                </div>
-                <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')">
-                    <svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg>
-                    <span class="key-label">6</span>
-                </div>
-            </div>
-            
-            <div class="keyboard-row row-3-col">
-                <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')">
-                    <svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg>
-                    <span class="key-label">1</span>
-                </div>
-                <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')">
-                    <svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg>
-                    <span class="key-label">2</span>
-                </div>
-                <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')">
-                    <svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg>
-                    <span class="key-label">3</span>
-                </div>
-            </div>
-            
-            <div class="keyboard-row row-4-col" id="bottom-row">
-                <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')">
-                    <svg viewBox="0 0 24 24"><path d="M12 5L19 12L12 19L5 12Z"/></svg>
-                    <span class="key-label">0</span>
-                </div>
-                <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')">
-                    <svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg>
-                    <span class="key-label">U</span>
-                </div>
-                <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')">
-                    <svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg>
-                    <span class="key-label">R</span>
-                </div>
-                <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')">
-                    <span class="mode-label">MODE</span>
-                    <span class="mode-sub">⎽⎽</span>
+                <div class="tl-action-btn" onclick="toggleTimelapseUI()" title="Close" style="color: var(--disabled-color);">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 6 6 18M6 6l12 12"/></svg>
                 </div>
             </div>
         </div>
     </div>
 
-    <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')">
-        <path d="M18 15l-6-6-6 6" />
-    </svg>
+    <div id="mobile-keyboard">
+        <div class="keyboard-trigger-area" onpointerdown="handleKbdTrigger('close')">
+            <div class="keyboard-close-bar"></div>
+        </div>
+        <div id="kbd-main-grid">
+            <div class="keyboard-row row-3-col">
+                <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')"><svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg><span class="key-label">7</span></div>
+                <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')"><svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg><span class="key-label">8</span></div>
+                <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')"><svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg><span class="key-label">9</span></div>
+            </div>
+            <div class="keyboard-row row-3-col">
+                <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')"><svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg><span class="key-label">4</span></div>
+                <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg><span class="key-label">5</span></div>
+                <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')"><svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg><span class="key-label">6</span></div>
+            </div>
+            <div class="keyboard-row row-3-col">
+                <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')"><svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg><span class="key-label">1</span></div>
+                <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')"><svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg><span class="key-label">2</span></div>
+                <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')"><svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg><span class="key-label">3</span></div>
+            </div>
+            <div class="keyboard-row row-4-col" id="bottom-row">
+                <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')"><svg viewBox="0 0 24 24" style="fill: currentColor; stroke: none;"><path d="M12 5L19 12L12 19L5 12Z"/></svg><span class="key-label">0</span></div>
+                <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')"><svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg><span class="key-label">U</span></div>
+                <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')"><svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg><span class="key-label">R</span></div>
+                <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')"><span class="mode-label">MODE</span><span class="mode-sub">⎽⎽</span></div>
+            </div>
+        </div>
+    </div>
+
+    <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')"><path d="M18 15l-6-6-6 6" /></svg>
 
     <script>
-        document.addEventListener('touchmove', function (e) {
-            e.preventDefault();
-        }, { passive: false });
+        document.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
 
         const INITIAL_DELAY = 520;  
         const REPEAT_INTERVAL = 180; 
+        const FRAME_DURATION = 0.08; 
 
         const BASE_STEP_VAL = 60; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
@@ -526,198 +443,291 @@
         let offsetX = 0, offsetY = 0; let zoom = 0.48; 
         let history = [], redoStack = []; let isExporting = false;
         let actionTimeout = null; let currentTheme = 'light';
-        let lastPinchDist = 0;
+        let lastPinchDist = 0; let lastClickTime = 0; let isPanning = false;
 
-        let lastClickTime = 0;
-        let isPanning = false;
+        let tlHistory = []; 
+        let isTimelapseUIOpen = false;
+        let isPlayingTl = false;
+        let tlCurrentFrame = 0;
+        let tlSpeed = 1;
+        let tlInterval = null;
+
+        let isDashboardOpen = false;
+        let touchStartX = 0;
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
-            dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#414042', cursorColor: '#FF6666', drawCursor: '#58595B' },
-            blue: { canvasBg: '#0f172a', dotColor: '59, 130, 246', dotAlpha: 0.3, geomColor: '#3b82f6', cursorColor: '#60a5fa', drawCursor: '#93c5fd' }
+            dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8', cursorColor: '#FF6666', drawCursor: '#58595B' },
+            system: { canvasBg: '#0f172a', dotColor: '59, 130, 246', dotAlpha: 0.3, geomColor: '#3b82f6', cursorColor: '#60a5fa', drawCursor: '#93c5fd' }
         };
 
-        function toggleThemeMenu() {
-            document.getElementById('theme-menu').classList.toggle('open');
-            document.getElementById('export-menu').classList.remove('open');
+        function toggleDashboard() {
+            isDashboardOpen = !isDashboardOpen;
+            const dash = document.getElementById('dashboard');
+            const overlay = document.getElementById('dashboard-overlay');
+            if (isDashboardOpen) {
+                dash.classList.add('open');
+                overlay.classList.add('open');
+                document.body.classList.add('dashboard-open');
+                handleKbdTrigger('close');
+            } else {
+                dash.classList.remove('open');
+                overlay.classList.remove('open');
+                document.body.classList.remove('dashboard-open');
+            }
         }
 
-        function toggleExportMenu() {
-            document.getElementById('export-menu').classList.toggle('open');
-            document.getElementById('theme-menu').classList.remove('open');
+        function updateUIState() {
+            const disabledIds = ['menu-btn', 'eraser-btn', 'mode-header'];
+            const kbdKeys = document.querySelectorAll('.v-key');
+            if (isTimelapseUIOpen) {
+                disabledIds.forEach(id => document.getElementById(id).classList.add('disabled'));
+                kbdKeys.forEach(k => k.classList.add('disabled'));
+            } else {
+                disabledIds.forEach(id => document.getElementById(id).classList.remove('disabled'));
+                kbdKeys.forEach(k => k.classList.remove('disabled'));
+            }
+        }
+
+        function toggleTimelapseUI() {
+            isTimelapseUIOpen = !isTimelapseUIOpen;
+            const toolbar = document.getElementById('timelapse-toolbar');
+            if (isTimelapseUIOpen) {
+                toolbar.classList.add('visible');
+                document.body.classList.add('timelapse-active');
+                handleKbdTrigger('close');
+                showActionHint("Timelapse", true);
+                tlCurrentFrame = 0; 
+                if (tlHistory.length > 0) {
+                    const first = tlHistory[0];
+                    segments = JSON.parse(JSON.stringify(first.segments));
+                    specialElements = JSON.parse(JSON.stringify(first.specialElements));
+                }
+                updateTlProgress();
+                stopTlPlayback();
+            } else {
+                toolbar.classList.remove('visible');
+                document.body.classList.remove('timelapse-active');
+                stopTlPlayback();
+                updateModeUI();
+                if (tlHistory.length > 0) {
+                    const last = tlHistory[tlHistory.length - 1];
+                    segments = JSON.parse(JSON.stringify(last.segments));
+                    specialElements = JSON.parse(JSON.stringify(last.specialElements));
+                }
+            }
+            updateUIState(); redraw();
+        }
+
+        function captureState() {
+            const lastState = tlHistory.length > 0 ? tlHistory[tlHistory.length - 1] : null;
+            const currentSegments = JSON.stringify(segments);
+            const currentSpecials = JSON.stringify(specialElements);
+            if (lastState && JSON.stringify(lastState.segments) === currentSegments && JSON.stringify(lastState.specialElements) === currentSpecials) return;
+            tlHistory.push({ segments: JSON.parse(currentSegments), specialElements: JSON.parse(currentSpecials), cursor: { i: curI, j: curJ } });
+        }
+
+        function cycleTlSpeed() { if (tlSpeed === 1) setTlSpeed(2); else if (tlSpeed === 2) setTlSpeed(4); else if (tlSpeed === 4) setTlSpeed(8); else setTlSpeed(1); }
+        function setTlSpeed(s) { tlSpeed = s; document.getElementById('tl-cycle-speed').innerText = `${s}x`; if (isPlayingTl) { stopTlPlayback(); startTlPlayback(); } }
+        function formatTime(totalSeconds) { const m = Math.floor(totalSeconds / 60); const s = Math.floor(totalSeconds % 60); return `${m}:${s.toString().padStart(2, '0')}`; }
+
+        function updateTlProgress() {
+            const fill = document.getElementById('tl-fill');
+            const totalFrames = Math.max(0, tlHistory.length - 1);
+            const percent = totalFrames > 0 ? (tlCurrentFrame / totalFrames) * 100 : 0;
+            fill.style.width = `${Math.min(100, percent)}%`;
+            const timeDisplay = document.getElementById('tl-current-time');
+            const currentSeconds = tlCurrentFrame * FRAME_DURATION;
+            const totalSeconds = totalFrames * FRAME_DURATION;
+            timeDisplay.innerText = `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
+        }
+
+        function handleTimelineSeek(e) {
+            if (tlHistory.length < 2) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const percentage = (e.clientX - rect.left) / rect.width;
+            tlCurrentFrame = Math.floor(percentage * (tlHistory.length - 1));
+            tlCurrentFrame = Math.max(0, Math.min(tlCurrentFrame, tlHistory.length - 1));
+            applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
+        }
+
+        function applyFrame(idx) {
+            const frame = tlHistory[idx];
+            if (!frame) return;
+            segments = JSON.parse(JSON.stringify(frame.segments));
+            specialElements = JSON.parse(JSON.stringify(frame.specialElements));
+            curI = frame.cursor.i; curJ = frame.cursor.j;
+        }
+
+        function togglePlayTimelapse() { if (isPlayingTl) stopTlPlayback(); else startTlPlayback(); }
+
+        function startTlPlayback() {
+            if (tlHistory.length === 0) return;
+            isPlayingTl = true;
+            document.getElementById('tl-play-icon').style.display = 'none';
+            document.getElementById('tl-pause-icon').style.display = 'block';
+            if (tlCurrentFrame >= tlHistory.length - 1) tlCurrentFrame = 0;
+            const baseRate = FRAME_DURATION * 1000; 
+            tlInterval = setInterval(() => {
+                if (tlCurrentFrame < tlHistory.length - 1) {
+                    tlCurrentFrame++; applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
+                } else stopTlPlayback();
+            }, baseRate / tlSpeed);
+        }
+
+        function stopTlPlayback() {
+            isPlayingTl = false;
+            document.getElementById('tl-play-icon').style.display = 'block';
+            document.getElementById('tl-pause-icon').style.display = 'none';
+            if (tlInterval) clearInterval(tlInterval);
+        }
+
+        async function exportTimelapseVideo() {
+            if (tlHistory.length === 0) return;
+            showActionHint("Exporting video...", true);
+            stopTlPlayback(); tlCurrentFrame = 0;
+            const canvasElem = document.getElementById('defaultCanvas0');
+            const stream = canvasElem.captureStream(60); 
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            const chunks = [];
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); a.download = `timelapse-${Date.now()}.webm`; a.click();
+                if (isTimelapseUIOpen) showActionHint("Timelapse", true); else showActionHint("Done");
+            };
+            recorder.start();
+            for (let i = 0; i < tlHistory.length; i++) {
+                tlCurrentFrame = i; applyFrame(i); updateTlProgress(); redraw();
+                await new Promise(r => setTimeout(r, 20 / tlSpeed));
+            }
+            await new Promise(r => setTimeout(r, 500));
+            recorder.stop();
         }
 
         function handleKbdTrigger(action) {
+            if ((isTimelapseUIOpen || isDashboardOpen) && action === 'open') return;
             const kbd = document.getElementById('mobile-keyboard');
-            if (action === 'open') kbd.classList.add('open');
-            else if (action === 'close') kbd.classList.remove('open');
+            if (action === 'open') kbd.classList.add('open'); else if (action === 'close') kbd.classList.remove('open');
         }
 
-        function vKeyStart(e, k) { 
-            if (e) { e.preventDefault(); e.stopPropagation(); } 
-            handleActionDown(k); 
-        }
-        function vKeyEnd(e, k) { 
-            if (e) { e.preventDefault(); e.stopPropagation(); } 
-            handleActionUp(k); 
-        }
+        function vKeyStart(event, key) { if (isTimelapseUIOpen || isDashboardOpen) return; if (event) { event.preventDefault(); event.stopPropagation(); } handleActionDown(key); }
+        function vKeyEnd(event, key) { if (isTimelapseUIOpen || isDashboardOpen) return; if (event) { event.preventDefault(); event.stopPropagation(); } handleActionUp(key); }
 
         function setTheme(m) { 
-            currentTheme = m; 
-            document.body.setAttribute('data-theme', m); 
-            document.getElementById('theme-menu').classList.remove('open'); 
-            
-            let hint = 'Light Theme';
-            if(m === 'dark') hint = 'Dark Theme';
-            if(m === 'blue') hint = 'System Theme';
-            
-            showActionHint(hint);
-            redraw(); 
+            currentTheme = m; document.body.setAttribute('data-theme', m); 
+            document.querySelectorAll('.theme-opt').forEach(opt => opt.classList.remove('active'));
+            document.getElementById('opt-' + m).classList.add('active');
+            showActionHint(m.charAt(0).toUpperCase() + m.slice(1)); redraw(); 
         }
         
         function showActionHint(t, persistent = false) { 
-            let a = document.getElementById('action-indicator'); 
-            a.innerText = t; 
-            a.classList.add('visible'); 
+            let a = document.getElementById('action-indicator'); a.innerText = t; a.classList.add('visible'); 
             if(actionTimeout) { clearTimeout(actionTimeout); actionTimeout = null; }
             if (!persistent) {
                 actionTimeout = setTimeout(() => {
-                    if (!isEraserActive) a.classList.remove('visible');
-                    else updateModeUI(); 
+                    if (isTimelapseUIOpen) return; 
+                    if (!isEraserActive) a.classList.remove('visible'); else updateModeUI(); 
                 }, 1200); 
             }
         }
 
         function saveState() {
             history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-            if(history.length > 200) history.shift(); 
-            redoStack = []; 
+            if(history.length > 200) history.shift(); redoStack = []; 
         }
 
         function undo() { 
+            if (isTimelapseUIOpen || isDashboardOpen) return;
             if(history.length > 0) { 
                 redoStack.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-                let s = history.pop(); 
-                segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
-                showActionHint('Undo'); redraw();
+                let s = history.pop(); segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
+                showActionHint('Undo'); redraw(); captureState();
             }
         }
 
         function redo() { 
+            if (isTimelapseUIOpen || isDashboardOpen) return;
             if(redoStack.length > 0) { 
                 history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
-                let s = redoStack.pop(); 
-                segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
-                showActionHint('Redo'); redraw();
+                let s = redoStack.pop(); segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
+                showActionHint('Redo'); redraw(); captureState();
             }
         }
         
         function updateModeUI() {
+            if (isTimelapseUIOpen) { showActionHint("Timelapse", true); return; }
             const modeHeader = document.getElementById('mode-text');
             const indicator = document.getElementById('action-indicator');
             const eraserBtn = document.getElementById('eraser-btn');
             modeHeader.innerText = isDrawingMode ? "Drawing" : "Navigation";
-            if (isEraserActive) { 
-                eraserBtn.classList.add('active'); 
-                let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100); 
-                showActionHint(`Size: ${percent}%`, true);
-            } else { 
-                eraserBtn.classList.remove('active'); 
-                if (!actionTimeout) indicator.classList.remove('visible');
-            }
+            if (isEraserActive) { eraserBtn.classList.add('active'); let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100); showActionHint(`Eraser: ${percent}%`, true); }
+            else { eraserBtn.classList.remove('active'); if (!actionTimeout) indicator.classList.remove('visible'); }
         }
 
         function toggleMode() { 
-            if (isEraserActive) isEraserActive = false; 
-            else { 
-                isDrawingMode = !isDrawingMode; 
-                lastDirection = null; 
-            }
-            updateModeUI(); 
-            redraw(); 
+            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (isEraserActive) isEraserActive = false; else { isDrawingMode = !isDrawingMode; lastDirection = null; }
+            updateModeUI(); redraw(); 
         }
         
         function toggleEraser() { 
-            isEraserActive = !isEraserActive; 
-            if (isEraserActive && eraserRadius === DEFAULT_ERASER_RADIUS) eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
-            updateModeUI(); 
-            redraw(); 
+            if (isTimelapseUIOpen || isDashboardOpen) return;
+            isEraserActive = !isEraserActive; if (isEraserActive && eraserRadius === DEFAULT_ERASER_RADIUS) eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
+            updateModeUI(); redraw(); 
         }
 
         function performReset() { 
-            saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; 
-            offsetX = width / 2; offsetY = height / 2; lastDirection = null; 
-            showActionHint('Reset'); redraw(); 
+            if (isTimelapseUIOpen) return;
+            saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; offsetX = width / 2; offsetY = height / 2; lastDirection = null; 
+            showActionHint('Cleared'); redraw(); captureState();
         }
 
         function setup() { 
-            let c = createCanvas(windowWidth, windowHeight); 
-            c.parent('canvas-container'); 
-            offsetX = width/2; offsetY = height/2; 
-            
+            let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); offsetX = width/2; offsetY = height/2; 
             const canvas = document.getElementById('defaultCanvas0');
-            
             canvas.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
             canvas.addEventListener('mouseup', (e) => handleEnd(e.clientX, e.clientY));
-            
             canvas.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
                 if (e.touches.length === 1) handleStart(e.touches[0].clientX, e.touches[0].clientY);
-                else if (e.touches.length === 2) {
-                    lastPinchDist = getDist(e.touches[0], e.touches[1]);
-                    isPanning = false;
-                }
+                else if (e.touches.length === 2) { lastPinchDist = getDist(e.touches[0], e.touches[1]); isPanning = false; }
             }, { passive: false });
-
             canvas.addEventListener('touchend', (e) => {
+                const touchEndX = e.changedTouches[0].clientX;
+                if (touchEndX - touchStartX > 100 && !isDashboardOpen) toggleDashboard();
                 if (e.changedTouches.length === 1) handleEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
                 isPanning = false;
             }, { passive: false });
-
             canvas.addEventListener('touchmove', (e) => {
                 if (e.touches.length === 2) {
                     e.preventDefault();
                     let currentDist = getDist(e.touches[0], e.touches[1]);
-                    let midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                    let midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                    applyZoom(currentDist / lastPinchDist, midX, midY);
-                    lastPinchDist = currentDist;
-                    redraw();
+                    let midX = (e.touches[0].clientX + e.touches[1].clientX) / 2; let midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                    applyZoom(currentDist / lastPinchDist, midX, midY); lastPinchDist = currentDist; redraw();
                 }
             }, { passive: false });
+            captureState(); 
         }
 
-        function handleStart(x, y) {
-            if (isOverUI(x, y)) return;
-            lastClickTime = millis();
-            isPanning = true;
-        }
-
+        function handleStart(x, y) { if (isOverUI(x, y)) return; lastClickTime = millis(); isPanning = true; }
         function handleEnd(x, y) {
             if (isPanning && millis() - lastClickTime < 200) {
-                if (!isOverUI(x, y)) {
-                    let worldX = (x - offsetX) / zoom;
-                    let worldY = (y - offsetY) / zoom;
-                    curI = Math.round(worldX / STEP);
-                    curJ = Math.round(worldY / STEP);
-                    lastDirection = null;
-                    redraw();
+                if (!isOverUI(x, y) && !isTimelapseUIOpen) {
+                    let worldX = (x - offsetX) / zoom; let worldY = (y - offsetY) / zoom;
+                    curI = Math.round(worldX / STEP); curJ = Math.round(worldY / STEP); lastDirection = null; redraw();
+                    captureState();
                 }
             }
             isPanning = false;
         }
 
         function isOverUI(x, y) {
-            if (y < 80) return true;
+            if (y < 80) return true; if (isTimelapseUIOpen && y > height - 120) return true;
+            if (isDashboardOpen && x < 300) return true;
             const kbd = document.getElementById('mobile-keyboard');
-            if (kbd.classList.contains('open')) {
-                const rect = kbd.getBoundingClientRect();
-                if (x >= rect.left && x <= rect.right && y >= rect.top) return true;
-            }
-            const menus = document.querySelectorAll('.dropdown-options.open');
-            for (let menu of menus) {
-                const rect = menu.getBoundingClientRect();
-                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true;
-            }
+            if (kbd.classList.contains('open')) { const rect = kbd.getBoundingClientRect(); if (x >= rect.left && x <= rect.right && y >= rect.top) return true; }
             const handle = document.querySelector('.handle-arrow');
             const hRect = handle.getBoundingClientRect();
             if (x >= hRect.left - 20 && x <= hRect.right + 20 && y >= hRect.top - 20) return true;
@@ -725,7 +735,6 @@
         }
 
         function getDist(t1, t2) { return Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2)); }
-
         function applyZoom(factor, centerX, centerY) {
             let oldZoom = zoom; zoom = constrain(zoom * factor, 0.05, 5);
             let worldX = (centerX - offsetX) / oldZoom; let worldY = (centerY - offsetY) / oldZoom;
@@ -735,12 +744,10 @@
         function draw() {
             let colors = themeConfig[currentTheme];
             if (isExporting) clear(); else background(colors.canvasBg);
-            
             if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUI(mouseX, mouseY) && (!touches || touches.length < 2)) {
-                if (isEraserActive) performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
+                if (isEraserActive && !isTimelapseUIOpen) performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
                 else if (isPanning) { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
             }
-            
             push(); translate(offsetX, offsetY); scale(zoom);
             if (!isExporting) drawGrid(colors.dotColor, colors.dotAlpha);
             drawGeometry(colors.geomColor);
@@ -791,40 +798,39 @@
         }
 
         function drawCursor() {
-            if (isEraserActive) {
+            if (isEraserActive && !isTimelapseUIOpen) {
                 let worldMX = (mouseX - offsetX) / zoom; let worldMY = (mouseY - offsetY) / zoom;
                 noFill(); stroke("#FF6666"); strokeWeight(2 / zoom); fill("rgba(255, 102, 102, 0.15)"); ellipse(worldMX, worldMY, (eraserRadius * 2) / zoom); return;
             }
-            let colors = themeConfig[currentTheme];
-            let finalColor = isDrawingMode ? colors.drawCursor : colors.cursorColor;
+            if (isTimelapseUIOpen && !isPlayingTl && tlHistory.length > 0) {
+                let frame = tlHistory[tlCurrentFrame]; if (!frame) return;
+                let cI = frame.cursor.i, cJ = frame.cursor.j;
+                push(); translate(cI * STEP, cJ * STEP); fill(themeConfig[currentTheme].drawCursor); noStroke(); rectMode(CENTER); rotate(QUARTER_PI); rect(0, 0, 20, 20); pop();
+                return;
+            } else if (isTimelapseUIOpen && !isPlayingTl) return;
+            let colors = themeConfig[currentTheme]; let finalColor = isDrawingMode ? colors.drawCursor : colors.cursorColor;
             push(); translate(curI * STEP, curJ * STEP); fill(finalColor); noStroke(); rectMode(CENTER);
-            if (lastDirection && lastDirection.di !== 0 && lastDirection.dj !== 0) rect(0, 0, 20, 20);
-            else { rotate(QUARTER_PI); rect(0, 0, 20, 20); }
+            if (lastDirection && lastDirection.di !== 0 && lastDirection.dj !== 0) rect(0, 0, 20, 20); else { rotate(QUARTER_PI); rect(0, 0, 20, 20); }
             pop();
         }
 
         function findSegment(x1, y1, x2, y2) {
-            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2};
-            if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
+            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2}; if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
             return segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
         }
 
         function move(k) {
-            const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]};
-            if(!m[k]) return;
+            if (isTimelapseUIOpen || isDashboardOpen) return;
+            const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]}; if(!m[k]) return;
             let [di, dj] = m[k];
             if (isDrawingMode && !isEraserActive && lastDirection !== null) {
-                const prev = lastDirection;
-                const isReversing = (di === -prev.di && dj === -prev.dj);
+                const prev = lastDirection; const isReversing = (di === -prev.di && dj === -prev.dj);
                 if (isReversing) {
                     let segIdx = findSegment(curI, curJ, curI + di, curJ + dj);
-                    if (segIdx !== -1) {
-                        saveState(); segments.splice(segIdx, 1); curI += di; curJ += dj;
-                        updateLastMoveAfterErase(); redraw(); return;
-                    } else if(repeatTimer) { stopRepeat(); return; }
+                    if (segIdx !== -1) { saveState(); segments.splice(segIdx, 1); curI += di; curJ += dj; updateLastMoveAfterErase(); redraw(); captureState(); return; }
+                    else if(repeatTimer) { stopRepeat(); return; }
                 }
-                let dot = di * prev.di + dj * prev.dj;
-                if (dot < 0) { if(repeatTimer) stopRepeat(); return; }
+                let dot = di * prev.di + dj * prev.dj; if (dot < 0 && !isReversing) { if(repeatTimer) stopRepeat(); return; }
             }
             let id = `${curI},${curJ}`;
             if (isEraserActive || !isDrawingMode) {
@@ -832,72 +838,52 @@
                 lastDirection = {di, dj};
             } else {
                 saveState();
-                if (specialElements[id]?.isDiamond) { 
-                    addSeg(curI, curJ, curI+di, curJ+dj); 
-                    addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); 
-                    addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); 
-                    curI += di * 3; curJ += dj * 3; 
-                }
+                if (specialElements[id]?.isDiamond) { addSeg(curI, curJ, curI+di, curJ+dj); addSeg(curI+di, curJ+dj, curI+di*2, curJ+dj*2); addSeg(curI+di*2, curJ+dj*2, curI+di*3, curJ+dj*3); curI += di * 3; curJ += dj * 3; }
                 else { addSeg(curI, curJ, curI + di, curJ + dj); curI += di; curJ += dj; }
                 lastDirection = {di, dj};
             }
-            redraw();
+            redraw(); captureState();
         }
 
         function updateLastMoveAfterErase() {
             let connected = segments.filter(s => (s.p1.x === curI && s.p1.y === curJ) || (s.p2.x === curI && s.p2.y === curJ));
-            if (connected.length >= 1) { 
-                let s = connected[connected.length - 1]; 
-                let other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1; 
-                lastDirection = {di: curI - other.x, dj: curJ - other.y}; 
-            }
+            if (connected.length >= 1) { let s = connected[connected.length - 1]; let other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1; lastDirection = {di: curI - other.x, dj: curJ - other.y}; }
             else lastDirection = null;
         }
 
         let repeatTimer = null, activeKey = null;
         function handleActionDown(k) {
+            if (isTimelapseUIOpen || isDashboardOpen) return;
             k = k.toLowerCase(); if (activeKey === k) return; activeKey = k;
             if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
-            if(k === 'e') { toggleEraser(); return; }
-            if(k === 'u') { undo(); return; }
-            if(k === 'r') { redo(); return; }
-            if(k === 'x') { performReset(); return; } 
-            if(k === '5') { toggleSpecial('isNode'); return; }
-            if(k === '0') { toggleSpecial('isDiamond'); return; }
+            if(k === 'e') { toggleEraser(); return; } if(k === 'u') { undo(); return; } if(k === 'r') { redo(); } if(k === 'x') { performReset(); return; } 
+            if(k === '5') { toggleSpecial('isNode'); return; } if(k === '0') { toggleSpecial('isDiamond'); return; }
             if(['1','2','3','4','6','7','8','9'].includes(k)) { 
                 move(k); if(repeatTimer) stopRepeat();
                 repeatTimer = setTimeout(() => { repeatTimer = setInterval(() => move(k), REPEAT_INTERVAL); }, INITIAL_DELAY);
             }
         }
-        
-        function handleActionUp(k) { 
-            const key = k.toLowerCase();
-            if (activeKey === key) { stopRepeat(); activeKey = null; } 
-        }
-
+        function handleActionUp(k) { const key = k.toLowerCase(); if (activeKey === key) { stopRepeat(); activeKey = null; } }
         function stopRepeat() { if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } }
 
         function toggleSpecial(t) {
-            if (!isDrawingMode || isEraserActive) return;
-            if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) {
-                return;
-            }
-            saveState(); let id = `${curI},${curJ}`;
-            if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
+            if (isTimelapseUIOpen || !isDrawingMode || isEraserActive || isDashboardOpen) return;
+            if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) return;
+            saveState(); let id = `${curI},${curJ}`; if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
             specialElements[id][t] = !specialElements[id][t];
             if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
             if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
-            showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw();
+            showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw(); captureState();
         }
 
         function addSeg(x1, y1, x2, y2) {
-            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2};
-            if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
+            let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2}; if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
             let idx = segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
             if(idx !== -1) segments.splice(idx, 1); else segments.push({p1, p2});
         }
 
         function performEraserActionAt(worldX, worldY) {
+            if (isTimelapseUIOpen || isDashboardOpen) return;
             const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
             for (let id in specialElements) {
                 let [i, j] = id.split(',').map(Number); let dx = i * STEP - worldX; let dy = j * STEP - worldY;
@@ -909,11 +895,12 @@
                 return !(dx1 * dx1 + dy1 * dy1 <= rSq || dx2 * dx2 + dy2 * dy2 <= rSq);
             });
             if (newSegments.length !== initialLength) { if (!changed) saveState(); segments = newSegments; changed = true; }
-            if (changed) redraw();
+            if (changed) { redraw(); captureState(); }
         }
 
         function exportFile(fmt) {
-            document.getElementById('export-menu').classList.remove('open');
+            if (isTimelapseUIOpen) return;
+            if(isDashboardOpen) toggleDashboard();
             if(fmt==='svg') {
                 let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1000 -1000 2000 2000">`;
                 getPathGroups().forEach(g => {
@@ -921,18 +908,16 @@
                     svg += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter"/>`;
                 });
                 svg += `</svg>`;
-                let b = new Blob([svg], {type:'image/svg+xml'}); let a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download='karakuli.svg'; a.click();
-            } else { isExporting = true; redraw(); setTimeout(() => { saveCanvas('karakuli', 'png'); isExporting = false; redraw(); }, 100); }
+                let b = new Blob([svg], {type:'image/svg+xml'}); let a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download='drawing.svg'; a.click();
+            } else { isExporting = true; redraw(); setTimeout(() => { saveCanvas('drawing', 'png'); isExporting = false; redraw(); }, 100); }
         }
         
         function mouseWheel(e) {
             if (e.ctrlKey) { 
-                if (isEraserActive) { 
-                    if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); 
-                    else eraserRadius = Math.min(300, eraserRadius + 2); 
+                if (isEraserActive && !isTimelapseUIOpen) { 
+                    if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); else eraserRadius = Math.min(300, eraserRadius + 2); 
                     updateModeUI(); redraw(); 
-                } 
-                return false; 
+                } return false; 
             }
             applyZoom(e.delta > 0 ? 1/1.1 : 1.1, mouseX, mouseY); return false; 
         }
