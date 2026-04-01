@@ -101,6 +101,20 @@
             transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
         }
 
+        /* Обертка для всего контента, который должен блюриться */
+        #main-content {
+            width: 100%;
+            height: 100%;
+            transition: filter 0.4s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        body.dashboard-open #main-content {
+            filter: blur(8px); /* Интенсивность блюра фона */
+        }
+
         .glass-panel {
             background: var(--panel-bg);
             backdrop-filter: var(--glass-blur);
@@ -143,15 +157,15 @@
         /* --- DASHBOARD / SIDEBAR --- */
         #dashboard-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.2); z-index: 2500; opacity: 0; pointer-events: none;
-            transition: opacity 0.3s ease;
+            background: rgba(0,0,0,0.15); z-index: 2500; opacity: 0; pointer-events: none;
+            transition: opacity 0.4s ease;
         }
         #dashboard-overlay.open { opacity: 1; pointer-events: auto; }
 
         #dashboard {
             position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width);
             background: var(--bg-color); z-index: 2600; transform: translateX(-100%);
-            transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
             display: flex; flex-direction: column; padding: max(40px, env(safe-area-inset-top)) 24px 24px 24px;
             box-shadow: 20px 0 50px rgba(0,0,0,0.1);
         }
@@ -168,7 +182,6 @@
         .dash-btn:active { transform: scale(0.98); background: var(--active-btn-bg); }
         .dash-btn svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; }
 
-        /* Theme Toggle in Dash */
         .theme-container {
             display: flex; background: var(--panel-bg); border-radius: 14px; border: 1px solid var(--border-color);
             padding: 4px; gap: 4px;
@@ -179,7 +192,6 @@
         }
         .theme-opt.active { background: var(--bg-color); color: var(--text-color); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 
-        /* Login Section */
         .login-box {
             margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);
         }
@@ -214,7 +226,7 @@
         .tl-row-top { width: 100%; }
         .tl-progress-container { width: 100%; height: 12px; display: flex; align-items: center; cursor: pointer; }
         .tl-progress-track { width: 100%; height: 4px; background: var(--tl-track-bg); border-radius: 2px; position: relative; overflow: hidden; }
-        .tl-progress-fill { width: 0%; height: 100%; background: var(--tl-progress-fill); transition: width 0.05s linear; }
+        .tl-progress-fill { width: 0%; height: 100%; background: var(--tl-track-fill); transition: width 0.05s linear; }
         .tl-row-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .tl-left-group { display: flex; align-items: center; gap: 12px; }
         .tl-right-group { display: flex; align-items: center; gap: 8px; }
@@ -273,7 +285,6 @@
 
         .theme-svg { width: 19.8px; height: 19.8px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 
-        /* Mobile Adjustments */
         @media (max-width: 600px) {
             --sidebar-width: 85vw;
         }
@@ -286,9 +297,9 @@
     <div id="dashboard">
         <div class="dash-section">
             <span class="dash-label">Workspace</span>
+            <!-- Updated icon to simple PLUS -->
             <div class="dash-btn" onclick="performReset(); toggleDashboard()">
-                <!-- New Icon: Plus Document -->
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 New Canvas
             </div>
             <div class="dash-btn" style="opacity: 0.5; cursor: not-allowed;">
@@ -339,94 +350,97 @@
         </div>
     </div>
 
-    <div class="top-nav-container">
-        <div class="left-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-            <div class="control-btn glass-panel" id="menu-btn" onpointerdown="event.stopPropagation(); toggleDashboard()" title="Menu">
-                <svg viewBox="0 0 24 24" class="theme-svg"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-            </div>
-        </div>
-
-        <div class="top-nav-wrapper">
-            <div class="mode-header glass-panel" id="mode-header" onpointerdown="event.stopPropagation(); toggleMode()">
-                <span id="mode-text">Navigation</span>
-            </div>
-            <div id="action-indicator" class="indicator-text">Action</div>
-        </div>
-
-        <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-            <div class="control-btn glass-panel" id="eraser-btn" onpointerdown="event.stopPropagation(); toggleEraser()" title="Eraser (E)">
-                <svg viewBox="0 0 24 24" class="theme-svg">
-                    <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
-                    <path d="m22 21H7" /><path d="m5 11 9 9" />
-                </svg>
-            </div>
-        </div>
-    </div>
-    
-    <div id="canvas-container"></div>
-
-    <div id="timelapse-toolbar">
-        <div class="tl-row-top">
-            <div class="tl-progress-container" onclick="handleTimelineSeek(event)">
-                <div class="tl-progress-track">
-                    <div class="tl-progress-fill" id="tl-fill"></div>
+    <!-- Основное содержимое (все UI элементы и холст), которое будет блюриться -->
+    <div id="main-content">
+        <div class="top-nav-container">
+            <div class="left-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
+                <div class="control-btn glass-panel" id="menu-btn" onpointerdown="event.stopPropagation(); toggleDashboard()" title="Menu">
+                    <svg viewBox="0 0 24 24" class="theme-svg"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </div>
             </div>
-        </div>
-        <div class="tl-row-bottom">
-            <div class="tl-left-group">
-                <div class="tl-action-btn" id="tl-play-btn" onclick="togglePlayTimelapse()" title="Play/Pause">
-                    <svg id="tl-play-icon" viewBox="0 0 24 24" width="22" height="22">
-                        <path d="M6.2,20.8 C5.4,21.3 4.4,20.8 4.4,19.9 L4.4,4.1 C4.4,3.2 5.4,2.7 6.2,3.2 L19.4,11.1 C20.2,11.5 20.2,12.5 19.4,12.9 L6.2,20.8 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-                    </svg>
-                    <svg id="tl-pause-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style="display:none">
-                        <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+
+            <div class="top-nav-wrapper">
+                <div class="mode-header glass-panel" id="mode-header" onpointerdown="event.stopPropagation(); toggleMode()">
+                    <span id="mode-text">Navigation</span>
+                </div>
+                <div id="action-indicator" class="indicator-text">Action</div>
+            </div>
+
+            <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
+                <div class="control-btn glass-panel" id="eraser-btn" onpointerdown="event.stopPropagation(); toggleEraser()" title="Eraser (E)">
+                    <svg viewBox="0 0 24 24" class="theme-svg">
+                        <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+                        <path d="m22 21H7" /><path d="m5 11 9 9" />
                     </svg>
                 </div>
-                <div class="tl-time-display" id="tl-current-time">0:00 / 0:00</div>
-            </div>
-            <div class="tl-right-group">
-                <div class="tl-action-btn speed-btn" id="tl-cycle-speed" onclick="cycleTlSpeed()" title="Playback Speed">1x</div>
-                <div class="tl-action-btn" onclick="exportTimelapseVideo()" title="Export Video">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                </div>
-                <div class="tl-action-btn" onclick="toggleTimelapseUI()" title="Close" style="color: var(--disabled-color);">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                </div>
             </div>
         </div>
-    </div>
+        
+        <div id="canvas-container"></div>
 
-    <div id="mobile-keyboard">
-        <div class="keyboard-trigger-area" onpointerdown="handleKbdTrigger('close')">
-            <div class="keyboard-close-bar"></div>
+        <div id="timelapse-toolbar">
+            <div class="tl-row-top">
+                <div class="tl-progress-container" onclick="handleTimelineSeek(event)">
+                    <div class="tl-progress-track">
+                        <div class="tl-progress-fill" id="tl-fill"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="tl-row-bottom">
+                <div class="tl-left-group">
+                    <div class="tl-action-btn" id="tl-play-btn" onclick="togglePlayTimelapse()" title="Play/Pause">
+                        <svg id="tl-play-icon" viewBox="0 0 24 24" width="22" height="22">
+                            <path d="M6.2,20.8 C5.4,21.3 4.4,20.8 4.4,19.9 L4.4,4.1 C4.4,3.2 5.4,2.7 6.2,3.2 L19.4,11.1 C20.2,11.5 20.2,12.5 19.4,12.9 L6.2,20.8 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                        </svg>
+                        <svg id="tl-pause-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style="display:none">
+                            <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+                        </svg>
+                    </div>
+                    <div class="tl-time-display" id="tl-current-time">0:00 / 0:00</div>
+                </div>
+                <div class="tl-right-group">
+                    <div class="tl-action-btn speed-btn" id="tl-cycle-speed" onclick="cycleTlSpeed()" title="Playback Speed">1x</div>
+                    <div class="tl-action-btn" onclick="exportTimelapseVideo()" title="Export Video">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    </div>
+                    <div class="tl-action-btn" onclick="toggleTimelapseUI()" title="Close" style="color: var(--disabled-color);">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="kbd-main-grid">
-            <div class="keyboard-row row-3-col">
-                <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')"><svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg><span class="key-label">7</span></div>
-                <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')"><svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg><span class="key-label">8</span></div>
-                <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')"><svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg><span class="key-label">9</span></div>
-            </div>
-            <div class="keyboard-row row-3-col">
-                <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')"><svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg><span class="key-label">4</span></div>
-                <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg><span class="key-label">5</span></div>
-                <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')"><svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg><span class="key-label">6</span></div>
-            </div>
-            <div class="keyboard-row row-3-col">
-                <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')"><svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg><span class="key-label">1</span></div>
-                <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')"><svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg><span class="key-label">2</span></div>
-                <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')"><svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg><span class="key-label">3</span></div>
-            </div>
-            <div class="keyboard-row row-4-col" id="bottom-row">
-                <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')"><svg viewBox="0 0 24 24" style="fill: currentColor; stroke: none;"><path d="M12 5L19 12L12 19L5 12Z"/></svg><span class="key-label">0</span></div>
-                <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')"><svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg><span class="key-label">U</span></div>
-                <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')"><svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg><span class="key-label">R</span></div>
-                <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')"><span class="mode-label">MODE</span><span class="mode-sub">⎽⎽</span></div>
-            </div>
-        </div>
-    </div>
 
-    <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')"><path d="M18 15l-6-6-6 6" /></svg>
+        <div id="mobile-keyboard">
+            <div class="keyboard-trigger-area" onpointerdown="handleKbdTrigger('close')">
+                <div class="keyboard-close-bar"></div>
+            </div>
+            <div id="kbd-main-grid">
+                <div class="keyboard-row row-3-col">
+                    <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')"><svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg><span class="key-label">7</span></div>
+                    <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')"><svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg><span class="key-label">8</span></div>
+                    <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')"><svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg><span class="key-label">9</span></div>
+                </div>
+                <div class="keyboard-row row-3-col">
+                    <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')"><svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg><span class="key-label">4</span></div>
+                    <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg><span class="key-label">5</span></div>
+                    <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')"><svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg><span class="key-label">6</span></div>
+                </div>
+                <div class="keyboard-row row-3-col">
+                    <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')"><svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg><span class="key-label">1</span></div>
+                    <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')"><svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg><span class="key-label">2</span></div>
+                    <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')"><svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg><span class="key-label">3</span></div>
+                </div>
+                <div class="keyboard-row row-4-col" id="bottom-row">
+                    <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')"><svg viewBox="0 0 24 24" style="fill: currentColor; stroke: none;"><path d="M12 5L19 12L12 19L5 12Z"/></svg><span class="key-label">0</span></div>
+                    <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')"><svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg><span class="key-label">U</span></div>
+                    <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')"><svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg><span class="key-label">R</span></div>
+                    <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')"><span class="mode-label">MODE</span><span class="mode-sub">⎽⎽</span></div>
+                </div>
+            </div>
+        </div>
+
+        <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')"><path d="M18 15l-6-6-6 6" /></svg>
+    </div>
 
     <script>
         document.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
@@ -453,7 +467,6 @@
         let tlInterval = null;
 
         let isDashboardOpen = false;
-        let touchStartX = 0;
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
@@ -681,7 +694,7 @@
         function performReset() { 
             if (isTimelapseUIOpen) return;
             saveState(); segments = []; specialElements = {}; curI = 0; curJ = 0; offsetX = width / 2; offsetY = height / 2; lastDirection = null; 
-            showActionHint('Cleared'); redraw(); captureState();
+            showActionHint('New Canvas'); redraw(); captureState();
         }
 
         function setup() { 
@@ -690,13 +703,10 @@
             canvas.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
             canvas.addEventListener('mouseup', (e) => handleEnd(e.clientX, e.clientY));
             canvas.addEventListener('touchstart', (e) => {
-                touchStartX = e.touches[0].clientX;
                 if (e.touches.length === 1) handleStart(e.touches[0].clientX, e.touches[0].clientY);
                 else if (e.touches.length === 2) { lastPinchDist = getDist(e.touches[0], e.touches[1]); isPanning = false; }
             }, { passive: false });
             canvas.addEventListener('touchend', (e) => {
-                const touchEndX = e.changedTouches[0].clientX;
-                if (touchEndX - touchStartX > 100 && !isDashboardOpen) toggleDashboard();
                 if (e.changedTouches.length === 1) handleEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
                 isPanning = false;
             }, { passive: false });
