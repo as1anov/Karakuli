@@ -36,7 +36,6 @@
             --tl-track-bg: rgba(0, 0, 0, 0.1);
             --tl-progress-fill: #000000;
             
-            /* Цвета для Google-кнопки */
             --google-blue: #4285F4;
             --google-blue-hover: #3367d6;
             --google-blue-active: #2a56ad;
@@ -209,8 +208,43 @@
             border-top: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            align-items: center; /* Центрируем содержимое по горизонтали */
+            align-items: center; 
             gap: 12px;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 8px;
+        }
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid var(--border-color);
+        }
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .user-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-color);
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
+        .user-email {
+            font-size: 11px;
+            color: var(--disabled-color);
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
         }
 
         .google-btn {
@@ -219,7 +253,7 @@
             border: none !important;
             box-shadow: 0 4px 12px rgba(66, 133, 244, 0.25);
             transition: all 0.2s ease;
-            justify-content: center; /* Центрируем иконку и текст внутри кнопки */
+            justify-content: center; 
             width: 100%;
         }
         .google-btn:hover {
@@ -362,8 +396,9 @@
             </div>
         </div>
 
-        <div class="login-box">
-            <div class="dash-btn google-btn">
+        <div class="login-box" id="login-container">
+            <!-- Кнопка входа по умолчанию -->
+            <div class="dash-btn google-btn" id="google-login-btn">
                 <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
                 Login with Google
             </div>
@@ -463,6 +498,85 @@
 
         <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')"><path d="M18 15l-6-6-6 6" /></svg>
     </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // Firebase configuration (Заглушка - замените на свои ключи из консоли Firebase)
+        const firebaseConfig = {
+            apiKey: "ВАШ_API_KEY",
+            authDomain: "ВАШ_PROJECT.firebaseapp.com",
+            projectId: "ВАШ_PROJECT_ID",
+            storageBucket: "ВАШ_PROJECT.appspot.com",
+            messagingSenderId: "ВАШ_SENDER_ID",
+            appId: "ВАШ_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        const loginBtn = document.getElementById('google-login-btn');
+        const loginContainer = document.getElementById('login-container');
+
+        // Функция входа
+        async function handleGoogleLogin() {
+            try {
+                const result = await signInWithPopup(auth, provider);
+                console.log("Успешный вход:", result.user);
+            } catch (error) {
+                console.error("Ошибка входа:", error);
+            }
+        }
+
+        // Функция выхода
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Ошибка выхода:", error);
+            }
+        }
+
+        // Подключаем клик к кнопке
+        loginBtn.addEventListener('click', handleGoogleLogin);
+
+        // Слушатель состояния авторизации
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Пользователь вошел
+                loginContainer.innerHTML = `
+                    <div class="user-profile">
+                        <img src="${user.photoURL}" alt="avatar" class="user-avatar" onerror="this.src='https://ui-avatars.com/api/?name=${user.displayName}'">
+                        <div class="user-info">
+                            <span class="user-name">${user.displayName}</span>
+                            <span class="user-email">${user.email}</span>
+                        </div>
+                    </div>
+                    <div class="dash-btn" id="logout-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.2);">
+                        <svg viewBox="0 0 24 24" style="stroke: #ef4444;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                        Logout
+                    </div>
+                `;
+                document.getElementById('logout-btn').addEventListener('click', handleLogout);
+            } else {
+                // Пользователь не вошел
+                loginContainer.innerHTML = `
+                    <div class="dash-btn google-btn" id="google-login-btn">
+                        <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
+                        Login with Google
+                    </div>
+                    <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 11px; color: var(--disabled-color); margin-bottom: 0; padding: 6px; width: auto;">
+                        Continue as Guest
+                    </div>
+                `;
+                document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
+            }
+        });
+    </script>
 
     <script>
         // Блокировка стандартных жестов браузера
