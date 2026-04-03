@@ -376,7 +376,10 @@
         <div class="dash-section">
             <span class="dash-label">Features</span>
             <div class="dash-btn" onclick="toggleTimelapseUI(); toggleDashboard()">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <!-- Play Icon with rounded corners -->
+                <svg viewBox="0 0 24 24">
+                    <path d="M7.75 3.5a1.25 1.25 0 0 0-1.85 1.09v14.82a1.25 1.25 0 0 0 1.85 1.09l12.83-7.41a1.25 1.25 0 0 0 0-2.18L7.75 3.5z" stroke-linejoin="round" />
+                </svg>
                 Time-lapse
             </div>
         </div>
@@ -397,7 +400,6 @@
         </div>
 
         <div class="login-box" id="login-container">
-            <!-- Кнопка входа по умолчанию -->
             <div class="dash-btn google-btn" id="google-login-btn">
                 <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
                 Login with Google
@@ -446,8 +448,9 @@
             <div class="tl-row-bottom">
                 <div class="tl-left-group">
                     <div class="tl-action-btn" id="tl-play-btn" onclick="togglePlayTimelapse()" title="Play/Pause">
+                        <!-- Play Icon with rounded corners (updated) -->
                         <svg id="tl-play-icon" viewBox="0 0 24 24" width="22" height="22">
-                            <path d="M6.2,20.8 C5.4,21.3 4.4,20.8 4.4,19.9 L4.4,4.1 C4.4,3.2 5.4,2.7 6.2,3.2 L19.4,11.1 C20.2,11.5 20.2,12.5 19.4,12.9 L6.2,20.8 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                            <path d="M7.75 3.5a1.25 1.25 0 0 0-1.85 1.09v14.82a1.25 1.25 0 0 0 1.85 1.09l12.83-7.41a1.25 1.25 0 0 0 0-2.18L7.75 3.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
                         </svg>
                         <svg id="tl-pause-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style="display:none">
                             <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
@@ -499,55 +502,28 @@
         <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')"><path d="M18 15l-6-6-6 6" /></svg>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (Simulation/Placeholder logic preserved) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // Firebase configuration (Заглушка - замените на свои ключи из консоли Firebase)
-        const firebaseConfig = {
-            apiKey: "ВАШ_API_KEY",
-            authDomain: "ВАШ_PROJECT.firebaseapp.com",
-            projectId: "ВАШ_PROJECT_ID",
-            storageBucket: "ВАШ_PROJECT.appspot.com",
-            messagingSenderId: "ВАШ_SENDER_ID",
-            appId: "ВАШ_APP_ID"
-        };
-
-        // Initialize Firebase
+        const firebaseConfig = { apiKey: "API_KEY", authDomain: "DOMAIN", projectId: "ID", storageBucket: "BUCKET", messagingSenderId: "SENDER", appId: "APP_ID" };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        const loginBtn = document.getElementById('google-login-btn');
         const loginContainer = document.getElementById('login-container');
 
-        // Функция входа
         async function handleGoogleLogin() {
-            try {
-                const result = await signInWithPopup(auth, provider);
-                console.log("Успешный вход:", result.user);
-            } catch (error) {
-                console.error("Ошибка входа:", error);
-            }
+            try { await signInWithPopup(auth, provider); } catch (error) { console.error("Login Error:", error); }
         }
 
-        // Функция выхода
         async function handleLogout() {
-            try {
-                await signOut(auth);
-            } catch (error) {
-                console.error("Ошибка выхода:", error);
-            }
+            try { await signOut(auth); } catch (error) { console.error("Logout Error:", error); }
         }
 
-        // Подключаем клик к кнопке
-        loginBtn.addEventListener('click', handleGoogleLogin);
-
-        // Слушатель состояния авторизации
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // Пользователь вошел
                 loginContainer.innerHTML = `
                     <div class="user-profile">
                         <img src="${user.photoURL}" alt="avatar" class="user-avatar" onerror="this.src='https://ui-avatars.com/api/?name=${user.displayName}'">
@@ -563,7 +539,6 @@
                 `;
                 document.getElementById('logout-btn').addEventListener('click', handleLogout);
             } else {
-                // Пользователь не вошел
                 loginContainer.innerHTML = `
                     <div class="dash-btn google-btn" id="google-login-btn">
                         <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
@@ -573,13 +548,13 @@
                         Continue as Guest
                     </div>
                 `;
-                document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
+                const btn = document.getElementById('google-login-btn');
+                if (btn) btn.addEventListener('click', handleGoogleLogin);
             }
         });
     </script>
 
     <script>
-        // Блокировка стандартных жестов браузера
         document.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
 
         const INITIAL_DELAY = 520;  
