@@ -200,6 +200,32 @@
         }
         .theme-opt.active { background: var(--bg-color); color: var(--text-color); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
 
+        /* Projects List */
+        #projects-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+        .project-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--ui-accent);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .project-item:hover { background: var(--active-btn-bg); }
+        .delete-proj-btn {
+            padding: 4px;
+            color: #ef4444;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        .delete-proj-btn:hover { opacity: 1; }
+
         /* --- LOGIN BOX ADJUSTMENT --- */
         .login-box {
             margin-top: auto; 
@@ -353,9 +379,15 @@
                 <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 New Canvas
             </div>
-            <div class="dash-btn" style="opacity: 0.5; cursor: not-allowed;">
+            <div id="projects-section" style="display: none;">
+                <span class="dash-label">My Projects</span>
+                <div id="projects-list">
+                    <div style="font-size: 11px; opacity: 0.5; padding: 10px;">Loading projects...</div>
+                </div>
+            </div>
+            <div id="projects-placeholder" class="dash-btn" style="opacity: 0.5; cursor: not-allowed;">
                 <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                My Projects
+                Projects (Login required)
             </div>
         </div>
 
@@ -376,7 +408,6 @@
         <div class="dash-section">
             <span class="dash-label">Features</span>
             <div class="dash-btn" onclick="toggleTimelapseUI(); toggleDashboard()">
-                <!-- Play Icon with rounded corners -->
                 <svg viewBox="0 0 24 24">
                     <path d="M7.75 3.5a1.25 1.25 0 0 0-1.85 1.09v14.82a1.25 1.25 0 0 0 1.85 1.09l12.83-7.41a1.25 1.25 0 0 0 0-2.18L7.75 3.5z" stroke-linejoin="round" />
                 </svg>
@@ -448,7 +479,6 @@
             <div class="tl-row-bottom">
                 <div class="tl-left-group">
                     <div class="tl-action-btn" id="tl-play-btn" onclick="togglePlayTimelapse()" title="Play/Pause">
-                        <!-- Play Icon with rounded corners (updated) -->
                         <svg id="tl-play-icon" viewBox="0 0 24 24" width="22" height="22">
                             <path d="M7.75 3.5a1.25 1.25 0 0 0-1.85 1.09v14.82a1.25 1.25 0 0 0 1.85 1.09l12.83-7.41a1.25 1.25 0 0 0 0-2.18L7.75 3.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
                         </svg>
@@ -502,27 +532,49 @@
         <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')"><path d="M18 15l-6-6-6 6" /></svg>
     </div>
 
-    <!-- Firebase SDK (Simulation/Placeholder logic preserved) -->
+    <!-- Firebase SDK Implementation -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = { apiKey: "API_KEY", authDomain: "DOMAIN", projectId: "ID", storageBucket: "BUCKET", messagingSenderId: "SENDER", appId: "APP_ID" };
+        // Environment Variables
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "demo", authDomain: "demo", projectId: "demo" };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'karakuli-app';
 
         const loginContainer = document.getElementById('login-container');
+        const projectsSection = document.getElementById('projects-section');
+        const projectsPlaceholder = document.getElementById('projects-placeholder');
+        const projectsList = document.getElementById('projects-list');
 
-        async function handleGoogleLogin() {
+        // Global state references for Firestore logic
+        window.firebaseDb = db;
+        window.firebaseAppId = appId;
+
+        async function initAuth() {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                // Anonymous sign in as fallback for guest mode persistence if needed
+                // But for "Login with Google" we wait for user click
+            }
+        }
+        initAuth();
+
+        window.handleGoogleLogin = async function() {
             try { await signInWithPopup(auth, provider); } catch (error) { console.error("Login Error:", error); }
-        }
+        };
 
-        async function handleLogout() {
-            try { await signOut(auth); } catch (error) { console.error("Logout Error:", error); }
-        }
+        window.handleLogout = async function() {
+            try { await signOut(auth); window.location.reload(); } catch (error) { console.error("Logout Error:", error); }
+        };
 
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
+            window.currentUser = user;
             if (user) {
                 loginContainer.innerHTML = `
                     <div class="user-profile">
@@ -537,7 +589,11 @@
                         Logout
                     </div>
                 `;
-                document.getElementById('logout-btn').addEventListener('click', handleLogout);
+                document.getElementById('logout-btn').addEventListener('click', window.handleLogout);
+                
+                projectsSection.style.display = 'block';
+                projectsPlaceholder.style.display = 'none';
+                loadUserProjects(user.uid);
             } else {
                 loginContainer.innerHTML = `
                     <div class="dash-btn google-btn" id="google-login-btn">
@@ -549,9 +605,79 @@
                     </div>
                 `;
                 const btn = document.getElementById('google-login-btn');
-                if (btn) btn.addEventListener('click', handleGoogleLogin);
+                if (btn) btn.addEventListener('click', window.handleGoogleLogin);
+                
+                projectsSection.style.display = 'none';
+                projectsPlaceholder.style.display = 'flex';
             }
         });
+
+        async function loadUserProjects(uid) {
+            const projectsRef = collection(db, 'artifacts', appId, 'users', uid, 'drawings');
+            onSnapshot(projectsRef, (snapshot) => {
+                projectsList.innerHTML = '';
+                if (snapshot.empty) {
+                    projectsList.innerHTML = '<div style="font-size: 11px; opacity: 0.5; padding: 10px;">No saved drawings yet.</div>';
+                    return;
+                }
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const item = document.createElement('div');
+                    item.className = 'project-item';
+                    item.innerHTML = `
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${data.name || 'Untitled'}</span>
+                        <div class="delete-proj-btn" onclick="event.stopPropagation(); window.deleteProject('${doc.id}')">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        </div>
+                    `;
+                    item.onclick = () => window.loadProject(data);
+                    projectsList.appendChild(item);
+                });
+            }, (err) => console.error("Firestore Error:", err));
+        }
+
+        window.saveProjectToCloud = async function() {
+            if (!window.currentUser) return;
+            const uid = window.currentUser.uid;
+            const projectData = {
+                name: `Sketch ${new Date().toLocaleTimeString()}`,
+                segments: segments,
+                specialElements: specialElements,
+                curI, curJ, lastDirection,
+                timestamp: Date.now()
+            };
+            try {
+                const projectsRef = collection(db, 'artifacts', appId, 'users', uid, 'drawings');
+                await setDoc(doc(projectsRef, `sketch_${projectData.timestamp}`), projectData);
+                window.showActionHint("Saved to Cloud");
+            } catch (e) {
+                console.error("Save error:", e);
+            }
+        };
+
+        window.loadProject = function(data) {
+            segments = data.segments || [];
+            specialElements = data.specialElements || {};
+            curI = data.curI || 0;
+            curJ = data.curJ || 0;
+            lastDirection = data.lastDirection || null;
+            history = []; redoStack = [];
+            window.showActionHint("Project Loaded");
+            window.toggleDashboard();
+            redraw();
+        };
+
+        window.deleteProject = async function(id) {
+            if (!window.currentUser) return;
+            if (!confirm("Delete this drawing?")) return;
+            const uid = window.currentUser.uid;
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'drawings', id));
+                window.showActionHint("Deleted");
+            } catch (e) {
+                console.error("Delete error:", e);
+            }
+        };
     </script>
 
     <script>
@@ -757,6 +883,7 @@
                 }, 1200); 
             }
         }
+        window.showActionHint = showActionHint; // Export for module script
 
         function saveState() {
             history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
@@ -804,6 +931,11 @@
         }
 
         function performReset() { 
+            // Auto-save before reset if logged in
+            if (window.currentUser && segments.length > 0) {
+                window.saveProjectToCloud();
+            }
+
             if (isTimelapseUIOpen) {
                 isTimelapseUIOpen = false;
                 const toolbar = document.getElementById('timelapse-toolbar');
