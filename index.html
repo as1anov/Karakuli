@@ -1033,14 +1033,56 @@
             if (isTimelapseUIOpen) return;
             if(isDashboardOpen) toggleDashboard();
             if(fmt==='svg') {
-                let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1000 -1000 2000 2000">`;
+                const ringD = BASE_STEP_VAL * 2;
+                const innerHoleR = (ringD - LINE_WEIGHT) / 2;
+                let svgContent = "";
+                
+                // Элементы маскирования (дырки в линиях под ноды)
+                let masks = "";
+                for (let id in specialElements) {
+                    if (specialElements[id].isNode) {
+                        let [i, j] = id.split(',').map(Number);
+                        masks += `<circle cx="${i * STEP}" cy="${j * STEP}" r="${innerHoleR}" fill="black"/>`;
+                    }
+                }
+
+                let maskTag = "";
+                if (masks !== "") {
+                    maskTag = `<defs><mask id="holeMask"><rect x="-100000" y="-100000" width="200000" height="200000" fill="white"/>${masks}</mask></defs>`;
+                }
+
+                // Рисование путей
                 getPathGroups().forEach(g => {
-                    let d = `M ${g[0].p1.x*STEP} ${g[0].p1.y*STEP}`; g.forEach(s => d += ` L ${s.p2.x*STEP} ${s.p2.y*STEP}`);
-                    svg += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter"/>`;
+                    let d = `M ${g[0].p1.x*STEP} ${g[0].p1.y*STEP}`; 
+                    g.forEach(s => d += ` L ${s.p2.x*STEP} ${s.p2.y*STEP}`);
+                    svgContent += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
                 });
-                svg += `</svg>`;
-                let b = new Blob([svg], {type:'image/svg+xml'}); let a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download='drawing.svg'; a.click();
-            } else { isExporting = true; redraw(); setTimeout(() => { saveCanvas('drawing', 'png'); isExporting = false; redraw(); }, 100); }
+
+                // Рисование спец-элементов (круги и ромбы)
+                for (let id in specialElements) {
+                    let [i, j] = id.split(',').map(Number);
+                    let x = i * STEP;
+                    let y = j * STEP;
+                    if (specialElements[id].isNode) {
+                        svgContent += `<circle cx="${x}" cy="${y}" r="${ringD/2}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}"/>`;
+                    }
+                    if (specialElements[id].isDiamond) {
+                        let ry = y + LINE_WEIGHT / 2;
+                        svgContent += `<rect x="${x - LINE_WEIGHT/2}" y="${ry - LINE_WEIGHT/2}" width="${LINE_WEIGHT}" height="${LINE_WEIGHT}" fill="black" transform="rotate(45, ${x}, ${ry})"/>`;
+                    }
+                }
+
+                let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1000 -1000 2000 2000">${maskTag}${svgContent}</svg>`;
+                let b = new Blob([svg], {type:'image/svg+xml'}); 
+                let a = document.createElement('a'); 
+                a.href = URL.createObjectURL(b); 
+                a.download='drawing.svg'; 
+                a.click();
+            } else { 
+                isExporting = true; 
+                redraw(); 
+                setTimeout(() => { saveCanvas('drawing', 'png'); isExporting = false; redraw(); }, 100); 
+            }
         }
         
         function mouseWheel(e) {
