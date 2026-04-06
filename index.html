@@ -341,6 +341,35 @@
         @media (max-width: 600px) {
             --sidebar-width: 85vw;
         }
+
+        /* --- NEW CANVAS MODAL --- */
+        #new-canvas-modal {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.5); z-index: 3000; display: none;
+            justify-content: center; align-items: center; backdrop-filter: blur(4px);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        #new-canvas-modal.show { display: flex; opacity: 1; }
+        .modal-content {
+            background: var(--bg-color); padding: 30px; border-radius: 20px; width: 320px;
+            display: flex; flex-direction: column; gap: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color); color: var(--text-color);
+        }
+        .modal-content h2 { margin: 0; font-size: 18px; text-align: center; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        .input-group label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--disabled-color); }
+        .input-group input {
+            padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);
+            background: var(--panel-bg); color: var(--text-color);
+            font-family: 'JetBrains Mono', monospace; font-size: 16px;
+        }
+        .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .modal-btn {
+            flex: 1; padding: 12px; border-radius: 10px; border: none; cursor: pointer;
+            font-weight: 700; font-size: 14px; transition: opacity 0.2s;
+        }
+        .modal-btn.primary { background: var(--text-color); color: var(--bg-color); }
+        .modal-btn.secondary { background: var(--panel-bg); color: var(--text-color); border: 1px solid var(--border-color); }
     </style>
 </head>
 <body data-theme="light"> 
@@ -349,7 +378,7 @@
     <div id="dashboard">
         <div class="dash-section">
             <span class="dash-label">Workspace</span>
-            <div class="dash-btn" onclick="performReset(); toggleDashboard()">
+            <div class="dash-btn" onclick="openNewCanvasModal()">
                 <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 New Canvas
             </div>
@@ -406,6 +435,26 @@
             </div>
             <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 11px; color: var(--disabled-color); margin-bottom: 0; padding: 6px; width: auto;">
                 Continue as Guest
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно размеров холста -->
+    <div id="new-canvas-modal">
+        <div class="modal-content">
+            <h2>Размеры холста</h2>
+            <div class="input-group">
+                <label>Ширина (мм)</label>
+                <input type="number" id="canvas-w-input" value="210">
+            </div>
+            <div class="input-group">
+                <label>Высота (мм)</label>
+                <input type="number" id="canvas-h-input" value="297">
+            </div>
+            <div style="font-size: 10.5px; color: var(--disabled-color); text-align: center;">Линия рисования: 12мм</div>
+            <div class="modal-actions">
+                <button class="modal-btn secondary" onclick="closeNewCanvasModal()">Отмена</button>
+                <button class="modal-btn primary" onclick="applyNewCanvasSize()">Создать</button>
             </div>
         </div>
     </div>
@@ -580,11 +629,62 @@
 
         let isDashboardOpen = false;
 
+        let paperWidthMm = 210;
+        let paperHeightMm = 297;
+        let isPaperVisible = false;
+
+        let isResizingCanvas = false;
+        let activeCorner = null;
+        let isResizingOnly = false;
+
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
             dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8', cursorColor: '#FF6666', drawCursor: '#58595B' },
             system: { canvasBg: '#0f172a', dotColor: '59, 130, 246', dotAlpha: 0.3, geomColor: '#3b82f6', cursorColor: '#60a5fa', drawCursor: '#93c5fd' }
         };
+
+        function openNewCanvasModal() {
+            isResizingOnly = false;
+            toggleDashboard();
+            if (isPaperVisible) {
+                document.getElementById('canvas-w-input').value = Math.round(paperWidthMm);
+                document.getElementById('canvas-h-input').value = Math.round(paperHeightMm);
+            }
+            const modal = document.getElementById('new-canvas-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function openNewCanvasModalFromCorner() {
+            isResizingOnly = true;
+            document.getElementById('canvas-w-input').value = Math.round(paperWidthMm);
+            document.getElementById('canvas-h-input').value = Math.round(paperHeightMm);
+            const modal = document.getElementById('new-canvas-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function closeNewCanvasModal() {
+            const modal = document.getElementById('new-canvas-modal');
+            modal.classList.remove('show');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+
+        function applyNewCanvasSize() {
+            const w = parseFloat(document.getElementById('canvas-w-input').value);
+            const h = parseFloat(document.getElementById('canvas-h-input').value);
+            if (w > 0 && h > 0) {
+                paperWidthMm = w;
+                paperHeightMm = h;
+                isPaperVisible = true;
+                closeNewCanvasModal();
+                if (!isResizingOnly) {
+                    performReset();
+                } else {
+                    redraw();
+                }
+            }
+        }
 
         function toggleDashboard() {
             isDashboardOpen = !isDashboardOpen;
@@ -842,8 +942,52 @@
             captureState(); 
         }
 
-        function handleStart(x, y) { if (isOverUI(x, y)) return; lastClickTime = millis(); isPanning = true; }
+        function checkCornerClick(worldX, worldY) {
+            let MM_TO_PX = LINE_WEIGHT / 12;
+            let halfW = (paperWidthMm * MM_TO_PX) / 2;
+            let halfH = (paperHeightMm * MM_TO_PX) / 2;
+            let cs = 30 / zoom; 
+
+            if (Math.abs(worldX - halfW) < cs && Math.abs(worldY - halfH) < cs) return 'br';
+            if (Math.abs(worldX + halfW) < cs && Math.abs(worldY - halfH) < cs) return 'bl';
+            if (Math.abs(worldX - halfW) < cs && Math.abs(worldY + halfH) < cs) return 'tr';
+            if (Math.abs(worldX + halfW) < cs && Math.abs(worldY + halfH) < cs) return 'tl';
+
+            return null;
+        }
+
+        function handleStart(x, y) { 
+            if (isOverUI(x, y)) return; 
+            
+            if (isPaperVisible && !isTimelapseUIOpen && !isExporting) {
+                let worldX = (x - offsetX) / zoom;
+                let worldY = (y - offsetY) / zoom;
+                let corner = checkCornerClick(worldX, worldY);
+                if (corner) {
+                    isResizingCanvas = true;
+                    activeCorner = corner;
+                    lastClickTime = millis();
+                    return;
+                }
+            }
+            
+            lastClickTime = millis(); 
+            isPanning = true; 
+        }
+        
         function handleEnd(x, y) {
+            if (isResizingCanvas) {
+                if (millis() - lastClickTime < 200) {
+                    openNewCanvasModalFromCorner();
+                } else {
+                    paperWidthMm = Math.round(paperWidthMm);
+                    paperHeightMm = Math.round(paperHeightMm);
+                }
+                isResizingCanvas = false;
+                activeCorner = null;
+                return;
+            }
+
             if (isPanning && millis() - lastClickTime < 200) {
                 if (!isOverUI(x, y) && !isTimelapseUIOpen) {
                     let worldX = (x - offsetX) / zoom; let worldY = (y - offsetY) / zoom;
@@ -855,6 +999,7 @@
         }
 
         function isOverUI(x, y) {
+            if (document.getElementById('new-canvas-modal').classList.contains('show')) return true;
             if (y < 80) return true; if (isTimelapseUIOpen && y > height - 120) return true;
             if (isDashboardOpen && x < 300) return true;
             const kbd = document.getElementById('mobile-keyboard');
@@ -874,13 +1019,65 @@
 
         function draw() {
             let colors = themeConfig[currentTheme];
-            if (isExporting) clear(); else background(colors.canvasBg);
+            if (isTimelapseUIOpen) {
+                background(255);
+            } else if (isExporting) {
+                clear();
+            } else {
+                background(colors.canvasBg);
+            }
+
             if(!isExporting && mouseIsPressed && mouseButton===LEFT && !isOverUI(mouseX, mouseY) && (!touches || touches.length < 2)) {
-                if (isEraserActive && !isTimelapseUIOpen) performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
-                else if (isPanning) { offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; }
+                if (isResizingCanvas) {
+                    let worldX = (mouseX - offsetX) / zoom;
+                    let worldY = (mouseY - offsetY) / zoom;
+                    let MM_TO_PX = LINE_WEIGHT / 12;
+                    let newW_px = paperWidthMm * MM_TO_PX;
+                    let newH_px = paperHeightMm * MM_TO_PX;
+                    
+                    if (activeCorner.includes('r')) newW_px = Math.max(50, worldX * 2);
+                    if (activeCorner.includes('l')) newW_px = Math.max(50, -worldX * 2);
+                    if (activeCorner.includes('b')) newH_px = Math.max(50, worldY * 2);
+                    if (activeCorner.includes('t')) newH_px = Math.max(50, -worldY * 2);
+                    
+                    paperWidthMm = newW_px / MM_TO_PX;
+                    paperHeightMm = newH_px / MM_TO_PX;
+                } else if (isEraserActive && !isTimelapseUIOpen) { 
+                    performEraserActionAt((mouseX - offsetX) / zoom, (mouseY - offsetY) / zoom); 
+                } else if (isPanning) { 
+                    offsetX += mouseX - pmouseX; offsetY += mouseY - pmouseY; 
+                }
             }
             push(); translate(offsetX, offsetY); scale(zoom);
-            if (!isExporting) drawGrid(colors.dotColor, colors.dotAlpha);
+            
+            if (isPaperVisible && !isExporting && !isTimelapseUIOpen) {
+                let paperColor = currentTheme === 'light' ? '#ffffff' : (currentTheme === 'dark' ? '#1e1e1e' : '#1e293b');
+                fill(paperColor);
+                stroke('rgba(128,128,128,0.2)');
+                strokeWeight(2 / zoom);
+                rectMode(CENTER);
+                let wPx = paperWidthMm * (LINE_WEIGHT / 12);
+                let hPx = paperHeightMm * (LINE_WEIGHT / 12);
+                rect(0, 0, wPx, hPx);
+
+                fill(40);
+                noStroke();
+                let cSize = 20 / zoom;
+                let halfW = wPx / 2;
+                let halfH = hPx / 2;
+                rect(halfW, halfH, cSize, cSize);
+                rect(-halfW, halfH, cSize, cSize);
+                rect(halfW, -halfH, cSize, cSize);
+                rect(-halfW, -halfH, cSize, cSize);
+            }
+
+            if (!isExporting) {
+                if (isTimelapseUIOpen) {
+                    drawGrid('0,0,0', 0.15);
+                } else {
+                    drawGrid(colors.dotColor, colors.dotAlpha);
+                }
+            }
             drawGeometry(colors.geomColor);
             if (!isExporting) drawCursor();
             pop();
