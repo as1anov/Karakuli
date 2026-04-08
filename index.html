@@ -173,26 +173,34 @@
         }
         #dashboard.open { transform: translateX(0); }
 
-        /* Dashboard Tabs */
+        /* Dashboard Tabs Revision */
         .dash-header-tabs {
-            display: flex; gap: 10px; margin-bottom: 24px; flex-shrink: 0;
+            display: flex; margin-bottom: 20px; flex-shrink: 0;
+            background: transparent; padding: 0; border: none;
+            border-bottom: 1px solid var(--border-color); border-radius: 0;
         }
         .dash-tab {
-            flex: 1; padding: 10px 0; text-align: center; font-size: 13px; font-weight: 700;
-            color: var(--disabled-color); cursor: pointer; border-bottom: 2px solid transparent;
-            transition: all 0.2s ease;
+            flex: 1; padding: 12px 0; text-align: center; font-size: 13px; font-weight: 700;
+            color: var(--disabled-color); cursor: pointer; border-radius: 0;
+            transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px;
+            border: none; background: transparent; position: relative;
         }
         .dash-tab.active {
-            color: var(--text-color); border-bottom: 2px solid var(--text-color);
+            color: var(--text-color); background: transparent; box-shadow: none;
         }
+        .dash-tab.active::after {
+            content: ''; position: absolute; bottom: -1px; left: 0; width: 100%;
+            height: 2px; background: var(--text-color);
+        }
+
         .dash-content-container {
             display: flex; flex-direction: column; flex-grow: 1; overflow-y: auto; overflow-x: hidden;
-            padding-bottom: 24px; /* padding for scrolling items */
+            padding-bottom: 24px;
         }
         .dash-content-container::-webkit-scrollbar { display: none; }
         .dash-content-container { -ms-overflow-style: none; scrollbar-width: none; }
         
-        #dash-games { display: none; } /* Hidden by default */
+        #dash-games { display: none; }
 
         .dash-section { margin-bottom: 24px; flex-shrink: 0; } 
         .dash-label { 
@@ -223,70 +231,19 @@
 
         /* --- LOGIN BOX ADJUSTMENT --- */
         .login-box {
-            margin-top: auto; 
-            padding-top: 20px; 
-            padding-bottom: max(20px, env(safe-area-inset-bottom)); 
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            align-items: center; 
-            gap: 12px;
-            flex-shrink: 0; /* Important for iPadOS overflow */
+            margin-top: auto; padding-top: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom)); 
+            border-top: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; gap: 12px; flex-shrink: 0;
         }
 
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            width: 100%;
-            padding: 8px;
-        }
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 1px solid var(--border-color);
-        }
-        .user-info {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .user-name {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--text-color);
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            overflow: hidden;
-        }
-        .user-email {
-            font-size: 11px;
-            color: var(--disabled-color);
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            overflow: hidden;
-        }
+        .user-profile { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color); }
+        .user-info { display: flex; flex-direction: column; overflow: hidden; }
+        .user-name { font-size: 13px; font-weight: 700; color: var(--text-color); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+        .user-email { font-size: 11px; color: var(--disabled-color); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 
-        .google-btn {
-            background: var(--google-blue) !important;
-            color: white !important;
-            border: none !important;
-            box-shadow: 0 4px 12px rgba(66, 133, 244, 0.25);
-            transition: all 0.2s ease;
-            justify-content: center; 
-            width: 100%;
-        }
-        .google-btn:hover {
-            background: var(--google-blue-hover) !important;
-            box-shadow: 0 6px 16px rgba(66, 133, 244, 0.35);
-        }
-        .google-btn:active {
-            background: var(--google-blue-active) !important;
-            transform: scale(0.96);
-            box-shadow: 0 2px 4px rgba(66, 133, 244, 0.2);
-        }
+        .google-btn { background: var(--google-blue) !important; color: white !important; border: none !important; box-shadow: 0 4px 12px rgba(66, 133, 244, 0.25); transition: all 0.2s ease; justify-content: center; width: 100%; }
+        .google-btn:hover { background: var(--google-blue-hover) !important; box-shadow: 0 6px 16px rgba(66, 133, 244, 0.35); }
+        .google-btn:active { background: var(--google-blue-active) !important; transform: scale(0.96); box-shadow: 0 2px 4px rgba(66, 133, 244, 0.2); }
 
         /* --- TIMELINE PANEL --- */
         #timelapse-toolbar {
@@ -335,6 +292,7 @@
 
         #mobile-keyboard.open + .handle-arrow, 
         body.timelapse-active .handle-arrow,
+        body.game-active .handle-arrow,
         body.dashboard-open .handle-arrow { opacity: 0; pointer-events: none; visibility: hidden; }
 
         #kbd-main-grid { display: grid; grid-template-rows: repeat(4, 60px); gap: 8px; width: 100%; padding-bottom: 20px; }
@@ -388,10 +346,13 @@
         .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
         .modal-btn {
             flex: 1; padding: 12px; border-radius: 10px; border: none; cursor: pointer;
-            font-weight: 700; font-size: 14px; transition: opacity 0.2s;
+            font-weight: 400; font-size: 14px; transition: opacity 0.2s;
         }
         .modal-btn.primary { background: var(--text-color); color: var(--bg-color); }
         .modal-btn.secondary { background: var(--panel-bg); color: var(--text-color); border: 1px solid var(--border-color); }
+
+        #game-hearts { display: none; gap: 6px; align-items: center; justify-content: center; height: 100%; width: 100%; }
+        .pixel-heart { width: 18px; height: 18px; }
     </style>
 </head>
 <body data-theme="light"> 
@@ -399,8 +360,14 @@
     <div id="dashboard-overlay" onclick="toggleDashboard()"></div>
     <div id="dashboard">
         <div class="dash-header-tabs">
-            <div class="dash-tab active" id="tab-home" onclick="switchDashTab('home')">Home</div>
-            <div class="dash-tab" id="tab-games" onclick="switchDashTab('games')">Games</div>
+            <div class="dash-tab active" id="tab-home" onclick="switchDashTab('home')">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                Home
+            </div>
+            <div class="dash-tab" id="tab-games" onclick="switchDashTab('games')">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4"/><path d="M8 10v4"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+                Games
+            </div>
         </div>
 
         <div class="dash-content-container" id="dash-home">
@@ -460,7 +427,7 @@
                     <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
                     Login with Google
                 </div>
-                <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 11px; color: var(--disabled-color); margin-bottom: 0; padding: 6px; width: auto;">
+                <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 11px; color: var(--disabled-color); margin-bottom: 0; padding: 6px; width: auto; margin-top: -6px;">
                     Continue as Guest
                 </div>
             </div>
@@ -469,13 +436,9 @@
         <div class="dash-content-container" id="dash-games">
             <div class="dash-section">
                 <span class="dash-label">Available Games</span>
-                <div class="dash-btn" style="opacity: 0.5; cursor: not-allowed;">
-                    <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                    Multiplayer Draw (Coming Soon)
-                </div>
-                <div class="dash-btn" style="opacity: 0.5; cursor: not-allowed;">
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                    Tic-Tac-Toe (Coming Soon)
+                <div class="dash-btn" onclick="startBreakMaze()">
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3" /><rect x="7" y="17" width="10" height="3" rx="1.5" /></svg>
+                    Break Maze
                 </div>
             </div>
         </div>
@@ -502,21 +465,22 @@
 
     <div id="main-content">
         <div class="top-nav-container">
-            <div class="left-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-                <div class="control-btn glass-panel" id="menu-btn" onpointerdown="event.stopPropagation(); toggleDashboard()" title="Menu">
+            <div class="left-controls-group" id="left-nav-group" style="display: flex; gap: 8px; pointer-events: none;">
+                <div class="control-btn glass-panel" id="menu-btn" onclick="event.stopPropagation(); toggleDashboard()" title="Menu">
                     <svg viewBox="0 0 24 24" class="theme-svg"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </div>
             </div>
 
             <div class="top-nav-wrapper">
-                <div class="mode-header glass-panel" id="mode-header" onpointerdown="event.stopPropagation(); toggleMode()">
+                <div class="mode-header glass-panel" id="mode-header" onclick="event.stopPropagation(); toggleMode()">
                     <span id="mode-text">Navigation</span>
+                    <div id="game-hearts"></div>
                 </div>
                 <div id="action-indicator" class="indicator-text">Action</div>
             </div>
 
-            <div class="right-controls-group" style="display: flex; gap: 8px; pointer-events: none;">
-                <div class="control-btn glass-panel" id="eraser-btn" onpointerdown="event.stopPropagation(); toggleEraser()" title="Eraser (E)">
+            <div class="right-controls-group" id="right-nav-group" style="display: flex; gap: 8px; pointer-events: none;">
+                <div class="control-btn glass-panel" id="eraser-btn" onclick="event.stopPropagation(); toggleEraser()" title="Eraser (E)">
                     <svg viewBox="0 0 24 24" class="theme-svg">
                         <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
                         <path d="m22 21H7" /><path d="m5 11 9 9" />
@@ -565,25 +529,25 @@
             </div>
             <div id="kbd-main-grid">
                 <div class="keyboard-row row-3-col">
-                    <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')"><svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg><span class="key-label">7</span></div>
-                    <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')"><svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg><span class="key-label">8</span></div>
-                    <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')"><svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg><span class="key-label">9</span></div>
+                    <div class="v-key key-7" onpointerdown="vKeyStart(event, '7')" onpointerup="vKeyEnd(event, '7')" onpointercancel="vKeyEnd(event, '7')" onpointerleave="vKeyEnd(event, '7')"><svg viewBox="0 0 24 24"><path d="M15 9H9v6"/></svg><span class="key-label">7</span></div>
+                    <div class="v-key key-8" onpointerdown="vKeyStart(event, '8')" onpointerup="vKeyEnd(event, '8')" onpointercancel="vKeyEnd(event, '8')" onpointerleave="vKeyEnd(event, '8')"><svg viewBox="0 0 24 24"><path d="M8 12l4-4 4 4"/></svg><span class="key-label">8</span></div>
+                    <div class="v-key key-9" onpointerdown="vKeyStart(event, '9')" onpointerup="vKeyEnd(event, '9')" onpointercancel="vKeyEnd(event, '9')" onpointerleave="vKeyEnd(event, '9')"><svg viewBox="0 0 24 24"><path d="M9 9h6v6"/></svg><span class="key-label">9</span></div>
                 </div>
                 <div class="keyboard-row row-3-col">
-                    <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')"><svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg><span class="key-label">4</span></div>
-                    <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg><span class="key-label">5</span></div>
-                    <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')"><svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg><span class="key-label">6</span></div>
+                    <div class="v-key key-4" onpointerdown="vKeyStart(event, '4')" onpointerup="vKeyEnd(event, '4')" onpointercancel="vKeyEnd(event, '4')" onpointerleave="vKeyEnd(event, '4')"><svg viewBox="0 0 24 24"><path d="M13 8l-4 4 4 4"/></svg><span class="key-label">4</span></div>
+                    <div class="v-key key-5" onpointerdown="vKeyStart(event, '5')" onpointerup="vKeyEnd(event, '5')" onpointercancel="vKeyEnd(event, '5')" onpointerleave="vKeyEnd(event, '5')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" /></svg><span class="key-label">5</span></div>
+                    <div class="v-key key-6" onpointerdown="vKeyStart(event, '6')" onpointerup="vKeyEnd(event, '6')" onpointercancel="vKeyEnd(event, '6')" onpointerleave="vKeyEnd(event, '6')"><svg viewBox="0 0 24 24"><path d="M11 8l4 4-4 4"/></svg><span class="key-label">6</span></div>
                 </div>
                 <div class="keyboard-row row-3-col">
-                    <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')"><svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg><span class="key-label">1</span></div>
-                    <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')"><svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg><span class="key-label">2</span></div>
-                    <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')"><svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg><span class="key-label">3</span></div>
+                    <div class="v-key key-1" onpointerdown="vKeyStart(event, '1')" onpointerup="vKeyEnd(event, '1')" onpointercancel="vKeyEnd(event, '1')" onpointerleave="vKeyEnd(event, '1')"><svg viewBox="0 0 24 24"><path d="M15 15H9V9"/></svg><span class="key-label">1</span></div>
+                    <div class="v-key key-2" onpointerdown="vKeyStart(event, '2')" onpointerup="vKeyEnd(event, '2')" onpointercancel="vKeyEnd(event, '2')" onpointerleave="vKeyEnd(event, '2')"><svg viewBox="0 0 24 24"><path d="M8 12l4 4 4-4"/></svg><span class="key-label">2</span></div>
+                    <div class="v-key key-3" onpointerdown="vKeyStart(event, '3')" onpointerup="vKeyEnd(event, '3')" onpointercancel="vKeyEnd(event, '3')" onpointerleave="vKeyEnd(event, '3')"><svg viewBox="0 0 24 24"><path d="M9 15h6V9"/></svg><span class="key-label">3</span></div>
                 </div>
                 <div class="keyboard-row row-4-col" id="bottom-row">
-                    <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')"><svg viewBox="0 0 24 24" style="fill: currentColor; stroke: none;"><path d="M12 5L19 12L12 19L5 12Z"/></svg><span class="key-label">0</span></div>
-                    <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')"><svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg><span class="key-label">U</span></div>
-                    <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')"><svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg><span class="key-label">R</span></div>
-                    <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')"><span class="mode-label">MODE</span><span class="mode-sub">⎽⎽</span></div>
+                    <div class="v-key key-0" onpointerdown="vKeyStart(event, '0')" onpointerup="vKeyEnd(event, '0')" onpointercancel="vKeyEnd(event, '0')" onpointerleave="vKeyEnd(event, '0')"><svg viewBox="0 0 24 24" style="fill: currentColor; stroke: none;"><path d="M12 5L19 12L12 19L5 12Z"/></svg><span class="key-label">0</span></div>
+                    <div class="v-key key-u" onpointerdown="vKeyStart(event, 'u')" onpointerup="vKeyEnd(event, 'u')" onpointercancel="vKeyEnd(event, 'u')" onpointerleave="vKeyEnd(event, 'u')"><svg viewBox="0 0 24 24"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 1 1 0 8"/></svg><span class="key-label">U</span></div>
+                    <div class="v-key key-r" onpointerdown="vKeyStart(event, 'r')" onpointerup="vKeyEnd(event, 'r')" onpointercancel="vKeyEnd(event, 'r')" onpointerleave="vKeyEnd(event, 'r')"><svg viewBox="0 0 24 24"><path d="M15 14l4-4-4-4M19 10H8a4 4 0 1 0 0 8"/></svg><span class="key-label">R</span></div>
+                    <div class="v-key mode-key" onpointerdown="vKeyStart(event, ' ')" onpointerup="vKeyEnd(event, ' ')" onpointercancel="vKeyEnd(event, ' ')" onpointerleave="vKeyEnd(event, ' ')"><span class="mode-label">MODE</span><span class="mode-sub">⎽⎽</span></div>
                 </div>
             </div>
         </div>
@@ -591,7 +555,6 @@
         <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')"><path d="M18 15l-6-6-6 6" /></svg>
     </div>
 
-    <!-- Firebase SDK (Simulation/Placeholder logic preserved) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -633,7 +596,7 @@
                         <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
                         Login with Google
                     </div>
-                    <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 11px; color: var(--disabled-color); margin-bottom: 0; padding: 6px; width: auto;">
+                    <div class="dash-btn" onclick="toggleDashboard()" style="border: none; background: transparent; justify-content: center; font-size: 11px; color: var(--disabled-color); margin-bottom: 0; padding: 6px; width: auto; margin-top: -6px;">
                         Continue as Guest
                     </div>
                 `;
@@ -677,12 +640,24 @@
         let activeCorner = null;
         let isResizingOnly = false;
 
-        // Pointer API Variables
         let activePointers = new Map();
         let mainPointerId = null;
         let pX = 0, pY = 0, lastPX = 0, lastPY = 0;
         let lastPinchDist = 0;
         let isPointerDrawing = false;
+
+        // --- GAME VARIABLES ---
+        let isGameMode = false;
+        let gameState = 'idle'; // idle, loading, start, playing, victory, gameover
+        let gameBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+        let targetZoom = 1, targetOffsetX = 0, targetOffsetY = 0;
+        let loadingProgress = 0;
+        let paddle = { x: 0, y: 0, w: 0, h: 0 };
+        let ball = { x: 0, y: 0, vx: 0, vy: 0, r: 0, speed: 0 };
+        let gameBricks = { lines: [], nodes: [], diamonds: [] };
+        let gameParticles = [];
+        let lives = 3;
+        let keys = { left: false, right: false };
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
@@ -695,7 +670,6 @@
             document.getElementById('tab-games').classList.remove('active');
             document.getElementById('dash-home').style.display = 'none';
             document.getElementById('dash-games').style.display = 'none';
-
             document.getElementById('tab-' + tab).classList.add('active');
             document.getElementById('dash-' + tab).style.display = 'flex';
         }
@@ -744,6 +718,7 @@
         }
 
         function toggleDashboard() {
+            if(isGameMode) return;
             isDashboardOpen = !isDashboardOpen;
             const dash = document.getElementById('dashboard');
             const overlay = document.getElementById('dashboard-overlay');
@@ -772,6 +747,7 @@
         }
 
         function toggleTimelapseUI() {
+            if(isGameMode) return;
             isTimelapseUIOpen = !isTimelapseUIOpen;
             const toolbar = document.getElementById('timelapse-toolbar');
             if (isTimelapseUIOpen) {
@@ -872,7 +848,6 @@
             applyFrame(0); 
             updateTlProgress();
             
-            // Force rendering of the first frame before starting recorder
             draw(); 
             await new Promise(r => requestAnimationFrame(r));
             
@@ -896,7 +871,6 @@
                 applyFrame(i); 
                 updateTlProgress(); 
                 
-                // Manually trigger p5 to redraw, then wait for browser composition
                 draw();
                 await new Promise(r => requestAnimationFrame(r));
                 
@@ -909,13 +883,13 @@
         }
 
         function handleKbdTrigger(action) {
-            if ((isTimelapseUIOpen || isDashboardOpen) && action === 'open') return;
+            if ((isTimelapseUIOpen || isDashboardOpen || isGameMode) && action === 'open') return;
             const kbd = document.getElementById('mobile-keyboard');
             if (action === 'open') kbd.classList.add('open'); else if (action === 'close') kbd.classList.remove('open');
         }
 
-        function vKeyStart(event, key) { if (isTimelapseUIOpen || isDashboardOpen) return; if (event) { event.preventDefault(); event.stopPropagation(); } handleActionDown(key); }
-        function vKeyEnd(event, key) { if (isTimelapseUIOpen || isDashboardOpen) return; if (event) { event.preventDefault(); event.stopPropagation(); } handleActionUp(key); }
+        function vKeyStart(event, key) { if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return; if (event) { event.preventDefault(); event.stopPropagation(); } handleActionDown(key); }
+        function vKeyEnd(event, key) { if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return; if (event) { event.preventDefault(); event.stopPropagation(); } handleActionUp(key); }
 
         function setTheme(m) { 
             currentTheme = m; document.body.setAttribute('data-theme', m); 
@@ -929,7 +903,7 @@
             if(actionTimeout) { clearTimeout(actionTimeout); actionTimeout = null; }
             if (!persistent) {
                 actionTimeout = setTimeout(() => {
-                    if (isTimelapseUIOpen) return; 
+                    if (isTimelapseUIOpen || isGameMode) return; 
                     if (!isEraserActive) a.classList.remove('visible'); else updateModeUI(); 
                 }, 1200); 
             }
@@ -941,7 +915,7 @@
         }
 
         function undo() { 
-            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             if(history.length > 0) { 
                 redoStack.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
                 let s = history.pop(); segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
@@ -950,7 +924,7 @@
         }
 
         function redo() { 
-            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             if(redoStack.length > 0) { 
                 history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
                 let s = redoStack.pop(); segments = s.segments; specialElements = s.specialElements; curI = s.curI; curJ = s.curJ; lastDirection = s.lastDirection; 
@@ -959,7 +933,7 @@
         }
         
         function updateModeUI() {
-            if (isTimelapseUIOpen) { showActionHint("Timelapse", true); return; }
+            if (isTimelapseUIOpen || isGameMode) return;
             const modeHeader = document.getElementById('mode-text');
             const indicator = document.getElementById('action-indicator');
             const eraserBtn = document.getElementById('eraser-btn');
@@ -969,18 +943,19 @@
         }
 
         function toggleMode() { 
-            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             if (isEraserActive) isEraserActive = false; else { isDrawingMode = !isDrawingMode; lastDirection = null; }
             updateModeUI(); redraw(); 
         }
         
         function toggleEraser() { 
-            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             isEraserActive = !isEraserActive; if (isEraserActive && eraserRadius === DEFAULT_ERASER_RADIUS) eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
             updateModeUI(); redraw(); 
         }
 
         function performReset() { 
+            if (isGameMode) return;
             if (isTimelapseUIOpen) {
                 isTimelapseUIOpen = false;
                 const toolbar = document.getElementById('timelapse-toolbar');
@@ -991,7 +966,7 @@
             }
             segments = []; specialElements = {}; curI = 0; curJ = 0; lastDirection = null;
             history = []; redoStack = []; tlHistory = []; tlCurrentFrame = 0;
-            offsetX = width / 2; offsetY = height / 2; 
+            offsetX = width / 2; offsetY = height / 2; zoom = 0.48;
             showActionHint('New Canvas'); updateModeUI(); redraw(); captureState(); 
         }
 
@@ -1023,13 +998,15 @@
                 const hRect = handle.getBoundingClientRect();
                 if (x >= hRect.left - 20 && x <= hRect.right + 20 && y >= hRect.top - 20) return true;
             }
+            // Add top nav check
+            if (y < 80) return true;
             return false;
         }
 
         function handleStart(x, y) { 
             if (isOverUI(x, y)) return; 
             
-            if (isPaperVisible && !isTimelapseUIOpen && !isExporting) {
+            if (isPaperVisible && !isTimelapseUIOpen && !isExporting && !isGameMode) {
                 let worldX = (x - offsetX) / zoom;
                 let worldY = (y - offsetY) / zoom;
                 let corner = checkCornerClick(worldX, worldY);
@@ -1056,12 +1033,13 @@
                 }
                 isResizingCanvas = false;
                 activeCorner = null;
+                updateModeUI();
                 redraw();
                 return;
             }
 
             if (isPanning && performance.now() - (window.lastClickTime || 0) < 200) {
-                if (!isOverUI(x, y) && !isTimelapseUIOpen) {
+                if (!isOverUI(x, y) && !isTimelapseUIOpen && !isGameMode) {
                     let worldX = (x - offsetX) / zoom; let worldY = (y - offsetY) / zoom;
                     curI = Math.round(worldX / STEP); curJ = Math.round(worldY / STEP); lastDirection = null; redraw();
                     captureState();
@@ -1070,11 +1048,325 @@
             isPanning = false;
         }
 
+        // --- BREAK MAZE LOGIC ---
+        function startBreakMaze() {
+            if (segments.length === 0 && Object.keys(specialElements).length === 0) {
+                showActionHint("Draw something first!", false);
+                return;
+            }
+            if(isDashboardOpen) toggleDashboard();
+            isGameMode = true;
+            lives = 3;
+            document.body.classList.add('game-active');
+
+            // UI Changes
+            document.getElementById('mode-text').style.display = 'none';
+            document.getElementById('game-hearts').style.display = 'flex';
+            document.getElementById('eraser-btn').style.display = 'none';
+            
+            let menuBtn = document.getElementById('menu-btn');
+            menuBtn.innerHTML = `<svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
+            menuBtn.onclick = function(e) { e.stopPropagation(); exitGame(); };
+
+            updateHeartsUI();
+            
+            buildGameBricks();
+            calculateGameBounds();
+
+            // Set targets for smooth camera fly
+            let worldW = gameBounds.maxX - gameBounds.minX;
+            let worldH = gameBounds.maxY - gameBounds.minY;
+            targetZoom = Math.min(width / worldW, height / worldH) * 0.85;
+            targetOffsetX = width/2 - ((gameBounds.minX + gameBounds.maxX)/2) * targetZoom;
+            targetOffsetY = height/2 - ((gameBounds.minY + gameBounds.maxY)/2) * targetZoom;
+
+            paddle = { w: 8 * STEP, h: LINE_WEIGHT, x: (gameBounds.minX + gameBounds.maxX)/2, y: gameBounds.maxY - LINE_WEIGHT };
+            ball = { r: (STEP * 0.7) / 2, x: paddle.x, y: paddle.y - paddle.h/2 - (STEP*0.7)/2, vx: 0, vy: 0, speed: STEP * 0.4 };
+
+            gameState = 'loading';
+            loadingProgress = 0;
+            gameParticles = [];
+            
+            showActionHint("Loading Maze...", true);
+            loop(); // start animation
+        }
+
+        function updateHeartsUI() {
+            let html = '';
+            let heartSVG = `<svg class="pixel-heart" viewBox="0 0 24 24" fill="#FF6666" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+            let emptySVG = `<svg class="pixel-heart" viewBox="0 0 24 24" fill="none" stroke="var(--disabled-color)" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+            for(let i=0; i<3; i++) html += (i < lives) ? heartSVG : emptySVG;
+            document.getElementById('game-hearts').innerHTML = html;
+        }
+
+        function buildGameBricks() {
+            gameBricks = { lines: [], nodes: [], diamonds: [] };
+            segments.forEach((s, idx) => { gameBricks.lines.push({ id: idx, seg: s, active: true }); });
+            for(let id in specialElements) {
+                let [i, j] = id.split(',').map(Number);
+                if (specialElements[id].isNode) gameBricks.nodes.push({ id: id, x: i*STEP, y: j*STEP, hp: 3 });
+                if (specialElements[id].isDiamond) gameBricks.diamonds.push({ id: id, x: i*STEP, y: j*STEP, hp: 1 });
+            }
+        }
+
+        function calculateGameBounds() {
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            segments.forEach(s => {
+                minX = Math.min(minX, s.p1.x*STEP, s.p2.x*STEP); maxX = Math.max(maxX, s.p1.x*STEP, s.p2.x*STEP);
+                minY = Math.min(minY, s.p1.y*STEP, s.p2.y*STEP); maxY = Math.max(maxY, s.p1.y*STEP, s.p2.y*STEP);
+            });
+            for(let id in specialElements) {
+                let [i, j] = id.split(',').map(Number);
+                minX = Math.min(minX, i*STEP - BASE_STEP_VAL); maxX = Math.max(maxX, i*STEP + BASE_STEP_VAL);
+                minY = Math.min(minY, j*STEP - BASE_STEP_VAL); maxY = Math.max(maxY, j*STEP + BASE_STEP_VAL);
+            }
+            if (minX === Infinity) { minX = 0; maxX = width; minY = 0; maxY = height; }
+            let pad = 4 * STEP;
+            gameBounds = { minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad + 15 * STEP };
+        }
+
+        function handleGameInput(type, val) {
+            if (!isGameMode) return;
+            if ((gameState === 'start' || gameState === 'gameover' || gameState === 'victory') && (type === 'click' || type === 'keydown')) {
+                if(gameState === 'gameover' || gameState === 'victory') { startBreakMaze(); return; }
+                gameState = 'playing';
+                ball.vy = -ball.speed; ball.vx = (Math.random() - 0.5) * ball.speed;
+            }
+        }
+
+        class Particle {
+            constructor(x, y, type) {
+                this.x = x; this.y = y;
+                this.vx = (Math.random() - 0.5) * 15;
+                this.vy = (Math.random() - 0.5) * 15 - 5;
+                this.life = 1.0;
+                this.size = Math.random() * 10 + 5;
+                this.rot = Math.random() * TWO_PI;
+                this.vRot = (Math.random() - 0.5) * 0.5;
+                this.type = type;
+            }
+            update() { this.x += this.vx; this.y += this.vy; this.vy += 0.5; this.life -= 0.03; this.rot += this.vRot; }
+            draw(col) {
+                push(); fill(col); noStroke(); translate(this.x, this.y); rotate(this.rot);
+                if(this.type === 'node') circle(0,0, this.size); else rect(0,0, this.size, this.size);
+                pop();
+            }
+        }
+
+        function destroyLineChain(startIndex) {
+            let toDestroy = [startIndex];
+            gameBricks.lines[startIndex].active = false;
+            let count = 1, queue = [startIndex];
+            
+            while(queue.length > 0 && count < 4) {
+                let currIdx = queue.shift();
+                let currSeg = gameBricks.lines[currIdx].seg;
+                for(let i=0; i<gameBricks.lines.length; i++) {
+                    if (!gameBricks.lines[i].active) continue;
+                    let s = gameBricks.lines[i].seg;
+                    if ((s.p1.x === currSeg.p1.x && s.p1.y === currSeg.p1.y) || (s.p1.x === currSeg.p2.x && s.p1.y === currSeg.p2.y) ||
+                        (s.p2.x === currSeg.p1.x && s.p2.y === currSeg.p1.y) || (s.p2.x === currSeg.p2.x && s.p2.y === currSeg.p2.y)) {
+                        gameBricks.lines[i].active = false; toDestroy.push(i); queue.push(i); count++;
+                        if (count >= 4) break;
+                    }
+                }
+            }
+            toDestroy.forEach(idx => {
+                let seg = gameBricks.lines[idx].seg;
+                for(let j=0; j<3; j++) gameParticles.push(new Particle((seg.p1.x + seg.p2.x)*STEP/2, (seg.p1.y + seg.p2.y)*STEP/2, 'line'));
+            });
+            gameBricks.lines = gameBricks.lines.filter(l => l.active);
+        }
+
+        function distToSegmentSquared(p, v, w) {
+            let l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
+            if (l2 === 0) return (p.x - v.x)**2 + (p.y - v.y)**2;
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            let proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
+            return { distSq: (p.x - proj.x)**2 + (p.y - proj.y)**2, proj: proj };
+        }
+
+        function physicsStep() {
+            ball.x += ball.vx; ball.y += ball.vy;
+            
+            // Walls
+            if (ball.x - ball.r < gameBounds.minX) { ball.x = gameBounds.minX + ball.r; ball.vx *= -1; }
+            if (ball.x + ball.r > gameBounds.maxX) { ball.x = gameBounds.maxX - ball.r; ball.vx *= -1; }
+            if (ball.y - ball.r < gameBounds.minY) { ball.y = gameBounds.minY + ball.r; ball.vy *= -1; }
+            
+            // Paddle
+            let px = constrain(ball.x, paddle.x - paddle.w/2, paddle.x + paddle.w/2);
+            let distToPaddle = Math.sqrt((ball.x - px)**2 + (ball.y - paddle.y)**2);
+            if (distToPaddle < ball.r + paddle.h/2 && ball.vy > 0) {
+                ball.vy = -Math.abs(ball.vy);
+                ball.vx += (ball.x - paddle.x) * 0.08;
+                let s = Math.sqrt(ball.vx**2 + ball.vy**2);
+                ball.vx = (ball.vx/s) * ball.speed; ball.vy = (ball.vy/s) * ball.speed;
+            }
+
+            if (ball.y > gameBounds.maxY) {
+                lives--; updateHeartsUI();
+                if (lives <= 0) { gameState = 'gameover'; }
+                else { gameState = 'start'; ball.x = paddle.x; ball.y = paddle.y - paddle.h/2 - ball.r; }
+            }
+
+            // Bricks
+            for(let i=gameBricks.nodes.length-1; i>=0; i--) {
+                let n = gameBricks.nodes[i];
+                let d = Math.sqrt((ball.x - n.x)**2 + (ball.y - n.y)**2);
+                let outerR = BASE_STEP_VAL; let innerR = BASE_STEP_VAL - LINE_WEIGHT;
+                if (d > innerR - ball.r && d < outerR + ball.r) {
+                    let nx = (ball.x - n.x) / d; let ny = (ball.y - n.y) / d;
+                    if (d < (innerR + outerR)/2) { nx = -nx; ny = -ny; ball.x = n.x - nx * (innerR - ball.r); ball.y = n.y - ny * (innerR - ball.r); } 
+                    else { ball.x = n.x + nx * (outerR + ball.r); ball.y = n.y + ny * (outerR + ball.r); }
+                    let dot = ball.vx * nx + ball.vy * ny;
+                    ball.vx -= 2 * dot * nx; ball.vy -= 2 * dot * ny;
+                    n.hp--;
+                    for(let j=0; j<5; j++) gameParticles.push(new Particle(ball.x, ball.y, 'node'));
+                    if (n.hp <= 0) gameBricks.nodes.splice(i, 1);
+                    return;
+                }
+            }
+            
+            for(let i=gameBricks.diamonds.length-1; i>=0; i--) {
+                let d = gameBricks.diamonds[i];
+                let tx = ball.x - d.x; let ty = ball.y - d.y - LINE_WEIGHT/2;
+                let c = Math.cos(-Math.PI/4), s = Math.sin(-Math.PI/4);
+                let lx = tx * c - ty * s; let ly = tx * s + ty * c;
+                let half = LINE_WEIGHT/2;
+                let p_x = Math.max(-half, Math.min(lx, half)); let p_y = Math.max(-half, Math.min(ly, half));
+                let distSq = (lx - p_x)**2 + (ly - p_y)**2;
+                if (distSq < ball.r * ball.r) {
+                    let dist = Math.sqrt(distSq); let lnx = (lx - p_x) / dist; let lny = (ly - p_y) / dist;
+                    if(dist===0) { lnx = 1; lny = 0; }
+                    let bc = Math.cos(Math.PI/4), bs = Math.sin(Math.PI/4);
+                    let nx = lnx * bc - lny * bs; let ny = lnx * bs + lny * bc;
+                    ball.x += nx * (ball.r - dist + 1); ball.y += ny * (ball.r - dist + 1);
+                    let dot = ball.vx * nx + ball.vy * ny; ball.vx -= 2 * dot * nx; ball.vy -= 2 * dot * ny;
+                    for(let j=0; j<5; j++) gameParticles.push(new Particle(d.x, d.y + LINE_WEIGHT/2, 'diamond'));
+                    gameBricks.diamonds.splice(i, 1);
+                    return;
+                }
+            }
+
+            for(let i=gameBricks.lines.length-1; i>=0; i--) {
+                let l = gameBricks.lines[i].seg;
+                let p1x = l.p1.x * STEP, p1y = l.p1.y * STEP, p2x = l.p2.x * STEP, p2y = l.p2.y * STEP;
+                let res = distToSegmentSquared(ball, {x: p1x, y: p1y}, {x: p2x, y: p2y});
+                let r = ball.r + LINE_WEIGHT/2;
+                if (res.distSq < r*r) {
+                    let dist = Math.sqrt(res.distSq);
+                    let nx = (ball.x - res.proj.x) / dist; let ny = (ball.y - res.proj.y) / dist;
+                    if (dist === 0) { nx = 1; ny = 0; }
+                    ball.x = res.proj.x + nx * r; ball.y = res.proj.y + ny * r;
+                    let dot = ball.vx * nx + ball.vy * ny;
+                    ball.vx = ball.vx - 2 * dot * nx; ball.vy = ball.vy - 2 * dot * ny;
+                    ball.vx += (Math.random() - 0.5); ball.vy += (Math.random() - 0.5);
+                    let spd = Math.sqrt(ball.vx**2 + ball.vy**2); ball.vx = (ball.vx/spd)*ball.speed; ball.vy = (ball.vy/spd)*ball.speed;
+                    destroyLineChain(i);
+                    return;
+                }
+            }
+
+            if (gameBricks.lines.length === 0 && gameBricks.nodes.length === 0 && gameBricks.diamonds.length === 0) {
+                gameState = 'victory'; showActionHint("YOU WIN!", true);
+            }
+        }
+
+        function drawBreakMaze() {
+            background(themeConfig[currentTheme].canvasBg);
+            push(); translate(offsetX, offsetY); scale(zoom);
+            
+            // Bounds
+            stroke('rgba(128,128,128,0.2)'); strokeWeight(5); noFill();
+            rectMode(CORNER);
+            rect(gameBounds.minX, gameBounds.minY, gameBounds.maxX - gameBounds.minX, gameBounds.maxY - gameBounds.minY);
+
+            if (gameState === 'loading') {
+                loadingProgress += 0.02;
+                zoom = lerp(zoom, targetZoom, 0.1);
+                offsetX = lerp(offsetX, targetOffsetX, 0.1);
+                offsetY = lerp(offsetY, targetOffsetY, 0.1);
+                fill(themeConfig[currentTheme].geomColor); rectMode(CENTER);
+                rect((gameBounds.minX + gameBounds.maxX)/2, (gameBounds.minY + gameBounds.maxY)/2, 300 * Math.min(1, loadingProgress), 10, 5);
+                if (loadingProgress >= 1.0) { gameState = 'start'; showActionHint("Tap to Start", true); }
+                pop(); return;
+            }
+
+            // Draw Bricks exactly as SVG
+            let ogSeg = segments; let ogSpec = specialElements;
+            segments = gameBricks.lines.map(l => l.seg);
+            specialElements = {};
+            gameBricks.nodes.forEach(n => specialElements[n.id] = {isNode: true, hp: n.hp});
+            gameBricks.diamonds.forEach(d => specialElements[d.id] = {isDiamond: true});
+            
+            drawGeometry(themeConfig[currentTheme].geomColor);
+            
+            segments = ogSeg; specialElements = ogSpec;
+
+            // Particles
+            gameParticles.forEach(p => p.update());
+            gameParticles = gameParticles.filter(p => p.life > 0);
+            gameParticles.forEach(p => p.draw(themeConfig[currentTheme].geomColor));
+
+            // Paddle
+            fill(themeConfig[currentTheme].geomColor); noStroke(); rectMode(CENTER);
+            rect(paddle.x, paddle.y, paddle.w, paddle.h);
+
+            // Ball
+            fill(themeConfig[currentTheme].cursorColor);
+            circle(ball.x, ball.y, ball.r * 2);
+
+            pop();
+
+            if (isGameMode && (gameState === 'playing' || gameState === 'start')) {
+                if (keys.left) paddle.x -= STEP * 0.6;
+                if (keys.right) paddle.x += STEP * 0.6;
+                paddle.x = constrain(paddle.x, gameBounds.minX + paddle.w/2, gameBounds.maxX - paddle.w/2);
+                if (gameState === 'start') ball.x = paddle.x;
+            }
+
+            if (gameState === 'playing') physicsStep();
+
+            if (gameState === 'gameover') {
+                fill(0, 0, 0, 180);
+                noStroke();
+                rectMode(CORNER);
+                rect(0, 0, width, height);
+                fill(255);
+                textAlign(CENTER, CENTER);
+                textFont('Sora');
+                textStyle(BOLD);
+                textSize(48);
+                text("Game Over!", width/2, height/2 - 20);
+                textSize(16);
+                textStyle(NORMAL);
+                fill(200);
+                text("Tap to restart", width/2, height/2 + 30);
+            }
+        }
+
+        function exitGame() {
+            isGameMode = false;
+            document.body.classList.remove('game-active');
+            document.getElementById('mode-text').style.display = 'inline';
+            document.getElementById('game-hearts').style.display = 'none';
+            document.getElementById('eraser-btn').style.display = 'flex';
+            
+            let menuBtn = document.getElementById('menu-btn');
+            menuBtn.innerHTML = `<svg viewBox="0 0 24 24" class="theme-svg"><path d="M4 6h16M4 12h16M4 18h16" /></svg>`;
+            menuBtn.onclick = function(e) { e.stopPropagation(); toggleDashboard(); };
+            
+            offsetX = width/2; offsetY = height/2; zoom = 0.48; 
+            updateModeUI(); redraw();
+        }
+
+        // --- CORE P5 ---
         function setup() { 
             let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); offsetX = width/2; offsetY = height/2; 
             const canvasElem = document.getElementById('defaultCanvas0');
             
-            // Native Pointer API integration for robust iPadOS support
             canvasElem.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
                 activePointers.set(e.pointerId, e);
@@ -1083,6 +1375,7 @@
                     mainPointerId = e.pointerId;
                     pX = e.clientX; pY = e.clientY;
                     isPointerDrawing = true;
+                    handleGameInput('click');
                     handleStart(e.clientX, e.clientY);
                 } else if (activePointers.size === 2) {
                     isPointerDrawing = false;
@@ -1099,47 +1392,38 @@
                 }
 
                 if (activePointers.size === 1 && e.pointerId === mainPointerId) {
-                    let dx = e.clientX - pX;
-                    let dy = e.clientY - pY;
+                    let dx = e.clientX - pX; let dy = e.clientY - pY;
                     pX = e.clientX; pY = e.clientY;
 
                     if (isPointerDrawing && !isOverUI(pX, pY)) {
-                        if (isResizingCanvas) {
-                            let worldX = (pX - offsetX) / zoom;
-                            let worldY = (pY - offsetY) / zoom;
+                        if (isGameMode && (gameState === 'playing' || gameState === 'start')) {
+                            let worldDx = dx / zoom;
+                            paddle.x = constrain(paddle.x + worldDx, gameBounds.minX + paddle.w/2, gameBounds.maxX - paddle.w/2);
+                            if(gameState === 'start') ball.x = paddle.x;
+                        }
+                        else if (isResizingCanvas && !isGameMode) {
+                            let worldX = (pX - offsetX) / zoom; let worldY = (pY - offsetY) / zoom;
                             let MM_TO_PX = LINE_WEIGHT / 12;
-                            let newW_px = paperWidthMm * MM_TO_PX;
-                            let newH_px = paperHeightMm * MM_TO_PX;
-                            
+                            let newW_px = paperWidthMm * MM_TO_PX; let newH_px = paperHeightMm * MM_TO_PX;
                             if (activeCorner.includes('r')) newW_px = Math.max(50, worldX * 2);
                             if (activeCorner.includes('l')) newW_px = Math.max(50, -worldX * 2);
                             if (activeCorner.includes('b')) newH_px = Math.max(50, worldY * 2);
                             if (activeCorner.includes('t')) newH_px = Math.max(50, -worldY * 2);
-                            
-                            paperWidthMm = newW_px / MM_TO_PX;
-                            paperHeightMm = newH_px / MM_TO_PX;
+                            paperWidthMm = newW_px / MM_TO_PX; paperHeightMm = newH_px / MM_TO_PX;
+                            showActionHint(`${Math.round(paperWidthMm)} × ${Math.round(paperHeightMm)} mm`, true);
                             redraw();
-                        } else if (isEraserActive && !isTimelapseUIOpen) {
+                        } else if (isEraserActive && !isTimelapseUIOpen && !isGameMode) {
                             performEraserActionAt((pX - offsetX) / zoom, (pY - offsetY) / zoom);
-                        } else if (isPanning) {
-                            offsetX += dx;
-                            offsetY += dy;
-                            redraw();
+                        } else if (isPanning && !isGameMode) {
+                            offsetX += dx; offsetY += dy; redraw();
                         }
                     }
-                } else if (activePointers.size === 2) {
+                } else if (activePointers.size === 2 && !isGameMode) {
                     let pts = Array.from(activePointers.values());
                     let currentDist = getDist(pts[0], pts[1]);
-                    let midX = (pts[0].clientX + pts[1].clientX) / 2;
-                    let midY = (pts[0].clientY + pts[1].clientY) / 2;
+                    let midX = (pts[0].clientX + pts[1].clientX) / 2; let midY = (pts[0].clientY + pts[1].clientY) / 2;
                     applyZoom(currentDist / lastPinchDist, midX, midY);
-                    lastPinchDist = currentDist;
-                    redraw();
-                }
-                
-                if (!isPointerDrawing && !isOverUI(e.clientX, e.clientY)) {
-                    pX = e.clientX; pY = e.clientY;
-                    redraw();
+                    lastPinchDist = currentDist; redraw();
                 }
             });
 
@@ -1147,11 +1431,9 @@
                 e.preventDefault();
                 if (e.pointerId === mainPointerId) {
                     handleEnd(e.clientX, e.clientY);
-                    isPointerDrawing = false;
-                    mainPointerId = null;
+                    isPointerDrawing = false; mainPointerId = null;
                 }
                 activePointers.delete(e.pointerId);
-                
                 if (activePointers.size === 1) {
                     let remainingId = Array.from(activePointers.keys())[0];
                     mainPointerId = remainingId;
@@ -1174,50 +1456,35 @@
             let oldZoom = zoom; zoom = constrain(zoom * factor, 0.05, 5);
             let worldX = (centerX - offsetX) / oldZoom; let worldY = (centerY - offsetY) / oldZoom;
             offsetX = centerX - worldX * zoom; offsetY = centerY - worldY * zoom;
+            showActionHint(Math.round(zoom * 100) + '%', false); // Zoom Display
         }
 
         function draw() {
+            if (isGameMode) { drawBreakMaze(); return; } // Branch directly to game engine
+
             let colors = themeConfig[currentTheme];
-            if (isTimelapseUIOpen) {
-                background(255);
-            } else if (isExporting) {
-                clear();
-            } else {
-                background(colors.canvasBg);
-            }
+            if (isTimelapseUIOpen) background(255);
+            else if (isExporting) clear();
+            else background(colors.canvasBg);
 
             push(); translate(offsetX, offsetY); scale(zoom);
             
             if (isPaperVisible && !isExporting && !isTimelapseUIOpen) {
                 let paperColor = currentTheme === 'light' ? '#ffffff' : (currentTheme === 'dark' ? '#1e1e1e' : '#1e293b');
-                fill(paperColor);
-                stroke('rgba(128,128,128,0.2)');
-                strokeWeight(2 / zoom);
-                rectMode(CENTER);
-                let wPx = paperWidthMm * (LINE_WEIGHT / 12);
-                let hPx = paperHeightMm * (LINE_WEIGHT / 12);
+                fill(paperColor); stroke('rgba(128,128,128,0.2)'); strokeWeight(2 / zoom); rectMode(CENTER);
+                let wPx = paperWidthMm * (LINE_WEIGHT / 12); let hPx = paperHeightMm * (LINE_WEIGHT / 12);
                 rect(0, 0, wPx, hPx);
-
-                // Simple L-shape corners instead of solid rectangles
-                stroke(currentTheme === 'light' ? 160 : 80);
-                strokeWeight(3 / zoom);
-                noFill();
-                let cLen = 20 / zoom;
-                let halfW = wPx / 2;
-                let halfH = hPx / 2;
-                
-                beginShape(); vertex(-halfW, -halfH + cLen); vertex(-halfW, -halfH); vertex(-halfW + cLen, -halfH); endShape(); // TL
-                beginShape(); vertex(halfW - cLen, -halfH); vertex(halfW, -halfH); vertex(halfW, -halfH + cLen); endShape(); // TR
-                beginShape(); vertex(-halfW, halfH - cLen); vertex(-halfW, halfH); vertex(-halfW + cLen, halfH); endShape(); // BL
-                beginShape(); vertex(halfW - cLen, halfH); vertex(halfW, halfH); vertex(halfW, halfH - cLen); endShape(); // BR
+                stroke(currentTheme === 'light' ? 160 : 80); strokeWeight(3 / zoom); noFill();
+                let cLen = 20 / zoom; let halfW = wPx / 2; let halfH = hPx / 2;
+                beginShape(); vertex(-halfW, -halfH + cLen); vertex(-halfW, -halfH); vertex(-halfW + cLen, -halfH); endShape(); 
+                beginShape(); vertex(halfW - cLen, -halfH); vertex(halfW, -halfH); vertex(halfW, -halfH + cLen); endShape(); 
+                beginShape(); vertex(-halfW, halfH - cLen); vertex(-halfW, halfH); vertex(-halfW + cLen, halfH); endShape(); 
+                beginShape(); vertex(halfW - cLen, halfH); vertex(halfW, halfH); vertex(halfW, halfH - cLen); endShape(); 
             }
 
             if (!isExporting) {
-                if (isTimelapseUIOpen) {
-                    drawGrid('0,0,0', 0.15);
-                } else {
-                    drawGrid(colors.dotColor, colors.dotAlpha);
-                }
+                if (isTimelapseUIOpen) drawGrid('0,0,0', 0.15);
+                else drawGrid(colors.dotColor, colors.dotAlpha);
             }
             drawGeometry(colors.geomColor);
             if (!isExporting) drawCursor();
@@ -1289,7 +1556,7 @@
         }
 
         function move(k) {
-            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]}; if(!m[k]) return;
             let [di, dj] = m[k];
             if (isDrawingMode && !isEraserActive && lastDirection !== null) {
@@ -1322,7 +1589,7 @@
 
         let repeatTimer = null, activeKey = null;
         function handleActionDown(k) {
-            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             k = k.toLowerCase(); if (activeKey === k) return; activeKey = k;
             if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; } 
             if(k === 'e') { toggleEraser(); return; } if(k === 'u') { undo(); return; } if(k === 'r') { redo(); } if(k === 'x') { performReset(); return; } 
@@ -1336,7 +1603,7 @@
         function stopRepeat() { if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } }
 
         function toggleSpecial(t) {
-            if (isTimelapseUIOpen || !isDrawingMode || isEraserActive || isDashboardOpen) return;
+            if (isTimelapseUIOpen || !isDrawingMode || isEraserActive || isDashboardOpen || isGameMode) return;
             if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) return;
             saveState(); let id = `${curI},${curJ}`; if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
             specialElements[id][t] = !specialElements[id][t];
@@ -1352,7 +1619,7 @@
         }
 
         function performEraserActionAt(worldX, worldY) {
-            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
             for (let id in specialElements) {
                 let [i, j] = id.split(',').map(Number); let dx = i * STEP - worldX; let dy = j * STEP - worldY;
@@ -1368,7 +1635,7 @@
         }
 
         function exportFile(fmt) {
-            if (isTimelapseUIOpen) return;
+            if (isTimelapseUIOpen || isGameMode) return;
             if(isDashboardOpen) toggleDashboard();
             if(fmt==='svg') {
                 const ringD = BASE_STEP_VAL * 2;
@@ -1422,17 +1689,33 @@
         
         function mouseWheel(e) {
             if (e.ctrlKey) { 
-                if (isEraserActive && !isTimelapseUIOpen) { 
+                if (isEraserActive && !isTimelapseUIOpen && !isGameMode) { 
                     if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); else eraserRadius = Math.min(300, eraserRadius + 2); 
                     updateModeUI(); redraw(); 
                 } return false; 
             }
-            applyZoom(e.delta > 0 ? 1/1.1 : 1.1, pX || mouseX, pY || mouseY); return false; 
+            if(!isGameMode) applyZoom(e.delta > 0 ? 1/1.1 : 1.1, pX || mouseX, pY || mouseY); 
+            return false; 
         }
 
         function windowResized() { resizeCanvas(windowWidth, windowHeight); }
-        window.addEventListener('keydown', e => { if (e.repeat) return; handleActionDown(e.key); });
-        window.addEventListener('keyup', e => { handleActionUp(e.key); });
+        window.addEventListener('keydown', e => { 
+            if(isGameMode) {
+                if(e.key === 'ArrowLeft') { keys.left = true; handleGameInput('keydown'); }
+                if(e.key === 'ArrowRight') { keys.right = true; handleGameInput('keydown'); }
+            } else {
+                if (e.repeat) return;
+                handleActionDown(e.key); 
+            }
+        });
+        window.addEventListener('keyup', e => { 
+            if(isGameMode) {
+                if(e.key === 'ArrowLeft') keys.left = false;
+                if(e.key === 'ArrowRight') keys.right = false;
+            } else {
+                handleActionUp(e.key); 
+            }
+        });
     </script>
 </body>
 </html>
