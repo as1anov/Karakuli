@@ -221,6 +221,15 @@
         .dash-btn:hover { background: var(--active-btn-bg); }
         .dash-btn:active { transform: scale(0.97); }
         .dash-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; flex-shrink: 0; }
+        .projects-list { display: none; margin: -2px 0 12px; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
+        .projects-list.open { display: block; }
+        .project-item { display: flex; align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid var(--border-color); }
+        .project-item:last-child { border-bottom: 0; }
+        .project-open { flex: 1; min-width: 0; cursor: pointer; }
+        .project-name { display: block; font-size: 12px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .project-date { display: block; margin-top: 2px; font-size: 10px; color: var(--disabled-color); }
+        .project-delete { width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: #ef4444; cursor: pointer; font-size: 18px; line-height: 1; }
+        .project-empty { padding: 12px; color: var(--disabled-color); font-size: 11px; text-align: center; }
 
         .theme-container {
             display: flex; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border-color);
@@ -380,10 +389,11 @@
                     <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     New Canvas
                 </div>
-                <div class="dash-btn" style="opacity: 0.5; cursor: not-allowed;">
+                <div class="dash-btn" onclick="toggleProjectsList()">
                     <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     My Projects
                 </div>
+                <div class="projects-list" id="projects-list"></div>
             </div>
 
             <div class="dash-section">
@@ -561,11 +571,22 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        const firebaseConfig = { apiKey: "API_KEY", authDomain: "DOMAIN", projectId: "ID", storageBucket: "BUCKET", messagingSenderId: "SENDER", appId: "APP_ID" };
+        const firebaseConfig = {
+            apiKey: "AIzaSyB2R9HE9a_s6NKWxhVN3uJ5M01_6HkS8Gw",
+            authDomain: "karakuli-c7a46.firebaseapp.com",
+            projectId: "karakuli-c7a46",
+            storageBucket: "karakuli-c7a46.firebasestorage.app",
+            messagingSenderId: "405624126859",
+            appId: "1:405624126859:web:215c7b98027fa0ae33c38e",
+            measurementId: "G-NKMZCLBC8T"
+        };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
+        let signedInUser = null;
 
         const loginContainer = document.getElementById('login-container');
 
@@ -577,7 +598,37 @@
             try { await signOut(auth); } catch (error) { console.error("Logout Error:", error); }
         }
 
+        const projectsRef = () => collection(db, 'users', signedInUser.uid, 'projects');
+        window.karakuliProjects = {
+            isSignedIn: () => Boolean(signedInUser),
+            async list() {
+                if (!signedInUser) return [];
+                const snapshot = await getDocs(query(projectsRef(), orderBy('updatedAtMs', 'desc')));
+                return snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+            },
+            async create(data) {
+                if (!signedInUser) return null;
+                const now = Date.now();
+                const result = await addDoc(projectsRef(), { ...data, createdAtMs: now, updatedAtMs: now });
+                return result.id;
+            },
+            async save(id, data) {
+                if (!signedInUser || !id) return;
+                await setDoc(doc(db, 'users', signedInUser.uid, 'projects', id), { ...data, updatedAtMs: Date.now() }, { merge: true });
+            },
+            async load(id) {
+                if (!signedInUser) return null;
+                const snapshot = await getDoc(doc(db, 'users', signedInUser.uid, 'projects', id));
+                return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+            },
+            async remove(id) {
+                if (!signedInUser || !id) return;
+                await deleteDoc(doc(db, 'users', signedInUser.uid, 'projects', id));
+            }
+        };
+
         onAuthStateChanged(auth, (user) => {
+            signedInUser = user;
             if (user) {
                 loginContainer.innerHTML = `
                     <div class="user-profile">
@@ -606,6 +657,7 @@
                 const btn = document.getElementById('google-login-btn');
                 if (btn) btn.addEventListener('click', handleGoogleLogin);
             }
+            window.dispatchEvent(new CustomEvent('karakuli-auth-change', { detail: { user } }));
         });
     </script>
 
@@ -645,6 +697,84 @@
         let paperWidthMm = 210;
         let paperHeightMm = 297;
         let isPaperVisible = false;
+        let activeProjectId = null;
+        let projectSaveTimer = null;
+        let currentProjectTitle = 'Untitled project';
+
+        function projectSnapshot() {
+            return JSON.parse(JSON.stringify({
+                title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
+                paperWidthMm, paperHeightMm, isPaperVisible, currentTheme
+            }));
+        }
+
+        async function saveCurrentProject() {
+            if (!window.karakuliProjects?.isSignedIn()) return;
+            const data = projectSnapshot();
+            if (!activeProjectId) activeProjectId = await window.karakuliProjects.create(data);
+            else await window.karakuliProjects.save(activeProjectId, data);
+            await renderProjectsList();
+        }
+
+        function scheduleProjectSave() {
+            if (!window.karakuliProjects?.isSignedIn()) return;
+            clearTimeout(projectSaveTimer);
+            projectSaveTimer = setTimeout(() => saveCurrentProject().catch(error => console.error('Project save error:', error)), 700);
+        }
+
+        async function renderProjectsList() {
+            const list = document.getElementById('projects-list');
+            if (!list) return;
+            if (!window.karakuliProjects?.isSignedIn()) {
+                list.innerHTML = '<div class="project-empty">Sign in with Google to save projects.</div>';
+                return;
+            }
+            const projects = await window.karakuliProjects.list();
+            list.innerHTML = projects.length ? projects.map(project => `
+                <div class="project-item">
+                    <div class="project-open" onclick="openProject('${project.id}')">
+                        <span class="project-name">${escapeProjectText(project.title || 'Untitled project')}</span>
+                        <span class="project-date">${new Date(project.updatedAtMs || project.createdAtMs).toLocaleString()}</span>
+                    </div>
+                    <button class="project-delete" aria-label="Delete project" onclick="deleteProject('${project.id}')">×</button>
+                </div>`).join('') : '<div class="project-empty">No saved projects yet.</div>';
+        }
+
+        function escapeProjectText(value) {
+            const node = document.createElement('span'); node.textContent = value; return node.innerHTML;
+        }
+
+        async function toggleProjectsList() {
+            const list = document.getElementById('projects-list');
+            list.classList.toggle('open');
+            if (list.classList.contains('open')) await renderProjectsList();
+        }
+
+        async function openProject(id) {
+            const project = await window.karakuliProjects?.load(id);
+            if (!project) return;
+            activeProjectId = id; currentProjectTitle = project.title || 'Untitled project';
+            segments = project.segments || []; specialElements = project.specialElements || {};
+            curI = project.curI || 0; curJ = project.curJ || 0; lastDirection = project.lastDirection || null;
+            paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
+            isPaperVisible = Boolean(project.isPaperVisible);
+            if (project.currentTheme) setTheme(project.currentTheme);
+            history = []; redoStack = []; invalidateGeometryCache(); redraw(); showActionHint('Project opened');
+            document.getElementById('projects-list').classList.remove('open');
+        }
+
+        async function deleteProject(id) {
+            if (!confirm('Delete this project permanently?')) return;
+            await window.karakuliProjects?.remove(id);
+            if (activeProjectId === id) { activeProjectId = null; currentProjectTitle = 'Untitled project'; }
+            await renderProjectsList();
+        }
+
+        window.addEventListener('karakuli-auth-change', event => {
+            activeProjectId = null;
+            if (event.detail.user) { renderProjectsList(); scheduleProjectSave(); }
+            else document.getElementById('projects-list').innerHTML = '';
+        });
 
         let isResizingCanvas = false;
         let activeCorner = null;
@@ -803,6 +933,7 @@
                 tlHistory = tlHistory.filter((_, index) => index === 0 || index === tlHistory.length - 1 || index % 2 === 0);
                 tlCaptureStride = Math.min(64, tlCaptureStride * 2);
             }
+            scheduleProjectSave();
         }
 
         function cycleTlSpeed() { if (tlSpeed === 1) setTlSpeed(2); else if (tlSpeed === 2) setTlSpeed(4); else if (tlSpeed === 4) setTlSpeed(8); else setTlSpeed(1); }
