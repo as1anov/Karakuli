@@ -230,6 +230,12 @@
         .project-date { display: block; margin-top: 2px; font-size: 10px; color: var(--disabled-color); }
         .project-delete { width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: #ef4444; cursor: pointer; font-size: 18px; line-height: 1; }
         .project-empty { padding: 12px; color: var(--disabled-color); font-size: 11px; text-align: center; }
+        .project-current { display: none; align-items: center; gap: 6px; margin-top: -2px; margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 10px; }
+        .project-current.visible { display: flex; }
+        .project-current-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; color: var(--text-color); }
+        .project-icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--border-color); border-radius: 8px; background: transparent; color: var(--text-color); cursor: pointer; }
+        .project-icon-btn svg { width: 15px; height: 15px; }
+        .project-icon-btn.delete { color: #ef4444; }
 
         .theme-container {
             display: flex; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border-color);
@@ -392,6 +398,11 @@
                 <div class="dash-btn" onclick="toggleProjectsList()">
                     <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     My Projects
+                </div>
+                <div class="project-current" id="project-current">
+                    <span class="project-current-name" id="project-current-name">Karakuli #0000</span>
+                    <button class="project-icon-btn" aria-label="Save project" title="Save" onclick="saveCurrentProject()"><svg viewBox="0 0 24 24"><path d="M5 3h12l2 2v16H5zM8 3v6h8V3M8 21v-7h8v7"/></svg></button>
+                    <button class="project-icon-btn delete" aria-label="Delete current project" title="Delete" onclick="deleteCurrentProject()"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M7 6l1 15h8l1-15M10 10v7M14 10v7"/></svg></button>
                 </div>
                 <div class="projects-list" id="projects-list"></div>
             </div>
@@ -699,20 +710,41 @@
         let isPaperVisible = false;
         let activeProjectId = null;
         let projectSaveTimer = null;
-        let currentProjectTitle = 'Untitled project';
+        let currentProjectTitle = 'Karakuli #0000';
+        let createProjectOnReset = false;
 
         function projectSnapshot() {
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
-                paperWidthMm, paperHeightMm, isPaperVisible, currentTheme
+                paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
+                tlHistory, tlCurrentFrame, tlCaptureStride, tlCaptureCounter
             }));
+        }
+
+        function updateCurrentProjectUI() {
+            const current = document.getElementById('project-current');
+            const name = document.getElementById('project-current-name');
+            if (!current || !name) return;
+            const visible = window.karakuliProjects?.isSignedIn() && activeProjectId;
+            current.classList.toggle('visible', Boolean(visible));
+            name.textContent = currentProjectTitle;
+        }
+
+        async function nextProjectTitle() {
+            const projects = await window.karakuliProjects.list();
+            const used = projects.map(project => Number((project.title || '').match(/^Karakuli #(\d{4})$/)?.[1]))
+                .filter(Number.isFinite);
+            const next = used.length ? Math.max(...used) + 1 : 0;
+            return `Karakuli #${String(next).padStart(4, '0')}`;
         }
 
         async function saveCurrentProject() {
             if (!window.karakuliProjects?.isSignedIn()) return;
+            if (!activeProjectId) currentProjectTitle = await nextProjectTitle();
             const data = projectSnapshot();
             if (!activeProjectId) activeProjectId = await window.karakuliProjects.create(data);
             else await window.karakuliProjects.save(activeProjectId, data);
+            updateCurrentProjectUI();
             await renderProjectsList();
         }
 
@@ -738,6 +770,7 @@
                     </div>
                     <button class="project-delete" aria-label="Delete project" onclick="deleteProject('${project.id}')">×</button>
                 </div>`).join('') : '<div class="project-empty">No saved projects yet.</div>';
+            updateCurrentProjectUI();
         }
 
         function escapeProjectText(value) {
@@ -753,27 +786,40 @@
         async function openProject(id) {
             const project = await window.karakuliProjects?.load(id);
             if (!project) return;
-            activeProjectId = id; currentProjectTitle = project.title || 'Untitled project';
+            activeProjectId = id; currentProjectTitle = project.title || 'Karakuli #0000';
             segments = project.segments || []; specialElements = project.specialElements || {};
             curI = project.curI || 0; curJ = project.curJ || 0; lastDirection = project.lastDirection || null;
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
+            tlHistory = project.tlHistory || [];
+            tlCurrentFrame = project.tlCurrentFrame || 0;
+            tlCaptureStride = project.tlCaptureStride || 1;
+            tlCaptureCounter = project.tlCaptureCounter || 0;
             if (project.currentTheme) setTheme(project.currentTheme);
             history = []; redoStack = []; invalidateGeometryCache(); redraw(); showActionHint('Project opened');
             document.getElementById('projects-list').classList.remove('open');
+            updateCurrentProjectUI();
         }
 
         async function deleteProject(id) {
             if (!confirm('Delete this project permanently?')) return;
             await window.karakuliProjects?.remove(id);
-            if (activeProjectId === id) { activeProjectId = null; currentProjectTitle = 'Untitled project'; }
+            if (activeProjectId === id) { activeProjectId = null; currentProjectTitle = 'Karakuli #0000'; }
+            updateCurrentProjectUI();
             await renderProjectsList();
+        }
+
+        async function deleteCurrentProject() {
+            if (!activeProjectId) return;
+            await deleteProject(activeProjectId);
+            performReset();
         }
 
         window.addEventListener('karakuli-auth-change', event => {
             activeProjectId = null;
             if (event.detail.user) { renderProjectsList(); scheduleProjectSave(); }
             else document.getElementById('projects-list').innerHTML = '';
+            updateCurrentProjectUI();
         });
 
         let isResizingCanvas = false;
@@ -816,6 +862,7 @@
 
         function openNewCanvasModal() {
             isResizingOnly = false;
+            createProjectOnReset = true;
             toggleDashboard();
             if (isPaperVisible) {
                 document.getElementById('canvas-w-input').value = Math.round(paperWidthMm);
@@ -828,6 +875,7 @@
 
         function openNewCanvasModalFromCorner() {
             isResizingOnly = true;
+            createProjectOnReset = false;
             document.getElementById('canvas-w-input').value = Math.round(paperWidthMm);
             document.getElementById('canvas-h-input').value = Math.round(paperHeightMm);
             const modal = document.getElementById('new-canvas-modal');
@@ -836,6 +884,7 @@
         }
 
         function closeNewCanvasModal() {
+            createProjectOnReset = false;
             const modal = document.getElementById('new-canvas-modal');
             modal.classList.remove('show');
             setTimeout(() => modal.style.display = 'none', 300);
@@ -845,11 +894,13 @@
             const w = parseFloat(document.getElementById('canvas-w-input').value);
             const h = parseFloat(document.getElementById('canvas-h-input').value);
             if (w > 0 && h > 0) {
+                const shouldCreateProject = !isResizingOnly && createProjectOnReset;
                 paperWidthMm = w;
                 paperHeightMm = h;
                 isPaperVisible = true;
                 closeNewCanvasModal();
                 if (!isResizingOnly) {
+                    if (shouldCreateProject) { activeProjectId = null; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
                     performReset();
                 } else {
                     redraw();
