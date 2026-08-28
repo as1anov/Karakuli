@@ -710,6 +710,7 @@
         let isPaperVisible = false;
         let activeProjectId = null;
         let projectSaveTimer = null;
+        let projectCreationPromise = null;
         let currentProjectTitle = 'Karakuli #0000';
         let createProjectOnReset = false;
 
@@ -725,7 +726,7 @@
             const current = document.getElementById('project-current');
             const name = document.getElementById('project-current-name');
             if (!current || !name) return;
-            const visible = window.karakuliProjects?.isSignedIn() && activeProjectId;
+            const visible = window.karakuliProjects?.isSignedIn();
             current.classList.toggle('visible', Boolean(visible));
             name.textContent = currentProjectTitle;
         }
@@ -740,16 +741,25 @@
 
         async function saveCurrentProject() {
             if (!window.karakuliProjects?.isSignedIn()) return;
-            if (!activeProjectId) currentProjectTitle = await nextProjectTitle();
-            const data = projectSnapshot();
-            if (!activeProjectId) activeProjectId = await window.karakuliProjects.create(data);
-            else await window.karakuliProjects.save(activeProjectId, data);
+            if (!activeProjectId) {
+                if (!projectCreationPromise) {
+                    projectCreationPromise = (async () => {
+                        currentProjectTitle = await nextProjectTitle();
+                        activeProjectId = await window.karakuliProjects.create(projectSnapshot());
+                        updateCurrentProjectUI();
+                    })().finally(() => { projectCreationPromise = null; });
+                }
+                await projectCreationPromise;
+            }
+            await window.karakuliProjects.save(activeProjectId, projectSnapshot());
             updateCurrentProjectUI();
             await renderProjectsList();
         }
 
         function scheduleProjectSave() {
             if (!window.karakuliProjects?.isSignedIn()) return;
+            // The first edit creates the file immediately; subsequent edits are batched.
+            if (!activeProjectId) { saveCurrentProject().catch(error => console.error('Project save error:', error)); return; }
             clearTimeout(projectSaveTimer);
             projectSaveTimer = setTimeout(() => saveCurrentProject().catch(error => console.error('Project save error:', error)), 700);
         }
