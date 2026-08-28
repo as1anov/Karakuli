@@ -1,6 +1,5 @@
 
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -605,31 +604,67 @@
         }
 
         const projectsRef = () => collection(db, 'users', signedInUser.uid, 'projects');
+        const localProjectsKey = () => `karakuli-projects-${signedInUser.uid}`;
+        const readLocalProjects = () => JSON.parse(localStorage.getItem(localProjectsKey()) || '[]');
+        const writeLocalProjects = projects => localStorage.setItem(localProjectsKey(), JSON.stringify(projects));
+        const saveLocalProject = project => {
+            const projects = readLocalProjects();
+            const index = projects.findIndex(item => item.id === project.id);
+            if (index === -1) projects.push(project); else projects[index] = { ...projects[index], ...project };
+            writeLocalProjects(projects);
+        };
         window.karakuliProjects = {
             isSignedIn: () => Boolean(signedInUser),
             async list() {
                 if (!signedInUser) return [];
-                const snapshot = await getDocs(query(projectsRef(), orderBy('updatedAtMs', 'desc')));
-                return snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+                const local = readLocalProjects();
+                try {
+                    const snapshot = await getDocs(query(projectsRef(), orderBy('updatedAtMs', 'desc')));
+                    const cloud = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+                    return [...new Map([...local, ...cloud].map(project => [project.id, project])).values()]
+                        .sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
+                } catch (error) {
+                    console.warn('Cloud project list unavailable; using local projects.', error);
+                    return local.sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
+                }
             },
             async create(data) {
                 if (!signedInUser) return null;
                 const now = Date.now();
-                const result = await addDoc(projectsRef(), { ...data, createdAtMs: now, updatedAtMs: now });
-                return result.id;
+                const localProject = { id: crypto.randomUUID(), ...data, createdAtMs: now, updatedAtMs: now };
+                saveLocalProject(localProject);
+                try {
+                    const result = await addDoc(projectsRef(), { ...data, createdAtMs: now, updatedAtMs: now });
+                    // Keep the cloud document id so later edits sync to it.
+                    const projects = readLocalProjects().filter(project => project.id !== localProject.id);
+                    const cloudProject = { ...localProject, id: result.id };
+                    projects.push(cloudProject); writeLocalProjects(projects);
+                    return result.id;
+                } catch (error) {
+                    console.warn('Cloud project creation unavailable; saved locally.', error);
+                    return localProject.id;
+                }
             },
             async save(id, data) {
                 if (!signedInUser || !id) return;
-                await setDoc(doc(db, 'users', signedInUser.uid, 'projects', id), { ...data, updatedAtMs: Date.now() }, { merge: true });
+                const localProject = { id, ...data, updatedAtMs: Date.now() };
+                saveLocalProject(localProject);
+                try { await setDoc(doc(db, 'users', signedInUser.uid, 'projects', id), localProject, { merge: true }); }
+                catch (error) { console.warn('Cloud project save unavailable; saved locally.', error); }
             },
             async load(id) {
                 if (!signedInUser) return null;
-                const snapshot = await getDoc(doc(db, 'users', signedInUser.uid, 'projects', id));
-                return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+                try {
+                    const snapshot = await getDoc(doc(db, 'users', signedInUser.uid, 'projects', id));
+                    if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() };
+                } catch (error) { console.warn('Cloud project load unavailable; using local project.', error); }
+                return readLocalProjects().find(project => project.id === id) || null;
             },
             async remove(id) {
                 if (!signedInUser || !id) return;
-                await deleteDoc(doc(db, 'users', signedInUser.uid, 'projects', id));
+                writeLocalProjects(readLocalProjects().filter(project => project.id !== id));
+                try { await deleteDoc(doc(db, 'users', signedInUser.uid, 'projects', id)); }
+                catch (error) { console.warn('Cloud project delete unavailable; deleted locally.', error); }
             }
         };
 
