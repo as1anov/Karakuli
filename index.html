@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1542,6 +1543,24 @@
 
         function invalidateGeometryCache() { geometryCache.source = null; }
 
+        // This leaves segment construction and path grouping untouched. It only
+        // seals the anti-aliased seam that can occur where several paths meet.
+        function getBranchJunctions() {
+            const connections = new Map();
+            const addPoint = point => {
+                const key = `${point.x},${point.y}`;
+                connections.set(key, (connections.get(key) || 0) + 1);
+            };
+
+            segments.forEach(({ p1, p2 }) => { addPoint(p1); addPoint(p2); });
+            return [...connections]
+                .filter(([key, count]) => count > 2 && !specialElements[key]?.isNode)
+                .map(([key]) => {
+                    const [x, y] = key.split(',').map(Number);
+                    return { x, y };
+                });
+        }
+
         function drawGeometry(colValue, skipCache = false) {
             let col = isExporting ? 0 : colValue; let ringD = BASE_STEP_VAL * 2; let innerHoleR = (ringD - LINE_WEIGHT) / 2;
             push(); let ctx = drawingContext; ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
@@ -1551,6 +1570,12 @@
             ctx.clip(); stroke(col); strokeWeight(LINE_WEIGHT); strokeCap(SQUARE); strokeJoin(MITER); noFill();
             getPathGroups(skipCache).forEach(group => { beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape(); });
             ctx.restore(); pop();
+
+            // Same colour and diameter as the line. This is a visual seal only;
+            // it does not add, remove, or alter any segment.
+            noStroke(); fill(col);
+            getBranchJunctions().forEach(({ x, y }) => circle(x * STEP, y * STEP, LINE_WEIGHT));
+
             for(let id in specialElements) {
                 let [i, j] = id.split(',').map(Number); let x = i*STEP, y = j*STEP;
                 if(specialElements[id].isNode) { noFill(); stroke(col); strokeWeight(LINE_WEIGHT); ellipse(x, y, ringD, ringD); }
@@ -1748,6 +1773,9 @@
                     let d = `M ${svgX(g[0].p1.x * STEP)} ${svgY(g[0].p1.y * STEP)}`;
                     g.forEach(s => d += ` L ${svgX(s.p2.x * STEP)} ${svgY(s.p2.y * STEP)}`);
                     svgContent += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
+                });
+                getBranchJunctions().forEach(({ x, y }) => {
+                    svgContent += `<circle cx="${svgX(x * STEP)}" cy="${svgY(y * STEP)}" r="${LINE_WEIGHT / 2}" fill="black"/>`;
                 });
 
                 for (let id in specialElements) {
