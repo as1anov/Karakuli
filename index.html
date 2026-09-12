@@ -1,5 +1,7 @@
 
 
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -193,6 +195,11 @@
         .dash-tab.active::after {
             content: ''; position: absolute; bottom: -1px; left: 0; width: 100%;
             height: 2px; background: var(--text-color);
+        }
+        .kbd-menu-focus {
+            outline: none !important;
+            background: var(--active-btn-bg) !important;
+            box-shadow: none;
         }
 
         .dash-content-container {
@@ -710,8 +717,8 @@
         const FRAME_DURATION = 0.08;
         const TL_MAX_FRAMES = 360;
 
-        // Ring radius is 4% larger while the line weight stays visually consistent.
-        const BASE_STEP_VAL = 62.4; let STEP = 30; let LINE_WEIGHT = 58; 
+        // The ring is 4% larger than the previous version; line weight stays visually consistent.
+        const BASE_STEP_VAL = 66.6611712; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
         let curI = 0, curJ = 0; let lastDirection = null; 
         let isDrawingMode = false; let isEraserActive = false;
@@ -734,6 +741,7 @@
         let geometryCache = { source: null, groups: [] };
 
         let isDashboardOpen = false;
+        let menuNavIndex = 0;
 
         let paperWidthMm = 210;
         let paperHeightMm = 297;
@@ -866,7 +874,7 @@
         async function deleteCurrentProject() {
             if (!activeProjectId) return;
             await deleteProject(activeProjectId);
-            performReset();
+            performReset({ preserveUndo: false });
         }
 
         window.addEventListener('karakuli-auth-change', event => {
@@ -912,6 +920,66 @@
             document.getElementById('dash-games').style.display = 'none';
             document.getElementById('tab-' + tab).classList.add('active');
             document.getElementById('dash-' + tab).style.display = 'flex';
+            menuNavIndex = 0;
+            if (isDashboardOpen) updateMenuNavigationFocus();
+        }
+
+        function getMenuNavigationItems() {
+            const activeTab = document.querySelector('.dash-tab.active');
+            const activePanel = activeTab ? document.getElementById(activeTab.id.replace('tab-', 'dash-')) : null;
+            if (!activePanel) return [];
+            return [...activePanel.querySelectorAll('.dash-btn, .theme-opt, .project-open, .project-icon-btn, .project-delete')]
+                .filter(item => !item.classList.contains('disabled') && item.offsetParent !== null);
+        }
+
+        function clearMenuNavigationFocus() {
+            document.querySelectorAll('.kbd-menu-focus').forEach(item => item.classList.remove('kbd-menu-focus'));
+        }
+
+        function updateMenuNavigationFocus() {
+            clearMenuNavigationFocus();
+            const items = getMenuNavigationItems();
+            if (!items.length) return;
+            menuNavIndex = (menuNavIndex + items.length) % items.length;
+            const item = items[menuNavIndex];
+            item.classList.add('kbd-menu-focus');
+            item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+
+        function moveMenuFocus(verticalDirection) {
+            const items = getMenuNavigationItems();
+            if (!items.length) return;
+            menuNavIndex = (menuNavIndex + verticalDirection + items.length) % items.length;
+            updateMenuNavigationFocus();
+        }
+
+        function moveMenuHorizontally(direction) {
+            const items = getMenuNavigationItems();
+            const current = items[menuNavIndex];
+            if (current) {
+                const siblings = [...current.parentElement.children].filter(item => items.includes(item));
+                if (siblings.length > 1) {
+                    const siblingIndex = siblings.indexOf(current);
+                    const next = siblings[(siblingIndex + direction + siblings.length) % siblings.length];
+                    menuNavIndex = items.indexOf(next);
+                    updateMenuNavigationFocus();
+                    return;
+                }
+            }
+            switchDashTab(direction < 0 ? 'home' : 'games');
+        }
+
+        function handleDashboardNavigation(key) {
+            const control = resolveShortcut(key);
+            if (control === 'escape') { toggleDashboard(); return; }
+            if (control === '8') { moveMenuFocus(-1); return; }
+            if (control === '2') { moveMenuFocus(1); return; }
+            if (control === '4') { moveMenuHorizontally(-1); return; }
+            if (control === '6') { moveMenuHorizontally(1); return; }
+            if (control === '5') {
+                const item = getMenuNavigationItems()[menuNavIndex];
+                if (item) item.click();
+            }
         }
 
         function openNewCanvasModal() {
@@ -955,7 +1023,7 @@
                 closeNewCanvasModal();
                 if (!isResizingOnly) {
                     if (shouldCreateProject) { activeProjectId = null; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
-                    performReset();
+                    performReset({ preserveUndo: false });
                 } else {
                     redraw();
                 }
@@ -972,10 +1040,13 @@
                 overlay.classList.add('open');
                 document.body.classList.add('dashboard-open');
                 handleKbdTrigger('close');
+                menuNavIndex = 0;
+                updateMenuNavigationFocus();
             } else {
                 dash.classList.remove('open');
                 overlay.classList.remove('open');
                 document.body.classList.remove('dashboard-open');
+                clearMenuNavigationFocus();
             }
         }
 
@@ -1159,8 +1230,17 @@
             if (action === 'open') kbd.classList.add('open'); else if (action === 'close') kbd.classList.remove('open');
         }
 
-        function vKeyStart(event, key) { if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return; if (event) { event.preventDefault(); event.stopPropagation(); } handleActionDown(key); }
-        function vKeyEnd(event, key) { if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return; if (event) { event.preventDefault(); event.stopPropagation(); } handleActionUp(key); }
+        function vKeyStart(event, key) {
+            if (isTimelapseUIOpen) return;
+            if (event) { event.preventDefault(); event.stopPropagation(); }
+            if (isDashboardOpen) handleDashboardNavigation(key);
+            else if (isGameMode) handleGameControlDown(key); else handleActionDown(key);
+        }
+        function vKeyEnd(event, key) {
+            if (isTimelapseUIOpen || isDashboardOpen) return;
+            if (event) { event.preventDefault(); event.stopPropagation(); }
+            if (isGameMode) handleGameControlUp(key); else handleActionUp(key);
+        }
 
         function setTheme(m) { 
             currentTheme = m; document.body.setAttribute('data-theme', m); 
@@ -1225,7 +1305,7 @@
             updateModeUI(); redraw(); 
         }
 
-        function performReset() { 
+        function performReset({ preserveUndo = true } = {}) {
             if (isGameMode) return;
             if (isTimelapseUIOpen) {
                 isTimelapseUIOpen = false;
@@ -1235,11 +1315,16 @@
                 stopTlPlayback();
                 updateUIState();
             }
+            // Backspace clears the drawing, but leaves one recoverable state for Undo/Back.
+            if (preserveUndo) saveState();
             segments = []; specialElements = {}; curI = 0; curJ = 0; lastDirection = null;
-            history = []; redoStack = []; tlHistory = []; tlCurrentFrame = 0; tlCaptureStride = 1; tlCaptureCounter = 0;
+            if (!preserveUndo) {
+                history = []; redoStack = []; tlHistory = []; tlCurrentFrame = 0;
+                tlCaptureStride = 1; tlCaptureCounter = 0;
+            }
             invalidateGeometryCache();
             offsetX = width / 2; offsetY = height / 2; zoom = 0.48;
-            showActionHint('New Canvas'); updateModeUI(); redraw(); captureState(); 
+            showActionHint(preserveUndo ? 'Canvas cleared — Undo to restore' : 'New Canvas'); updateModeUI(); redraw(); captureState();
         }
 
         function checkCornerClick(worldX, worldY) {
@@ -1404,6 +1489,20 @@
                 gameState = 'playing';
                 ball.vy = -ball.speed; ball.vx = (Math.random() - 0.5) * ball.speed;
             }
+        }
+
+        function handleGameControlDown(key) {
+            const control = resolveShortcut(key);
+            if (control === '4') { keys.left = true; return; }
+            if (control === '6') { keys.right = true; return; }
+            if (control === '5') { handleGameInput('keydown'); return; }
+            if (control === 'backspace') { ignoreBackspaceUntilKeyUp = true; exitGame(); }
+        }
+
+        function handleGameControlUp(key) {
+            const control = resolveShortcut(key);
+            if (control === '4') keys.left = false;
+            if (control === '6') keys.right = false;
         }
 
         class Particle {
@@ -1622,6 +1721,8 @@
 
         function exitGame() {
             isGameMode = false;
+            keys.left = false; keys.right = false;
+            handleKbdTrigger('close');
             document.body.classList.remove('game-active');
             document.getElementById('mode-text').style.display = 'inline';
             document.getElementById('game-hearts').style.display = 'none';
@@ -1881,10 +1982,13 @@
             return segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
         }
 
-        function move(k) {
+        function move(k, isHeld = false) {
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]}; if(!m[k]) return;
             let [di, dj] = m[k];
+            // A held direction is twice as fast in Navigation, while Drawing
+            // still adds one contiguous segment at a time.
+            const distance = isHeld && !isDrawingMode && !isEraserActive ? 2 : 1;
             if (isDrawingMode && !isEraserActive && lastDirection !== null) {
                 const prev = lastDirection; const isReversing = (di === -prev.di && dj === -prev.dj);
                 if (isReversing) {
@@ -1896,7 +2000,7 @@
             }
             let id = `${curI},${curJ}`;
             if (isEraserActive || !isDrawingMode) {
-                if (specialElements[id]?.isDiamond) { curI += di * 3; curJ += dj * 3; } else { curI += di; curJ += dj; }
+                if (specialElements[id]?.isDiamond) { curI += di * 3 * distance; curJ += dj * 3 * distance; } else { curI += di * distance; curJ += dj * distance; }
                 lastDirection = {di, dj};
             } else {
                 saveState();
@@ -1907,31 +2011,61 @@
             redraw(); captureState();
         }
 
+        function panCanvas(k, isHeld = false) {
+            const directions = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]};
+            const direction = directions[k];
+            if (!direction) return;
+            const distance = STEP * (isHeld ? 4 : 2);
+            // Move the view in the selected world direction, without altering the drawing.
+            offsetX -= direction[0] * distance;
+            offsetY -= direction[1] * distance;
+            redraw();
+        }
+
         function updateLastMoveAfterErase() {
             let connected = segments.filter(s => (s.p1.x === curI && s.p1.y === curJ) || (s.p2.x === curI && s.p2.y === curJ));
             if (connected.length >= 1) { let s = connected[connected.length - 1]; let other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1; lastDirection = {di: curI - other.x, dj: curJ - other.y}; }
             else lastDirection = null;
         }
 
-        const KEYBOARD_ALIASES = { w: '8', e: '9', d: '6', c: '3', x: '2', z: '1', a: '4', q: '7', s: '5', r: '0' };
+        const KEYBOARD_ALIASES = { w: '8', e: '9', d: '6', c: '3', x: '2', z: '1', a: '4', q: '7', s: '5', r: '0', browserback: '/', goback: '/', back: '/' };
         function resolveShortcut(key) { return KEYBOARD_ALIASES[String(key).toLowerCase()] || String(key).toLowerCase(); }
         function isTypingInField(target) { return target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName); }
-        let repeatTimer = null, activeKey = null;
+        let repeatTimer = null, activeKey = null, ignoreBackspaceUntilKeyUp = false;
+        let isEnterPressed = false, isEnterUsedForPan = false, isCanvasNavigationModifier = false;
+
         function handleActionDown(k) {
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
-            k = resolveShortcut(k); if (activeKey === k) return; activeKey = k;
-            if(k === ' ' || k === 'space' || k === 'm' || k === 'enter') { toggleMode(); return; }
+            k = resolveShortcut(k);
+            if (k === 'enter') { isEnterPressed = true; isEnterUsedForPan = false; return; }
+            if (activeKey === k) return; activeKey = k;
+            if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; }
             if(k === 'f') { toggleEraser(); return; } if(k === '/') { undo(); return; } if(k === '*') { redo(); return; }
             if(k === '+' || k === '=') { applyZoom(1.1, width / 2, height / 2); redraw(); return; }
             if(k === '-') { applyZoom(1 / 1.1, width / 2, height / 2); redraw(); return; }
             if(k === 'backspace') { performReset(); return; }
             if(k === '5') { toggleSpecial('isNode'); return; } if(k === '0') { toggleSpecial('isDiamond'); return; }
             if(['1','2','3','4','6','7','8','9'].includes(k)) { 
-                move(k); if(repeatTimer) stopRepeat();
-                repeatTimer = setTimeout(() => { repeatTimer = setInterval(() => move(k), REPEAT_INTERVAL); }, INITIAL_DELAY);
+                isCanvasNavigationModifier = isEnterPressed;
+                if (isCanvasNavigationModifier) isEnterUsedForPan = true;
+                if (isCanvasNavigationModifier) panCanvas(k); else move(k);
+                if(repeatTimer) stopRepeat();
+                repeatTimer = setTimeout(() => {
+                    repeatTimer = setInterval(() => {
+                        if (isCanvasNavigationModifier) panCanvas(k, true); else move(k, true);
+                    }, REPEAT_INTERVAL);
+                }, INITIAL_DELAY);
             }
         }
-        function handleActionUp(k) { const key = resolveShortcut(k); if (activeKey === key) { stopRepeat(); activeKey = null; } }
+        function handleActionUp(k) {
+            const key = resolveShortcut(k);
+            if (key === 'enter') {
+                isEnterPressed = false; isCanvasNavigationModifier = false;
+                if (!isEnterUsedForPan) toggleMode();
+                return;
+            }
+            if (activeKey === key) { stopRepeat(); activeKey = null; }
+        }
         function stopRepeat() { if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } }
 
         function toggleSpecial(t) {
@@ -2054,22 +2188,39 @@
         function windowResized() { resizeCanvas(windowWidth, windowHeight); redraw(); }
         window.addEventListener('keydown', e => {
             if (isTypingInField(e.target)) return;
+            if (isTimelapseUIOpen && e.key === 'Escape') {
+                e.preventDefault(); toggleTimelapseUI(); return;
+            }
+            const canvasModal = document.getElementById('new-canvas-modal');
+            if (canvasModal.classList.contains('show')) {
+                if (e.key === 'Escape') { e.preventDefault(); closeNewCanvasModal(); return; }
+                if (resolveShortcut(e.key) === '5') { e.preventDefault(); applyNewCanvasSize(); return; }
+            }
             if(isGameMode) {
-                if(e.key === 'ArrowLeft') { keys.left = true; handleGameInput('keydown'); }
-                if(e.key === 'ArrowRight') { keys.right = true; handleGameInput('keydown'); }
-            } else {
-                if (e.repeat) return;
+                const gameControl = e.key === 'ArrowLeft' ? '4' : e.key === 'ArrowRight' ? '6' : e.key;
+                const resolved = resolveShortcut(gameControl);
+                if (['4', '5', '6', 'backspace'].includes(resolved)) e.preventDefault();
+                handleGameControlDown(gameControl);
+            } else if (isDashboardOpen) {
                 const shortcut = resolveShortcut(e.key);
-                if (['1','2','3','4','5','6','7','8','9','0','/','*','+','=','-','enter'].includes(shortcut)) e.preventDefault();
+                if (['2', '4', '5', '6', '8', 'escape'].includes(shortcut)) e.preventDefault();
+                if (!e.repeat) handleDashboardNavigation(e.key);
+            } else {
+                if (e.key === 'Backspace' && ignoreBackspaceUntilKeyUp) { e.preventDefault(); return; }
+                if (e.repeat) return;
+                if (e.key === '.' || e.key === ',') { e.preventDefault(); toggleDashboard(); return; }
+                const shortcut = resolveShortcut(e.key);
+                if ([' ','1','2','3','4','5','6','7','8','9','0','/','*','+','=','-','enter','backspace'].includes(shortcut)) e.preventDefault();
                 handleActionDown(e.key);
             }
         });
         window.addEventListener('keyup', e => {
             if (isTypingInField(e.target)) return;
             if(isGameMode) {
-                if(e.key === 'ArrowLeft') keys.left = false;
-                if(e.key === 'ArrowRight') keys.right = false;
+                const gameControl = e.key === 'ArrowLeft' ? '4' : e.key === 'ArrowRight' ? '6' : e.key;
+                handleGameControlUp(gameControl);
             } else {
+                if (e.key === 'Backspace') ignoreBackspaceUntilKeyUp = false;
                 handleActionUp(e.key); 
             }
         });
