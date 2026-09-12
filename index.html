@@ -292,6 +292,7 @@
             cursor: pointer; color: var(--text-color); background: var(--panel-bg); transition: all 0.2s ease;
             border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
         }
+        .tl-action-btn.kbd-tl-focus, #tl-progress-container.kbd-tl-focus .tl-progress-track { background: var(--active-btn-bg); }
         .tl-action-btn:hover { background: var(--active-btn-bg); border-color: var(--border-color); }
         .tl-action-btn:active { background: var(--active-btn-bg); border-color: var(--border-color); transform: scale(0.92); }
         .tl-action-btn.speed-btn { font-family: var(--main-font); font-size: 12.65px; font-weight: 800; }
@@ -518,7 +519,7 @@
 
         <div id="timelapse-toolbar">
             <div class="tl-row-top">
-                <div class="tl-progress-container" onclick="handleTimelineSeek(event)">
+                <div class="tl-progress-container" id="tl-progress-container" onclick="handleTimelineSeek(event)">
                     <div class="tl-progress-track">
                         <div class="tl-progress-fill" id="tl-fill"></div>
                     </div>
@@ -538,10 +539,10 @@
                 </div>
                 <div class="tl-right-group">
                     <div class="tl-action-btn speed-btn" id="tl-cycle-speed" onclick="cycleTlSpeed()" title="Playback Speed">1x</div>
-                    <div class="tl-action-btn" onclick="exportTimelapseVideo()" title="Export Video">
+                    <div class="tl-action-btn" id="tl-export-btn" onclick="exportTimelapseVideo()" title="Export Video">
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                     </div>
-                    <div class="tl-action-btn" onclick="toggleTimelapseUI()" title="Close" style="color: var(--disabled-color);">
+                    <div class="tl-action-btn" id="tl-close-btn" onclick="toggleTimelapseUI()" title="Close" style="color: var(--disabled-color);">
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 6 6 18M6 6l12 12"/></svg>
                     </div>
                 </div>
@@ -738,6 +739,8 @@
         let tlPlaybackStartFrame = 0;
         let tlCaptureStride = 1;
         let tlCaptureCounter = 0;
+        let tlNavArea = 'controls';
+        let tlNavIndex = 0;
         let geometryCache = { source: null, groups: [] };
 
         let isDashboardOpen = false;
@@ -954,24 +957,17 @@
         }
 
         function moveMenuHorizontally(direction) {
-            const items = getMenuNavigationItems();
-            const current = items[menuNavIndex];
-            if (current) {
-                const siblings = [...current.parentElement.children].filter(item => items.includes(item));
-                if (siblings.length > 1) {
-                    const siblingIndex = siblings.indexOf(current);
-                    const next = siblings[(siblingIndex + direction + siblings.length) % siblings.length];
-                    menuNavIndex = items.indexOf(next);
-                    updateMenuNavigationFocus();
-                    return;
-                }
-            }
+            // Left/right are reserved for the Home/Games tabs. Up/down always
+            // walks through every action, including controls on the same row.
             switchDashTab(direction < 0 ? 'home' : 'games');
         }
 
         function handleDashboardNavigation(key) {
             const control = resolveShortcut(key);
-            if (control === 'escape') { toggleDashboard(); return; }
+            if (control === 'escape' || control === 'backspace') {
+                if (control === 'backspace') ignoreBackspaceUntilKeyUp = true;
+                toggleDashboard(); return;
+            }
             if (control === '8') { moveMenuFocus(-1); return; }
             if (control === '2') { moveMenuFocus(1); return; }
             if (control === '4') { moveMenuHorizontally(-1); return; }
@@ -1081,6 +1077,8 @@
                 }
                 updateTlProgress();
                 stopTlPlayback();
+                tlNavArea = 'controls'; tlNavIndex = 0;
+                updateTimelapseNavigationFocus();
             } else {
                 toolbar.classList.remove('visible');
                 document.body.classList.remove('timelapse-active');
@@ -1092,6 +1090,7 @@
                     specialElements = JSON.parse(JSON.stringify(last.specialElements));
                     invalidateGeometryCache();
                 }
+                clearTimelapseNavigationFocus();
             }
             updateUIState(); redraw();
         }
@@ -1134,6 +1133,56 @@
             tlCurrentFrame = Math.floor(percentage * (tlHistory.length - 1));
             tlCurrentFrame = Math.max(0, Math.min(tlCurrentFrame, tlHistory.length - 1));
             applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
+        }
+
+        function stepTimelapse(delta) {
+            if (tlHistory.length === 0) return;
+            stopTlPlayback();
+            tlCurrentFrame = Math.max(0, Math.min(tlHistory.length - 1, tlCurrentFrame + delta));
+            applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
+        }
+
+        function getTimelapseControls() {
+            return [
+                document.getElementById('tl-play-btn'),
+                document.getElementById('tl-cycle-speed'),
+                document.getElementById('tl-export-btn'),
+                document.getElementById('tl-close-btn')
+            ];
+        }
+
+        function clearTimelapseNavigationFocus() {
+            document.querySelectorAll('.kbd-tl-focus').forEach(item => item.classList.remove('kbd-tl-focus'));
+        }
+
+        function updateTimelapseNavigationFocus() {
+            clearTimelapseNavigationFocus();
+            if (!isTimelapseUIOpen) return;
+            if (tlNavArea === 'timeline') {
+                document.getElementById('tl-progress-container').classList.add('kbd-tl-focus');
+                return;
+            }
+            const controls = getTimelapseControls();
+            tlNavIndex = (tlNavIndex + controls.length) % controls.length;
+            controls[tlNavIndex].classList.add('kbd-tl-focus');
+        }
+
+        function handleTimelapseKeyboard(key) {
+            const control = resolveShortcut(key);
+            if (control === 'escape' || control === 'backspace') {
+                if (control === 'backspace') ignoreBackspaceUntilKeyUp = true;
+                toggleTimelapseUI(); return;
+            }
+            if (tlNavArea === 'timeline') {
+                if (control === '4') { stepTimelapse(-1); return; }
+                if (control === '6') { stepTimelapse(1); return; }
+                if (control === '2') { tlNavArea = 'controls'; updateTimelapseNavigationFocus(); }
+                return;
+            }
+            if (control === '8') { tlNavArea = 'timeline'; updateTimelapseNavigationFocus(); return; }
+            if (control === '4') { tlNavIndex--; updateTimelapseNavigationFocus(); return; }
+            if (control === '6') { tlNavIndex++; updateTimelapseNavigationFocus(); return; }
+            if (control === '5' || control === 'enter') getTimelapseControls()[tlNavIndex].click();
         }
 
         function applyFrame(idx) {
@@ -2188,8 +2237,11 @@
         function windowResized() { resizeCanvas(windowWidth, windowHeight); redraw(); }
         window.addEventListener('keydown', e => {
             if (isTypingInField(e.target)) return;
-            if (isTimelapseUIOpen && e.key === 'Escape') {
-                e.preventDefault(); toggleTimelapseUI(); return;
+            if (isTimelapseUIOpen) {
+                const timelapseControl = resolveShortcut(e.key);
+                if (['2', '4', '5', '6', '8', 'enter', 'escape', 'backspace'].includes(timelapseControl)) e.preventDefault();
+                if (!e.repeat || ['4', '6'].includes(timelapseControl)) handleTimelapseKeyboard(e.key);
+                return;
             }
             const canvasModal = document.getElementById('new-canvas-modal');
             if (canvasModal.classList.contains('show')) {
@@ -2202,13 +2254,14 @@
                 if (['4', '5', '6', 'backspace'].includes(resolved)) e.preventDefault();
                 handleGameControlDown(gameControl);
             } else if (isDashboardOpen) {
+                if (e.key === '.') { e.preventDefault(); toggleDashboard(); return; }
                 const shortcut = resolveShortcut(e.key);
-                if (['2', '4', '5', '6', '8', 'escape'].includes(shortcut)) e.preventDefault();
+                if (['2', '4', '5', '6', '8', 'escape', 'backspace'].includes(shortcut)) e.preventDefault();
                 if (!e.repeat) handleDashboardNavigation(e.key);
             } else {
                 if (e.key === 'Backspace' && ignoreBackspaceUntilKeyUp) { e.preventDefault(); return; }
                 if (e.repeat) return;
-                if (e.key === '.' || e.key === ',') { e.preventDefault(); toggleDashboard(); return; }
+                if (e.key === '.') { e.preventDefault(); toggleDashboard(); return; }
                 const shortcut = resolveShortcut(e.key);
                 if ([' ','1','2','3','4','5','6','7','8','9','0','/','*','+','=','-','enter','backspace'].includes(shortcut)) e.preventDefault();
                 handleActionDown(e.key);
