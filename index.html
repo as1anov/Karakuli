@@ -371,7 +371,7 @@
         .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
         .modal-btn {
             flex: 1; padding: 12px; border-radius: 10px; border: none; cursor: pointer;
-            font-weight: 400; font-size: 14px; transition: opacity 0.2s;
+            font-family: var(--main-font); font-weight: 400; font-size: 14px; transition: opacity 0.2s;
         }
         .modal-btn.primary { background: var(--text-color); color: var(--bg-color); }
         .modal-btn.secondary { background: var(--panel-bg); color: var(--text-color); border: 1px solid var(--border-color); }
@@ -476,11 +476,11 @@
             <h2>Canvas Size</h2>
             <div class="input-group">
                 <label>Width (mm)</label>
-                <input type="number" id="canvas-w-input" value="210">
+                <input type="number" id="canvas-w-input" value="210" onkeydown="handleCanvasSizeKey(event)">
             </div>
             <div class="input-group">
                 <label>Height (mm)</label>
-                <input type="number" id="canvas-h-input" value="297">
+                <input type="number" id="canvas-h-input" value="297" onkeydown="handleCanvasSizeKey(event)">
             </div>
             <div class="modal-actions">
                 <button class="modal-btn secondary" onclick="closeNewCanvasModal()">Cancel</button>
@@ -539,7 +539,7 @@
                 </div>
                 <div class="tl-right-group">
                     <div class="tl-action-btn speed-btn" id="tl-cycle-speed" onclick="cycleTlSpeed()" title="Playback Speed">1x</div>
-                    <div class="tl-action-btn" id="tl-export-btn" onclick="exportTimelapseVideo()" title="Export Video">
+                    <div class="tl-action-btn" id="tl-export-btn" onclick="exportTimelapseVideo()" title="Export MP4">
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                     </div>
                     <div class="tl-action-btn" id="tl-close-btn" onclick="toggleTimelapseUI()" title="Close" style="color: var(--disabled-color);">
@@ -715,7 +715,9 @@
 
         const INITIAL_DELAY = 520;  
         const REPEAT_INTERVAL = 180; 
+        // 1× is three times faster while retaining enough render samples for a fluid stroke.
         const FRAME_DURATION = 0.08;
+        const TL_PLAYBACK_FPS = 60;
         const TL_MAX_FRAMES = 360;
 
         // The ring is 4% larger than the previous version; line weight stays visually consistent.
@@ -725,7 +727,7 @@
         let isDrawingMode = false; let isEraserActive = false;
         const DEFAULT_ERASER_RADIUS = 40; let eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
         let offsetX = 0, offsetY = 0; let zoom = 0.48; 
-        let history = [], redoStack = []; let isExporting = false;
+        let history = [], redoStack = []; let isExporting = false; let isTimelapseExport = false;
         let actionTimeout = null; let currentTheme = 'light';
         let isPanning = false;
 
@@ -741,6 +743,11 @@
         let tlCaptureCounter = 0;
         let tlNavArea = 'controls';
         let tlNavIndex = 0;
+        let tlTheme = 'light';
+        let tlTransition = null;
+        let tlAnimatedTip = null;
+        let tlSuppressedSegmentKey = null;
+        let tlPlaybackBatches = [];
         let geometryCache = { source: null, groups: [] };
 
         let isDashboardOpen = false;
@@ -1026,6 +1033,12 @@
             }
         }
 
+        function handleCanvasSizeKey(event) {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            applyNewCanvasSize();
+        }
+
         function toggleDashboard() {
             if(isGameMode) return;
             isDashboardOpen = !isDashboardOpen;
@@ -1047,7 +1060,8 @@
         }
 
         function updateUIState() {
-            const disabledIds = ['menu-btn', 'eraser-btn', 'mode-header'];
+            // Keep the menu available in Time-lapse so its theme controls remain usable.
+            const disabledIds = ['eraser-btn', 'mode-header'];
             const kbdKeys = document.querySelectorAll('.v-key');
             if (isTimelapseUIOpen) {
                 disabledIds.forEach(id => document.getElementById(id).classList.add('disabled'));
@@ -1060,7 +1074,7 @@
 
         function toggleTimelapseUI() {
             if(isGameMode) return;
-            if (!isTimelapseUIOpen) captureState(true);
+            if (!isTimelapseUIOpen) { captureState(true); tlTheme = currentTheme; }
             isTimelapseUIOpen = !isTimelapseUIOpen;
             const toolbar = document.getElementById('timelapse-toolbar');
             if (isTimelapseUIOpen) {
@@ -1077,12 +1091,14 @@
                 }
                 updateTlProgress();
                 stopTlPlayback();
+                tlTransition = null;
                 tlNavArea = 'controls'; tlNavIndex = 0;
                 updateTimelapseNavigationFocus();
             } else {
                 toolbar.classList.remove('visible');
                 document.body.classList.remove('timelapse-active');
                 stopTlPlayback();
+                tlTransition = null;
                 updateModeUI();
                 if (tlHistory.length > 0) {
                     const last = tlHistory[tlHistory.length - 1];
@@ -1185,6 +1201,13 @@
             if (control === '5' || control === 'enter') getTimelapseControls()[tlNavIndex].click();
         }
 
+        function handleTimelapseScreenTap(x, y) {
+            const toolbarRect = document.getElementById('timelapse-toolbar').getBoundingClientRect();
+            if (x >= toolbarRect.left && x <= toolbarRect.right && y >= toolbarRect.top && y <= toolbarRect.bottom) return false;
+            stepTimelapse(x < width / 2 ? -1 : 1);
+            return true;
+        }
+
         function applyFrame(idx) {
             const frame = tlHistory[idx];
             if (!frame) return;
@@ -1194,30 +1217,102 @@
             invalidateGeometryCache();
         }
 
+        function pointsMatch(a, b) {
+            return a && b && a.x === b.x && a.y === b.y;
+        }
+
+        function getAddedSegments(fromFrame, toFrame) {
+            const before = new Set(fromFrame.segments.map(segmentKey));
+            return toFrame.segments.filter(segment => !before.has(segmentKey(segment)));
+        }
+
+        function frameOnlyAddsConnectedLines(fromFrame, toFrame, previousEnd) {
+            if (JSON.stringify(fromFrame.specialElements) !== JSON.stringify(toFrame.specialElements)) return null;
+            const before = new Set(fromFrame.segments.map(segmentKey));
+            if (fromFrame.segments.some(segment => !new Set(toFrame.segments.map(segmentKey)).has(segmentKey(segment)))) return null;
+            const added = getAddedSegments(fromFrame, toFrame);
+            if (!added.length) return null;
+            const ordered = orderTimelapseSegments(added, fromFrame.cursor);
+            if (previousEnd && !pointsMatch(ordered[0]?.p1, previousEnd)) return null;
+            return ordered;
+        }
+
+        function buildTimelapseBatches() {
+            const batches = [];
+            for (let start = 0; start < tlHistory.length - 1;) {
+                let end = start;
+                let endPoint = null;
+                let first = true;
+                while (end < tlHistory.length - 1) {
+                    const ordered = frameOnlyAddsConnectedLines(tlHistory[end], tlHistory[end + 1], endPoint);
+                    if (!ordered) break;
+                    if (first) { first = false; } else if (!pointsMatch(ordered[0]?.p1, endPoint)) break;
+                    endPoint = ordered[ordered.length - 1].p2;
+                    end++;
+                }
+                if (end > start) batches.push({ start, end });
+                start = end > start ? end : start + 1;
+            }
+            return batches;
+        }
+
+        function getTimelapseBatchAt(position) {
+            return tlPlaybackBatches.find(batch => position >= batch.start && position < batch.end) || null;
+        }
+
+        // A batch represents one uninterrupted drawn stroke.  While it grows we
+        // keep the canvas at the beginning of that stroke and draw all of its
+        // additions as a single polyline; replacing the snapshot on every grid
+        // segment was the source of the visible "stepping" at turns.
+        function renderTimelapsePosition(position, appliedFrame) {
+            const lastFrame = tlHistory.length - 1;
+            const safePosition = Math.max(0, Math.min(lastFrame, position));
+            const displayFrame = Math.floor(safePosition);
+            const batch = getTimelapseBatchAt(safePosition);
+            const sourceFrame = batch ? batch.start : displayFrame;
+
+            if (appliedFrame.index !== sourceFrame) {
+                applyFrame(sourceFrame);
+                appliedFrame.index = sourceFrame;
+            }
+
+            tlCurrentFrame = displayFrame;
+            tlTransition = batch
+                ? {
+                    from: batch.start,
+                    to: batch.end,
+                    progress: (safePosition - batch.start) / (batch.end - batch.start)
+                }
+                : null;
+        }
+
         function togglePlayTimelapse() { if (isPlayingTl) stopTlPlayback(); else startTlPlayback(); }
 
         function startTlPlayback() {
-            if (tlHistory.length === 0) return;
+            if (tlHistory.length < 2) return;
             isPlayingTl = true;
             document.getElementById('tl-play-icon').style.display = 'none';
             document.getElementById('tl-pause-icon').style.display = 'block';
             if (tlCurrentFrame >= tlHistory.length - 1) tlCurrentFrame = 0;
             tlPlaybackStart = performance.now();
             tlPlaybackStartFrame = tlCurrentFrame;
+            tlPlaybackBatches = buildTimelapseBatches();
+            const appliedFrame = { index: -1 };
             const tick = (now) => {
                 if (!isPlayingTl) return;
                 const elapsed = now - tlPlaybackStart;
-                const nextFrame = Math.min(
+                const framePosition = Math.min(
                     tlHistory.length - 1,
-                    tlPlaybackStartFrame + Math.floor(elapsed / ((FRAME_DURATION * 1000) / tlSpeed))
+                    tlPlaybackStartFrame + elapsed / ((FRAME_DURATION * 1000) / tlSpeed)
                 );
-                if (nextFrame !== tlCurrentFrame) {
-                    tlCurrentFrame = nextFrame;
-                    applyFrame(tlCurrentFrame);
-                    updateTlProgress();
-                    redraw();
+                renderTimelapsePosition(framePosition, appliedFrame);
+                updateTlProgress(); redraw();
+                if (framePosition >= tlHistory.length - 1) {
+                    applyFrame(tlHistory.length - 1);
+                    tlTransition = null;
+                    updateTlProgress(); redraw();
+                    stopTlPlayback();
                 }
-                if (tlCurrentFrame >= tlHistory.length - 1) stopTlPlayback();
                 else tlAnimationFrame = requestAnimationFrame(tick);
             };
             tlAnimationFrame = requestAnimationFrame(tick);
@@ -1229,48 +1324,74 @@
             document.getElementById('tl-pause-icon').style.display = 'none';
             if (tlAnimationFrame) cancelAnimationFrame(tlAnimationFrame);
             tlAnimationFrame = null;
+            tlTransition = null;
+            tlAnimatedTip = null;
+        }
+
+        function getMp4MimeType() {
+            if (!window.MediaRecorder) return null;
+            return ['video/mp4;codecs=avc1.42E01E', 'video/mp4']
+                .find(type => MediaRecorder.isTypeSupported(type)) || null;
         }
 
         async function exportTimelapseVideo() {
-            if (tlHistory.length === 0) return;
-            showActionHint("Exporting video...", true);
-            stopTlPlayback(); 
-            tlCurrentFrame = 0;
-            applyFrame(0); 
-            updateTlProgress();
-            
-            draw(); 
-            await new Promise(r => requestAnimationFrame(r));
-            
-            const canvasElem = document.getElementById('defaultCanvas0');
-            const stream = canvasElem.captureStream(60); 
-            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-            const chunks = [];
-            recorder.ondataavailable = e => chunks.push(e.data);
-            recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/webm' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob); 
-                a.download = `timelapse-${Date.now()}.webm`; 
-                a.click();
-                if (isTimelapseUIOpen) showActionHint("Timelapse", true); else showActionHint("Done");
-            };
-            recorder.start();
-            
-            for (let i = 0; i < tlHistory.length; i++) {
-                tlCurrentFrame = i; 
-                applyFrame(i); 
-                updateTlProgress(); 
-                
-                draw();
-                await new Promise(r => requestAnimationFrame(r));
-                
-                if (20 / tlSpeed > 16) {
-                    await new Promise(r => setTimeout(r, (20 / tlSpeed) - 16));
-                }
+            if (tlHistory.length < 2) return;
+            const mp4MimeType = getMp4MimeType();
+            if (!mp4MimeType) {
+                showActionHint('MP4 export is not supported by this browser', true);
+                return;
             }
-            await new Promise(r => setTimeout(r, 500));
+
+            showActionHint('Exporting MP4…', true);
+            stopTlPlayback();
+            tlCurrentFrame = 0;
+            tlTransition = null;
+            isTimelapseExport = true;
+            applyFrame(0);
+            updateTlProgress();
+            draw();
+            await new Promise(resolve => requestAnimationFrame(resolve));
+
+            const canvasElem = document.getElementById('defaultCanvas0');
+            const stream = canvasElem.captureStream(TL_PLAYBACK_FPS);
+            const recorder = new MediaRecorder(stream, { mimeType: mp4MimeType, videoBitsPerSecond: 8_000_000 });
+            const chunks = [];
+            recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+            const finished = new Promise(resolve => {
+                recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: mp4MimeType });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `timelapse-${Date.now()}.mp4`;
+                    link.click();
+                    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+                    resolve();
+                };
+            });
+            recorder.start();
+
+            const frameDelay = 1000 / TL_PLAYBACK_FPS;
+            tlPlaybackBatches = buildTimelapseBatches();
+            const appliedFrame = { index: -1 };
+            const lastFrame = tlHistory.length - 1;
+            const frameCount = Math.max(1, Math.ceil((lastFrame * FRAME_DURATION * 1000) / (tlSpeed * frameDelay)));
+            for (let outputFrame = 0; outputFrame < frameCount; outputFrame++) {
+                const framePosition = Math.min(lastFrame, outputFrame * tlSpeed * frameDelay / (FRAME_DURATION * 1000));
+                renderTimelapsePosition(framePosition, appliedFrame);
+                updateTlProgress();
+                draw();
+                await new Promise(resolve => setTimeout(resolve, frameDelay));
+            }
+            tlCurrentFrame = tlHistory.length - 1;
+            tlTransition = null;
+            applyFrame(tlCurrentFrame);
+            updateTlProgress(); draw();
+            await new Promise(resolve => setTimeout(resolve, frameDelay));
             recorder.stop();
+            await finished;
+            isTimelapseExport = false;
+            redraw();
+            if (isTimelapseUIOpen) showActionHint('Timelapse', true); else showActionHint('Done');
         }
 
         function handleKbdTrigger(action) {
@@ -1283,18 +1404,22 @@
             if (isTimelapseUIOpen) return;
             if (event) { event.preventDefault(); event.stopPropagation(); }
             if (isDashboardOpen) handleDashboardNavigation(key);
-            else if (isGameMode) handleGameControlDown(key); else handleActionDown(key);
+            else if (isGameMode) handleGameControlDown(key);
+            else if (String(key).toLowerCase() === 'enter') toggleMode();
+            else handleActionDown(key);
         }
         function vKeyEnd(event, key) {
             if (isTimelapseUIOpen || isDashboardOpen) return;
             if (event) { event.preventDefault(); event.stopPropagation(); }
-            if (isGameMode) handleGameControlUp(key); else handleActionUp(key);
+            if (isGameMode) handleGameControlUp(key);
+            else if (String(key).toLowerCase() !== 'enter') handleActionUp(key);
         }
 
         function setTheme(m) { 
             currentTheme = m; document.body.setAttribute('data-theme', m); 
             document.querySelectorAll('.theme-opt').forEach(opt => opt.classList.remove('active'));
             document.getElementById('opt-' + m).classList.add('active');
+            if (isTimelapseUIOpen) tlTheme = m;
             showActionHint(m.charAt(0).toUpperCase() + m.slice(1)); redraw(); 
         }
         
@@ -1793,6 +1918,7 @@
             
             canvasElem.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
+                if (isTimelapseUIOpen && (e.pointerType === 'touch' || e.pointerType === 'pen') && handleTimelapseScreenTap(e.clientX, e.clientY)) return;
                 activePointers.set(e.pointerId, e);
                 
                 if (activePointers.size === 1) {
@@ -1888,8 +2014,9 @@
         function draw() {
             if (isGameMode) { drawBreakMaze(); return; } // Branch directly to game engine
 
-            let colors = themeConfig[currentTheme];
-            if (isTimelapseUIOpen) background(255);
+            const renderTheme = (isTimelapseUIOpen || isTimelapseExport) ? tlTheme : currentTheme;
+            let colors = themeConfig[renderTheme];
+            if (isTimelapseUIOpen || isTimelapseExport) background(colors.canvasBg);
             else if (isExporting) clear();
             else background(colors.canvasBg);
 
@@ -1908,12 +2035,11 @@
                 beginShape(); vertex(halfW - cLen, halfH); vertex(halfW, halfH); vertex(halfW, halfH - cLen); endShape(); 
             }
 
-            if (!isExporting) {
-                if (isTimelapseUIOpen) drawGrid('0,0,0', 0.15);
-                else drawGrid(colors.dotColor, colors.dotAlpha);
+            if (!isExporting || isTimelapseExport) {
+                drawGrid(colors.dotColor, colors.dotAlpha);
             }
             drawGeometry(colors.geomColor);
-            if (!isExporting) drawCursor();
+            if (!isExporting || isTimelapseExport) drawCursor();
             pop();
         }
 
@@ -1929,58 +2055,134 @@
 
         function invalidateGeometryCache() { geometryCache.source = null; }
 
-        // This leaves segment construction and path grouping untouched. It only
-        // seals the anti-aliased seam that can occur where several paths meet.
-        function getBranchJunctions() {
-            const connections = new Map();
-            const addPoint = point => {
-                const key = `${point.x},${point.y}`;
-                connections.set(key, (connections.get(key) || 0) + 1);
-            };
-
-            segments.forEach(({ p1, p2 }) => { addPoint(p1); addPoint(p2); });
-            return [...connections]
-                .filter(([key, count]) => count > 2 && !specialElements[key]?.isNode)
-                .map(([key]) => {
-                    const [x, y] = key.split(',').map(Number);
-                    return { x, y };
-                });
+        function getVisualLineWeight(theme = ((isTimelapseUIOpen || isTimelapseExport) ? tlTheme : currentTheme)) {
+            return (theme === 'dark' || theme === 'system') ? LINE_WEIGHT - 2 : LINE_WEIGHT;
         }
 
         function drawGeometry(colValue, skipCache = false) {
-            let col = isExporting ? 0 : colValue; let ringD = BASE_STEP_VAL * 2; let innerHoleR = (ringD - LINE_WEIGHT) / 2;
+            const visualLineWeight = getVisualLineWeight();
+            let col = isExporting && !isTimelapseExport ? 0 : colValue; let ringD = BASE_STEP_VAL * 2; let innerHoleR = (ringD - visualLineWeight) / 2;
+            if (isTimelapseUIOpen && (isPlayingTl || isTimelapseExport)) tlAnimatedTip = null;
+            const growthPath = getTimelapseGrowthPath();
+            tlSuppressedSegmentKey = growthPath?.predecessorKey || null;
             push(); let ctx = drawingContext; ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
             for (let id in specialElements) if (specialElements[id].isNode) {
                 let [i, j] = id.split(',').map(Number); ctx.moveTo(i * STEP + innerHoleR, j * STEP); ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
             }
-            ctx.clip(); stroke(col); strokeWeight(LINE_WEIGHT); strokeCap(SQUARE); strokeJoin(MITER); noFill();
-            getPathGroups(skipCache).forEach(group => { beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape(); });
+            ctx.clip(); stroke(col); strokeWeight(visualLineWeight); strokeCap(SQUARE); strokeJoin(MITER); noFill();
+            const drawableSegments = tlSuppressedSegmentKey
+                ? segments.filter(segment => segmentKey(segment) !== tlSuppressedSegmentKey)
+                : segments;
+            getPathGroups(skipCache || Boolean(tlSuppressedSegmentKey), drawableSegments).forEach(group => { beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape(); });
             ctx.restore(); pop();
-
-            // Same colour and diameter as the line. This is a visual seal only;
-            // it does not add, remove, or alter any segment.
-            noStroke(); fill(col);
-            getBranchJunctions().forEach(({ x, y }) => circle(x * STEP, y * STEP, LINE_WEIGHT));
 
             for(let id in specialElements) {
                 let [i, j] = id.split(',').map(Number); let x = i*STEP, y = j*STEP;
-                if(specialElements[id].isNode) { noFill(); stroke(col); strokeWeight(LINE_WEIGHT); ellipse(x, y, ringD, ringD); }
-                if(specialElements[id].isDiamond) { fill(col); noStroke(); push(); translate(x, y + LINE_WEIGHT/2); rotate(QUARTER_PI); rectMode(CENTER); rect(0, 0, LINE_WEIGHT, LINE_WEIGHT); pop(); }
+                if(specialElements[id].isNode) { noFill(); stroke(col); strokeWeight(visualLineWeight); ellipse(x, y, ringD, ringD); }
+                if(specialElements[id].isDiamond) { fill(col); noStroke(); push(); translate(x, y + visualLineWeight/2); rotate(QUARTER_PI); rectMode(CENTER); rect(0, 0, visualLineWeight, visualLineWeight); pop(); }
             }
+            drawTimelapseGrowth(col, visualLineWeight, innerHoleR, growthPath);
+            tlSuppressedSegmentKey = null;
         }
 
-        function getPathGroups(skipCache = false) {
-            if (!skipCache && geometryCache.source === segments) return geometryCache.groups;
+        function segmentKey(segment) {
+            return `${segment.p1.x},${segment.p1.y}:${segment.p2.x},${segment.p2.y}`;
+        }
+
+        function orderTimelapseSegments(segments, cursor) {
+            const pending = segments.map(segment => ({ ...segment }));
+            const ordered = [];
+            let point = { x: cursor.i, y: cursor.j };
+            while (pending.length) {
+                const nextIndex = pending.findIndex(segment =>
+                    (segment.p1.x === point.x && segment.p1.y === point.y) ||
+                    (segment.p2.x === point.x && segment.p2.y === point.y)
+                );
+                const segment = pending.splice(nextIndex >= 0 ? nextIndex : 0, 1)[0];
+                const startsAtCursor = segment.p1.x === point.x && segment.p1.y === point.y;
+                const endsAtCursor = segment.p2.x === point.x && segment.p2.y === point.y;
+                const p1 = endsAtCursor && !startsAtCursor ? segment.p2 : segment.p1;
+                const p2 = endsAtCursor && !startsAtCursor ? segment.p1 : segment.p2;
+                ordered.push({ p1, p2 });
+                point = p2;
+            }
+            return ordered;
+        }
+
+        function getTimelapseGrowthPath() {
+            if (!tlTransition || !tlHistory[tlTransition.from] || !tlHistory[tlTransition.to]) return;
+            const fromFrame = tlHistory[tlTransition.from];
+            const toFrame = tlHistory[tlTransition.to];
+            const fromSegments = new Set(fromFrame.segments.map(segmentKey));
+            const addedSegments = toFrame.segments.filter(segment => !fromSegments.has(segmentKey(segment)));
+            if (!addedSegments.length) return;
+            const orderedSegments = orderTimelapseSegments(addedSegments, fromFrame.cursor);
+            const start = orderedSegments[0]?.p1;
+            const predecessor = [...fromFrame.segments].reverse().find(segment =>
+                (segment.p1.x === start.x && segment.p1.y === start.y) ||
+                (segment.p2.x === start.x && segment.p2.y === start.y)
+            );
+            if (!predecessor) return { fromFrame, toFrame, segments: orderedSegments, predecessorKey: null };
+            const predecessorStartsAtJoint = predecessor.p2.x === start.x && predecessor.p2.y === start.y;
+            const orientedPredecessor = predecessorStartsAtJoint
+                ? predecessor
+                : { p1: predecessor.p2, p2: predecessor.p1 };
+            return {
+                fromFrame, toFrame,
+                segments: [orientedPredecessor, ...orderedSegments],
+                growthOffset: 1,
+                predecessorKey: segmentKey(predecessor)
+            };
+        }
+
+        function drawTimelapseGrowth(col, lineWeight, innerHoleR, growthPath) {
+            if (!growthPath) return;
+            const { fromFrame, toFrame } = growthPath;
+            const orderedSegments = growthPath.segments;
+            const progress = Math.max(0, Math.min(1, tlTransition.progress));
+            const growthOffset = growthPath.growthOffset || 0;
+            const pathPosition = growthOffset + progress * (orderedSegments.length - growthOffset);
+            let tip = { x: fromFrame.cursor.i * STEP, y: fromFrame.cursor.j * STEP, dx: 0, dy: 0 };
+            const ctx = drawingContext;
+            push(); ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
+            for (const id in toFrame.specialElements) {
+                if (!toFrame.specialElements[id].isNode) continue;
+                const [i, j] = id.split(',').map(Number);
+                ctx.moveTo(i * STEP + innerHoleR, j * STEP);
+                ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
+            }
+            ctx.clip(); stroke(col); strokeWeight(lineWeight); strokeCap(SQUARE); strokeJoin(MITER); noFill();
+            // Render the whole in-progress addition as one polyline. This preserves
+            // sharp miter corners and eliminates the visible seam between steps.
+            let hasPath = false;
+            beginShape();
+            orderedSegments.forEach((segment, index) => {
+                const localProgress = Math.max(0, Math.min(1, pathPosition - index));
+                if (localProgress <= 0) return;
+                const x1 = segment.p1.x * STEP, y1 = segment.p1.y * STEP;
+                const x2 = segment.p2.x * STEP, y2 = segment.p2.y * STEP;
+                if (!hasPath) { vertex(x1, y1); hasPath = true; }
+                const tipX = lerp(x1, x2, localProgress), tipY = lerp(y1, y2, localProgress);
+                vertex(tipX, tipY);
+                tip = { x: tipX, y: tipY, dx: x2 - x1, dy: y2 - y1 };
+            });
+            endShape();
+            ctx.restore(); pop();
+            tlAnimatedTip = { ...tip, specialElements: toFrame.specialElements, innerHoleR };
+        }
+
+        function getPathGroups(skipCache = false, sourceSegments = segments) {
+            if (!skipCache && sourceSegments === segments && geometryCache.source === segments) return geometryCache.groups;
             const keyOf = p => `${p.x},${p.y}`;
             const adjacency = new Map();
-            segments.forEach((segment, index) => {
+            sourceSegments.forEach((segment, index) => {
                 [segment.p1, segment.p2].forEach(point => {
                     const key = keyOf(point);
                     if (!adjacency.has(key)) adjacency.set(key, []);
                     adjacency.get(key).push(index);
                 });
             });
-            const used = new Array(segments.length).fill(false);
+            const used = new Array(sourceSegments.length).fill(false);
             const groups = [];
             const trace = (start, firstEdge) => {
                 const group = [];
@@ -1988,7 +2190,7 @@
                 let edgeIndex = firstEdge;
                 while (edgeIndex !== undefined && !used[edgeIndex]) {
                     used[edgeIndex] = true;
-                    const edge = segments[edgeIndex];
+                    const edge = sourceSegments[edgeIndex];
                     const next = keyOf(edge.p1) === keyOf(point) ? edge.p2 : edge.p1;
                     group.push({ p1: point, p2: next });
                     point = next;
@@ -2004,9 +2206,28 @@
                     edges.forEach(edgeIndex => { if (!used[edgeIndex]) trace({ x, y }, edgeIndex); });
                 }
             });
-            segments.forEach((segment, index) => { if (!used[index]) trace(segment.p1, index); });
-            if (!skipCache) geometryCache = { source: segments, groups };
+            sourceSegments.forEach((segment, index) => { if (!used[index]) trace(segment.p1, index); });
+            if (!skipCache && sourceSegments === segments) geometryCache = { source: segments, groups };
             return groups;
+        }
+
+        function isTimelapsePointInsideNode(x, y, specialElements, innerHoleR) {
+            return Object.keys(specialElements).some(id => {
+                if (!specialElements[id].isNode) return false;
+                const [i, j] = id.split(',').map(Number);
+                return (x - i * STEP) ** 2 + (y - j * STEP) ** 2 < innerHoleR ** 2;
+            });
+        }
+
+        function drawTimelapseLeadCursor() {
+            if (!tlAnimatedTip) return;
+            const length = Math.hypot(tlAnimatedTip.dx, tlAnimatedTip.dy) || 1;
+            // Centre the cursor on the head so half of it overlaps the growing stroke.
+            const lead = 0;
+            const x = tlAnimatedTip.x + (tlAnimatedTip.dx / length) * lead;
+            const y = tlAnimatedTip.y + (tlAnimatedTip.dy / length) * lead;
+            if (isTimelapsePointInsideNode(x, y, tlAnimatedTip.specialElements, tlAnimatedTip.innerHoleR)) return;
+            push(); translate(x, y); fill(themeConfig[tlTheme].drawCursor); noStroke(); rectMode(CENTER); rotate(QUARTER_PI); rect(0, 0, 20, 20); pop();
         }
 
         function drawCursor() {
@@ -2014,10 +2235,13 @@
                 let worldMX = (pX - offsetX) / zoom; let worldMY = (pY - offsetY) / zoom;
                 noFill(); stroke("#FF6666"); strokeWeight(2 / zoom); fill("rgba(255, 102, 102, 0.15)"); ellipse(worldMX, worldMY, (eraserRadius * 2) / zoom); return;
             }
+            if (isTimelapseUIOpen && (isPlayingTl || isTimelapseExport)) { drawTimelapseLeadCursor(); return; }
+            if (isTimelapseUIOpen && specialElements[`${curI},${curJ}`]?.isNode) return;
             if (isTimelapseUIOpen && !isPlayingTl && tlHistory.length > 0) {
                 let frame = tlHistory[tlCurrentFrame]; if (!frame) return;
                 let cI = frame.cursor.i, cJ = frame.cursor.j;
-                push(); translate(cI * STEP, cJ * STEP); fill(themeConfig[currentTheme].drawCursor); noStroke(); rectMode(CENTER); rotate(QUARTER_PI); rect(0, 0, 20, 20); pop();
+                if (frame.specialElements[`${cI},${cJ}`]?.isNode) return;
+                push(); translate(cI * STEP, cJ * STEP); fill(themeConfig[tlTheme].drawCursor); noStroke(); rectMode(CENTER); rotate(QUARTER_PI); rect(0, 0, 20, 20); pop();
                 return;
             } else if (isTimelapseUIOpen && !isPlayingTl) return;
             let colors = themeConfig[currentTheme]; let finalColor = isDrawingMode ? colors.drawCursor : colors.cursorColor;
@@ -2193,10 +2417,6 @@
                     g.forEach(s => d += ` L ${svgX(s.p2.x * STEP)} ${svgY(s.p2.y * STEP)}`);
                     svgContent += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
                 });
-                getBranchJunctions().forEach(({ x, y }) => {
-                    svgContent += `<circle cx="${svgX(x * STEP)}" cy="${svgY(y * STEP)}" r="${LINE_WEIGHT / 2}" fill="black"/>`;
-                });
-
                 for (let id in specialElements) {
                     let [i, j] = id.split(',').map(Number);
                     let x = svgX(i * STEP);
