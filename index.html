@@ -746,8 +746,8 @@
         let tlTheme = 'light';
         let tlTransition = null;
         let tlAnimatedTip = null;
-        let tlSuppressedSegmentKey = null;
         let tlPlaybackBatches = [];
+        let tlScreenHold = { pointerId: null, direction: 0, startX: 0, startY: 0, timer: null, interval: null, repeating: false };
         let geometryCache = { source: null, groups: [] };
 
         let isDashboardOpen = false;
@@ -1074,6 +1074,7 @@
 
         function toggleTimelapseUI() {
             if(isGameMode) return;
+            clearTimelapseScreenHold();
             if (!isTimelapseUIOpen) { captureState(true); tlTheme = currentTheme; }
             isTimelapseUIOpen = !isTimelapseUIOpen;
             const toolbar = document.getElementById('timelapse-toolbar');
@@ -1201,10 +1202,54 @@
             if (control === '5' || control === 'enter') getTimelapseControls()[tlNavIndex].click();
         }
 
-        function handleTimelapseScreenTap(x, y) {
+        function clearTimelapseScreenHold() {
+            if (tlScreenHold.timer) clearTimeout(tlScreenHold.timer);
+            if (tlScreenHold.interval) clearInterval(tlScreenHold.interval);
+            tlScreenHold = { pointerId: null, direction: 0, startX: 0, startY: 0, timer: null, interval: null, repeating: false };
+        }
+
+        function beginTimelapseScreenScrub(e) {
             const toolbarRect = document.getElementById('timelapse-toolbar').getBoundingClientRect();
-            if (x >= toolbarRect.left && x <= toolbarRect.right && y >= toolbarRect.top && y <= toolbarRect.bottom) return false;
-            stepTimelapse(x < width / 2 ? -1 : 1);
+            if (e.clientX >= toolbarRect.left && e.clientX <= toolbarRect.right && e.clientY >= toolbarRect.top && e.clientY <= toolbarRect.bottom) return false;
+            const direction = e.clientX < width / 2 ? -1 : 1;
+            clearTimelapseScreenHold();
+            tlScreenHold.pointerId = e.pointerId;
+            tlScreenHold.direction = direction;
+            tlScreenHold.startX = e.clientX;
+            tlScreenHold.startY = e.clientY;
+            tlScreenHold.timer = setTimeout(() => {
+                tlScreenHold.repeating = true;
+                stepTimelapse(direction);
+                tlScreenHold.interval = setInterval(() => stepTimelapse(direction), 120);
+            }, 320);
+            return true;
+        }
+
+        function moveTimelapseScreenScrub(e) {
+            if (e.pointerId !== tlScreenHold.pointerId) return false;
+            const dx = e.clientX - tlScreenHold.startX;
+            const dy = e.clientY - tlScreenHold.startY;
+            if (Math.hypot(dx, dy) < 10) return true;
+
+            // A real drag is always a canvas pan.  Only a motionless hold is a
+            // timeline scrub, so both gestures remain available on the same area.
+            clearTimelapseScreenHold();
+            activePointers.set(e.pointerId, e);
+            mainPointerId = e.pointerId;
+            pX = e.clientX; pY = e.clientY;
+            isPointerDrawing = true;
+            isPanning = true;
+            window.lastClickTime = 0;
+            offsetX += dx; offsetY += dy;
+            redraw();
+            return false;
+        }
+
+        function endTimelapseScreenScrub(e) {
+            if (e.pointerId !== tlScreenHold.pointerId) return false;
+            const { direction, repeating } = tlScreenHold;
+            clearTimelapseScreenHold();
+            if (!repeating) stepTimelapse(direction);
             return true;
         }
 
@@ -1918,7 +1963,10 @@
             
             canvasElem.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
-                if (isTimelapseUIOpen && (e.pointerType === 'touch' || e.pointerType === 'pen') && handleTimelapseScreenTap(e.clientX, e.clientY)) return;
+                if (isTimelapseUIOpen && beginTimelapseScreenScrub(e)) {
+                    canvasElem.setPointerCapture?.(e.pointerId);
+                    return;
+                }
                 activePointers.set(e.pointerId, e);
                 
                 if (activePointers.size === 1) {
@@ -1937,6 +1985,7 @@
 
             canvasElem.addEventListener('pointermove', (e) => {
                 e.preventDefault();
+                if (isTimelapseUIOpen && moveTimelapseScreenScrub(e)) return;
                 if (activePointers.has(e.pointerId)) {
                     activePointers.set(e.pointerId, e);
                 }
@@ -1979,6 +2028,7 @@
 
             const endPointer = (e) => {
                 e.preventDefault();
+                if (isTimelapseUIOpen && endTimelapseScreenScrub(e)) return;
                 if (e.pointerId === mainPointerId) {
                     handleEnd(e.clientX, e.clientY);
                     isPointerDrawing = false; mainPointerId = null;
@@ -2059,21 +2109,39 @@
             return (theme === 'dark' || theme === 'system') ? LINE_WEIGHT - 2 : LINE_WEIGHT;
         }
 
+        // Separate paths meet at a branch.  A square overlap of one backing
+        // pixel closes anti-alias hairlines without changing a corner into a
+        // round one.
+        function getSharpJunctions(sourceSegments, sourceSpecials) {
+            const connections = new Map();
+            sourceSegments.forEach(({ p1, p2 }) => {
+                for (const point of [p1, p2]) {
+                    const key = `${point.x},${point.y}`;
+                    connections.set(key, (connections.get(key) || 0) + 1);
+                }
+            });
+            return [...connections]
+                .filter(([key, count]) => count > 2 && !sourceSpecials[key]?.isNode)
+                .map(([key]) => key.split(',').map(Number));
+        }
+
         function drawGeometry(colValue, skipCache = false) {
             const visualLineWeight = getVisualLineWeight();
             let col = isExporting && !isTimelapseExport ? 0 : colValue; let ringD = BASE_STEP_VAL * 2; let innerHoleR = (ringD - visualLineWeight) / 2;
             if (isTimelapseUIOpen && (isPlayingTl || isTimelapseExport)) tlAnimatedTip = null;
             const growthPath = getTimelapseGrowthPath();
-            tlSuppressedSegmentKey = growthPath?.predecessorKey || null;
             push(); let ctx = drawingContext; ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
             for (let id in specialElements) if (specialElements[id].isNode) {
                 let [i, j] = id.split(',').map(Number); ctx.moveTo(i * STEP + innerHoleR, j * STEP); ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
             }
             ctx.clip(); stroke(col); strokeWeight(visualLineWeight); strokeCap(SQUARE); strokeJoin(MITER); noFill();
-            const drawableSegments = tlSuppressedSegmentKey
-                ? segments.filter(segment => segmentKey(segment) !== tlSuppressedSegmentKey)
-                : segments;
-            getPathGroups(skipCache || Boolean(tlSuppressedSegmentKey), drawableSegments).forEach(group => { beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape(); });
+            getPathGroups(skipCache, segments).forEach(group => { beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape(); });
+            const seamBleed = 1 / Math.max(1, pixelDensity());
+            const junctionSize = visualLineWeight + seamBleed * 2;
+            ctx.fillStyle = ctx.strokeStyle;
+            getSharpJunctions(segments, specialElements).forEach(([i, j]) => {
+                ctx.fillRect(i * STEP - junctionSize / 2, j * STEP - junctionSize / 2, junctionSize, junctionSize);
+            });
             ctx.restore(); pop();
 
             for(let id in specialElements) {
@@ -2082,7 +2150,6 @@
                 if(specialElements[id].isDiamond) { fill(col); noStroke(); push(); translate(x, y + visualLineWeight/2); rotate(QUARTER_PI); rectMode(CENTER); rect(0, 0, visualLineWeight, visualLineWeight); pop(); }
             }
             drawTimelapseGrowth(col, visualLineWeight, innerHoleR, growthPath);
-            tlSuppressedSegmentKey = null;
         }
 
         function segmentKey(segment) {
@@ -2122,7 +2189,7 @@
                 (segment.p1.x === start.x && segment.p1.y === start.y) ||
                 (segment.p2.x === start.x && segment.p2.y === start.y)
             );
-            if (!predecessor) return { fromFrame, toFrame, segments: orderedSegments, predecessorKey: null };
+            if (!predecessor) return { fromFrame, toFrame, segments: orderedSegments };
             const predecessorStartsAtJoint = predecessor.p2.x === start.x && predecessor.p2.y === start.y;
             const orientedPredecessor = predecessorStartsAtJoint
                 ? predecessor
@@ -2130,8 +2197,7 @@
             return {
                 fromFrame, toFrame,
                 segments: [orientedPredecessor, ...orderedSegments],
-                growthOffset: 1,
-                predecessorKey: segmentKey(predecessor)
+                growthOffset: 1
             };
         }
 
