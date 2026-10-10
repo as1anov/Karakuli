@@ -1626,6 +1626,9 @@
 
         // --- BREAK MAZE LOGIC ---
         function startBreakMaze() {
+            // The game always starts from the complete drawing, not from an
+            // intermediate Time-lapse frame or its overlay controls.
+            if (isTimelapseUIOpen) toggleTimelapseUI();
             if (segments.length === 0 && Object.keys(specialElements).length === 0) {
                 showActionHint("Draw something first!", false);
                 return;
@@ -2106,7 +2109,7 @@
         function invalidateGeometryCache() { geometryCache.source = null; }
 
         function getVisualLineWeight(theme = ((isTimelapseUIOpen || isTimelapseExport) ? tlTheme : currentTheme)) {
-            return (theme === 'dark' || theme === 'system') ? LINE_WEIGHT - 2 : LINE_WEIGHT;
+            return (theme === 'dark' || theme === 'system') ? LINE_WEIGHT - 1 : LINE_WEIGHT;
         }
 
         // Separate paths meet at a branch.  A square overlap of one backing
