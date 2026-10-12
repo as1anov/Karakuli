@@ -749,6 +749,8 @@
         let tlPlaybackBatches = [];
         let tlScreenHold = { pointerId: null, direction: 0, startX: 0, startY: 0, timer: null, interval: null, repeating: false };
         let geometryCache = { source: null, groups: [] };
+        let tlGrowthCache = { from: -1, to: -1, historyLength: 0, path: null };
+        let tlBatchCache = { historyLength: -1, batches: [] };
 
         let isDashboardOpen = false;
         let menuNavIndex = 0;
@@ -1117,8 +1119,14 @@
             const lastState = tlHistory.length > 0 ? tlHistory[tlHistory.length - 1] : null;
             const currentSegments = JSON.stringify(segments);
             const currentSpecials = JSON.stringify(specialElements);
-            if (lastState && JSON.stringify(lastState.segments) === currentSegments && JSON.stringify(lastState.specialElements) === currentSpecials) return;
-            tlHistory.push({ segments: JSON.parse(currentSegments), specialElements: JSON.parse(currentSpecials), cursor: { i: curI, j: curJ } });
+            const signature = `${currentSegments}\u0000${currentSpecials}`;
+            const previousSignature = lastState?._signature || (lastState && `${JSON.stringify(lastState.segments)}\u0000${JSON.stringify(lastState.specialElements)}`);
+            if (previousSignature === signature) return;
+            const snapshot = { segments: JSON.parse(currentSegments), specialElements: JSON.parse(currentSpecials), cursor: { i: curI, j: curJ } };
+            // Runtime-only comparison key: omitted from project saves, so it does
+            // not enlarge saved projects or alter the Time-lapse data format.
+            Object.defineProperty(snapshot, '_signature', { value: signature, enumerable: false });
+            tlHistory.push(snapshot);
             // Keep recordings bounded on long drawings. Older frames are sampled rather
             // than discarded, so playback still starts at the first stroke.
             if (tlHistory.length > TL_MAX_FRAMES) {
@@ -1267,17 +1275,33 @@
         }
 
         function getAddedSegments(fromFrame, toFrame) {
-            const before = new Set(fromFrame.segments.map(segmentKey));
+            const before = getFrameSegmentKeys(fromFrame);
             return toFrame.segments.filter(segment => !before.has(segmentKey(segment)));
         }
 
+        function getFrameSegmentKeys(frame) {
+            if (frame._segmentKeys) return frame._segmentKeys;
+            const keys = new Set(frame.segments.map(segmentKey));
+            Object.defineProperty(frame, '_segmentKeys', { value: keys, enumerable: false });
+            return keys;
+        }
+
+        function getFrameSpecialSignature(frame) {
+            if (frame._specialSignature !== undefined) return frame._specialSignature;
+            const signature = JSON.stringify(frame.specialElements);
+            Object.defineProperty(frame, '_specialSignature', { value: signature, enumerable: false });
+            return signature;
+        }
+
         function frameOnlyAddsConnectedLines(fromFrame, toFrame, previousEnd) {
-            if (JSON.stringify(fromFrame.specialElements) !== JSON.stringify(toFrame.specialElements)) return null;
-            const before = new Set(fromFrame.segments.map(segmentKey));
-            if (fromFrame.segments.some(segment => !new Set(toFrame.segments.map(segmentKey)).has(segmentKey(segment)))) return null;
-            const added = getAddedSegments(fromFrame, toFrame);
+            if (getFrameSpecialSignature(fromFrame) !== getFrameSpecialSignature(toFrame)) return null;
+            const before = getFrameSegmentKeys(fromFrame);
+            const after = getFrameSegmentKeys(toFrame);
+            if (fromFrame.segments.some(segment => !after.has(segmentKey(segment)))) return null;
+            const added = toFrame.segments.filter(segment => !before.has(segmentKey(segment)));
             if (!added.length) return null;
             const ordered = orderTimelapseSegments(added, fromFrame.cursor);
+            if (!ordered || !pointsMatch(ordered[0]?.p1, { x: fromFrame.cursor.i, y: fromFrame.cursor.j })) return null;
             if (previousEnd && !pointsMatch(ordered[0]?.p1, previousEnd)) return null;
             return ordered;
         }
@@ -1298,6 +1322,13 @@
                 if (end > start) batches.push({ start, end });
                 start = end > start ? end : start + 1;
             }
+            return batches;
+        }
+
+        function getTimelapseBatches() {
+            if (tlBatchCache.historyLength === tlHistory.length) return tlBatchCache.batches;
+            const batches = buildTimelapseBatches();
+            tlBatchCache = { historyLength: tlHistory.length, batches };
             return batches;
         }
 
@@ -1339,10 +1370,12 @@
             document.getElementById('tl-play-icon').style.display = 'none';
             document.getElementById('tl-pause-icon').style.display = 'block';
             if (tlCurrentFrame >= tlHistory.length - 1) tlCurrentFrame = 0;
-            tlPlaybackStart = performance.now();
             tlPlaybackStartFrame = tlCurrentFrame;
-            tlPlaybackBatches = buildTimelapseBatches();
+            tlPlaybackBatches = getTimelapseBatches();
             const appliedFrame = { index: -1 };
+            // Preparation can be expensive for a large recording. Start the
+            // clock only after it finishes, so no part of the video is skipped.
+            tlPlaybackStart = performance.now();
             const tick = (now) => {
                 if (!isPlayingTl) return;
                 const elapsed = now - tlPlaybackStart;
@@ -1350,8 +1383,12 @@
                     tlHistory.length - 1,
                     tlPlaybackStartFrame + elapsed / ((FRAME_DURATION * 1000) / tlSpeed)
                 );
+                const previousFrame = tlCurrentFrame;
                 renderTimelapsePosition(framePosition, appliedFrame);
-                updateTlProgress(); redraw();
+                // The canvas needs every visual sample; the DOM controls only
+                // need an update when their displayed frame has changed.
+                if (tlCurrentFrame !== previousFrame) updateTlProgress();
+                redraw();
                 if (framePosition >= tlHistory.length - 1) {
                     applyFrame(tlHistory.length - 1);
                     tlTransition = null;
@@ -1416,7 +1453,7 @@
             recorder.start();
 
             const frameDelay = 1000 / TL_PLAYBACK_FPS;
-            tlPlaybackBatches = buildTimelapseBatches();
+            tlPlaybackBatches = getTimelapseBatches();
             const appliedFrame = { index: -1 };
             const lastFrame = tlHistory.length - 1;
             const frameCount = Math.max(1, Math.ceil((lastFrame * FRAME_DURATION * 1000) / (tlSpeed * frameDelay)));
@@ -2106,26 +2143,10 @@
             for(let i=sI; i<=eI; i++) for(let j=sJ; j<=eJ; j++) circle(i*STEP, j*STEP, 1.5/zoom);
         }
 
-        function invalidateGeometryCache() { geometryCache.source = null; }
+        function invalidateGeometryCache() { geometryCache = { source: null, groups: [] }; }
 
         function getVisualLineWeight(theme = ((isTimelapseUIOpen || isTimelapseExport) ? tlTheme : currentTheme)) {
             return (theme === 'dark' || theme === 'system') ? LINE_WEIGHT - 1 : LINE_WEIGHT;
-        }
-
-        // Separate paths meet at a branch.  A square overlap of one backing
-        // pixel closes anti-alias hairlines without changing a corner into a
-        // round one.
-        function getSharpJunctions(sourceSegments, sourceSpecials) {
-            const connections = new Map();
-            sourceSegments.forEach(({ p1, p2 }) => {
-                for (const point of [p1, p2]) {
-                    const key = `${point.x},${point.y}`;
-                    connections.set(key, (connections.get(key) || 0) + 1);
-                }
-            });
-            return [...connections]
-                .filter(([key, count]) => count > 2 && !sourceSpecials[key]?.isNode)
-                .map(([key]) => key.split(',').map(Number));
         }
 
         function drawGeometry(colValue, skipCache = false) {
@@ -2137,14 +2158,15 @@
             for (let id in specialElements) if (specialElements[id].isNode) {
                 let [i, j] = id.split(',').map(Number); ctx.moveTo(i * STEP + innerHoleR, j * STEP); ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
             }
-            ctx.clip(); stroke(col); strokeWeight(visualLineWeight); strokeCap(SQUARE); strokeJoin(MITER); noFill();
-            getPathGroups(skipCache, segments).forEach(group => { beginShape(); vertex(group[0].p1.x * STEP, group[0].p1.y * STEP); group.forEach(s => vertex(s.p2.x * STEP, s.p2.y * STEP)); endShape(); });
-            const seamBleed = 1 / Math.max(1, pixelDensity());
-            const junctionSize = visualLineWeight + seamBleed * 2;
-            ctx.fillStyle = ctx.strokeStyle;
-            getSharpJunctions(segments, specialElements).forEach(([i, j]) => {
-                ctx.fillRect(i * STEP - junctionSize / 2, j * STEP - junctionSize / 2, junctionSize, junctionSize);
+            ctx.clip(); stroke(col); strokeWeight(visualLineWeight); strokeCap(SQUARE); strokeJoin(MITER); ctx.miterLimit = 2; noFill();
+            // Stroke all subpaths in one native Canvas pass. This removes the
+            // anti-aliased seams caused by drawing touching groups separately.
+            ctx.beginPath();
+            getPathGroups(skipCache, segments).forEach(group => {
+                ctx.moveTo(group[0].p1.x * STEP, group[0].p1.y * STEP);
+                group.forEach(segment => ctx.lineTo(segment.p2.x * STEP, segment.p2.y * STEP));
             });
+            ctx.stroke();
             ctx.restore(); pop();
 
             for(let id in specialElements) {
@@ -2160,15 +2182,24 @@
         }
 
         function orderTimelapseSegments(segments, cursor) {
-            const pending = segments.map(segment => ({ ...segment }));
+            const availableAtPoint = new Map();
+            const pointKey = point => `${point.x},${point.y}`;
+            segments.forEach((segment, index) => {
+                for (const point of [segment.p1, segment.p2]) {
+                    const key = pointKey(point);
+                    if (!availableAtPoint.has(key)) availableAtPoint.set(key, []);
+                    availableAtPoint.get(key).push(index);
+                }
+            });
+            const used = new Array(segments.length).fill(false);
             const ordered = [];
             let point = { x: cursor.i, y: cursor.j };
-            while (pending.length) {
-                const nextIndex = pending.findIndex(segment =>
-                    (segment.p1.x === point.x && segment.p1.y === point.y) ||
-                    (segment.p2.x === point.x && segment.p2.y === point.y)
-                );
-                const segment = pending.splice(nextIndex >= 0 ? nextIndex : 0, 1)[0];
+            while (ordered.length < segments.length) {
+                const nextIndex = (availableAtPoint.get(pointKey(point)) || []).find(index => !used[index]);
+                // Never make an artificial bridge between disconnected lines.
+                if (nextIndex === undefined) return null;
+                used[nextIndex] = true;
+                const segment = segments[nextIndex];
                 const startsAtCursor = segment.p1.x === point.x && segment.p1.y === point.y;
                 const endsAtCursor = segment.p2.x === point.x && segment.p2.y === point.y;
                 const p1 = endsAtCursor && !startsAtCursor ? segment.p2 : segment.p1;
@@ -2181,27 +2212,36 @@
 
         function getTimelapseGrowthPath() {
             if (!tlTransition || !tlHistory[tlTransition.from] || !tlHistory[tlTransition.to]) return;
+            if (tlGrowthCache.from === tlTransition.from && tlGrowthCache.to === tlTransition.to && tlGrowthCache.historyLength === tlHistory.length) {
+                return tlGrowthCache.path;
+            }
             const fromFrame = tlHistory[tlTransition.from];
             const toFrame = tlHistory[tlTransition.to];
-            const fromSegments = new Set(fromFrame.segments.map(segmentKey));
+            const fromSegments = getFrameSegmentKeys(fromFrame);
             const addedSegments = toFrame.segments.filter(segment => !fromSegments.has(segmentKey(segment)));
-            if (!addedSegments.length) return;
+            if (!addedSegments.length) return cacheTimelapseGrowthPath(null);
             const orderedSegments = orderTimelapseSegments(addedSegments, fromFrame.cursor);
+            if (!orderedSegments) return cacheTimelapseGrowthPath(null);
             const start = orderedSegments[0]?.p1;
             const predecessor = [...fromFrame.segments].reverse().find(segment =>
                 (segment.p1.x === start.x && segment.p1.y === start.y) ||
                 (segment.p2.x === start.x && segment.p2.y === start.y)
             );
-            if (!predecessor) return { fromFrame, toFrame, segments: orderedSegments };
+            if (!predecessor) return cacheTimelapseGrowthPath({ fromFrame, toFrame, segments: orderedSegments });
             const predecessorStartsAtJoint = predecessor.p2.x === start.x && predecessor.p2.y === start.y;
             const orientedPredecessor = predecessorStartsAtJoint
                 ? predecessor
                 : { p1: predecessor.p2, p2: predecessor.p1 };
-            return {
+            return cacheTimelapseGrowthPath({
                 fromFrame, toFrame,
                 segments: [orientedPredecessor, ...orderedSegments],
                 growthOffset: 1
-            };
+            });
+        }
+
+        function cacheTimelapseGrowthPath(path) {
+            tlGrowthCache = { from: tlTransition.from, to: tlTransition.to, historyLength: tlHistory.length, path };
+            return path;
         }
 
         function drawTimelapseGrowth(col, lineWeight, innerHoleR, growthPath) {
@@ -2220,22 +2260,22 @@
                 ctx.moveTo(i * STEP + innerHoleR, j * STEP);
                 ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
             }
-            ctx.clip(); stroke(col); strokeWeight(lineWeight); strokeCap(SQUARE); strokeJoin(MITER); noFill();
+            ctx.clip(); stroke(col); strokeWeight(lineWeight); strokeCap(SQUARE); strokeJoin(MITER); ctx.miterLimit = 2; noFill();
             // Render the whole in-progress addition as one polyline. This preserves
             // sharp miter corners and eliminates the visible seam between steps.
             let hasPath = false;
-            beginShape();
+            ctx.beginPath();
             orderedSegments.forEach((segment, index) => {
                 const localProgress = Math.max(0, Math.min(1, pathPosition - index));
                 if (localProgress <= 0) return;
                 const x1 = segment.p1.x * STEP, y1 = segment.p1.y * STEP;
                 const x2 = segment.p2.x * STEP, y2 = segment.p2.y * STEP;
-                if (!hasPath) { vertex(x1, y1); hasPath = true; }
+                if (!hasPath) { ctx.moveTo(x1, y1); hasPath = true; }
                 const tipX = lerp(x1, x2, localProgress), tipY = lerp(y1, y2, localProgress);
-                vertex(tipX, tipY);
+                ctx.lineTo(tipX, tipY);
                 tip = { x: tipX, y: tipY, dx: x2 - x1, dy: y2 - y1 };
             });
-            endShape();
+            if (hasPath) ctx.stroke();
             ctx.restore(); pop();
             tlAnimatedTip = { ...tip, specialElements: toFrame.specialElements, innerHoleR };
         }
@@ -2481,11 +2521,13 @@
                 }
                 const maskTag = masks ? `<defs><mask id="holeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="${svgWidth}" height="${svgHeight}"><rect width="${svgWidth}" height="${svgHeight}" fill="white"/>${masks}</mask></defs>` : '';
 
+                let svgPathData = '';
                 getPathGroups().forEach(g => {
                     let d = `M ${svgX(g[0].p1.x * STEP)} ${svgY(g[0].p1.y * STEP)}`;
                     g.forEach(s => d += ` L ${svgX(s.p2.x * STEP)} ${svgY(s.p2.y * STEP)}`);
-                    svgContent += `<path d="${d}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
+                    svgPathData += ` ${d}`;
                 });
+                if (svgPathData) svgContent += `<path d="${svgPathData}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
                 for (let id in specialElements) {
                     let [i, j] = id.split(',').map(Number);
                     let x = svgX(i * STEP);
