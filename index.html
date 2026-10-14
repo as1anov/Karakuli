@@ -1,4 +1,8 @@
 
+
+Karakuli · HTML
+ 
+ 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -415,6 +419,11 @@
             color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s;
         }
         .chip:hover { background: var(--active-btn-bg); }
+        .chip-row.has-shapes { gap: 4px; flex-wrap: nowrap; }
+        .chip-row.has-shapes .chip { padding: 6px 9px; }
+        .chip-shape { display: inline-flex; align-items: center; gap: 5px; }
+        .chip-shape svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+        .chip-sep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--border-color); }
         .chip.active { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
         .field-error { margin-top: 10px; font-size: 11px; color: #ef4444; }
         .field-error:empty { display: none; }
@@ -427,19 +436,18 @@
         .preset-card:hover { background: var(--active-btn-bg); }
         .preset-card:active { transform: scale(0.98); }
         .preset-card.active { border-color: var(--text-color); background: var(--active-btn-bg); box-shadow: 0 0 0 1px var(--text-color) inset; }
-        .preset-icon { width: 96px; height: 72px; flex-shrink: 0; border-radius: 10px; overflow: hidden; }
-        .preset-icon svg { display: block; width: 96px; height: 72px; }
+        .preset-icon { flex-shrink: 0; border-radius: 10px; overflow: hidden; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-color); line-height: 0; }
+        .preset-card .preset-icon svg { display: block; }
+        .preset-text { flex: 1; min-width: 0; }
         .preset-name { display: block; font-size: 13px; font-weight: 600; color: var(--text-color); }
         .preset-dim { display: block; margin-top: 3px; font-size: 10px; color: var(--disabled-color); font-variant-numeric: tabular-nums; }
- 
-        .stepper { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--panel-bg); }
-        .stepper-btn {
-            width: 44px; height: 40px; border-radius: 8px; border: 1px solid var(--border-color);
-            background: var(--bg-color); color: var(--text-color); font-family: var(--main-font);
-            font-size: 20px; font-weight: 600; line-height: 1; cursor: pointer; transition: all 0.15s;
-        }
-        .stepper-btn:active { transform: scale(0.92); background: var(--active-btn-bg); }
-        .stepper-val { flex: 1; text-align: center; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-color); }
+        .shape-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .shape-card { gap: 10px; padding: 8px; }
+        .card-hooks { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--disabled-color); }
+        .card-hooks b { min-width: 14px; text-align: center; font-size: 13px; color: var(--text-color); font-variant-numeric: tabular-nums; }
+        .mini-btn { width: 32px; height: 28px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font-family: var(--main-font); font-size: 16px; font-weight: 600; line-height: 1; cursor: pointer; }
+        .mini-btn:active { transform: scale(0.92); background: var(--active-btn-bg); }
+        .swap-btn:disabled { opacity: 0.3; cursor: not-allowed; }
  
         .modal-actions { display: flex; gap: 10px; padding: 14px 24px 20px; border-top: 1px solid var(--border-color); flex-shrink: 0; }
         .modal-btn {
@@ -562,46 +570,29 @@
                 <div class="nc-section">
                     <div class="nc-label-row">
                         <span class="nc-label">Custom size</span>
-                        <div class="seg" id="unit-seg">
-                            <button data-unit="mm" onclick="setUnit('mm')">mm</button>
-                            <button data-unit="cm" onclick="setUnit('cm')">cm</button>
-                            <button data-unit="in" onclick="setUnit('in')">in</button>
-                        </div>
                     </div>
                     <div class="size-row">
                         <div class="field" id="field-w">
                             <label class="field-label" for="canvas-w-input">Width</label>
-                            <input id="canvas-w-input" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="210" oninput="onSizeInput()" onkeydown="handleCanvasSizeKey(event)" onfocus="this.select()">
+                            <input id="canvas-w-input" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="210" oninput="onSizeInput('w')" onchange="onSizeCommit()" onkeydown="handleCanvasSizeKey(event)" onfocus="this.select()">
                             <span class="field-unit" data-unit-label>mm</span>
                         </div>
-                        <button class="swap-btn" onclick="swapSize()" aria-label="Swap width and height" title="Swap width and height">
+                        <button class="swap-btn" id="swap-btn" onclick="swapSize()" aria-label="Swap width and height" title="Swap width and height">
                             <svg viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>
                         </button>
                         <div class="field" id="field-h">
                             <label class="field-label" for="canvas-h-input">Height</label>
-                            <input id="canvas-h-input" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="297" oninput="onSizeInput()" onkeydown="handleCanvasSizeKey(event)" onfocus="this.select()">
+                            <input id="canvas-h-input" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="297" oninput="onSizeInput('h')" onchange="onSizeCommit()" onkeydown="handleCanvasSizeKey(event)" onfocus="this.select()">
                             <span class="field-unit" data-unit-label>mm</span>
                         </div>
                     </div>
-                    <div class="chip-row" id="paper-chips"></div>
+                    <div class="chip-row has-shapes" id="paper-chips"></div>
                     <div class="field-error" id="size-error"></div>
                 </div>
  
                 <div class="nc-section">
                     <div class="nc-label-row"><span class="nc-label">Products</span></div>
                     <div class="preset-list" id="preset-list"></div>
-                </div>
- 
-                <div class="nc-section" id="hooks-group" style="display:none">
-                    <div class="nc-label-row">
-                        <span class="nc-label">Number of hooks</span>
-                        <span class="nc-hint">2 – 10</span>
-                    </div>
-                    <div class="stepper">
-                        <button class="stepper-btn" onclick="changeHooks(-1)" aria-label="Fewer hooks">−</button>
-                        <span class="stepper-val" id="hooks-count">7</span>
-                        <button class="stepper-btn" onclick="changeHooks(1)" aria-label="More hooks">+</button>
-                    </div>
                 </div>
             </div>
  
@@ -891,14 +882,13 @@
         let currentProjectTitle = 'Karakuli #0000';
         let createProjectOnReset = false;
         let activeProductKey = null;   // product shown on the canvas (shelf / hanger / magazine)
-        let hookCount = 7;             // hooks on the canvas (hanger only)
         let selectedPresetKey = null;  // product selected inside the New Canvas window
  
         function projectSnapshot() {
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
                 paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
-                productKey: activeProductKey, hookCount,
+                productKey: activeProductKey,
                 tlHistory, tlCurrentFrame, tlCaptureStride, tlCaptureCounter
             }));
         }
@@ -996,7 +986,7 @@
             curI = project.curI || 0; curJ = project.curJ || 0; lastDirection = project.lastDirection || null;
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
-            activeProductKey = project.productKey || null; hookCount = project.hookCount || 7;
+            activeProductKey = project.productKey || null;
             tlHistory = project.tlHistory || [];
             tlCurrentFrame = project.tlCurrentFrame || 0;
             tlCaptureStride = project.tlCaptureStride || 1;
@@ -1119,28 +1109,31 @@
             }
         }
  
-        // --- PRODUCTS & NEW CANVAS WINDOW ---
-        // Geometry is taken 1:1 from the technical drawings (veshalka.pdf / veshalka_icon.svg), all values in mm.
-        //  w, h     = flat sheet size, including the bent parts (the canvas is the whole flat sheet)
-        //  folds    = bend lines, measured from the top edge (dashed hairlines on the canvas)
-        //  holes    = bolt holes: inset from the left/right edge, rows from the top edge,
-        //             cols: 3 = left / centre / right, 2 = left / right
-        //  radius   = rounded bottom corners
-        //  hooks    = hook arms: they start `start` mm from the top, are `armW` wide, evenly spaced (min..max pieces)
-        //  profile  = side view, used only to draw the product icon: gap to the wall, face height,
-        //             foot depth / lip length / lip angle (shelf, hanger) or the return to the wall (insert)
+        // --- PRODUCTS, SHAPES & NEW CANVAS WINDOW ---
+        // Product geometry comes 1:1 from the technical drawings (veshalka.pdf / veshalka_icon.svg), all values in mm.
+        //  def      = default flat-sheet size (the canvas is the whole flat sheet, bent parts included)
+        //  tail     = the fixed bottom block (bends, shelf, lips). The variable part is `h - tail`;
+        //             the line at y = h - tail is the "anchor" that everything below is measured from.
+        //  folds    = bend lines, as distances below the anchor line
+        //  holes    = bolt holes: `inset` from the side edges, `top` row measured from the top edge,
+        //             `bottomUp` row sits that many mm above the anchor line (so it follows height changes)
+        //  hooks    = hanger arms: `armW` wide, always `pitch` mm apart; width = armW + (n - 1) * pitch
+        //  profile  = side view (icon only): gap to the wall, `face` = face length below the anchor,
+        //             foot depth / lip length / lip angle, or `back` = return towards the wall
         const PRODUCTS = {
-            shelf: { name: 'Shelf', w: 894, h: 379, radius: 7.5, folds: [232, 244, 364],
-                     holes: { inset: 17.8, rows: [69, 214.4], cols: 3 },
-                     profile: { gap: 20, face: 244, foot: 120, lip: 15, angle: 105 } },
-            hanger: { name: 'Hanger', w: 894, h: 321, folds: [269, 304],
-                      holes: { inset: 17.8, rows: [41.6, 184.7], cols: 3 },
-                      hooks: { start: 229.6, armW: 12, min: 2, max: 10, def: 7 },
-                      profile: { gap: 20, face: 269, foot: 35, lip: 17, angle: 105 } },
-            magazine: { name: 'Magazine insert', w: 894, h: 261.8, folds: [234.8],
-                        holes: { inset: 17.8, rows: [69], cols: 2 },
-                        profile: { gap: 25, face: 234.8, back: 27 } }
+            shelf: { name: 'Shelf', def: { w: 894, h: 379 }, tail: 147, minFace: 100, minW: 200, radius: 7.5,
+                     folds: [0, 12, 132], holes: { inset: 17.8, top: 69, bottomUp: 17.6 },
+                     profile: { gap: 20, face: 12, foot: 120, lip: 15, angle: 105 } },
+            hanger: { name: 'Hanger', def: { w: 894, h: 321 }, tail: 91.4, minFace: 150,
+                      folds: [39.4, 74.4], holes: { inset: 17.8, top: 41.6, bottomUp: 44.9 },
+                      hooks: { armW: 12, pitch: 147, min: 2, max: 7 },
+                      profile: { gap: 20, face: 39.4, foot: 35, lip: 17, angle: 105 } },
+            magazine: { name: 'Magazine holder', def: { w: 894, h: 261.8 }, tail: 27, minFace: 120, minW: 200,
+                        folds: [0], holes: { inset: 17.8, top: 69 },
+                        profile: { gap: 45, face: 0, back: 45 } }
         };
+        // Plain shapes: width = height (side of the square / diameter of the circle).
+        const SHAPES = { square: { name: 'Square', def: 500 }, circle: { name: 'Circle', def: 500 } };
         const PAPER_MIN_MM = 20, PAPER_MAX_MM = 5000;
         const UNITS = { mm: { f: 1, dec: 1 }, cm: { f: 10, dec: 2 }, in: { f: 25.4, dec: 2 } };
         const PAPER_CHIPS = { A4: [210, 297], A3: [297, 420], A2: [420, 594], A1: [594, 841] };
@@ -1149,14 +1142,47 @@
         const RED = '#FF6666';
         let sizeUnit = 'mm';
         let modalSizeMm = { w: 210, h: 297 };
-        let modalHookCount = 7;
  
-        function holePositionsMm(product, wMm) {
-            const h = product.holes;
-            const xs = h.cols === 3 ? [h.inset, wMm / 2, wMm - h.inset] : [h.inset, wMm - h.inset];
-            const pts = [];
-            h.rows.forEach(row => xs.forEach(x => pts.push([x, row])));
-            return pts;
+        // 'free' (custom size and A-formats), 'product', 'square' or 'circle'
+        function templateKind() {
+            if (!isPaperVisible || !activeProductKey) return 'free';
+            if (PRODUCTS[activeProductKey]) return 'product';
+            if (SHAPES[activeProductKey]) return activeProductKey;
+            return 'free';
+        }
+        function hooksFromWidth(w) {
+            const c = PRODUCTS.hanger.hooks;
+            return Math.max(c.min, Math.min(c.max, Math.round((w - c.armW) / c.pitch) + 1));
+        }
+        function hookWidth(n) { const c = PRODUCTS.hanger.hooks; return c.armW + (n - 1) * c.pitch; }
+        // Keeps a product within what can really be made: hanger width = whole number of hooks, minimum heights.
+        function normalizeProductSize(key, w, h) {
+            const P = PRODUCTS[key];
+            w = P.hooks ? hookWidth(hooksFromWidth(w)) : Math.max(P.minW || PAPER_MIN_MM, w);
+            h = Math.max(P.tail + P.minFace, h);
+            return { w: Math.min(PAPER_MAX_MM, +w.toFixed(2)), h: Math.min(PAPER_MAX_MM, +h.toFixed(2)) };
+        }
+        // Everything that depends on the product's size: bend lines, bolt holes, hook arms.
+        function productGeom(key, wMm, hMm) {
+            const P = PRODUCTS[key];
+            const anchor = hMm - P.tail;
+            const rows = [P.holes.top];
+            if (P.holes.bottomUp != null) rows.push(anchor - P.holes.bottomUp);
+            // narrow products (4 hooks or fewer) get 4 holes instead of 6
+            const xs = wMm <= 460 ? [P.holes.inset, wMm - P.holes.inset] : [P.holes.inset, wMm / 2, wMm - P.holes.inset];
+            const holes = [];
+            rows.forEach(y => xs.forEach(x => holes.push([x, y])));
+            let arms = [];
+            if (P.hooks) {
+                const n = hooksFromWidth(wMm), c = P.hooks;
+                for (let i = 0; i < n; i++) arms.push([i * c.pitch, i * c.pitch + c.armW]);
+            }
+            return { anchor, folds: P.folds.map(o => anchor + o), holes, arms };
+        }
+        // Bolt holes of the template currently on the canvas, in mm from the sheet's top-left corner.
+        function currentHolesMm() {
+            if (templateKind() !== 'product') return [];
+            return productGeom(activeProductKey, paperWidthMm, paperHeightMm).holes;
         }
  
         // ---- unit helpers ----
@@ -1173,11 +1199,23 @@
         function sizeIsValid(v) { return Number.isFinite(v) && v >= PAPER_MIN_MM && v <= PAPER_MAX_MM; }
  
         // ---- window actions ----
+        function dimsFor(key) {
+            if (SHAPES[key]) { const sz = (selectedPresetKey === key) ? modalSizeMm.w : SHAPES[key].def; return { s: sz, w: sz, h: sz }; }
+            const P = PRODUCTS[key];
+            if (selectedPresetKey === key) return normalizeProductSize(key, modalSizeMm.w, modalSizeMm.h);
+            return { w: P.def.w, h: P.def.h };
+        }
+ 
         function selectPreset(key) {
-            const p = PRODUCTS[key];
-            if (!p) return;
-            selectedPresetKey = key;
-            writeSize(p.w, p.h);
+            if (SHAPES[key]) {
+                const keep = SHAPES[selectedPresetKey] && sizeIsValid(modalSizeMm.w);
+                const sz = keep ? modalSizeMm.w : SHAPES[key].def;
+                selectedPresetKey = key;
+                writeSize(sz, sz);
+            } else if (PRODUCTS[key]) {
+                selectedPresetKey = key;
+                writeSize(PRODUCTS[key].def.w, PRODUCTS[key].def.h);   // default size; can be edited afterwards
+            } else return;
             refreshModal();
         }
  
@@ -1188,16 +1226,29 @@
             refreshModal();
         }
  
-        // Typing a custom size means "no product": no bolt holes, no hooks.
-        function onSizeInput() {
-            selectedPresetKey = null;
+        // Custom size: no template. Product: stays selected, its holes / hooks follow the size. Shape: width = height.
+        function onSizeInput(which) {
             const w = readField('canvas-w-input'), h = readField('canvas-h-input');
-            if (sizeIsValid(w) && sizeIsValid(h)) modalSizeMm = { w, h };
+            if (SHAPES[selectedPresetKey]) {
+                const v = which === 'h' ? h : w;
+                document.getElementById('canvas-w-input').value = document.getElementById('canvas-h-input').value = (which === 'h' ? document.getElementById('canvas-h-input') : document.getElementById('canvas-w-input')).value;
+                if (sizeIsValid(v)) modalSizeMm = { w: v, h: v };
+            } else if (sizeIsValid(w) && sizeIsValid(h)) modalSizeMm = { w, h };
+            refreshModal();
+        }
+ 
+        // Leaving a field: snap a product to a size that can actually be made.
+        function onSizeCommit() {
+            const w = readField('canvas-w-input'), h = readField('canvas-h-input');
+            if (PRODUCTS[selectedPresetKey] && sizeIsValid(w) && sizeIsValid(h)) {
+                const n = normalizeProductSize(selectedPresetKey, w, h);
+                writeSize(n.w, n.h);
+            }
             refreshModal();
         }
  
         function swapSize() {
-            selectedPresetKey = null;
+            if (selectedPresetKey) return;
             const w = readField('canvas-w-input'), h = readField('canvas-h-input');
             if (sizeIsValid(w) && sizeIsValid(h)) writeSize(h, w); else writeSize(modalSizeMm.h, modalSizeMm.w);
             refreshModal();
@@ -1210,85 +1261,88 @@
             refreshModal();
         }
  
-        function changeHooks(delta) {
-            const cfg = PRODUCTS.hanger.hooks;
-            modalHookCount = Math.max(cfg.min, Math.min(cfg.max, modalHookCount + delta));
+        // Hooks: every hook changes the width by one pitch (147 mm), so the spacing never changes.
+        function changeHooks(delta, event) {
+            if (event) event.stopPropagation();
+            const c = PRODUCTS.hanger.hooks;
+            const n = Math.max(c.min, Math.min(c.max, hooksFromWidth(modalSizeMm.w) + delta));
+            writeSize(hookWidth(n), modalSizeMm.h);
             refreshModal();
         }
  
-        // Product icon: a small parametric render, product mounted on a dark wall and seen from the
-        // front-left (like the product photos, but with no pattern). Every number comes from PRODUCTS.
-        function productIconSVG(key, W, H) {
-            const P = PRODUCTS[key], pr = P.profile, id = 'ic' + key;
+        // Template icon: a technical sketch (line drawing, no pattern) of the whole product mounted on the wall,
+        // seen from the front-left. Every number comes from PRODUCTS / SHAPES; it follows the chosen size.
+        function productIconSVG(key, W, H, dims) {
             const ang = 30 * Math.PI / 180, pit = 13 * Math.PI / 180;
-            const ca = Math.cos(ang), sa = Math.sin(ang), cb = Math.cos(pit), sb = Math.sin(pit);
-            const D = 1500, F = D * 0.21;
-            const base = (x, y, z) => {                       // y = mm down from the top edge, z = mm away from the wall
+            const ca = Math.cos(ang), sa = Math.sin(ang), cb = Math.cos(pit), sb = Math.sin(pit), D = 1500;
+            const proj = (x, y, z) => {                       // y = mm down from the top edge, z = mm away from the wall
                 const up = -y, X = x * ca + z * sa, Zd = x * sa - z * ca;
-                const Z2 = D + Zd * cb - up * sb, s = F / Z2;
-                return [X * s, -(up * cb + Zd * sb) * s, s];
+                const Z2 = D + Zd * cb - up * sb, s = D / Z2;
+                return [X * s, -(up * cb + Zd * sb) * s];
             };
-            const lowest = pr.back ? pr.face : pr.face + 4;
-            const top0 = base(0, 0, pr.gap)[1], bot0 = base(0, lowest, pr.gap + (pr.foot || 0))[1];
-            const tx = 12, ty = H / 2 - (top0 + bot0) / 2;
-            const pt = (x, y, z) => { const q = base(x, y, z); return [q[0] + tx, q[1] + ty, q[2]]; };
-            const poly = (pts, fill, extra) => '<polygon points="' + pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ') + '" fill="' + fill + '" ' + (extra || '') + '/>';
-            const edge = 'stroke="rgba(255,255,255,0.30)" stroke-width="0.5" stroke-linejoin="round"';
-            const g = pr.gap, w = P.w, rad = (180 - (pr.angle || 90)) * Math.PI / 180;
-            const lipDz = (pr.lip || 0) * Math.cos(rad), lipDy = (pr.lip || 0) * Math.sin(rad);
-            let n = 0, centres = [], armW = 0, start = pr.face;
-            if (P.hooks) {
-                n = modalHookCount; armW = P.hooks.armW; start = P.hooks.start;
-                for (let i = 0; i < n; i++) centres.push(armW / 2 + i * (w - armW) / (n - 1));
-            }
-            let body = '';
-            // shadow on the wall
-            body += '<g filter="url(#' + id + 'b)" opacity="0.7">' +
-                poly([pt(14, 8, 0), pt(w + 14, 8, 0), pt(w + 14, pr.face + 20, 0), pt(14, pr.face + 20, 0)], '#000') + '</g>';
-            // foot / ledge / hooks (drawn first, they sit in front of the wall and below the face)
-            if (P.hooks) {
-                centres.forEach(c => {
-                    const x0 = c - armW / 2, x1 = c + armW / 2;
-                    body += poly([pt(x0, pr.face, g), pt(x1, pr.face, g), pt(x1, pr.face, g + pr.foot), pt(x0, pr.face, g + pr.foot)], 'url(#' + id + 't)', edge);
-                    body += poly([pt(x0, pr.face, g + pr.foot), pt(x1, pr.face, g + pr.foot), pt(x1, pr.face - lipDy, g + pr.foot + lipDz), pt(x0, pr.face - lipDy, g + pr.foot + lipDz)], 'url(#' + id + 'l)', edge);
-                });
-            } else if (!pr.back) {
-                body += poly([pt(0, pr.face, g), pt(w, pr.face, g), pt(w, pr.face, g + pr.foot), pt(0, pr.face, g + pr.foot)], 'url(#' + id + 't)', edge);
-                body += poly([pt(0, pr.face, g + pr.foot), pt(w, pr.face, g + pr.foot), pt(w, pr.face - lipDy, g + pr.foot + lipDz), pt(0, pr.face - lipDy, g + pr.foot + lipDz)], 'url(#' + id + 'l)', edge);
-            }
-            // front face
-            if (P.hooks) {
-                body += poly([pt(0, 0, g), pt(w, 0, g), pt(w, start, g), pt(0, start, g)], 'url(#' + id + 'f)', edge);
-                centres.forEach(c => {
-                    const x0 = c - armW / 2, x1 = c + armW / 2;
-                    body += poly([pt(x0, start - 0.5, g), pt(x1, start - 0.5, g), pt(x1, pr.face, g), pt(x0, pr.face, g)], 'url(#' + id + 'f)', edge);
-                });
+            const polys = [], lines = [], holes = [];
+            let wall;
+            if (SHAPES[key]) {
+                const sz = dims.s, g = 20;
+                const pts = key === 'circle'
+                    ? Array.from({ length: 48 }, (_, i) => { const t = 2 * Math.PI * i / 48; return [sz / 2 + sz / 2 * Math.cos(t), sz / 2 + sz / 2 * Math.sin(t), g]; })
+                    : [[0, 0, g], [sz, 0, g], [sz, sz, g], [0, sz, g]];
+                polys.push({ pts, cls: 'face' });
+                wall = [-sz * 0.08, -sz * 0.08, sz * 1.08, sz * 1.08];
             } else {
-                body += poly([pt(0, 0, g), pt(w, 0, g), pt(w, pr.face, g), pt(0, pr.face, g)], 'url(#' + id + 'f)', edge);
+                const P = PRODUCTS[key], pr = P.profile, w = dims.w, h = dims.h, G = productGeom(key, w, h);
+                const g = pr.gap, fb = G.anchor + pr.face;
+                const rad = (180 - (pr.angle || 90)) * Math.PI / 180;
+                const lipDz = (pr.lip || 0) * Math.cos(rad), lipDy = (pr.lip || 0) * Math.sin(rad);
+                wall = [-40, -40, w + 40, fb + 40];
+                G.holes.forEach(([x, y]) => { lines.push([[x, y, g], [x, y, 0]]); holes.push([x, y, g]); });
+                if (pr.foot) {
+                    const spans = P.hooks ? G.arms : [[0, w]];
+                    spans.forEach(([x0, x1]) => {
+                        polys.push({ pts: [[x0, fb, g], [x1, fb, g], [x1, fb, g + pr.foot], [x0, fb, g + pr.foot]], cls: 'foot' });
+                        polys.push({ pts: [[x0, fb, g + pr.foot], [x1, fb, g + pr.foot], [x1, fb - lipDy, g + pr.foot + lipDz], [x0, fb - lipDy, g + pr.foot + lipDz]], cls: 'foot' });
+                    });
+                }
+                if (P.hooks) {
+                    polys.push({ pts: [[0, 0, g], [w, 0, g], [w, G.anchor, g], [0, G.anchor, g]], cls: 'face' });
+                    G.arms.forEach(([x0, x1]) => polys.push({ pts: [[x0, G.anchor - 0.5, g], [x1, G.anchor - 0.5, g], [x1, fb, g], [x0, fb, g]], cls: 'face' }));
+                } else {
+                    if (pr.back) polys.push({ pts: [[0, fb, g], [w, fb, g], [w, fb, g - pr.back], [0, fb, g - pr.back]], cls: 'flange' });
+                    polys.push({ pts: [[0, 0, g], [w, 0, g], [w, fb, g], [0, fb, g]], cls: 'face' });
+                }
             }
-            // bolt heads
-            holePositionsMm(P, w).forEach(([x, y]) => {
-                const q = pt(x, y, g + 3), r = Math.max(1.6, 5 * q[2]);
-                body += '<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="' + r.toFixed(2) + '" fill="url(#' + id + 'k)"/>';
-            });
-            const defs = '<defs>' +
-                '<linearGradient id="' + id + 'f" x1="0" x2="1" y1="0" y2="0.15"><stop offset="0" stop-color="#d3d6da"/><stop offset="0.6" stop-color="#a1a5aa"/><stop offset="1" stop-color="#85898e"/></linearGradient>' +
-                '<linearGradient id="' + id + 't" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#e6e8eb"/><stop offset="1" stop-color="#b3b7bc"/></linearGradient>' +
-                '<linearGradient id="' + id + 'l" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#c3c6ca"/><stop offset="1" stop-color="#8d9196"/></linearGradient>' +
-                '<radialGradient id="' + id + 'k" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#f2f3f4"/><stop offset="1" stop-color="#8b8f94"/></radialGradient>' +
-                '<radialGradient id="' + id + 'w" cx="0.3" cy="0.4" r="1"><stop offset="0" stop-color="#2c2c2f"/><stop offset="1" stop-color="#151517"/></radialGradient>' +
-                '<filter id="' + id + 'b" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.2"/></filter>' +
-                '<clipPath id="' + id + 'c"><rect width="' + W + '" height="' + H + '" rx="10"/></clipPath></defs>';
-            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">' + defs +
-                '<g clip-path="url(#' + id + 'c)"><rect width="' + W + '" height="' + H + '" fill="url(#' + id + 'w)"/>' + body + '</g></svg>';
+            // fit the WHOLE product into the tile
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+            polys.forEach(p => p.pts.forEach(q => { const r = proj(q[0], q[1], q[2]); x0 = Math.min(x0, r[0]); x1 = Math.max(x1, r[0]); y0 = Math.min(y0, r[1]); y1 = Math.max(y1, r[1]); }));
+            const pad = 9, k = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (y1 - y0));
+            const tx = W / 2 - (x0 + x1) / 2 * k, ty = H / 2 - (y0 + y1) / 2 * k;
+            const at = q => { const r = proj(q[0], q[1], q[2]); return [r[0] * k + tx, r[1] * k + ty]; };
+            const pts = arr => arr.map(q => { const r = at(q); return r[0].toFixed(1) + ',' + r[1].toFixed(1); }).join(' ');
+            let g = '';
+            lines.forEach(l => { const a = at(l[0]), b = at(l[1]); g += '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" stroke="currentColor" stroke-opacity="0.55" stroke-width="0.8"/>'; });
+            const sketch = 'style="fill:var(--bg-color);stroke:currentColor;stroke-width:1.1;stroke-linejoin:round"';
+            polys.filter(p => p.cls === 'foot').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
+            polys.filter(p => p.cls === 'flange').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
+            polys.filter(p => p.cls === 'face').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
+            polys.filter(p => p.cls === 'flange').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" fill="currentColor" fill-opacity="0.13" stroke="currentColor" stroke-opacity="0.75" stroke-width="0.9" stroke-linejoin="round"/>'; });
+            holes.forEach(h => { const c = at(h); g += '<ellipse cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" rx="1.2" ry="1.6" fill="none" stroke="' + RED + '" stroke-width="0.9"/>'; });
+            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">' + g + '</svg>';
         }
  
         function renderProductCards() {
             document.getElementById('preset-list').innerHTML = Object.entries(PRODUCTS).map(([key, p]) => {
-                const extra = p.hooks ? ` · ${modalHookCount} hooks` : '';
-                return `<div class="preset-card${key === selectedPresetKey ? ' active' : ''}" role="button" onclick="selectPreset('${key}')">
-                    <div class="preset-icon">${productIconSVG(key, 96, 72)}</div>
-                    <div><span class="preset-name">${p.name}</span><span class="preset-dim">${p.w} × ${p.h} mm${extra}</span></div>
+                const d = dimsFor(key), on = key === selectedPresetKey;
+                const hooks = p.hooks ? hooksFromWidth(d.w) : 0;
+                const extra = (p.hooks && !on) ? ` · ${hooks} hooks` : '';
+                const stepper = (p.hooks && on) ? `<div class="card-hooks" onclick="event.stopPropagation()">
+                        <span>Hooks</span>
+                        <button class="mini-btn" onclick="changeHooks(-1, event)" aria-label="Fewer hooks">−</button>
+                        <b>${hooks}</b>
+                        <button class="mini-btn" onclick="changeHooks(1, event)" aria-label="More hooks">+</button>
+                    </div>` : '';
+                return `<div class="preset-card${on ? ' active' : ''}" role="button" onclick="selectPreset('${key}')">
+                    <div class="preset-icon">${productIconSVG(key, 120, 78, d)}</div>
+                    <div class="preset-text"><span class="preset-name">${p.name}</span><span class="preset-dim">${fmtLen(d.w)} × ${fmtLen(d.h)} ${sizeUnit}${extra}</span>${stepper}</div>
                 </div>`;
             }).join('');
         }
@@ -1301,43 +1355,49 @@
             document.getElementById('size-error').textContent = (wOk && hOk) ? '' :
                 `Each side must be between ${fmtLen(PAPER_MIN_MM)} and ${fmtLen(PAPER_MAX_MM)} ${sizeUnit}.`;
             document.getElementById('nc-confirm').disabled = !(wOk && hOk);
+            document.getElementById('swap-btn').disabled = Boolean(selectedPresetKey);
             document.querySelectorAll('#unit-seg button').forEach(b => b.classList.toggle('active', b.dataset.unit === sizeUnit));
             document.querySelectorAll('[data-unit-label]').forEach(el => { el.textContent = sizeUnit; });
+            const shapeIco = {
+                square: '<svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>',
+                circle: '<svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5"/></svg>'
+            };
             document.getElementById('paper-chips').innerHTML = Object.entries(PAPER_CHIPS).map(([name, [cw, ch]]) => {
                 const on = !selectedPresetKey && Math.abs(modalSizeMm.w - cw) < 0.5 && Math.abs(modalSizeMm.h - ch) < 0.5;
                 return `<button class="chip${on ? ' active' : ''}" onclick="selectPaperChip('${name}')">${name}</button>`;
-            }).join('');
+            }).join('') + '<span class="chip-sep"></span>' + Object.entries(SHAPES).map(([key, sp]) =>
+                `<button class="chip chip-shape${key === selectedPresetKey ? ' active' : ''}" onclick="selectPreset('${key}')">${shapeIco[key]}${sp.name}</button>`).join('');
             renderProductCards();
-            const P = selectedPresetKey ? PRODUCTS[selectedPresetKey] : null;
-            document.getElementById('hooks-group').style.display = (P && P.hooks) ? 'block' : 'none';
-            document.getElementById('hooks-count').textContent = modalHookCount;
         }
  
         function prepareModalPresets() {
             selectedPresetKey = isPaperVisible ? activeProductKey : null;
-            modalHookCount = activeProductKey === 'hanger' ? hookCount : PRODUCTS.hanger.hooks.def;
             if (isPaperVisible) writeSize(paperWidthMm, paperHeightMm); else writeSize(modalSizeMm.w, modalSizeMm.h);
             refreshModal();
         }
  
-        // Outline of the selected product as an SVG path, in world pixels (+ optional offset).
-        // The hanger's arms are centred on grid points; the outer arms stay flush with the sheet edge.
+        // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         function productOutlineD(dx = 0, dy = 0) {
-            const P = PRODUCTS[activeProductKey];
-            if (!P) return '';
+            const kind = templateKind();
+            if (kind === 'free') return '';
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const L = -wPx / 2 + dx, R = wPx / 2 + dx, T = -hPx / 2 + dy, B = hPx / 2 + dy;
             const f = v => +v.toFixed(2);
+            if (kind === 'circle') {
+                const rx = wPx / 2, ry = hPx / 2;
+                return `M${f(L)} ${f(dy)}A${f(rx)} ${f(ry)} 0 1 0 ${f(R)} ${f(dy)}A${f(rx)} ${f(ry)} 0 1 0 ${f(L)} ${f(dy)}Z`;
+            }
+            if (kind === 'square') return `M${f(L)} ${f(T)}H${f(R)}V${f(B)}H${f(L)}Z`;
+            const P = PRODUCTS[activeProductKey];
+            const G = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
             if (P.hooks) {
-                const n = Math.max(P.hooks.min, Math.min(P.hooks.max, hookCount));
-                const half = P.hooks.armW * MM / 2;
-                const startY = Math.round((-hPx / 2 + P.hooks.start * MM) / STEP) * STEP + dy;
-                const cx = i => Math.max(-wPx / 2 + half, Math.min(wPx / 2 - half,
-                    Math.round((-wPx / 2 + half + i * (wPx - 2 * half) / (n - 1)) / STEP) * STEP)) + dx;
-                const xl = i => i === 0 ? L : cx(i) - half;
-                const xr = i => i === n - 1 ? R : cx(i) + half;
-                let d = `M${f(L)} ${f(T)}H${f(R)}V${f(B)}H${f(xl(n - 1))}V${f(startY)}`;
-                for (let i = n - 2; i >= 0; i--) d += `H${f(xr(i))}V${f(B)}H${f(xl(i))}V${f(startY)}`;
+                // arms keep an exact 147 mm pitch; the plate ends where they begin
+                const startY = T + G.anchor * MM;
+                let d = `M${f(L)} ${f(T)}H${f(R)}V${f(startY)}`;
+                for (let i = G.arms.length - 1; i >= 0; i--) {
+                    const al = L + G.arms[i][0] * MM, ar = L + G.arms[i][1] * MM;
+                    d += `H${f(ar)}V${f(B)}H${f(al)}V${f(startY)}`;
+                }
                 return d + 'Z';
             }
             if (P.radius) {
@@ -1347,28 +1407,79 @@
             return `M${f(L)} ${f(T)}H${f(R)}V${f(B)}H${f(L)}Z`;
         }
  
-        // The product's flat drawing on the canvas: contour + dashed bend lines.
+        // The template's flat drawing on the canvas: contour + dashed bend lines.
         function drawProductTemplate(paperColor) {
-            const P = PRODUCTS[activeProductKey];
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const path = new Path2D(productOutlineD());
             const ctx = drawingContext;
             push();
             fill(paperColor); stroke('rgba(128,128,128,0.4)'); strokeWeight(2 / zoom);
             ctx.fill(path); ctx.stroke(path);
-            ctx.save();
-            ctx.clip(path);
-            stroke('rgba(128,128,128,0.45)'); strokeWeight(1 / zoom);
-            ctx.setLineDash([7 / zoom, 6 / zoom]);
-            P.folds.forEach(mmY => { const y = -hPx / 2 + mmY * MM; line(-wPx / 2, y, wPx / 2, y); });
-            ctx.restore();
+            if (templateKind() === 'product') {
+                ctx.save();
+                ctx.clip(path);
+                stroke('rgba(128,128,128,0.45)'); strokeWeight(1 / zoom);
+                ctx.setLineDash([7 / zoom, 6 / zoom]);
+                productGeom(activeProductKey, paperWidthMm, paperHeightMm).folds.forEach(mmY => {
+                    const y = -hPx / 2 + mmY * MM; line(-wPx / 2, y, wPx / 2, y);
+                });
+                ctx.restore();
+            }
             pop();
+        }
+ 
+        // The corner "ears" that resize the canvas.
+        //  custom size / A-formats / square : four L-shaped ears in the corners
+        //  products (shelf, hanger, holder) : only the top-left ear (a tap opens the size window)
+        //  circle                           : four arc-shaped ears sitting on the circle at the diagonals
+        function drawCanvasEars(wPx, hPx) {
+            const kind = templateKind();
+            const col = currentTheme === 'light' ? 160 : 80;
+            const halfW = wPx / 2, halfH = hPx / 2, cLen = 20 / zoom;
+            push();
+            stroke(col); strokeWeight(3 / zoom); noFill();
+            if (kind === 'circle') {
+                const r = halfW, span = (cLen * 1.3) / r;
+                [[225, 'tl'], [315, 'tr'], [135, 'bl'], [45, 'br']].forEach(([deg]) => {
+                    const a = deg * Math.PI / 180;
+                    arc(0, 0, r * 2, r * 2, a - span, a + span);
+                });
+            } else {
+                const L = kind === 'product' ? ['tl'] : ['tl', 'tr', 'bl', 'br'];
+                if (L.includes('tl')) { beginShape(); vertex(-halfW, -halfH + cLen); vertex(-halfW, -halfH); vertex(-halfW + cLen, -halfH); endShape(); }
+                if (L.includes('tr')) { beginShape(); vertex(halfW - cLen, -halfH); vertex(halfW, -halfH); vertex(halfW, -halfH + cLen); endShape(); }
+                if (L.includes('bl')) { beginShape(); vertex(-halfW, halfH - cLen); vertex(-halfW, halfH); vertex(-halfW + cLen, halfH); endShape(); }
+                if (L.includes('br')) { beginShape(); vertex(halfW - cLen, halfH); vertex(halfW, halfH); vertex(halfW, halfH - cLen); endShape(); }
+            }
+            pop();
+        }
+ 
+        // Dragging an ear: square and circle stay round / square, products follow what can be made.
+        function applyCornerDrag(worldX, worldY) {
+            const MM = LINE_WEIGHT / 12, kind = templateKind();
+            if (kind === 'square' || kind === 'circle') {
+                const half = kind === 'circle' ? Math.hypot(worldX, worldY) : Math.max(Math.abs(worldX), Math.abs(worldY));
+                const sz = Math.max(PAPER_MIN_MM, Math.min(PAPER_MAX_MM, (half * 2) / MM));
+                paperWidthMm = paperHeightMm = sz;
+                showActionHint(`${kind === 'circle' ? 'Ø ' : ''}${Math.round(sz)} mm`, true);
+            } else if (kind === 'product') {
+                const n = normalizeProductSize(activeProductKey, (-worldX * 2) / MM, (-worldY * 2) / MM);
+                paperWidthMm = n.w; paperHeightMm = n.h;
+                showActionHint(`${Math.round(n.w)} × ${Math.round(n.h)} mm`, true);
+            } else {
+                let newW_px = paperWidthMm * MM, newH_px = paperHeightMm * MM;
+                if (activeCorner.includes('r')) newW_px = Math.max(50, worldX * 2);
+                if (activeCorner.includes('l')) newW_px = Math.max(50, -worldX * 2);
+                if (activeCorner.includes('b')) newH_px = Math.max(50, worldY * 2);
+                if (activeCorner.includes('t')) newH_px = Math.max(50, -worldY * 2);
+                paperWidthMm = newW_px / MM; paperHeightMm = newH_px / MM;
+                showActionHint(`${Math.round(paperWidthMm)} × ${Math.round(paperHeightMm)} mm`, true);
+            }
         }
  
         // Bolt holes on the canvas: centre dot + ring + four ticks (a reticle), constant 1 px lines on screen.
         function drawProductMarks(wPx, hPx) {
-            const product = PRODUCTS[activeProductKey];
-            if (!product) return;
+            if (templateKind() !== 'product') return;
             const MM = LINE_WEIGHT / 12;
             const left = -wPx / 2, top = -hPx / 2;
             // Everything sits on the drawing grid, so the cursor lands exactly on it.
@@ -1377,7 +1488,7 @@
             const R = Math.max(HOLE_RING_MM * MM, 6 / zoom);
             const dotD = Math.max(R * 0.55, 3 / zoom);
             strokeWeight(1 / zoom); strokeCap(ROUND);
-            holePositionsMm(product, wPx / MM).forEach(([xMm, yMm]) => {
+            currentHolesMm().forEach(([xMm, yMm]) => {
                 const x = snap(left + xMm * MM), y = snap(top + yMm * MM);
                 noFill(); stroke(RED);
                 circle(x, y, R * 2);
@@ -1423,14 +1534,15 @@
         }
  
         function applyNewCanvasSize() {
-            const w = readField('canvas-w-input'), h = readField('canvas-h-input');
+            let w = readField('canvas-w-input'), h = readField('canvas-h-input');
             if (!sizeIsValid(w) || !sizeIsValid(h)) { refreshModal(); return; }
+            if (PRODUCTS[selectedPresetKey]) { const n = normalizeProductSize(selectedPresetKey, w, h); w = n.w; h = n.h; }
+            if (SHAPES[selectedPresetKey]) h = w;
             const shouldCreateProject = !isResizingOnly && createProjectOnReset;
             paperWidthMm = +w.toFixed(2);
             paperHeightMm = +h.toFixed(2);
             isPaperVisible = true;
             activeProductKey = selectedPresetKey;
-            hookCount = modalHookCount;
             closeNewCanvasModal();
             if (!isResizingOnly) {
                 if (shouldCreateProject) { activeProjectId = null; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
@@ -1442,10 +1554,35 @@
  
         function handleCanvasSizeKey(event) {
             if (event.key === 'Escape') { event.preventDefault(); closeNewCanvasModal(); return; }
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                stepSize(event.currentTarget === document.getElementById('canvas-h-input') ? 'h' : 'w', event.key === 'ArrowUp' ? 1 : -1, event.shiftKey);
+                return;
+            }
             if (event.key !== 'Enter') return;
             event.preventDefault();
             applyNewCanvasSize();
         }
+ 
+        // Scrolling over Width / Height changes the value: 1 mm per notch, 10 mm with Shift (Ctrl: 0.1 mm).
+        function stepSize(which, dir, big) {
+            const id = which === 'h' ? 'canvas-h-input' : 'canvas-w-input';
+            let v = readField(id);
+            if (!Number.isFinite(v)) v = which === 'h' ? modalSizeMm.h : modalSizeMm.w;
+            v = Math.round((v + dir * (big ? 10 : 1)) * 10) / 10;
+            v = Math.max(PAPER_MIN_MM, Math.min(PAPER_MAX_MM, v));
+            document.getElementById(id).value = fmtLen(v);
+            onSizeInput(which);
+            onSizeCommit();
+        }
+        ['w', 'h'].forEach(k => {
+            const el = document.getElementById(k === 'h' ? 'canvas-h-input' : 'canvas-w-input');
+            if (el) el.addEventListener('wheel', e => {
+                e.preventDefault();
+                if (!e.deltaY) return;
+                stepSize(k, e.deltaY < 0 ? 1 : -1, e.shiftKey);
+            }, { passive: false });
+        });
  
         function toggleDashboard() {
             if(isGameMode) return;
@@ -1990,16 +2127,27 @@
         }
  
         function checkCornerClick(worldX, worldY) {
-            let MM_TO_PX = LINE_WEIGHT / 12;
-            let halfW = (paperWidthMm * MM_TO_PX) / 2;
-            let halfH = (paperHeightMm * MM_TO_PX) / 2;
-            let cs = 30 / zoom; 
+            const kind = templateKind();
+            const MM_TO_PX = LINE_WEIGHT / 12;
+            const halfW = (paperWidthMm * MM_TO_PX) / 2;
+            const halfH = (paperHeightMm * MM_TO_PX) / 2;
+            const cs = 30 / zoom;
  
-            if (Math.abs(worldX - halfW) < cs && Math.abs(worldY - halfH) < cs) return 'br';
-            if (Math.abs(worldX + halfW) < cs && Math.abs(worldY - halfH) < cs) return 'bl';
-            if (Math.abs(worldX - halfW) < cs && Math.abs(worldY + halfH) < cs) return 'tr';
+            if (kind === 'circle') {
+                const d = halfW * Math.SQRT1_2;   // the ears sit on the circle at 45 degrees
+                if (Math.hypot(worldX - d, worldY - d) < cs) return 'br';
+                if (Math.hypot(worldX + d, worldY - d) < cs) return 'bl';
+                if (Math.hypot(worldX - d, worldY + d) < cs) return 'tr';
+                if (Math.hypot(worldX + d, worldY + d) < cs) return 'tl';
+                return null;
+            }
+            // products keep only the top-left ear
+            if (kind !== 'product') {
+                if (Math.abs(worldX - halfW) < cs && Math.abs(worldY - halfH) < cs) return 'br';
+                if (Math.abs(worldX + halfW) < cs && Math.abs(worldY - halfH) < cs) return 'bl';
+                if (Math.abs(worldX - halfW) < cs && Math.abs(worldY + halfH) < cs) return 'tr';
+            }
             if (Math.abs(worldX + halfW) < cs && Math.abs(worldY + halfH) < cs) return 'tl';
- 
             return null;
         }
  
@@ -2046,9 +2194,11 @@
             if (isResizingCanvas) {
                 if (performance.now() - (window.lastClickTime || 0) < 200) {
                     openNewCanvasModalFromCorner();
-                } else if (!activeProductKey) {
+                } else {
                     paperWidthMm = Math.round(paperWidthMm);
                     paperHeightMm = Math.round(paperHeightMm);
+                    if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
+                    if (SHAPES[activeProductKey]) paperHeightMm = paperWidthMm;
                 }
                 isResizingCanvas = false;
                 activeCorner = null;
@@ -2446,18 +2596,8 @@
                             paddle.x = constrain(paddle.x + worldDx, gameBounds.minX + paddle.w/2, gameBounds.maxX - paddle.w/2);
                             if(gameState === 'start') ball.x = paddle.x;
                         }
-                        else if (isResizingCanvas && activeProductKey && !isGameMode) {
-                            /* product templates have a fixed size */
-                        } else if (isResizingCanvas && !isGameMode) {
-                            let worldX = (pX - offsetX) / zoom; let worldY = (pY - offsetY) / zoom;
-                            let MM_TO_PX = LINE_WEIGHT / 12;
-                            let newW_px = paperWidthMm * MM_TO_PX; let newH_px = paperHeightMm * MM_TO_PX;
-                            if (activeCorner.includes('r')) newW_px = Math.max(50, worldX * 2);
-                            if (activeCorner.includes('l')) newW_px = Math.max(50, -worldX * 2);
-                            if (activeCorner.includes('b')) newH_px = Math.max(50, worldY * 2);
-                            if (activeCorner.includes('t')) newH_px = Math.max(50, -worldY * 2);
-                            paperWidthMm = newW_px / MM_TO_PX; paperHeightMm = newH_px / MM_TO_PX;
-                            showActionHint(`${Math.round(paperWidthMm)} × ${Math.round(paperHeightMm)} mm`, true);
+                        else if (isResizingCanvas && !isGameMode) {
+                            applyCornerDrag((pX - offsetX) / zoom, (pY - offsetY) / zoom);
                             redraw();
                         } else if (isEraserActive && !isTimelapseUIOpen && !isGameMode) {
                             performEraserActionAt((pX - offsetX) / zoom, (pY - offsetY) / zoom);
@@ -2524,20 +2664,15 @@
                 let paperColor = currentTheme === 'light' ? '#ffffff' : (currentTheme === 'dark' ? '#1e1e1e' : '#1e293b');
                 fill(paperColor); stroke('rgba(128,128,128,0.2)'); strokeWeight(2 / zoom); rectMode(CENTER);
                 let wPx = paperWidthMm * (LINE_WEIGHT / 12); let hPx = paperHeightMm * (LINE_WEIGHT / 12);
-                if (activeProductKey && PRODUCTS[activeProductKey]) drawProductTemplate(paperColor); else rect(0, 0, wPx, hPx);
-                stroke(currentTheme === 'light' ? 160 : 80); strokeWeight(3 / zoom); noFill();
-                let cLen = 20 / zoom; let halfW = wPx / 2; let halfH = hPx / 2;
-                beginShape(); vertex(-halfW, -halfH + cLen); vertex(-halfW, -halfH); vertex(-halfW + cLen, -halfH); endShape(); 
-                beginShape(); vertex(halfW - cLen, -halfH); vertex(halfW, -halfH); vertex(halfW, -halfH + cLen); endShape(); 
-                beginShape(); vertex(-halfW, halfH - cLen); vertex(-halfW, halfH); vertex(-halfW + cLen, halfH); endShape(); 
-                beginShape(); vertex(halfW - cLen, halfH); vertex(halfW, halfH); vertex(halfW, halfH - cLen); endShape();
+                if (templateKind() !== 'free') drawProductTemplate(paperColor); else rect(0, 0, wPx, hPx);
+                drawCanvasEars(wPx, hPx);
                 drawProductMarks(wPx, hPx); 
             }
  
             if (!isExporting || isTimelapseExport) {
                 drawGrid(colors.dotColor, colors.dotAlpha);
             }
-            const clipToProduct = isExporting && !isTimelapseExport && isPaperVisible && activeProductKey && PRODUCTS[activeProductKey];
+            const clipToProduct = isExporting && !isTimelapseExport && templateKind() !== 'free';
             if (clipToProduct) { push(); drawingContext.save(); drawingContext.clip(new Path2D(productOutlineD())); }
             drawGeometry(colors.geomColor);
             if (clipToProduct) { drawingContext.restore(); pop(); }
@@ -2558,11 +2693,11 @@
         // Bolt holes of the selected product, in world pixels (on grid points).
         // Any line drawn over one of them is cut open there, instantly.
         function getBoltHolesPx() {
-            if (!isPaperVisible || !activeProductKey || !PRODUCTS[activeProductKey]) return [];
-            const product = PRODUCTS[activeProductKey], MM = LINE_WEIGHT / 12;
+            if (templateKind() !== 'product') return [];
+            const MM = LINE_WEIGHT / 12;
             const wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const snap = v => Math.round(v / STEP) * STEP;
-            return holePositionsMm(product, paperWidthMm).map(([xMm, yMm]) => ({
+            return currentHolesMm().map(([xMm, yMm]) => ({
                 x: snap(-wPx / 2 + xMm * MM), y: snap(-hPx / 2 + yMm * MM), r: (HOLE_DIAMETER_MM * MM) / 2
             }));
         }
@@ -2976,7 +3111,7 @@
                 }
  
                 // Clip everything to the canvas window; size the file in real millimetres.
-                const clipShape = (isPaperVisible && activeProductKey && PRODUCTS[activeProductKey]) ? `<path d="${productOutlineD(-minX, -minY)}"/>` : `<rect width="${svgWidth}" height="${svgHeight}"/>`;
+                const clipShape = (templateKind() !== 'free') ? `<path d="${productOutlineD(-minX, -minY)}"/>` : `<rect width="${svgWidth}" height="${svgHeight}"/>`;
                 const clipDefs = isPaperVisible ? `<defs><clipPath id="paperClip">${clipShape}</clipPath></defs>` : '';
                 const body = isPaperVisible ? `<g clip-path="url(#paperClip)">${svgContent}</g>` : svgContent;
                 const outW = isPaperVisible ? `${+paperWidthMm.toFixed(2)}mm` : svgWidth;
@@ -3081,3 +3216,4 @@
 </body>
 </html>
  
+Ответ Claude завершен
