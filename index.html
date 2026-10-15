@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -371,7 +370,8 @@
  
         .nc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 22px 24px 14px; flex-shrink: 0; }
         .nc-header h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
-        .nc-sub { margin: 4px 0 0; font-size: 11px; color: var(--disabled-color); }
+        .nc-sub { display: none !important; }
+        .nc-sub-unused { margin: 4px 0 0; font-size: 11px; color: var(--disabled-color); }
         .nc-close {
             width: 32px; height: 32px; flex-shrink: 0; display: grid; place-items: center;
             border: 1px solid var(--border-color); border-radius: 9px; background: transparent;
@@ -426,7 +426,9 @@
         .chip-row.has-shapes .chip { padding: 6px 9px; }
         .chip-shape { display: inline-flex; align-items: center; gap: 5px; }
         .chip-shape svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; }
-        .chip-sep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--border-color); }
+        .chip-sep { flex: 1; min-width: 6px; }
+        .chip-paper { display: inline-flex; align-items: center; gap: 6px; }
+        .sheet-ico { fill: none; stroke: currentColor; stroke-width: 1.3; }
         .chip.active { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
         .field-error { margin-top: 10px; font-size: 11px; color: #ef4444; }
         .field-error:empty { display: none; }
@@ -446,10 +448,21 @@
         .preset-dim { display: block; margin-top: 3px; font-size: 10px; color: var(--disabled-color); font-variant-numeric: tabular-nums; }
         .shape-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .shape-card { gap: 10px; padding: 8px; }
-        .card-hooks { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--disabled-color); }
-        .card-hooks b { min-width: 14px; text-align: center; font-size: 13px; color: var(--text-color); font-variant-numeric: tabular-nums; }
-        .mini-btn { width: 32px; height: 28px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font-family: var(--main-font); font-size: 16px; font-weight: 600; line-height: 1; cursor: pointer; }
-        .mini-btn:active { transform: scale(0.92); background: var(--active-btn-bg); }
+        /* same height as the icon tile (78 + 2 border): top of '+' = top of the tile, bottom of '−' = bottom of the tile */
+        .card-hooks { display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; width: 38px; height: 80px; margin-left: auto; flex-shrink: 0; overflow: hidden; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-color); }
+        .mini-btn { flex: 1 1 0; min-height: 0; width: 100%; border: 0; border-radius: 0; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 17px; font-weight: 500; line-height: 1; cursor: pointer; transition: background 0.15s, opacity 0.15s; }
+        .mini-btn:disabled { opacity: 0.28; cursor: default; }
+        .hk-roll { position: relative; display: block; width: 100%; height: 22px; flex: none; overflow: hidden; font-size: 15px; font-weight: 700; color: var(--text-color); font-variant-numeric: tabular-nums; }
+        .hk-roll i { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; }
+        .hk-roll.up .o   { animation: hkOutUp 0.28s cubic-bezier(.3,.7,.2,1) forwards; }
+        .hk-roll.up .n   { animation: hkInUp 0.28s cubic-bezier(.3,.7,.2,1); }
+        .hk-roll.down .o { animation: hkOutDown 0.28s cubic-bezier(.3,.7,.2,1) forwards; }
+        .hk-roll.down .n { animation: hkInDown 0.28s cubic-bezier(.3,.7,.2,1); }
+        @keyframes hkOutUp   { to { transform: translateY(-100%); opacity: 0; } }
+        @keyframes hkInUp    { from { transform: translateY(100%); opacity: 0; } }
+        @keyframes hkOutDown { to { transform: translateY(100%); opacity: 0; } }
+        @keyframes hkInDown  { from { transform: translateY(-100%); opacity: 0; } }
+        .mini-btn:not(:disabled):active { background: var(--active-btn-bg); }
         .swap-btn:disabled { opacity: 0.3; cursor: not-allowed; }
  
         .modal-actions { display: flex; gap: 10px; padding: 14px 24px 20px; border-top: 1px solid var(--border-color); flex-shrink: 0; }
@@ -573,9 +586,6 @@
  
             <div class="nc-body">
                 <div class="nc-section">
-                    <div class="nc-label-row">
-                        <span class="nc-label">Custom size</span>
-                    </div>
                     <div class="size-row">
                         <div class="field" id="field-w">
                             <label class="field-label" for="canvas-w-input">Width</label>
@@ -1274,10 +1284,13 @@
         }
  
         // Hooks: every hook changes the width by one pitch (24 grid steps), so the spacing never changes.
+        let hookAnim = null;
         function changeHooks(delta, event) {
             if (event) event.stopPropagation();
             const c = PRODUCTS.hanger.hooks;
-            const n = Math.max(c.min, Math.min(c.max, hooksFromWidth(modalSizeMm.w) + delta));
+            const cur = hooksFromWidth(modalSizeMm.w);
+            const n = Math.max(c.min, Math.min(c.max, cur + delta));
+            hookAnim = n !== cur ? { from: cur, to: n } : null;
             writeSize(hookWidth(n), modalSizeMm.h);
             refreshModal();
         }
@@ -1336,7 +1349,7 @@
             polys.filter(p => p.cls === 'foot').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
             polys.filter(p => p.cls === 'flange').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
             polys.filter(p => p.cls === 'face').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
-            holes.forEach(h => { const c = at(h); g += '<ellipse cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" rx="1" ry="1.3" fill="currentColor"/>'; });
+            holes.forEach(h => { const c = at(h); g += '<ellipse cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" rx="0.65" ry="0.85" fill="currentColor"/>'; });
             return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">' + g + '</svg>';
         }
  
@@ -1344,18 +1357,24 @@
             document.getElementById('preset-list').innerHTML = Object.entries(PRODUCTS).map(([key, p]) => {
                 const d = dimsFor(key), on = key === selectedPresetKey;
                 const hooks = p.hooks ? hooksFromWidth(d.w) : 0;
-                const extra = (p.hooks && !on) ? ` · ${hooks} hooks` : '';
-                const stepper = (p.hooks && on) ? `<div class="card-hooks" onclick="event.stopPropagation()">
-                        <span>Hooks</span>
-                        <button class="mini-btn" onclick="changeHooks(-1, event)" aria-label="Fewer hooks">−</button>
-                        <b>${hooks}</b>
-                        <button class="mini-btn" onclick="changeHooks(1, event)" aria-label="More hooks">+</button>
+                const extra = '';
+                const c = p.hooks;
+                // vertical counter: + above, − below, the number rolls up / down when it changes
+                let num = `<i class="n">${hooks}</i>`;
+                if (hookAnim && hookAnim.to === hooks && hookAnim.from !== hooks)
+                    num = `<i class="o">${hookAnim.from}</i><i class="n">${hooks}</i>`;
+                const roll = hookAnim && hookAnim.to === hooks ? (hookAnim.to > hookAnim.from ? ' up' : ' down') : '';
+                const stepper = (p.hooks && on) ? `<div class="card-hooks" onclick="event.stopPropagation()" role="group" aria-label="Number of hooks">
+                        <button class="mini-btn" onclick="changeHooks(1, event)" aria-label="More hooks"${hooks >= c.max ? ' disabled' : ''}>+</button>
+                        <span class="hk-roll${roll}">${num}</span>
+                        <button class="mini-btn" onclick="changeHooks(-1, event)" aria-label="Fewer hooks"${hooks <= c.min ? ' disabled' : ''}>−</button>
                     </div>` : '';
                 return `<div class="preset-card${on ? ' active' : ''}" role="button" onclick="selectPreset('${key}')">
                     <div class="preset-icon">${productIconSVG(key, 120, 78, d)}</div>
-                    <div class="preset-text"><span class="preset-name">${p.name}</span><span class="preset-dim">${fmtLen(d.w)} × ${fmtLen(d.h)} ${sizeUnit}${extra}</span>${stepper}</div>
+                    <div class="preset-text"><span class="preset-name">${p.name}</span><span class="preset-dim">${fmtLen(d.w)} × ${fmtLen(d.h)} ${sizeUnit}${extra}</span></div>${stepper}
                 </div>`;
             }).join('');
+            hookAnim = null;
         }
  
         function refreshModal() {
@@ -1369,13 +1388,17 @@
             document.getElementById('swap-btn').disabled = Boolean(selectedPresetKey);
             document.querySelectorAll('#unit-seg button').forEach(b => b.classList.toggle('active', b.dataset.unit === sizeUnit));
             document.querySelectorAll('[data-unit-label]').forEach(el => { el.textContent = sizeUnit; });
+            // Paper sizes: a sheet icon with the true A-series proportion (1 : 1.414), drawn bigger for bigger sheets.
+            // Shapes: a separate icon-only toggle on the right.
+            const sheetIco = (hh) => { const ww = Math.round(hh / 1.414 * 10) / 10; return `<svg class="sheet-ico" viewBox="0 0 ${ww + 2} ${hh + 2}" width="${ww + 2}" height="${hh + 2}"><rect x="1" y="1" width="${ww}" height="${hh}" rx="1"/></svg>`; };
+            const sheetH = { A4: 10, A3: 12, A2: 14, A1: 16 };
             const shapeIco = {
                 square: '<svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>',
                 circle: '<svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5"/></svg>'
             };
             document.getElementById('paper-chips').innerHTML = Object.entries(PAPER_CHIPS).map(([name, [cw, ch]]) => {
                 const on = !selectedPresetKey && Math.abs(modalSizeMm.w - cw) < 0.5 && Math.abs(modalSizeMm.h - ch) < 0.5;
-                return `<button class="chip${on ? ' active' : ''}" onclick="selectPaperChip('${name}')">${name}</button>`;
+                return `<button class="chip chip-paper${on ? ' active' : ''}" onclick="selectPaperChip('${name}')">${name}</button>`;
             }).join('') + '<span class="chip-sep"></span>' + Object.entries(SHAPES).map(([key, sp]) =>
                 `<button class="chip chip-shape${key === selectedPresetKey ? ' active' : ''}" onclick="selectPreset('${key}')">${shapeIco[key]}${sp.name}</button>`).join('');
             renderProductCards();
