@@ -1,8 +1,4 @@
 
-
-Karakuli · HTML
- 
- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -197,6 +193,13 @@ Karakuli · HTML
             content: ''; position: absolute; bottom: -1px; left: 0; width: 100%;
             height: 2px; background: var(--text-color);
         }
+        /* keyboard position: no frame, the element is simply shaded */
+        body:focus, #kbd-sink:focus { outline: none; }
+        #kbd-sink { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; pointer-events: none; font-size: 16px; }
+        .kbd-modal-focus { outline: none !important; background-image: linear-gradient(color-mix(in srgb, var(--text-color) 13%, transparent), color-mix(in srgb, var(--text-color) 13%, transparent)) !important; }
+        .field.kbd-modal-focus { background-image: none !important; }
+        .field.kbd-modal-focus input { background-image: linear-gradient(color-mix(in srgb, var(--text-color) 13%, transparent), color-mix(in srgb, var(--text-color) 13%, transparent)); }
+        .chip.active.kbd-modal-focus, .modal-btn.primary.kbd-modal-focus { background-image: none !important; opacity: 0.72; }
         .kbd-menu-focus {
             outline: none !important;
             background: var(--active-btn-bg) !important;
@@ -552,6 +555,8 @@ Karakuli · HTML
             </div>
         </div>
     </div>
+ 
+    <input id="kbd-sink" type="text" autofocus readonly inputmode="none" autocomplete="off" aria-hidden="true" tabindex="-1">
  
     <!-- Canvas Size Modal -->
     <div id="new-canvas-modal" onpointerdown="if (event.target === this) closeNewCanvasModal()">
@@ -987,6 +992,7 @@ Karakuli · HTML
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
+            if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
             tlHistory = project.tlHistory || [];
             tlCurrentFrame = project.tlCurrentFrame || 0;
             tlCaptureStride = project.tlCaptureStride || 1;
@@ -1093,6 +1099,12 @@ Karakuli · HTML
             switchDashTab(direction < 0 ? 'home' : 'games');
         }
  
+        // Side menu: arrows and the numpad (8 2 4 6) both move, Enter / 5 confirm.
+        function dashNavKey(e) {
+            const m = /^Numpad([0-9])$/.exec(e.code || '');
+            if (m && ['2', '4', '5', '6', '8'].includes(m[1])) return m[1];
+            return { ArrowUp: '8', ArrowDown: '2', ArrowLeft: '4', ArrowRight: '6', Enter: '5' }[e.key] || null;
+        }
         function handleDashboardNavigation(key) {
             const control = resolveShortcut(key);
             if (control === 'escape' || control === 'backspace') {
@@ -1124,9 +1136,9 @@ Karakuli · HTML
             shelf: { name: 'Shelf', def: { w: 894, h: 379 }, tail: 147, minFace: 100, minW: 200, radius: 7.5,
                      folds: [0, 12, 132], holes: { inset: 17.8, top: 69, bottomUp: 17.6 },
                      profile: { gap: 20, face: 12, foot: 120, lip: 15, angle: 105 } },
-            hanger: { name: 'Hanger', def: { w: 894, h: 321 }, tail: 91.4, minFace: 150,
+            hanger: { name: 'Hanger', def: { w: 12 + 6 * (24 * 30 * 12 / 58), h: 321 }, tail: 91.4, minFace: 150,
                       folds: [39.4, 74.4], holes: { inset: 17.8, top: 41.6, bottomUp: 44.9 },
-                      hooks: { armW: 12, pitch: 147, min: 2, max: 7 },
+                      hooks: { armW: 12, pitch: 24 * 30 * 12 / 58, min: 4, max: 7 }   /* pitch = 24 grid steps (720 px), so every hook sits on a grid column */,
                       profile: { gap: 20, face: 39.4, foot: 35, lip: 17, angle: 105 } },
             magazine: { name: 'Magazine holder', def: { w: 894, h: 261.8 }, tail: 27, minFace: 120, minW: 200,
                         folds: [0], holes: { inset: 17.8, top: 69 },
@@ -1160,7 +1172,7 @@ Karakuli · HTML
             const P = PRODUCTS[key];
             w = P.hooks ? hookWidth(hooksFromWidth(w)) : Math.max(P.minW || PAPER_MIN_MM, w);
             h = Math.max(P.tail + P.minFace, h);
-            return { w: Math.min(PAPER_MAX_MM, +w.toFixed(2)), h: Math.min(PAPER_MAX_MM, +h.toFixed(2)) };
+            return { w: Math.min(PAPER_MAX_MM, P.hooks ? w : +w.toFixed(2)), h: Math.min(PAPER_MAX_MM, +h.toFixed(2)) };
         }
         // Everything that depends on the product's size: bend lines, bolt holes, hook arms.
         function productGeom(key, wMm, hMm) {
@@ -1261,7 +1273,7 @@ Karakuli · HTML
             refreshModal();
         }
  
-        // Hooks: every hook changes the width by one pitch (147 mm), so the spacing never changes.
+        // Hooks: every hook changes the width by one pitch (24 grid steps), so the spacing never changes.
         function changeHooks(delta, event) {
             if (event) event.stopPropagation();
             const c = PRODUCTS.hanger.hooks;
@@ -1273,8 +1285,8 @@ Karakuli · HTML
         // Template icon: a technical sketch (line drawing, no pattern) of the whole product mounted on the wall,
         // seen from the front-left. Every number comes from PRODUCTS / SHAPES; it follows the chosen size.
         function productIconSVG(key, W, H, dims) {
-            const ang = 30 * Math.PI / 180, pit = 13 * Math.PI / 180;
-            const ca = Math.cos(ang), sa = Math.sin(ang), cb = Math.cos(pit), sb = Math.sin(pit), D = 1500;
+            const ang = 36 * Math.PI / 180, pit = 24 * Math.PI / 180;
+            const ca = Math.cos(ang), sa = Math.sin(ang), cb = Math.cos(pit), sb = Math.sin(pit), D = 1e7;   // D huge = parallel (axonometric) projection: parallel edges stay parallel, verticals stay vertical
             const proj = (x, y, z) => {                       // y = mm down from the top edge, z = mm away from the wall
                 const up = -y, X = x * ca + z * sa, Zd = x * sa - z * ca;
                 const Z2 = D + Zd * cb - up * sb, s = D / Z2;
@@ -1295,7 +1307,7 @@ Karakuli · HTML
                 const rad = (180 - (pr.angle || 90)) * Math.PI / 180;
                 const lipDz = (pr.lip || 0) * Math.cos(rad), lipDy = (pr.lip || 0) * Math.sin(rad);
                 wall = [-40, -40, w + 40, fb + 40];
-                G.holes.forEach(([x, y]) => { lines.push([[x, y, g], [x, y, 0]]); holes.push([x, y, g]); });
+                G.holes.forEach(([x, y]) => holes.push([x, y, g]));
                 if (pr.foot) {
                     const spans = P.hooks ? G.arms : [[0, w]];
                     spans.forEach(([x0, x1]) => {
@@ -1314,7 +1326,7 @@ Karakuli · HTML
             // fit the WHOLE product into the tile
             let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
             polys.forEach(p => p.pts.forEach(q => { const r = proj(q[0], q[1], q[2]); x0 = Math.min(x0, r[0]); x1 = Math.max(x1, r[0]); y0 = Math.min(y0, r[1]); y1 = Math.max(y1, r[1]); }));
-            const pad = 9, k = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (y1 - y0));
+            const pad = 7, k = 0.8 * Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (y1 - y0));   // drawn at 80 % of the tile
             const tx = W / 2 - (x0 + x1) / 2 * k, ty = H / 2 - (y0 + y1) / 2 * k;
             const at = q => { const r = proj(q[0], q[1], q[2]); return [r[0] * k + tx, r[1] * k + ty]; };
             const pts = arr => arr.map(q => { const r = at(q); return r[0].toFixed(1) + ',' + r[1].toFixed(1); }).join(' ');
@@ -1324,8 +1336,7 @@ Karakuli · HTML
             polys.filter(p => p.cls === 'foot').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
             polys.filter(p => p.cls === 'flange').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
             polys.filter(p => p.cls === 'face').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
-            polys.filter(p => p.cls === 'flange').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" fill="currentColor" fill-opacity="0.13" stroke="currentColor" stroke-opacity="0.75" stroke-width="0.9" stroke-linejoin="round"/>'; });
-            holes.forEach(h => { const c = at(h); g += '<ellipse cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" rx="1.2" ry="1.6" fill="none" stroke="' + RED + '" stroke-width="0.9"/>'; });
+            holes.forEach(h => { const c = at(h); g += '<ellipse cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" rx="1" ry="1.3" fill="currentColor"/>'; });
             return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">' + g + '</svg>';
         }
  
@@ -1368,6 +1379,7 @@ Karakuli · HTML
             }).join('') + '<span class="chip-sep"></span>' + Object.entries(SHAPES).map(([key, sp]) =>
                 `<button class="chip chip-shape${key === selectedPresetKey ? ' active' : ''}" onclick="selectPreset('${key}')">${shapeIco[key]}${sp.name}</button>`).join('');
             renderProductCards();
+            if (document.getElementById('new-canvas-modal').style.display === 'flex') applyModalFocus(false);
         }
  
         function prepareModalPresets() {
@@ -1501,6 +1513,68 @@ Karakuli · HTML
             pop();
         }
  
+        // ---- Keyboard navigation of the size / template window ----
+        // Rows: [Width, Height] / paper + shape chips / one row per product / [Cancel, Create].
+        // 8 2 4 6 (numpad or arrows) move, Enter or 5 activates; on the selected Hanger, 4 / 6 change the hook count.
+        let modalFocus = { r: 0, c: 0 };
+        function getModalRows() {
+            const rows = [[document.getElementById('field-w'), document.getElementById('field-h')]];
+            rows.push([...document.querySelectorAll('#paper-chips .chip')]);
+            document.querySelectorAll('#preset-list .preset-card').forEach(card => rows.push([card]));
+            rows.push([...document.querySelectorAll('#new-canvas-modal .modal-actions .modal-btn')]);
+            return rows.filter(r => r.length);
+        }
+        function applyModalFocus(scroll = true) {
+            document.querySelectorAll('.kbd-modal-focus').forEach(el => el.classList.remove('kbd-modal-focus'));
+            const rows = getModalRows();
+            modalFocus.r = Math.max(0, Math.min(rows.length - 1, modalFocus.r));
+            modalFocus.c = Math.max(0, Math.min(rows[modalFocus.r].length - 1, modalFocus.c));
+            const el = rows[modalFocus.r][modalFocus.c];
+            el.classList.add('kbd-modal-focus');
+            if (scroll) el.scrollIntoView({ block: 'nearest' });
+        }
+        function focusModalCreate() { const rows = getModalRows(); modalFocus = { r: rows.length - 1, c: rows[rows.length - 1].length - 1 }; applyModalFocus(); }
+        function initModalFocus() {
+            const rows = getModalRows();
+            let r = rows.length - 1, c = rows[r].length - 1;
+            if (selectedPresetKey) {
+                const idx = Object.keys(PRODUCTS).indexOf(selectedPresetKey);
+                if (idx >= 0) { r = 2 + idx; c = 0; }
+                else { r = 1; c = Object.keys(PAPER_CHIPS).length + Object.keys(SHAPES).indexOf(selectedPresetKey); }
+            }
+            modalFocus = { r, c }; applyModalFocus();
+        }
+        function modalNavKey(e) {
+            const m = /^Numpad([0-9])$/.exec(e.code || '');
+            if (m && ['2', '4', '5', '6', '8'].includes(m[1])) return m[1];
+            return { ArrowUp: '8', ArrowDown: '2', ArrowLeft: '4', ArrowRight: '6', Enter: 'enter' }[e.key] || (['2', '4', '5', '6', '8'].includes(e.key) ? e.key : null);
+        }
+        function handleModalKey(e) {
+            const k = modalNavKey(e);
+            if (!k) return false;
+            e.preventDefault();
+            const rows = getModalRows();
+            const row = rows[modalFocus.r];
+            if (k === '8' || k === '2') {
+                modalFocus.r = (modalFocus.r + (k === '2' ? 1 : -1) + rows.length) % rows.length;
+                applyModalFocus();
+            } else if (k === '4' || k === '6') {
+                const d = k === '6' ? 1 : -1, card = row[0];
+                if (row.length === 1 && card.classList.contains('active') && card.querySelector('.card-hooks')) changeHooks(d);
+                else { modalFocus.c = (modalFocus.c + d + row.length) % row.length; applyModalFocus(); }
+                applyModalFocus(false);
+            } else {   // enter / 5
+                const el = row[modalFocus.c];
+                if (el.classList.contains('field')) { const inp = el.querySelector('input'); inp.focus(); inp.select(); return true; }
+                const isAction = el.classList.contains('modal-btn');
+                // Enter on the item that is already selected (e.g. Hanger after setting hooks) creates the canvas
+                if (!isAction && el.classList.contains('active')) { applyNewCanvasSize(); return true; }
+                el.click();
+                if (!isAction) focusModalCreate();
+            }
+            return true;
+        }
+ 
         function showCanvasModal() {
             document.getElementById('nc-title').textContent = isResizingOnly ? 'Canvas Size' : 'New Canvas';
             document.getElementById('nc-sub').textContent = isResizingOnly
@@ -1511,6 +1585,7 @@ Karakuli · HTML
             const modal = document.getElementById('new-canvas-modal');
             modal.style.display = 'flex';
             setTimeout(() => modal.classList.add('show'), 10);
+            initModalFocus();
         }
  
         function openNewCanvasModal() {
@@ -1539,7 +1614,7 @@ Karakuli · HTML
             if (PRODUCTS[selectedPresetKey]) { const n = normalizeProductSize(selectedPresetKey, w, h); w = n.w; h = n.h; }
             if (SHAPES[selectedPresetKey]) h = w;
             const shouldCreateProject = !isResizingOnly && createProjectOnReset;
-            paperWidthMm = +w.toFixed(2);
+            paperWidthMm = PRODUCTS[selectedPresetKey] ? w : +w.toFixed(2);
             paperHeightMm = +h.toFixed(2);
             isPaperVisible = true;
             activeProductKey = selectedPresetKey;
@@ -1553,7 +1628,7 @@ Karakuli · HTML
         }
  
         function handleCanvasSizeKey(event) {
-            if (event.key === 'Escape') { event.preventDefault(); closeNewCanvasModal(); return; }
+            if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.blur(); ensureKeyboardFocus(); return; }
             if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                 event.preventDefault();
                 stepSize(event.currentTarget === document.getElementById('canvas-h-input') ? 'h' : 'w', event.key === 'ArrowUp' ? 1 : -1, event.shiftKey);
@@ -1804,6 +1879,45 @@ Karakuli · HTML
             return true;
         }
  
+        // ---- Time-lapse playback performance ----
+        // Playback must cost the same per frame no matter how big the pattern is, so the per-frame work avoids
+        // anything proportional to the drawing size: frames are shared (not deep-copied), their path groups and
+        // node lists are memoised, and nodes are painted in one native pass instead of one p5 call each.
+        let tlSharedActive = false;
+        const tlGroupsMemo = new WeakMap();
+        const tlNodesMemo = new WeakMap();
+        function getNodePoints(se) {
+            const useMemo = tlSharedActive || isTimelapseUIOpen;
+            if (useMemo && tlNodesMemo.has(se)) return tlNodesMemo.get(se);
+            const nodes = [], diamonds = [];
+            for (const id in se) {
+                const el = se[id];
+                if (!el.isNode && !el.isDiamond) continue;
+                const c = id.indexOf(',');
+                const i = +id.slice(0, c), j = +id.slice(c + 1);
+                if (el.isNode) nodes.push([i * STEP, j * STEP]);
+                if (el.isDiamond) diamonds.push([i * STEP, j * STEP]);
+            }
+            const res = { nodes, diamonds };
+            if (useMemo) tlNodesMemo.set(se, res);
+            return res;
+        }
+        function applyFrameShared(idx) {
+            const frame = tlHistory[idx];
+            if (!frame) return;
+            tlSharedActive = true;
+            segments = frame.segments; specialElements = frame.specialElements;
+            curI = frame.cursor.i; curJ = frame.cursor.j;
+            geometryCache = { source: null, groups: [] };
+        }
+        function endSharedFrames() {
+            if (!tlSharedActive) return;
+            tlSharedActive = false;
+            segments = JSON.parse(JSON.stringify(segments));
+            specialElements = JSON.parse(JSON.stringify(specialElements));
+            invalidateGeometryCache();
+        }
+ 
         function applyFrame(idx) {
             const frame = tlHistory[idx];
             if (!frame) return;
@@ -1876,14 +1990,19 @@ Karakuli · HTML
         }
  
         function getTimelapseBatchAt(position) {
-            return tlPlaybackBatches.find(batch => position >= batch.start && position < batch.end) || null;
+            let lo = 0, hi = tlPlaybackBatches.length - 1;
+            while (lo <= hi) {
+                const mid = (lo + hi) >> 1, b = tlPlaybackBatches[mid];
+                if (position < b.start) hi = mid - 1; else if (position >= b.end) lo = mid + 1; else return b;
+            }
+            return null;
         }
  
         // A batch represents one uninterrupted drawn stroke.  While it grows we
         // keep the canvas at the beginning of that stroke and draw all of its
         // additions as a single polyline; replacing the snapshot on every grid
         // segment was the source of the visible "stepping" at turns.
-        function renderTimelapsePosition(position, appliedFrame) {
+        function renderTimelapsePosition(position, appliedFrame, shared = false) {
             const lastFrame = tlHistory.length - 1;
             const safePosition = Math.max(0, Math.min(lastFrame, position));
             const displayFrame = Math.floor(safePosition);
@@ -1891,7 +2010,7 @@ Karakuli · HTML
             const sourceFrame = batch ? batch.start : displayFrame;
  
             if (appliedFrame.index !== sourceFrame) {
-                applyFrame(sourceFrame);
+                if (shared) applyFrameShared(sourceFrame); else applyFrame(sourceFrame);
                 appliedFrame.index = sourceFrame;
             }
  
@@ -1927,7 +2046,7 @@ Karakuli · HTML
                     tlPlaybackStartFrame + elapsed / ((FRAME_DURATION * 1000) / tlSpeed)
                 );
                 const previousFrame = tlCurrentFrame;
-                renderTimelapsePosition(framePosition, appliedFrame);
+                renderTimelapsePosition(framePosition, appliedFrame, true);
                 // The canvas needs every visual sample; the DOM controls only
                 // need an update when their displayed frame has changed.
                 if (tlCurrentFrame !== previousFrame) updateTlProgress();
@@ -1945,6 +2064,7 @@ Karakuli · HTML
  
         function stopTlPlayback() {
             isPlayingTl = false;
+            endSharedFrames();
             document.getElementById('tl-play-icon').style.display = 'block';
             document.getElementById('tl-pause-icon').style.display = 'none';
             if (tlAnimationFrame) cancelAnimationFrame(tlAnimationFrame);
@@ -2714,9 +2834,8 @@ Karakuli · HTML
             if (isTimelapseUIOpen && (isPlayingTl || isTimelapseExport)) tlAnimatedTip = null;
             const growthPath = getTimelapseGrowthPath();
             push(); let ctx = drawingContext; ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
-            for (let id in specialElements) if (specialElements[id].isNode) {
-                let [i, j] = id.split(',').map(Number); ctx.moveTo(i * STEP + innerHoleR, j * STEP); ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
-            }
+            const nodePts = getNodePoints(specialElements);
+            nodePts.nodes.forEach(([nx, ny]) => { ctx.moveTo(nx + innerHoleR, ny); ctx.arc(nx, ny, innerHoleR, 0, TWO_PI, true); });
             if (!isGameMode) getBoltHolesPx().forEach(h => { ctx.moveTo(h.x + h.r, h.y); ctx.arc(h.x, h.y, h.r, 0, TWO_PI, true); });
             ctx.clip(); stroke(col); strokeWeight(visualLineWeight); strokeCap(SQUARE); strokeJoin(MITER); ctx.miterLimit = 2; noFill();
             // Stroke all subpaths in one native Canvas pass. This removes the
@@ -2729,10 +2848,19 @@ Karakuli · HTML
             ctx.stroke();
             ctx.restore(); pop();
  
-            for(let id in specialElements) {
-                let [i, j] = id.split(',').map(Number); let x = i*STEP, y = j*STEP;
-                if(specialElements[id].isNode) { noFill(); stroke(col); strokeWeight(visualLineWeight); ellipse(x, y, ringD, ringD); }
-                if(specialElements[id].isDiamond) { fill(col); noStroke(); push(); translate(x, y + visualLineWeight/2); rotate(QUARTER_PI); rectMode(CENTER); rect(0, 0, visualLineWeight, visualLineWeight); pop(); }
+            // all node rings and diamonds in two native passes (was one p5 call per element)
+            if (nodePts.nodes.length) {
+                push(); noFill(); stroke(col); strokeWeight(visualLineWeight);
+                ctx.beginPath();
+                nodePts.nodes.forEach(([nx, ny]) => { ctx.moveTo(nx + ringD / 2, ny); ctx.arc(nx, ny, ringD / 2, 0, TWO_PI); });
+                ctx.stroke(); pop();
+            }
+            if (nodePts.diamonds.length) {
+                push(); fill(col); noStroke();
+                const dd = visualLineWeight / Math.SQRT2, off = visualLineWeight / 2;
+                ctx.beginPath();
+                nodePts.diamonds.forEach(([dx0, dy0]) => { const cy = dy0 + off; ctx.moveTo(dx0, cy - dd); ctx.lineTo(dx0 + dd, cy); ctx.lineTo(dx0, cy + dd); ctx.lineTo(dx0 - dd, cy); ctx.closePath(); });
+                ctx.fill(); pop();
             }
             drawTimelapseGrowth(col, visualLineWeight, innerHoleR, growthPath);
         }
@@ -2814,12 +2942,7 @@ Karakuli · HTML
             let tip = { x: fromFrame.cursor.i * STEP, y: fromFrame.cursor.j * STEP, dx: 0, dy: 0 };
             const ctx = drawingContext;
             push(); ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
-            for (const id in toFrame.specialElements) {
-                if (!toFrame.specialElements[id].isNode) continue;
-                const [i, j] = id.split(',').map(Number);
-                ctx.moveTo(i * STEP + innerHoleR, j * STEP);
-                ctx.arc(i * STEP, j * STEP, innerHoleR, 0, TWO_PI, true);
-            }
+            getNodePoints(toFrame.specialElements).nodes.forEach(([nx, ny]) => { ctx.moveTo(nx + innerHoleR, ny); ctx.arc(nx, ny, innerHoleR, 0, TWO_PI, true); });
             getBoltHolesPx().forEach(h => { ctx.moveTo(h.x + h.r, h.y); ctx.arc(h.x, h.y, h.r, 0, TWO_PI, true); });
             ctx.clip(); stroke(col); strokeWeight(lineWeight); strokeCap(SQUARE); strokeJoin(MITER); ctx.miterLimit = 2; noFill();
             // Render the whole in-progress addition as one polyline. This preserves
@@ -2843,6 +2966,10 @@ Karakuli · HTML
  
         function getPathGroups(skipCache = false, sourceSegments = segments) {
             if (!skipCache && sourceSegments === segments && geometryCache.source === segments) return geometryCache.groups;
+            if (!skipCache && tlSharedActive && sourceSegments === segments && tlGroupsMemo.has(segments)) {
+                geometryCache = { source: segments, groups: tlGroupsMemo.get(segments) };
+                return geometryCache.groups;
+            }
             const keyOf = p => `${p.x},${p.y}`;
             const adjacency = new Map();
             sourceSegments.forEach((segment, index) => {
@@ -2877,16 +3004,12 @@ Karakuli · HTML
                 }
             });
             sourceSegments.forEach((segment, index) => { if (!used[index]) trace(segment.p1, index); });
-            if (!skipCache && sourceSegments === segments) geometryCache = { source: segments, groups };
+            if (!skipCache && sourceSegments === segments) { geometryCache = { source: segments, groups }; if (tlSharedActive) tlGroupsMemo.set(segments, groups); }
             return groups;
         }
  
         function isTimelapsePointInsideNode(x, y, specialElements, innerHoleR) {
-            return Object.keys(specialElements).some(id => {
-                if (!specialElements[id].isNode) return false;
-                const [i, j] = id.split(',').map(Number);
-                return (x - i * STEP) ** 2 + (y - j * STEP) ** 2 < innerHoleR ** 2;
-            });
+            return getNodePoints(specialElements).nodes.some(([nx, ny]) => (x - nx) ** 2 + (y - ny) ** 2 < innerHoleR ** 2);
         }
  
         function drawTimelapseLeadCursor() {
@@ -2973,7 +3096,7 @@ Karakuli · HTML
  
         const KEYBOARD_ALIASES = { w: '8', e: '9', d: '6', c: '3', x: '2', z: '1', a: '4', q: '7', s: '5', r: '0', browserback: '/', goback: '/', back: '/' };
         function resolveShortcut(key) { return KEYBOARD_ALIASES[String(key).toLowerCase()] || String(key).toLowerCase(); }
-        function isTypingInField(target) { return target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName); }
+        function isTypingInField(target) { return target && target.id !== 'kbd-sink' && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName); }
         let repeatTimer = null, activeKey = null, ignoreBackspaceUntilKeyUp = false;
         let isEnterPressed = false, isEnterUsedForPan = false, isCanvasNavigationModifier = false;
  
@@ -3170,18 +3293,60 @@ Karakuli · HTML
         }
  
         function windowResized() { resizeCanvas(windowWidth, windowHeight); redraw(); }
+        // Hardware-keyboard events only reach the page once something in it has focus. The canvas swallows its
+        // pointer events (preventDefault), so on a fresh load nothing was focused and the numpad stayed dead until a
+        // menu button took focus. Give the page itself focus on load and after every touch / click on the canvas.
+        // A hidden read-only input holds keyboard focus (no on-screen keyboard is shown for it). Safari / iPadOS
+        // only deliver hardware-keyboard events to a focused element, and the canvas never takes focus, so without
+        // this the numpad is dead until a menu control happens to be focused. iPadOS allows programmatic focus only
+        // inside a user gesture, hence it is (re)claimed on every touch / click as well as on load.
+        function ensureKeyboardFocus() {
+            const a = document.activeElement;
+            if (a && a.id !== 'kbd-sink' && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName)) return;   // typing in a real field
+            const sink = document.getElementById('kbd-sink');
+            try { window.focus(); (sink || document.body).focus({ preventScroll: true }); } catch (_) {}
+        }
+        document.body.tabIndex = -1;
+        ['pointerdown', 'pointerup', 'touchend', 'mouseup', 'click'].forEach(t => window.addEventListener(t, () => {
+            const a = document.activeElement;
+            if (a && a.id !== 'kbd-sink' && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName) && a.contains && document.getElementById('new-canvas-modal').classList.contains('show')) return;
+            setTimeout(ensureKeyboardFocus, 0);
+        }, { capture: true, passive: true }));
+        window.addEventListener('load', ensureKeyboardFocus);
+        window.addEventListener('focus', ensureKeyboardFocus);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) ensureKeyboardFocus(); });
+        ensureKeyboardFocus();
+ 
+        // Numpad keys are reported differently by browsers / layouts / NumLock (Enter as 'NumpadEnter' or 'Return',
+        // digits as arrows, '.' as ',' or 'Delete'). Normalise them by physical key so the numpad always behaves
+        // exactly like the main keys: Enter = Enter, digits = digits, etc.
+        const NUMPAD_KEYS = { NumpadEnter: 'Enter', NumpadDecimal: '.', NumpadAdd: '+', NumpadSubtract: '-', NumpadMultiply: '*', NumpadDivide: '/' };
+        for (let n = 0; n <= 9; n++) NUMPAD_KEYS['Numpad' + n] = String(n);
+        const normalizeNumpadEvent = e => {
+            const k = NUMPAD_KEYS[e.code] || (e.key === 'Return' ? 'Enter' : null);
+            if (k && e.key !== k) { try { Object.defineProperty(e, 'key', { value: k, configurable: true }); } catch (_) {} }
+        };
+        window.addEventListener('keydown', normalizeNumpadEvent, true);
+        window.addEventListener('keyup', normalizeNumpadEvent, true);
         window.addEventListener('keydown', e => {
             if (isTypingInField(e.target)) return;
+            const dotKey = e.key === '.' || e.code === 'NumpadDecimal' || e.code === 'Period';
+            if (document.getElementById('new-canvas-modal').classList.contains('show')) {
+                if (e.key === 'Escape') { e.preventDefault(); closeNewCanvasModal(); return; }
+                if (dotKey) { e.preventDefault(); return; }
+                if (handleModalKey(e)) return;
+                return;
+            }
             if (isTimelapseUIOpen) {
+                if (dotKey) { e.preventDefault(); if (!e.repeat) toggleDashboard(); return; }
+                if (isDashboardOpen) {
+                    const dk = dashNavKey(e);
+                    if (dk) { e.preventDefault(); if (!e.repeat) handleDashboardNavigation(dk); return; }
+                }
                 const timelapseControl = resolveShortcut(e.key);
                 if (['2', '4', '5', '6', '8', 'enter', 'escape', 'backspace'].includes(timelapseControl)) e.preventDefault();
                 if (!e.repeat || ['4', '6'].includes(timelapseControl)) handleTimelapseKeyboard(e.key);
                 return;
-            }
-            const canvasModal = document.getElementById('new-canvas-modal');
-            if (canvasModal.classList.contains('show')) {
-                if (e.key === 'Escape') { e.preventDefault(); closeNewCanvasModal(); return; }
-                if (resolveShortcut(e.key) === '5') { e.preventDefault(); applyNewCanvasSize(); return; }
             }
             if(isGameMode) {
                 const gameControl = e.key === 'ArrowLeft' ? '4' : e.key === 'ArrowRight' ? '6' : e.key;
@@ -3189,14 +3354,16 @@ Karakuli · HTML
                 if (['4', '5', '6', 'backspace'].includes(resolved)) e.preventDefault();
                 handleGameControlDown(gameControl);
             } else if (isDashboardOpen) {
-                if (e.key === '.') { e.preventDefault(); toggleDashboard(); return; }
+                if (dotKey) { e.preventDefault(); if (!e.repeat) toggleDashboard(); return; }
+                const dk = dashNavKey(e);
+                if (dk) { e.preventDefault(); if (!e.repeat) handleDashboardNavigation(dk); return; }
                 const shortcut = resolveShortcut(e.key);
-                if (['2', '4', '5', '6', '8', 'escape', 'backspace'].includes(shortcut)) e.preventDefault();
+                if (['escape', 'backspace'].includes(shortcut)) e.preventDefault();
                 if (!e.repeat) handleDashboardNavigation(e.key);
             } else {
                 if (e.key === 'Backspace' && ignoreBackspaceUntilKeyUp) { e.preventDefault(); return; }
                 if (e.repeat) return;
-                if (e.key === '.') { e.preventDefault(); toggleDashboard(); return; }
+                if (dotKey) { e.preventDefault(); toggleDashboard(); return; }
                 const shortcut = resolveShortcut(e.key);
                 if ([' ','1','2','3','4','5','6','7','8','9','0','/','*','+','=','-','enter','backspace'].includes(shortcut)) e.preventDefault();
                 handleActionDown(e.key);
@@ -3215,5 +3382,3 @@ Karakuli · HTML
     </script>
 </body>
 </html>
- 
-Ответ Claude завершен
