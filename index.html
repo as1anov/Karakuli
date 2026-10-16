@@ -1642,9 +1642,19 @@
             if (!isResizingOnly) {
                 if (shouldCreateProject) { activeProjectId = null; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
                 performReset({ preserveUndo: false });
-            } else {
-                redraw();
             }
+            fitCanvasToView();
+            redraw();
+        }
+ 
+        // Shows the whole sheet at once (full size of the template, with room for the left-hand labels).
+        function fitCanvasToView() {
+            const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
+            const pad = 40, labelRoom = templateKind() === 'product' ? 90 : 0;
+            const z = Math.min((width - 2 * pad - labelRoom) / wPx, (height - 2 * pad) / hPx);
+            zoom = Math.max(0.05, Math.min(2, z));
+            offsetX = width / 2 + labelRoom / 2;
+            offsetY = height / 2;
         }
  
         function handleCanvasSizeKey(event) {
