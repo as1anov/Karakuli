@@ -3359,6 +3359,38 @@
         // Title-block data of the drawing sheet (PNG export of products). Edit here.
         const DRAWING_INFO = { material: 'Stainless steel', thicknessMm: 2, qty: '1 / 1', density: 7.9 /* g/cm3 */, designer: 'Karakuli' };
 
+        // Text for the DESCRIPTION cell of the title block: what the part is, what it is for, how it is made and fixed.
+        function productDescription(key, g, wMm, hMm) {
+            const f = v => +v.toFixed(1), T = DRAWING_INFO.thicknessMm, holes = g.holes.length;
+            const fix = `Fixed to the wall with ${holes} bolts through the holes in the back plate.`;
+            const mat = `Cut flat from a single sheet, then bent along the red dashed lines.`;
+            if (key === 'hanger') {
+                const n = g.arms.length, P = PRODUCTS.hanger;
+                return `Wall hanger with ${n} hooks for coats, bags, scarves and other everyday items in a hallway, wardrobe or utility room. ` +
+                    `The hooks are evenly spaced arms along the lower edge of the plate. ` +
+                    `Two bends form a ${f(P.profile.face)} mm face, a ${f(P.profile.foot)} mm foot and a ${f(P.profile.lip)} mm return lip that carry the hooks. ` +
+                    `${mat} ${fix}`;
+            }
+            if (key === 'shelf') {
+                const p = PRODUCTS.shelf.profile;
+                return `Wall shelf for books, decor and small household items. The back plate carries the bolt holes; below the pattern end ` +
+                    `the sheet is bent twice to form a front face of ${p.face} mm, a horizontal shelf of ${p.foot} mm and a return lip of ${p.lip} mm ` +
+                    `that stiffens the edge and protects from sharp corners. ${mat} ${fix}`;
+            }
+            if (key === 'magazine') {
+                return `Wall magazine holder for magazines, newspapers and documents. The back plate carries the bolt holes; the lower ` +
+                    `${PRODUCTS.magazine.tail} mm of the sheet is bent once along the bend line toward the wall and forms the pocket that supports the stack. ` +
+                    `${mat} ${fix}`;
+            }
+            return `Sheet-metal part. ${mat}`;
+        }
+        function wrapText(text, maxChars) {
+            const lines = []; let cur = '';
+            text.split(/\s+/).forEach(w => { if ((cur + ' ' + w).trim().length > maxChars) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); });
+            if (cur) lines.push(cur);
+            return lines;
+        }
+
         // Product PNG = an engineering drawing sheet: frame, the annotated flat pattern (same drawing as the SVG,
         // scaled to fit a standard A-format) and a title block at the bottom right.
         function exportProductPNG() {
@@ -3369,7 +3401,10 @@
             if (!r) return;
             const k = LINE_WEIGHT / 12;
             const cw = r.svgWidth / k, ch = r.svgHeight / k;           // content size in mm
-            const BLOCK_W = 180, BLOCK_H = 63, M = 10;                  // title block, sheet margin (mm)
+            const g = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
+            const descLines = wrapText(productDescription(activeProductKey, g, paperWidthMm, paperHeightMm), 100);
+            const DESC_H = 6 + descLines.length * 3.7;                 // DESCRIPTION cell, grows with the text
+            const BLOCK_W = 180, BLOCK_H = 63 + DESC_H, M = 10;        // title block, sheet margin (mm)
             const SHEETS = [['A3', 420, 297], ['A2', 594, 420], ['A1', 841, 594], ['A0', 1189, 841]];
             const SCALES = [[1, '1:1'], [0.5, '1:2'], [0.4, '1:2.5'], [1 / 3, '1:3'], [0.25, '1:4'], [0.2, '1:5'], [0.1, '1:10'], [0.05, '1:20']];   // smallest sheet (from A3) first, the largest scale that fits
             let pick = null;
@@ -3382,7 +3417,6 @@
             const areaH = ih - BLOCK_H;
             const px = ix + (iw - cw * sc) / 2, py = iy + (areaH - ch * sc) / 2;
             const content = r.svg.replace(/^<svg ([^>]*?) width="[^"]*" height="[^"]*"/, `<svg $1 x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${(cw * sc).toFixed(2)}" height="${(ch * sc).toFixed(2)}"`);
-            const g = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
             const T = DRAWING_INFO.thicknessMm;
             const kg = paperWidthMm * paperHeightMm * T * DRAWING_INFO.density * 1e-6;
             const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -3399,23 +3433,27 @@
             const dateStr = [String(d.getDate()).padStart(2, '0'), String(d.getMonth() + 1).padStart(2, '0'), d.getFullYear()].join('.');
             cell(0, 0, 120, 18, 'TITLE', name, 6);
             cell(120, 0, 60, 18, 'DRAWING No.', 'KRK-' + activeProductKey.slice(0, 3).toUpperCase() + '-001', 4.2);
-            cell(0, 18, 60, 14, 'MATERIAL', DRAWING_INFO.material, 3.7);
-            cell(60, 18, 30, 14, 'THICKNESS', T + ' mm', 4.2);
-            cell(90, 18, 30, 14, 'QTY', DRAWING_INFO.qty, 4.2);
-            cell(120, 18, 60, 14, 'OVERALL SIZE (FLAT)', `${+paperWidthMm.toFixed(1)} × ${+paperHeightMm.toFixed(1)} mm`, 3.7);
-            cell(0, 32, 60, 14, 'DESIGNED BY', DRAWING_INFO.designer, 3.7);
-            cell(60, 32, 30, 14, 'DATE', dateStr, 3.3);
-            cell(90, 32, 30, 14, 'SCALE', scName, 4.2);
-            cell(120, 32, 35, 14, 'WEIGHT (MAX)', `${kg.toFixed(2)} kg`, 3.5);
-            cell(155, 32, 25, 14, 'SHEET', `1/1 ${nm}`, 3.2);
+            tb += `<rect x="${bx}" y="${by + 18}" width="${BLOCK_W}" height="${DESC_H}" ${ln} stroke-width="0.25"/>`;
+            tb += `<text x="${bx + 1.2}" y="${by + 21}" font-size="2" fill="#444">DESCRIPTION / PURPOSE</text>`;
+            descLines.forEach((l, i) => { tb += `<text x="${bx + 2}" y="${by + 25.5 + i * 3.7}" font-size="2.2" fill="#000">${esc(l)}</text>`; });
+            const R = 18 + DESC_H;                                      // top of the remaining rows
+            cell(0, R, 60, 14, 'MATERIAL', DRAWING_INFO.material, 3.7);
+            cell(60, R, 30, 14, 'THICKNESS', T + ' mm', 4.2);
+            cell(90, R, 30, 14, 'QTY', DRAWING_INFO.qty, 4.2);
+            cell(120, R, 60, 14, 'OVERALL SIZE (FLAT)', `${+paperWidthMm.toFixed(1)} × ${+paperHeightMm.toFixed(1)} mm`, 3.7);
+            cell(0, R + 14, 60, 14, 'DESIGNED BY', DRAWING_INFO.designer, 3.7);
+            cell(60, R + 14, 30, 14, 'DATE', dateStr, 3.3);
+            cell(90, R + 14, 30, 14, 'SCALE', scName, 4.2);
+            cell(120, R + 14, 35, 14, 'WEIGHT (MAX)', `${kg.toFixed(2)} kg`, 3.5);
+            cell(155, R + 14, 25, 14, 'SHEET', `1/1 ${nm}`, 3.2);
             const notes = [
                 'Dimensions in mm. Bend lines: Red dashed (BEND LINE), PATTERN END: end of pattern.',
                 `Deburr all edges. Hole ${HOLE_DIAMETER_MM} mm per template.`,
                 'General tolerances ISO 2768-m. Do not scale the drawing.',
-                `Material: ${DRAWING_INFO.material}, ${T} mm. Inner bend radius = material thickness.`
+                'Inner bend radius = material thickness.'
             ];
-            tb += `<rect x="${bx}" y="${by + 46}" width="${BLOCK_W}" height="${BLOCK_H - 46}" ${ln} stroke-width="0.25"/>`;
-            notes.forEach((n, i) => { tb += `<text x="${bx + 2}" y="${by + 50 + i * 3.7}" font-size="2.1" fill="#000">${esc(n)}</text>`; });
+            tb += `<rect x="${bx}" y="${by + R + 28}" width="${BLOCK_W}" height="${BLOCK_H - R - 28}" ${ln} stroke-width="0.25"/>`;
+            notes.forEach((n, i) => { tb += `<text x="${bx + 2}" y="${by + R + 32 + i * 3.7}" font-size="2.1" fill="#000">${esc(n)}</text>`; });
             const makeSheet = (pw, ph) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sw} ${sh}" width="${pw}" height="${ph}" font-family="${DRAWING_FONT}" text-rendering="geometricPrecision">`
                 + `<rect width="${sw}" height="${sh}" fill="#fff"/>`
                 + `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" ${ln} stroke-width="0.7"/>`
