@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         :root {
@@ -2888,7 +2888,7 @@
             push(); translate(offsetX, offsetY); scale(zoom);
             
             if (isPaperVisible && !isExporting && !isTimelapseUIOpen) {
-                let paperColor = currentTheme === 'light' ? '#ffffff' : '#1e1e1e';
+                let paperColor = currentTheme === 'light' ? '#ffffff' : '#d2d2d2';   // dark theme: a light sheet, so the black pattern stays visible
                 fill(paperColor); stroke('rgba(128,128,128,0.2)'); strokeWeight(2 / zoom); rectMode(CENTER);
                 let wPx = paperWidthMm * (LINE_WEIGHT / 12); let hPx = paperHeightMm * (LINE_WEIGHT / 12);
                 if (templateKind() !== 'free') drawProductTemplate(paperColor); else rect(0, 0, wPx, hPx);
@@ -2901,7 +2901,8 @@
             }
             const clipToProduct = isExporting && !isTimelapseExport && templateKind() !== 'free';
             if (clipToProduct) { push(); drawingContext.save(); drawingContext.clip(new Path2D(productOutlineD())); fillNoPatternZone(); }
-            drawGeometry(colors.geomColor);
+            // On a sheet the pattern is always black (like the product), also in the dark theme.
+            drawGeometry(isPaperVisible ? '#000000' : colors.geomColor);
             if (clipToProduct) { drawingContext.restore(); pop(); }
             if (isPaperVisible && !isExporting && !isTimelapseUIOpen) drawBendLines();
             if (!isExporting || isTimelapseExport) drawCursor();
@@ -3283,7 +3284,7 @@
             const G = productGeom(activeProductKey, W, H);
             const hasArms = G.arms.length > 0;
             const pad = { l: 78 * k, t: 24 * k, r: 40 * k, b: (hasArms ? 36 : 12) * k };
-            const fs = 4.6 * k;                       // text height
+            const fs = 4.2 * k;                       // text height
             const fmt = v => String(+v.toFixed(1));
             const uniq = a => [...new Set(a.map(v => +v.toFixed(2)))].sort((p, q) => p - q);
             return {
@@ -3334,15 +3335,15 @@
             };
         }
 
-        // Drawing font: IBM Plex Mono from Google Fonts. An SVG used as an image cannot load web fonts, so the font
+        // Drawing font: Unbounded from Google Fonts. An SVG used as an image cannot load web fonts, so the font
         // files are fetched once and embedded (base64) into the exported SVG / PNG; offline it falls back to monospace.
-        const DRAWING_FONT = "'IBM Plex Mono', 'Courier New', monospace";
-        let plexCss = '';
-        async function getPlexFontCss() {
-            if (plexCss) return plexCss;
+        const DRAWING_FONT = "'Unbounded', Arial, Helvetica, sans-serif";
+        let drawingFontCss = '';
+        async function getDrawingFontCss() {
+            if (drawingFontCss) return drawingFontCss;
             try {
                 const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
-                let css = await (await fetch('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap', { signal: ctl.signal })).text();
+                let css = await (await fetch('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&display=swap', { signal: ctl.signal })).text();
                 const urls = [...new Set([...css.matchAll(/url\((https:[^)]+)\)/g)].map(m => m[1]))];
                 for (const u of urls) {
                     const blob = await (await fetch(u, { signal: ctl.signal })).blob();
@@ -3350,18 +3351,18 @@
                     css = css.split(u).join(data);
                 }
                 clearTimeout(t);
-                plexCss = css;
-            } catch (err) { console.warn('IBM Plex Mono could not be loaded, using a fallback font', err); }
-            return plexCss;
+                drawingFontCss = css;
+            } catch (err) { console.warn('Unbounded could not be loaded, using a fallback font', err); }
+            return drawingFontCss;
         }
 
         // Title-block data of the drawing sheet (PNG export of products). Edit here.
-        const DRAWING_INFO = { material: 'Stainless steel', thicknessMm: 2, qty: '1 / 1', density: 7.9 /* g/cm3 */, designer: 'Karakuli' };
+        const DRAWING_INFO = { material: 'Stainless steel', thicknessMm: 2, qty: '1 / 1', density: 7.9 /* g/cm3 */, designer: 'NaN' };
 
         // Product PNG = an engineering drawing sheet: frame, the annotated flat pattern (same drawing as the SVG,
         // scaled to fit a standard A-format) and a title block at the bottom right.
         function exportProductPNG() {
-            getPlexFontCss().then(css => exportProductPNGUnsafe(css)).catch(err => { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); });
+            getDrawingFontCss().then(css => exportProductPNGUnsafe(css)).catch(err => { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); });
         }
         function exportProductPNGUnsafe(css) {
             const r = buildExportSVG(css);
@@ -3390,26 +3391,26 @@
             let tb = `<rect x="${bx}" y="${by}" width="${BLOCK_W}" height="${BLOCK_H}" fill="#fff" stroke="#000" stroke-width="0.7"/>`;
             const cell = (x, y, w, h, label, value, vfs = 5) => {
                 tb += `<rect x="${bx + x}" y="${by + y}" width="${w}" height="${h}" ${ln} stroke-width="0.25"/>`;
-                tb += `<text x="${bx + x + 1.2}" y="${by + y + 3}" font-size="2.2" fill="#444">${esc(label)}</text>`;
+                tb += `<text x="${bx + x + 1.2}" y="${by + y + 3}" font-size="2" fill="#444">${esc(label)}</text>`;
                 tb += `<text x="${bx + x + 2}" y="${by + y + h - 2.6}" font-size="${vfs}" font-weight="600" fill="#000">${esc(value)}</text>`;
             };
             const name = PRODUCTS[activeProductKey].name;
             const d = new Date();
             const dateStr = [String(d.getDate()).padStart(2, '0'), String(d.getMonth() + 1).padStart(2, '0'), d.getFullYear()].join('.');
-            cell(0, 0, 120, 18, 'TITLE', name, 7);
-            cell(120, 0, 60, 18, 'DRAWING No.', 'KRK-' + activeProductKey.slice(0, 3).toUpperCase() + '-001', 5);
-            cell(0, 18, 60, 14, 'MATERIAL', DRAWING_INFO.material, 4.4);
-            cell(60, 18, 30, 14, 'THICKNESS', T + ' mm', 5);
-            cell(90, 18, 30, 14, 'QTY', DRAWING_INFO.qty, 5);
-            cell(120, 18, 60, 14, 'OVERALL SIZE (FLAT)', `${+paperWidthMm.toFixed(1)} × ${+paperHeightMm.toFixed(1)} mm`, 4.4);
-            cell(0, 32, 60, 14, 'DESIGNED BY', DRAWING_INFO.designer, 4.4);
-            cell(60, 32, 30, 14, 'DATE', dateStr, 4);
-            cell(90, 32, 30, 14, 'SCALE', scName, 5);
-            cell(120, 32, 35, 14, 'WEIGHT (MAX)', `≤ ${kg.toFixed(2)} kg`, 4.4);
-            cell(155, 32, 25, 14, 'SHEET', `1 / 1  ${nm}`, 3.8);
+            cell(0, 0, 120, 18, 'TITLE', name, 6);
+            cell(120, 0, 60, 18, 'DRAWING No.', 'KRK-' + activeProductKey.slice(0, 3).toUpperCase() + '-001', 4.2);
+            cell(0, 18, 60, 14, 'MATERIAL', DRAWING_INFO.material, 3.7);
+            cell(60, 18, 30, 14, 'THICKNESS', T + ' mm', 4.2);
+            cell(90, 18, 30, 14, 'QTY', DRAWING_INFO.qty, 4.2);
+            cell(120, 18, 60, 14, 'OVERALL SIZE (FLAT)', `${+paperWidthMm.toFixed(1)} × ${+paperHeightMm.toFixed(1)} mm`, 3.7);
+            cell(0, 32, 60, 14, 'DESIGNED BY', DRAWING_INFO.designer, 3.7);
+            cell(60, 32, 30, 14, 'DATE', dateStr, 3.3);
+            cell(90, 32, 30, 14, 'SCALE', scName, 4.2);
+            cell(120, 32, 35, 14, 'WEIGHT (MAX)', `${kg.toFixed(2)} kg`, 3.5);
+            cell(155, 32, 25, 14, 'SHEET', `1/1 ${nm}`, 3.2);
             tb += `<rect x="${bx}" y="${by + 46}" width="${BLOCK_W}" height="12" ${ln} stroke-width="0.25"/>`;
-            tb += `<text x="${bx + 2}" y="${by + 51}" font-size="2.4" fill="#000">Dimensions in mm. General tolerances ISO 2768-m. Bend lines: red dashed (BEND LINE), PATTERN END: end of pattern.</text>`;
-            tb += `<text x="${bx + 2}" y="${by + 55}" font-size="2.4" fill="#000">Deburr all edges. Hole Ø${HOLE_DIAMETER_MM} mm per template.</text>`;
+            tb += `<text x="${bx + 2}" y="${by + 51.5}" font-size="2.1" fill="#000">Dimensions in mm. Tolerances ISO 2768-m.</text>`;
+            tb += `<text x="${bx + 2}" y="${by + 55.5}" font-size="2.1" fill="#000">Red dashed: bend line. Deburr all edges.</text>`;
             const sheet = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sw} ${sh}" width="${sw}" height="${sh}" font-family="${DRAWING_FONT}">`
                 + `<rect width="${sw}" height="${sh}" fill="#fff"/>`
                 + `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" ${ln} stroke-width="0.7"/>`
@@ -3450,7 +3451,7 @@
             if(isDashboardOpen) toggleDashboard();
             if(fmt==='svg') {
                 const isProd = templateKind() === 'product';
-                (isProd ? getPlexFontCss() : Promise.resolve('')).then(css => {
+                (isProd ? getDrawingFontCss() : Promise.resolve('')).then(css => {
                     const r = buildExportSVG(css);
                     if (!r) return;
                     let b = new Blob([r.svg], {type:'image/svg+xml'}); 
