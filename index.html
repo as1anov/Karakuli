@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         :root {
@@ -3327,9 +3329,30 @@
                         o += dimH(a0[0], a0[1], H + 12, H, fmt(a0[1] - a0[0]));
                         if (G.arms.length > 1) o += dimH(a0[0], aN[0], H + 24, H, `${G.arms.length - 1}×${fmt(G.arms[1][0] - a0[0])} = ${fmt(aN[0] - a0[0])}`);
                     }
-                    return `<g id="annotations" font-family="Arial,Helvetica,sans-serif" fill="#000">${o}</g>`;
+                    return `<g id="annotations" font-family="${DRAWING_FONT}" fill="#000">${o}</g>`;
                 }
             };
+        }
+
+        // Drawing font: IBM Plex Mono from Google Fonts. An SVG used as an image cannot load web fonts, so the font
+        // files are fetched once and embedded (base64) into the exported SVG / PNG; offline it falls back to monospace.
+        const DRAWING_FONT = "'IBM Plex Mono', 'Courier New', monospace";
+        let plexCss = '';
+        async function getPlexFontCss() {
+            if (plexCss) return plexCss;
+            try {
+                const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+                let css = await (await fetch('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap', { signal: ctl.signal })).text();
+                const urls = [...new Set([...css.matchAll(/url\((https:[^)]+)\)/g)].map(m => m[1]))];
+                for (const u of urls) {
+                    const blob = await (await fetch(u, { signal: ctl.signal })).blob();
+                    const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+                    css = css.split(u).join(data);
+                }
+                clearTimeout(t);
+                plexCss = css;
+            } catch (err) { console.warn('IBM Plex Mono could not be loaded, using a fallback font', err); }
+            return plexCss;
         }
 
         // Title-block data of the drawing sheet (PNG export of products). Edit here.
@@ -3338,10 +3361,10 @@
         // Product PNG = an engineering drawing sheet: frame, the annotated flat pattern (same drawing as the SVG,
         // scaled to fit a standard A-format) and a title block at the bottom right.
         function exportProductPNG() {
-            try { exportProductPNGUnsafe(); } catch (err) { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); }
+            getPlexFontCss().then(css => exportProductPNGUnsafe(css)).catch(err => { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); });
         }
-        function exportProductPNGUnsafe() {
-            const r = buildExportSVG();
+        function exportProductPNGUnsafe(css) {
+            const r = buildExportSVG(css);
             if (!r) return;
             const k = LINE_WEIGHT / 12;
             const cw = r.svgWidth / k, ch = r.svgHeight / k;           // content size in mm
@@ -3373,7 +3396,7 @@
             const name = PRODUCTS[activeProductKey].name;
             const d = new Date();
             const dateStr = [String(d.getDate()).padStart(2, '0'), String(d.getMonth() + 1).padStart(2, '0'), d.getFullYear()].join('.');
-            cell(0, 0, 120, 18, 'TITLE', name + ' — flat pattern', 7.5);
+            cell(0, 0, 120, 18, 'TITLE', name, 7);
             cell(120, 0, 60, 18, 'DRAWING No.', 'KRK-' + activeProductKey.slice(0, 3).toUpperCase() + '-001', 5);
             cell(0, 18, 60, 14, 'MATERIAL', DRAWING_INFO.material, 4.4);
             cell(60, 18, 30, 14, 'THICKNESS', T + ' mm', 5);
@@ -3387,7 +3410,7 @@
             tb += `<rect x="${bx}" y="${by + 46}" width="${BLOCK_W}" height="12" ${ln} stroke-width="0.25"/>`;
             tb += `<text x="${bx + 2}" y="${by + 51}" font-size="2.4" fill="#000">Dimensions in mm. General tolerances ISO 2768-m. Bend lines: red dashed (BEND LINE), PATTERN END: end of pattern.</text>`;
             tb += `<text x="${bx + 2}" y="${by + 55}" font-size="2.4" fill="#000">Deburr all edges. Hole Ø${HOLE_DIAMETER_MM} mm per template.</text>`;
-            const sheet = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sw} ${sh}" width="${sw}" height="${sh}" font-family="Arial,Helvetica,sans-serif">`
+            const sheet = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sw} ${sh}" width="${sw}" height="${sh}" font-family="${DRAWING_FONT}">`
                 + `<rect width="${sw}" height="${sh}" fill="#fff"/>`
                 + `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" ${ln} stroke-width="0.7"/>`
                 + content + `<g id="title-block">${tb}</g></svg>`;
@@ -3426,13 +3449,16 @@
             if (isTimelapseUIOpen || isGameMode) return;
             if(isDashboardOpen) toggleDashboard();
             if(fmt==='svg') {
-                const r = buildExportSVG();
-                if (!r) return;
-                let b = new Blob([r.svg], {type:'image/svg+xml'}); 
-                let a = document.createElement('a'); 
-                a.href = URL.createObjectURL(b); 
-                a.download='drawing.svg'; 
-                a.click();
+                const isProd = templateKind() === 'product';
+                (isProd ? getPlexFontCss() : Promise.resolve('')).then(css => {
+                    const r = buildExportSVG(css);
+                    if (!r) return;
+                    let b = new Blob([r.svg], {type:'image/svg+xml'}); 
+                    let a = document.createElement('a'); 
+                    a.href = URL.createObjectURL(b); 
+                    a.download='drawing.svg'; 
+                    a.click();
+                });
             } else if (templateKind() === 'product') {
                 exportProductPNG();
             } else if (isPaperVisible) {
@@ -3445,7 +3471,7 @@
         }
 
         // The SVG of the drawing (also the source of the product PNG, so both files always match).
-        function buildExportSVG() {
+        function buildExportSVG(fontCss = '') {
             const ringD = BASE_STEP_VAL * 2;
             const innerHoleR = (ringD - LINE_WEIGHT) / 2;
             const strokePad = LINE_WEIGHT / 2;
@@ -3525,7 +3551,8 @@
             // real millimetres: 1 mm = LINE_WEIGHT / 12 drawing units
             const outW = isPaperVisible ? `${+(svgWidth * 12 / LINE_WEIGHT).toFixed(2)}mm` : svgWidth;
             const outH = isPaperVisible ? `${+(svgHeight * 12 / LINE_WEIGHT).toFixed(2)}mm` : svgHeight;
-            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${outW}" height="${outH}">${maskTag}${clipDefs}${body}</svg>`;
+            const fontDefs = fontCss ? `<defs><style>${fontCss}</style></defs>` : '';
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${outW}" height="${outH}">${fontDefs}${maskTag}${clipDefs}${body}</svg>`;
             return { svg, svgWidth, svgHeight };
         }
 
