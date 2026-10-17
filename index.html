@@ -898,6 +898,7 @@
 
         let isDashboardOpen = false;
         let menuNavIndex = 0;
+        let menuKbdShown = false;   // the keyboard highlight appears only once a key is pressed, so the first button never looks different
 
         let paperWidthMm = 210;
         let paperHeightMm = 297;
@@ -1081,7 +1082,7 @@
             document.getElementById('tab-' + tab).classList.add('active');
             document.getElementById('dash-' + tab).style.display = 'flex';
             menuNavIndex = 0;
-            if (isDashboardOpen) updateMenuNavigationFocus();
+            if (isDashboardOpen && menuKbdShown) updateMenuNavigationFocus();
         }
 
         function getMenuNavigationItems() {
@@ -1130,6 +1131,10 @@
             if (control === 'escape' || control === 'backspace') {
                 if (control === 'backspace') ignoreBackspaceUntilKeyUp = true;
                 toggleDashboard(); return;
+            }
+            if (!menuKbdShown && ['8', '2', '4', '6', '5'].includes(control)) {
+                menuKbdShown = true;
+                if (control !== '4' && control !== '6') { updateMenuNavigationFocus(); return; }   // first press only reveals the cursor
             }
             if (control === '8') { moveMenuFocus(-1); return; }
             if (control === '2') { moveMenuFocus(1); return; }
@@ -1761,7 +1766,8 @@
                 document.body.classList.add('dashboard-open');
                 handleKbdTrigger('close');
                 menuNavIndex = 0;
-                updateMenuNavigationFocus();
+                menuKbdShown = false;
+                clearMenuNavigationFocus();
             } else {
                 dash.classList.remove('open');
                 overlay.classList.remove('open');
@@ -3274,7 +3280,7 @@
             const W = paperWidthMm, H = paperHeightMm;
             const G = productGeom(activeProductKey, W, H);
             const hasArms = G.arms.length > 0;
-            const pad = { l: 78 * k, t: 36 * k, r: 40 * k, b: (hasArms ? 36 : 12) * k };
+            const pad = { l: 78 * k, t: 24 * k, r: 40 * k, b: (hasArms ? 36 : 12) * k };
             const fs = 4.6 * k;                       // text height
             const fmt = v => String(+v.toFixed(1));
             const uniq = a => [...new Set(a.map(v => +v.toFixed(2)))].sort((p, q) => p - q);
@@ -3309,23 +3315,18 @@
                         o += `<line x1="${X(0) }" y1="${Y(m.y)}" x2="${X(W)}" y2="${Y(m.y)}" stroke="#e11" stroke-width="${lineW}" stroke-dasharray="${+(4 * k).toFixed(2)} ${+(2 * k).toFixed(2)}"/>`;
                         o += `<text x="${+(X(0) - 3 * k).toFixed(2)}" y="${+(Y(m.y) + fs * 0.35).toFixed(2)}" text-anchor="end" font-size="${fs}" fill="#000">${m.label}</text>`;
                     });
-                    // right: chain of every feature level (lines + hole rows), then overall height
-                    const ys = uniq([0, ...G.marks.map(m => m.y), ...G.holes.map(h => h[1]), H]);
+                    // right: chain of the bend / pattern-end levels, then overall height
+                    const ys = uniq([0, ...G.marks.map(m => m.y), H]);
                     for (let i = 0; i < ys.length - 1; i++) o += dimV(ys[i], ys[i + 1], W + 12, W, fmt(ys[i + 1] - ys[i]));
                     o += dimV(0, H, W + 28, W, fmt(H));
-                    // top: hole spacing across the width, then overall width
-                    const xs = uniq([0, ...G.holes.map(h => h[0]), W]);
-                    for (let i = 0; i < xs.length - 1; i++) o += dimH(xs[i], xs[i + 1], -12, 0, fmt(xs[i + 1] - xs[i]));
-                    o += dimH(0, W, -26, 0, fmt(W));
+                    // top: overall width
+                    o += dimH(0, W, -12, 0, fmt(W));
                     // hanger: arm width and arm pitch along the bottom edge
                     if (hasArms) {
                         const a0 = G.arms[0], aN = G.arms[G.arms.length - 1];
                         o += dimH(a0[0], a0[1], H + 12, H, fmt(a0[1] - a0[0]));
                         if (G.arms.length > 1) o += dimH(a0[0], aN[0], H + 24, H, `${G.arms.length - 1}×${fmt(G.arms[1][0] - a0[0])} = ${fmt(aN[0] - a0[0])}`);
                     }
-                    // bolt holes: Ø note next to the first hole
-                    const hr = HOLE_DIAMETER_MM;
-                    if (G.holes.length) o += `<text x="${X(G.holes[0][0] + 6)}" y="${Y(G.holes[0][1] - 4)}" font-size="${fs * 0.9}" font-family="Arial,Helvetica,sans-serif">Ø${fmt(hr)}</text>`;
                     return `<g id="annotations" font-family="Arial,Helvetica,sans-serif" fill="#000">${o}</g>`;
                 }
             };
