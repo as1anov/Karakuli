@@ -3357,7 +3357,7 @@
         }
 
         // Title-block data of the drawing sheet (PNG export of products). Edit here.
-        const DRAWING_INFO = { material: 'Stainless steel', thicknessMm: 2, qty: '1 / 1', density: 7.9 /* g/cm3 */, designer: 'NaN' };
+        const DRAWING_INFO = { material: 'Stainless steel', thicknessMm: 2, qty: '1 / 1', density: 7.9 /* g/cm3 */, designer: 'Karakuli' };
 
         // Product PNG = an engineering drawing sheet: frame, the annotated flat pattern (same drawing as the SVG,
         // scaled to fit a standard A-format) and a title block at the bottom right.
@@ -3365,11 +3365,11 @@
             getDrawingFontCss().then(css => exportProductPNGUnsafe(css)).catch(err => { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); });
         }
         function exportProductPNGUnsafe(css) {
-            const r = buildExportSVG(css);
+            const r = buildExportSVG(css, true);
             if (!r) return;
             const k = LINE_WEIGHT / 12;
             const cw = r.svgWidth / k, ch = r.svgHeight / k;           // content size in mm
-            const BLOCK_W = 180, BLOCK_H = 58, M = 10;                  // title block, sheet margin (mm)
+            const BLOCK_W = 180, BLOCK_H = 63, M = 10;                  // title block, sheet margin (mm)
             const SHEETS = [['A3', 420, 297], ['A2', 594, 420], ['A1', 841, 594], ['A0', 1189, 841]];
             const SCALES = [[1, '1:1'], [0.5, '1:2'], [0.4, '1:2.5'], [1 / 3, '1:3'], [0.25, '1:4'], [0.2, '1:5'], [0.1, '1:10'], [0.05, '1:20']];   // smallest sheet (from A3) first, the largest scale that fits
             let pick = null;
@@ -3408,42 +3408,49 @@
             cell(90, 32, 30, 14, 'SCALE', scName, 4.2);
             cell(120, 32, 35, 14, 'WEIGHT (MAX)', `${kg.toFixed(2)} kg`, 3.5);
             cell(155, 32, 25, 14, 'SHEET', `1/1 ${nm}`, 3.2);
-            tb += `<rect x="${bx}" y="${by + 46}" width="${BLOCK_W}" height="12" ${ln} stroke-width="0.25"/>`;
-            tb += `<text x="${bx + 2}" y="${by + 51.5}" font-size="2.1" fill="#000">Dimensions in mm. Tolerances ISO 2768-m.</text>`;
-            tb += `<text x="${bx + 2}" y="${by + 55.5}" font-size="2.1" fill="#000">Red dashed: bend line. Deburr all edges.</text>`;
-            const sheet = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sw} ${sh}" width="${sw}" height="${sh}" font-family="${DRAWING_FONT}">`
+            const notes = [
+                'Dimensions in mm. Bend lines: Red dashed (BEND LINE), PATTERN END: end of pattern.',
+                `Deburr all edges. Hole ${HOLE_DIAMETER_MM} mm per template.`,
+                'General tolerances ISO 2768-m. Do not scale the drawing.',
+                `Material: ${DRAWING_INFO.material}, ${T} mm. Inner bend radius = material thickness.`
+            ];
+            tb += `<rect x="${bx}" y="${by + 46}" width="${BLOCK_W}" height="${BLOCK_H - 46}" ${ln} stroke-width="0.25"/>`;
+            notes.forEach((n, i) => { tb += `<text x="${bx + 2}" y="${by + 50 + i * 3.7}" font-size="2.1" fill="#000">${esc(n)}</text>`; });
+            const makeSheet = (pw, ph) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sw} ${sh}" width="${pw}" height="${ph}" font-family="${DRAWING_FONT}" text-rendering="geometricPrecision">`
                 + `<rect width="${sw}" height="${sh}" fill="#fff"/>`
                 + `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" ${ln} stroke-width="0.7"/>`
                 + content + `<g id="title-block">${tb}</g></svg>`;
             // Safari / iPadOS refuse canvases above ~16.7 M pixels (the bitmap comes out empty), so stay well below that.
             let ppm = Math.min(10, 8000 / Math.max(sw, sh), Math.sqrt(12e6 / (sw * sh)));
-            const svgUrl = URL.createObjectURL(new Blob([sheet], { type: 'image/svg+xml;charset=utf-8' }));
             const save = blob => {
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob); a.download = 'drawing.png';
                 document.body.appendChild(a); a.click(); a.remove();
                 setTimeout(() => URL.revokeObjectURL(a.href), 4000);
             };
-            const img = new Image();
-            img.onload = () => {
-                const attempt = () => {
+            const attempt = () => {
+                const pw = Math.round(sw * ppm), ph = Math.round(sh * ppm);
+                const svgUrl = URL.createObjectURL(new Blob([makeSheet(pw, ph)], { type: 'image/svg+xml;charset=utf-8' }));
+                const img = new Image();
+                img.onload = () => {
                     try {
                         const c = document.createElement('canvas');
-                        c.width = Math.round(sw * ppm); c.height = Math.round(sh * ppm);
+                        c.width = pw; c.height = ph;
                         const x = c.getContext('2d');
-                        x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
-                        x.drawImage(img, 0, 0, c.width, c.height);
+                        x.fillStyle = '#fff'; x.fillRect(0, 0, pw, ph);
+                        x.drawImage(img, 0, 0, pw, ph);
                         c.toBlob(blob => {
-                            if (blob) { save(blob); URL.revokeObjectURL(svgUrl); }
+                            URL.revokeObjectURL(svgUrl);
+                            if (blob) save(blob);
                             else if (ppm > 2) { ppm /= 2; attempt(); }   // browser could not make the bitmap: retry smaller
-                            else { URL.revokeObjectURL(svgUrl); showActionHint('PNG export failed'); }
+                            else showActionHint('PNG export failed');
                         }, 'image/png');
-                    } catch (err) { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); }
+                    } catch (err) { URL.revokeObjectURL(svgUrl); console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); }
                 };
-                attempt();
+                img.onerror = () => { URL.revokeObjectURL(svgUrl); showActionHint('PNG export failed: drawing could not be rendered'); };
+                img.src = svgUrl;
             };
-            img.onerror = () => { URL.revokeObjectURL(svgUrl); showActionHint('PNG export failed: drawing could not be rendered'); };
-            img.src = svgUrl;
+            attempt();
         }
 
         function exportFile(fmt) {
@@ -3472,7 +3479,7 @@
         }
 
         // The SVG of the drawing (also the source of the product PNG, so both files always match).
-        function buildExportSVG(fontCss = '') {
+        function buildExportSVG(fontCss = '', solidHoles = false) {
             const ringD = BASE_STEP_VAL * 2;
             const innerHoleR = (ringD - LINE_WEIGHT) / 2;
             const strokePad = LINE_WEIGHT / 2;
@@ -3517,7 +3524,7 @@
                 masks += `<circle cx="${svgX(i * STEP)}" cy="${svgY(j * STEP)}" r="${innerHoleR}" fill="black"/>`;
             }
             getBoltHolesPx().forEach(h => { masks += `<circle cx="${svgX(h.x)}" cy="${svgY(h.y)}" r="${h.r}" fill="black"/>`; });
-            const maskTag = masks ? `<defs><mask id="holeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="${svgWidth}" height="${svgHeight}"><rect width="${svgWidth}" height="${svgHeight}" fill="white"/>${masks}</mask></defs>` : '';
+            const maskTag = masks && !solidHoles ? `<defs><mask id="holeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="${svgWidth}" height="${svgHeight}"><rect width="${svgWidth}" height="${svgHeight}" fill="white"/>${masks}</mask></defs>` : '';
 
             let svgPathData = '';
             getPathGroups().forEach(g => {
@@ -3530,7 +3537,9 @@
                 const peY = peMm * LINE_WEIGHT / 12 + pad.t;
                 svgContent += `<rect x="${+pad.l.toFixed(2)}" y="${+peY.toFixed(2)}" width="${+paperPxW.toFixed(2)}" height="${+(pad.t + paperPxH - peY).toFixed(2)}" fill="black"/>`;
             }
-            if (svgPathData) svgContent += `<path d="${svgPathData}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
+            if (svgPathData) svgContent += `<path d="${svgPathData}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2" ${masks !== "" && !solidHoles ? 'mask="url(#holeMask)"' : ""}/>`;
+            // Raster export: no mask (rasterised soft by some browsers) - the holes are painted as crisp white discs over the pattern.
+            if (solidHoles && svgPathData && masks) svgContent += `<g>${masks.replace(/fill="black"/g, 'fill="#fff"')}</g>`;
             for (let id in specialElements) {
                 let [i, j] = id.split(',').map(Number);
                 let x = svgX(i * STEP);
