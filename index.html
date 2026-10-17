@@ -44,7 +44,7 @@
             --kbd-margin: 20px;
             --sidebar-width: 300px;
         }
- 
+
         [data-theme="dark"] {
             --bg-color: #111111;
             --canvas-bg: #111111;
@@ -60,8 +60,8 @@
             --tl-track-bg: rgba(255, 255, 255, 0.1);
             --tl-progress-fill: #FFFFFF;
         }
- 
- 
+
+
         * {
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none; 
@@ -71,7 +71,7 @@
             box-sizing: border-box;
             touch-action: none; 
         }
- 
+
         html, body {
             margin: 0; padding: 0;
             width: 100vw;
@@ -81,13 +81,13 @@
             top: 0; left: 0; right: 0; bottom: 0;
             background-color: var(--bg-color);
         }
- 
+
         body {
             display: flex; justify-content: center; align-items: center; 
             font-family: var(--main-font);
             transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
         }
- 
+
         #main-content {
             width: 100%;
             height: 100%;
@@ -96,18 +96,18 @@
             justify-content: center;
             align-items: center;
         }
- 
+
         body.dashboard-open #main-content {
             filter: blur(8px);
         }
- 
+
         .glass-panel {
             background: var(--panel-bg);
             backdrop-filter: var(--glass-blur);
             -webkit-backdrop-filter: var(--glass-blur);
             border: 1px solid var(--border-color);
         }
- 
+
         /* --- TOP NAV --- */
         .top-nav-container {
             position: fixed; 
@@ -116,7 +116,7 @@
             z-index: 500; display: flex; justify-content: space-between;
             align-items: flex-start; padding: 0 20px; pointer-events: none;
         }
- 
+
         .top-nav-wrapper { 
             display: flex; flex-direction: column; align-items: center; gap: 4px; 
             pointer-events: none; position: absolute; left: 50%; transform: translateX(-50%);
@@ -139,7 +139,7 @@
             background: var(--active-btn-bg);
             border-color: var(--text-color);
         }
- 
+
         /* --- DASHBOARD / SIDEBAR --- */
         #dashboard-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -147,7 +147,7 @@
             transition: opacity 0.4s ease;
         }
         #dashboard-overlay.open { opacity: 1; pointer-events: auto; }
- 
+
         #dashboard {
             position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width);
             background: var(--bg-color); z-index: 2600; transform: translateX(-100%);
@@ -156,7 +156,7 @@
             box-shadow: 20px 0 50px rgba(0,0,0,0.1);
         }
         #dashboard.open { transform: translateX(0); }
- 
+
         /* Dashboard Tabs Revision */
         .dash-header-tabs {
             display: flex; margin-bottom: 20px; flex-shrink: 0;
@@ -188,7 +188,7 @@
             background: var(--active-btn-bg) !important;
             box-shadow: none;
         }
- 
+
         .dash-content-container {
             display: flex; flex-direction: column; flex-grow: 1; overflow-y: auto; overflow-x: hidden;
             padding-bottom: 24px;
@@ -197,7 +197,7 @@
         .dash-content-container { -ms-overflow-style: none; scrollbar-width: none; }
         
         #dash-games { display: none; }
- 
+
         .dash-section { margin-bottom: 24px; flex-shrink: 0; } 
         .dash-label { 
             font-size: 10px; font-weight: 700; text-transform: uppercase; 
@@ -229,7 +229,7 @@
         .project-icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--border-color); border-radius: 8px; background: transparent; color: var(--text-color); cursor: pointer; }
         .project-icon-btn svg { width: 15px; height: 15px; }
         .project-icon-btn.delete { color: #ef4444; }
- 
+
         .theme-container {
             display: flex; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border-color);
             padding: 3px; gap: 3px;
@@ -239,23 +239,23 @@
             border-radius: 8px; cursor: pointer; transition: all 0.2s; color: var(--disabled-color);
         }
         .theme-opt.active { background: var(--bg-color); color: var(--text-color); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
- 
+
         /* --- LOGIN BOX ADJUSTMENT --- */
         .login-box {
             margin-top: auto; padding-top: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom)); 
             border-top: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; gap: 12px; flex-shrink: 0;
         }
- 
+
         .user-profile { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; }
         .user-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color); }
         .user-info { display: flex; flex-direction: column; overflow: hidden; }
         .user-name { font-size: 13px; font-weight: 700; color: var(--text-color); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .user-email { font-size: 11px; color: var(--disabled-color); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
- 
+
         .google-btn { background: var(--google-blue) !important; color: white !important; border: none !important; box-shadow: 0 4px 12px rgba(66, 133, 244, 0.25); transition: all 0.2s ease; justify-content: center; width: 100%; }
         .google-btn:hover { background: var(--google-blue-hover) !important; box-shadow: 0 6px 16px rgba(66, 133, 244, 0.35); }
         .google-btn:active { background: var(--google-blue-active) !important; transform: scale(0.96); box-shadow: 0 2px 4px rgba(66, 133, 244, 0.2); }
- 
+
         /* --- TIMELINE PANEL --- */
         #timelapse-toolbar {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(200px);
@@ -283,7 +283,7 @@
         .tl-action-btn:hover { background: var(--active-btn-bg); border-color: var(--border-color); }
         .tl-action-btn:active { background: var(--active-btn-bg); border-color: var(--border-color); transform: scale(0.92); }
         .tl-action-btn.speed-btn { font-family: var(--main-font); font-size: 12.65px; font-weight: 800; }
- 
+
         /* Keyboard */
         #mobile-keyboard {
             position: fixed; bottom: 0; left: 50%; transform: translate(-50%, calc(100% + 50px)); 
@@ -295,24 +295,24 @@
         .keyboard-trigger-area { width: 100%; height: 30px; display: flex; justify-content: center; align-items: center; pointer-events: auto; cursor: pointer; }
         .keyboard-close-bar { width: 50px; height: 4px; background: var(--kbd-text-color); border-radius: 2px; opacity: 0; transform: scaleX(0.5); transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
         #mobile-keyboard.open .keyboard-close-bar { opacity: 0.6; transform: scaleX(1); }
- 
+
         .handle-arrow { 
             width: 45px; height: 45px; stroke: var(--handle-icon-color); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round;
             opacity: 0.6; transition: transform 0.4s ease, opacity 0.4s ease, stroke 0.2s ease; animation: arrow-float 2.5s ease-in-out infinite;
             position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 1999; cursor: pointer; pointer-events: auto;
         }
         @keyframes arrow-float { 0%, 100% { transform: translateX(-50%) translateY(0px); } 50% { transform: translateX(-50%) translateY(-8px); } }
- 
+
         #mobile-keyboard.open + .handle-arrow, 
         body.timelapse-active .handle-arrow,
         body.game-active .handle-arrow,
         body.dashboard-open .handle-arrow { opacity: 0; pointer-events: none; visibility: hidden; }
- 
+
         #kbd-main-grid { display: grid; grid-template-rows: repeat(4, 60px); gap: 8px; width: 100%; padding-bottom: 20px; }
         .keyboard-row { display: grid; gap: 8px; pointer-events: auto; width: 100%; height: 100%; }
         .row-3-col { grid-template-columns: repeat(3, 1fr); }
         .row-4-col { grid-template-columns: repeat(4, 1fr); }
- 
+
         .v-key {
             height: 100%; background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
             border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -323,17 +323,17 @@
         .v-key .key-label, .v-key .mode-sub { display: none; }
         .v-key.mode-key { justify-content: center; align-items: center; }
         .v-key .mode-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; display: inline-block; color: var(--kbd-icon-color); transform: scaleY(1.3); transform-origin: center; pointer-events: none; }
- 
+
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100%; z-index: 1; overflow: hidden; touch-action: none; }
         .indicator-text { font-size: 11.2px; font-weight: 400; color: var(--text-color); opacity: 0; transition: opacity 0.3s ease, transform 0.2s ease; letter-spacing: 0.5px; pointer-events: none; transform: translateY(3px); text-align: center; }
         .indicator-text.visible { opacity: 1; transform: translateY(5px); }
- 
+
         .theme-svg { width: 19.8px; height: 19.8px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
- 
+
         @media (max-width: 600px) {
             --sidebar-width: 85vw;
         }
- 
+
         /* --- NEW CANVAS MODAL --- */
         #new-canvas-modal {
             position: fixed; inset: 0; z-index: 3000; display: none;
@@ -351,7 +351,7 @@
         }
         /* The global rule disables touch gestures; the window must scroll vertically. */
         .modal-content, .modal-content * { touch-action: pan-y; }
- 
+
         .nc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 22px 24px 14px; flex-shrink: 0; }
         .nc-header h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
         .nc-sub { display: none !important; }
@@ -363,7 +363,7 @@
         }
         .nc-close:hover { background: var(--active-btn-bg); }
         .nc-close svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
- 
+
         .nc-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 24px 8px; scrollbar-width: none; }
         .nc-body::-webkit-scrollbar { display: none; }
         .nc-section { padding: 16px 0; border-top: 1px solid var(--border-color); }
@@ -371,14 +371,14 @@
         .nc-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
         .nc-label { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
         .nc-hint { font-size: 10px; color: var(--disabled-color); }
- 
+
         .seg { display: flex; gap: 2px; padding: 2px; border-radius: 9px; border: 1px solid var(--border-color); background: var(--panel-bg); }
         .seg button {
             border: 0; background: transparent; color: var(--disabled-color); cursor: pointer;
             font-family: var(--main-font); font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 7px; transition: all 0.15s;
         }
         .seg button.active { background: var(--bg-color); color: var(--text-color); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
- 
+
         .size-row { display: flex; align-items: flex-end; gap: 8px; }
         .field { position: relative; flex: 1; min-width: 0; }
         .field-label { display: block; margin-bottom: 6px; font-size: 10px; font-weight: 600; color: var(--disabled-color); }
@@ -399,7 +399,7 @@
         .swap-btn:hover { background: var(--active-btn-bg); }
         .swap-btn:active { transform: scale(0.92); }
         .swap-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
- 
+
         .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
         .chip {
             padding: 6px 13px; border-radius: 999px; border: 1px solid var(--border-color); background: transparent;
@@ -416,7 +416,7 @@
         .chip.active { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
         .field-error { margin-top: 10px; font-size: 11px; color: #ef4444; }
         .field-error:empty { display: none; }
- 
+
         .preset-list { display: flex; flex-direction: column; gap: 8px; }
         /* hover and selected share one highlight colour: light grey in the light theme, a dark grey in the dark theme */
         #new-canvas-modal { --card: #dedede; --card-hl: #d0d0d0; }
@@ -453,7 +453,7 @@
         @keyframes hkInDown  { from { transform: translateY(-100%); opacity: 0; } }
         .mini-btn:not(:disabled):active { background: var(--active-btn-bg); }
         .swap-btn:disabled { opacity: 0.3; cursor: not-allowed; }
- 
+
         .modal-actions { display: flex; gap: 10px; padding: 14px 24px 20px; border-top: 1px solid var(--border-color); flex-shrink: 0; }
         .modal-btn {
             flex: 1; height: 46px; border-radius: 12px; border: none; cursor: pointer;
@@ -463,7 +463,32 @@
         .modal-btn.primary { flex: 1.4; background: var(--text-color); color: var(--bg-color); }
         .modal-btn.primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
         .modal-btn.secondary { background: var(--panel-bg); color: var(--text-color); border: 1px solid var(--border-color); }
- 
+
+        /* One surface colour for every control in the New Canvas window (inputs, chips, switches, buttons, cards)
+           and one highlight for hover / pressed / selected, so no control looks slightly off. */
+        #new-canvas-modal .field input,
+        #new-canvas-modal .seg,
+        #new-canvas-modal .chip,
+        #new-canvas-modal .swap-btn,
+        #new-canvas-modal .nc-close,
+        #new-canvas-modal .modal-btn.secondary,
+        #new-canvas-modal .preset-card { background-color: var(--card); border-color: var(--border-color); }
+        #new-canvas-modal .chip:hover,
+        #new-canvas-modal .swap-btn:hover:not(:disabled),
+        #new-canvas-modal .nc-close:hover,
+        #new-canvas-modal .modal-btn.secondary:hover,
+        #new-canvas-modal .preset-card:hover,
+        #new-canvas-modal .preset-card.active,
+        #new-canvas-modal .swap-btn:active:not(:disabled),
+        #new-canvas-modal .modal-btn.secondary:active { background-color: var(--card-hl); }
+        #new-canvas-modal .chip.active { background-color: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
+        #new-canvas-modal .seg button.active,
+        #new-canvas-modal .card-hooks,
+        #new-canvas-modal .preset-icon { background-color: var(--bg-color); }
+        #new-canvas-modal .mini-btn:not(:disabled):hover,
+        #new-canvas-modal .mini-btn:not(:disabled):active { background-color: var(--card-hl); }
+        #new-canvas-modal .field input:focus { border-color: var(--text-color); }
+
         #game-hearts { display: none; gap: 6px; align-items: center; justify-content: center; height: 100%; width: 100%; }
         .pixel-heart { width: 18px; height: 18px; }
     </style>
@@ -482,7 +507,7 @@
                 Games
             </div>
         </div>
- 
+
         <div class="dash-content-container" id="dash-home">
             <div class="dash-section">
                 <span class="dash-label">Workspace</span>
@@ -496,7 +521,7 @@
                 </div>
                 <div class="projects-list" id="projects-list"></div>
             </div>
- 
+
             <div class="dash-section">
                 <span class="dash-label">Export</span>
                 <div style="display: flex; gap: 10px;">
@@ -510,7 +535,7 @@
                     </div>
                 </div>
             </div>
- 
+
             <div class="dash-section">
                 <span class="dash-label">Features</span>
                 <div class="dash-btn" onclick="toggleTimelapseUI(); toggleDashboard()">
@@ -520,7 +545,7 @@
                     Time-lapse
                 </div>
             </div>
- 
+
             <div class="dash-section">
                 <span class="dash-label">Appearance</span>
                 <div class="theme-container">
@@ -532,7 +557,7 @@
                     </div>
                 </div>
             </div>
- 
+
             <div class="login-box" id="login-container">
                 <div class="dash-btn google-btn" id="google-login-btn">
                     <svg viewBox="0 0 24 24" style="stroke: white;"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/><path d="M7 12h10M12 7l5 5-5 5"/></svg>
@@ -543,7 +568,7 @@
                 </div>
             </div>
         </div>
- 
+
         <div class="dash-content-container" id="dash-games">
             <div class="dash-section">
                 <span class="dash-label">Available Games</span>
@@ -554,9 +579,9 @@
             </div>
         </div>
     </div>
- 
+
     <input id="kbd-sink" type="text" autofocus readonly inputmode="none" autocomplete="off" aria-hidden="true" tabindex="-1">
- 
+
     <!-- Canvas Size Modal -->
     <div id="new-canvas-modal" onpointerdown="if (event.target === this) closeNewCanvasModal()">
         <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="nc-title">
@@ -569,7 +594,7 @@
                     <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
                 </button>
             </div>
- 
+
             <div class="nc-body">
                 <div class="nc-section">
                     <div class="size-row">
@@ -590,20 +615,20 @@
                     <div class="chip-row has-shapes" id="paper-chips"></div>
                     <div class="field-error" id="size-error"></div>
                 </div>
- 
+
                 <div class="nc-section">
                     <div class="nc-label-row"><span class="nc-label">Products</span></div>
                     <div class="preset-list" id="preset-list"></div>
                 </div>
             </div>
- 
+
             <div class="modal-actions">
                 <button class="modal-btn secondary" onclick="closeNewCanvasModal()">Cancel</button>
                 <button class="modal-btn primary" id="nc-confirm" onclick="applyNewCanvasSize()">Create canvas</button>
             </div>
         </div>
     </div>
- 
+
     <div id="main-content">
         <div class="top-nav-container">
             <div class="left-controls-group" id="left-nav-group" style="display: flex; gap: 8px; pointer-events: none;">
@@ -611,7 +636,7 @@
                     <svg viewBox="0 0 24 24" class="theme-svg"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </div>
             </div>
- 
+
             <div class="top-nav-wrapper">
                 <div class="mode-header glass-panel" id="mode-header" onclick="event.stopPropagation(); toggleMode()" title="Drawing / Navigation (Enter)">
                     <span id="mode-text">Navigation</span>
@@ -619,7 +644,7 @@
                 </div>
                 <div id="action-indicator" class="indicator-text">Action</div>
             </div>
- 
+
             <div class="right-controls-group" id="right-nav-group" style="display: flex; gap: 8px; pointer-events: none;">
                 <div class="control-btn glass-panel" id="eraser-btn" onclick="event.stopPropagation(); toggleEraser()" title="Eraser (F)">
                     <svg viewBox="0 0 24 24" class="theme-svg">
@@ -631,7 +656,7 @@
         </div>
         
         <div id="canvas-container"></div>
- 
+
         <div id="timelapse-toolbar">
             <div class="tl-row-top">
                 <div class="tl-progress-container" id="tl-progress-container" onclick="handleTimelineSeek(event)">
@@ -663,7 +688,7 @@
                 </div>
             </div>
         </div>
- 
+
         <div id="mobile-keyboard">
             <div class="keyboard-trigger-area" onpointerdown="handleKbdTrigger('close')">
                 <div class="keyboard-close-bar"></div>
@@ -692,15 +717,15 @@
                 </div>
             </div>
         </div>
- 
+
         <svg class="handle-arrow" viewBox="0 0 24 24" onpointerdown="handleKbdTrigger('open')"><path d="M18 15l-6-6-6 6" /></svg>
     </div>
- 
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
- 
+
         const firebaseConfig = {
             apiKey: "AIzaSyB2R9HE9a_s6NKWxhVN3uJ5M01_6HkS8Gw",
             authDomain: "karakuli-c7a46.firebaseapp.com",
@@ -715,17 +740,17 @@
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
         let signedInUser = null;
- 
+
         const loginContainer = document.getElementById('login-container');
- 
+
         async function handleGoogleLogin() {
             try { await signInWithPopup(auth, provider); } catch (error) { console.error("Login Error:", error); }
         }
- 
+
         async function handleLogout() {
             try { await signOut(auth); } catch (error) { console.error("Logout Error:", error); }
         }
- 
+
         const projectsRef = () => collection(db, 'users', signedInUser.uid, 'projects');
         const localProjectsKey = () => `karakuli-projects-${signedInUser.uid}`;
         const readLocalProjects = () => JSON.parse(localStorage.getItem(localProjectsKey()) || '[]');
@@ -790,7 +815,7 @@
                 catch (error) { console.warn('Cloud project delete unavailable; deleted locally.', error); }
             }
         };
- 
+
         onAuthStateChanged(auth, (user) => {
             signedInUser = user;
             if (user) {
@@ -824,21 +849,21 @@
             window.dispatchEvent(new CustomEvent('karakuli-auth-change', { detail: { user } }));
         });
     </script>
- 
+
     <script>
         // Allow scrolling inside the New Canvas window; block page scrolling everywhere else.
         document.addEventListener('touchmove', function (e) {
             if (e.target.closest && e.target.closest('.modal-content')) return;
             e.preventDefault();
         }, { passive: false });
- 
+
         const INITIAL_DELAY = 520;  
         const REPEAT_INTERVAL = 180; 
         // 1× is three times faster while retaining enough render samples for a fluid stroke.
         const FRAME_DURATION = 0.08;
         const TL_PLAYBACK_FPS = 60;
         const TL_MAX_FRAMES = 360;
- 
+
         // The ring is 4% larger than the previous version; line weight stays visually consistent.
         const BASE_STEP_VAL = 66.6611712; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
@@ -849,7 +874,7 @@
         let history = [], redoStack = []; let isExporting = false; let isTimelapseExport = false;
         let actionTimeout = null; let currentTheme = 'light';
         let isPanning = false;
- 
+
         let tlHistory = []; 
         let isTimelapseUIOpen = false;
         let isPlayingTl = false;
@@ -870,10 +895,10 @@
         let geometryCache = { source: null, groups: [] };
         let tlGrowthCache = { from: -1, to: -1, historyLength: 0, path: null };
         let tlBatchCache = { historyLength: -1, batches: [] };
- 
+
         let isDashboardOpen = false;
         let menuNavIndex = 0;
- 
+
         let paperWidthMm = 210;
         let paperHeightMm = 297;
         let isPaperVisible = false;
@@ -884,7 +909,7 @@
         let createProjectOnReset = false;
         let activeProductKey = null;   // product shown on the canvas (shelf / hanger / magazine)
         let selectedPresetKey = null;  // product selected inside the New Canvas window
- 
+
         function projectSnapshot() {
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
@@ -893,12 +918,12 @@
                 tlHistory, tlCurrentFrame, tlCaptureStride, tlCaptureCounter
             }));
         }
- 
+
         function updateCurrentProjectUI() {
             const list = document.getElementById('projects-list');
             if (list?.classList.contains('open')) renderProjectsList();
         }
- 
+
         async function nextProjectTitle() {
             const projects = await window.karakuliProjects.list();
             const used = projects.map(project => Number((project.title || '').match(/^Karakuli #(\d{4})$/)?.[1]))
@@ -906,7 +931,7 @@
             const next = used.length ? Math.max(...used) + 1 : 0;
             return `Karakuli #${String(next).padStart(4, '0')}`;
         }
- 
+
         async function saveCurrentProject() {
             if (!window.karakuliProjects?.isSignedIn()) return;
             if (!activeProjectId) {
@@ -923,7 +948,7 @@
             updateCurrentProjectUI();
             await renderProjectsList();
         }
- 
+
         function scheduleProjectSave() {
             if (!window.karakuliProjects?.isSignedIn()) return;
             // The first edit creates the file immediately; subsequent edits are batched.
@@ -931,7 +956,7 @@
             clearTimeout(projectSaveTimer);
             projectSaveTimer = setTimeout(() => saveCurrentProject().catch(error => console.error('Project save error:', error)), 700);
         }
- 
+
         async function renderProjectsList() {
             const list = document.getElementById('projects-list');
             if (!list) return;
@@ -968,17 +993,17 @@
                 list.innerHTML = currentProject + '<div class="project-empty">Could not load the cloud project list.</div>';
             }
         }
- 
+
         function escapeProjectText(value) {
             const node = document.createElement('span'); node.textContent = value; return node.innerHTML;
         }
- 
+
         async function toggleProjectsList() {
             const list = document.getElementById('projects-list');
             list.classList.toggle('open');
             if (list.classList.contains('open')) await renderProjectsList();
         }
- 
+
         async function openProject(id) {
             const project = await window.karakuliProjects?.load(id);
             if (!project) return;
@@ -998,7 +1023,7 @@
             document.getElementById('projects-list').classList.remove('open');
             updateCurrentProjectUI();
         }
- 
+
         async function deleteProject(id) {
             if (!confirm('Delete this project permanently?')) return;
             await window.karakuliProjects?.remove(id);
@@ -1006,30 +1031,30 @@
             updateCurrentProjectUI();
             await renderProjectsList();
         }
- 
+
         async function deleteCurrentProject() {
             if (!activeProjectId) return;
             await deleteProject(activeProjectId);
             performReset({ preserveUndo: false });
         }
- 
+
         window.addEventListener('karakuli-auth-change', event => {
             activeProjectId = null;
             if (event.detail.user) { renderProjectsList(); scheduleProjectSave(); }
             else document.getElementById('projects-list').innerHTML = '';
             updateCurrentProjectUI();
         });
- 
+
         let isResizingCanvas = false;
         let activeCorner = null;
         let isResizingOnly = false;
- 
+
         let activePointers = new Map();
         let mainPointerId = null;
         let pX = 0, pY = 0, lastPX = 0, lastPY = 0;
         let lastPinchDist = 0;
         let isPointerDrawing = false;
- 
+
         // --- GAME VARIABLES ---
         let isGameMode = false;
         let gameState = 'idle'; // idle, loading, start, playing, victory, gameover
@@ -1042,12 +1067,12 @@
         let gameParticles = [];
         let lives = 3;
         let keys = { left: false, right: false };
- 
+
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
             dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8', cursorColor: '#FF6666', drawCursor: '#58595B' }
         };
- 
+
         function switchDashTab(tab) {
             document.getElementById('tab-home').classList.remove('active');
             document.getElementById('tab-games').classList.remove('active');
@@ -1058,7 +1083,7 @@
             menuNavIndex = 0;
             if (isDashboardOpen) updateMenuNavigationFocus();
         }
- 
+
         function getMenuNavigationItems() {
             const activeTab = document.querySelector('.dash-tab.active');
             const activePanel = activeTab ? document.getElementById(activeTab.id.replace('tab-', 'dash-')) : null;
@@ -1066,11 +1091,11 @@
             return [...activePanel.querySelectorAll('.dash-btn, .theme-opt, .project-open, .project-icon-btn, .project-delete')]
                 .filter(item => !item.classList.contains('disabled') && item.offsetParent !== null);
         }
- 
+
         function clearMenuNavigationFocus() {
             document.querySelectorAll('.kbd-menu-focus').forEach(item => item.classList.remove('kbd-menu-focus'));
         }
- 
+
         function updateMenuNavigationFocus() {
             clearMenuNavigationFocus();
             const items = getMenuNavigationItems();
@@ -1080,20 +1105,20 @@
             item.classList.add('kbd-menu-focus');
             item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         }
- 
+
         function moveMenuFocus(verticalDirection) {
             const items = getMenuNavigationItems();
             if (!items.length) return;
             menuNavIndex = (menuNavIndex + verticalDirection + items.length) % items.length;
             updateMenuNavigationFocus();
         }
- 
+
         function moveMenuHorizontally(direction) {
             // Left/right are reserved for the Home/Games tabs. Up/down always
             // walks through every action, including controls on the same row.
             switchDashTab(direction < 0 ? 'home' : 'games');
         }
- 
+
         // Side menu: arrows and the numpad (8 2 4 6) both move, Enter / 5 confirm.
         function dashNavKey(e) {
             const m = /^Numpad([0-9])$/.exec(e.code || '');
@@ -1115,7 +1140,7 @@
                 if (item) item.click();
             }
         }
- 
+
         // --- PRODUCTS, SHAPES & NEW CANVAS WINDOW ---
         // Product geometry comes 1:1 from the technical drawings (veshalka.pdf / veshalka_icon.svg), all values in mm.
         //  def      = default flat-sheet size (the canvas is the whole flat sheet, bent parts included)
@@ -1153,7 +1178,7 @@
         const RED = '#FF6666';
         let sizeUnit = 'mm';
         let modalSizeMm = { w: 210, h: 297 };
- 
+
         // 'free' (custom size and A-formats), 'product', 'square' or 'circle'
         function templateKind() {
             if (!isPaperVisible || !activeProductKey) return 'free';
@@ -1195,7 +1220,7 @@
             if (templateKind() !== 'product') return [];
             return productGeom(activeProductKey, paperWidthMm, paperHeightMm).holes;
         }
- 
+
         // ---- unit helpers ----
         function fmtLen(mm) { const u = UNITS[sizeUnit]; return String(+(mm / u.f).toFixed(u.dec)); }
         function readField(id) {
@@ -1208,7 +1233,7 @@
             modalSizeMm = { w, h };
         }
         function sizeIsValid(v) { return Number.isFinite(v) && v >= PAPER_MIN_MM && v <= PAPER_MAX_MM; }
- 
+
         // ---- window actions ----
         function dimsFor(key) {
             if (SHAPES[key]) { const sz = (selectedPresetKey === key) ? modalSizeMm.w : SHAPES[key].def; return { s: sz, w: sz, h: sz }; }
@@ -1216,7 +1241,7 @@
             if (selectedPresetKey === key) return normalizeProductSize(key, modalSizeMm.w, modalSizeMm.h);
             return { w: P.def.w, h: P.def.h };
         }
- 
+
         function selectPreset(key) {
             if (SHAPES[key]) {
                 const keep = SHAPES[selectedPresetKey] && sizeIsValid(modalSizeMm.w);
@@ -1229,14 +1254,14 @@
             } else return;
             refreshModal();
         }
- 
+
         function selectPaperChip(name) {
             const [w, h] = PAPER_CHIPS[name];
             selectedPresetKey = null;
             writeSize(w, h);
             refreshModal();
         }
- 
+
         // Custom size: no template. Product: stays selected, its holes / hooks follow the size. Shape: width = height.
         function onSizeInput(which) {
             const w = readField('canvas-w-input'), h = readField('canvas-h-input');
@@ -1247,7 +1272,7 @@
             } else if (sizeIsValid(w) && sizeIsValid(h)) modalSizeMm = { w, h };
             refreshModal();
         }
- 
+
         // Leaving a field: snap a product to a size that can actually be made.
         function onSizeCommit() {
             const w = readField('canvas-w-input'), h = readField('canvas-h-input');
@@ -1257,21 +1282,21 @@
             }
             refreshModal();
         }
- 
+
         function swapSize() {
             if (selectedPresetKey) return;
             const w = readField('canvas-w-input'), h = readField('canvas-h-input');
             if (sizeIsValid(w) && sizeIsValid(h)) writeSize(h, w); else writeSize(modalSizeMm.h, modalSizeMm.w);
             refreshModal();
         }
- 
+
         function setUnit(unit) {
             if (!UNITS[unit]) return;
             sizeUnit = unit;
             writeSize(modalSizeMm.w, modalSizeMm.h);
             refreshModal();
         }
- 
+
         // Hooks: every hook changes the width by one pitch (24 grid steps), so the spacing never changes.
         let hookAnim = null;
         function changeHooks(delta, event) {
@@ -1284,7 +1309,7 @@
             writeSize(hookWidth(n), modalSizeMm.h);
             refreshModal();
         }
- 
+
         // Template icon: a technical sketch (line drawing, no pattern) of the whole product mounted on the wall,
         // seen from the front-left. Every number comes from PRODUCTS / SHAPES; it follows the chosen size.
         function productIconSVG(key, W, H, dims) {
@@ -1342,7 +1367,7 @@
             holes.forEach(h => { const c = at(h); g += '<ellipse cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" rx="0.65" ry="0.85" fill="currentColor"/>'; });
             return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">' + g + '</svg>';
         }
- 
+
         function renderProductCards() {
             document.getElementById('preset-list').innerHTML = Object.entries(PRODUCTS).map(([key, p]) => {
                 const d = dimsFor(key), on = key === selectedPresetKey;
@@ -1366,7 +1391,7 @@
             }).join('');
             hookAnim = null;
         }
- 
+
         function refreshModal() {
             const w = readField('canvas-w-input'), h = readField('canvas-h-input');
             const wOk = sizeIsValid(w), hOk = sizeIsValid(h);
@@ -1394,13 +1419,13 @@
             renderProductCards();
             if (document.getElementById('new-canvas-modal').style.display === 'flex') applyModalFocus(false);
         }
- 
+
         function prepareModalPresets() {
             selectedPresetKey = isPaperVisible ? activeProductKey : null;
             if (isPaperVisible) writeSize(paperWidthMm, paperHeightMm); else writeSize(modalSizeMm.w, modalSizeMm.h);
             refreshModal();
         }
- 
+
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         function productOutlineD(dx = 0, dy = 0) {
             const kind = templateKind();
@@ -1431,7 +1456,7 @@
             }
             return `M${f(L)} ${f(T)}H${f(R)}V${f(B)}H${f(L)}Z`;
         }
- 
+
         // The template's flat drawing on the canvas: contour + dashed bend lines.
         // The part of a product that carries no pattern (everything below PATTERN END) is solid black,
         // kept inside the template outline.
@@ -1447,7 +1472,7 @@
             rect(-wPx / 2, -hPx / 2 + yMm * MM, wPx, hPx - yMm * MM);
             ctx.restore(); pop();
         }
- 
+
         function drawProductTemplate(paperColor) {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const path = new Path2D(productOutlineD());
@@ -1458,13 +1483,13 @@
             pop();
             fillNoPatternZone();
         }
- 
+
         // Phones, zoomed far out (below 20 %): no text next to the lines and no reticles, just red dots for the holes.
         function isFarOutOnMobile() {
             const mobile = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768;
             return mobile && zoom < 0.2;
         }
- 
+
         // Bend lines: dashed red, over the whole width of the sheet, always ABOVE the pattern (drawn after it),
         // each labelled on the left, outside the sheet: PATTERN END (where the pattern stops) or BEND LINE (a fold).
         function drawBendLines() {
@@ -1484,7 +1509,7 @@
             marks.forEach(m => { const y = -hPx / 2 + m.y * MM; text(m.label, -wPx / 2 - 8 / zoom, y); });
             pop();
         }
- 
+
         // The corner "ears" that resize the canvas.
         //  custom size / A-formats / square : four L-shaped ears in the corners
         //  products (shelf, hanger, holder) : only the top-left ear (a tap opens the size window)
@@ -1510,7 +1535,7 @@
             }
             pop();
         }
- 
+
         // Dragging an ear: square and circle stay round / square, products follow what can be made.
         function applyCornerDrag(worldX, worldY) {
             const MM = LINE_WEIGHT / 12, kind = templateKind();
@@ -1533,7 +1558,7 @@
                 showActionHint(`${Math.round(paperWidthMm)} × ${Math.round(paperHeightMm)} mm`, true);
             }
         }
- 
+
         // Bolt holes on the canvas: centre dot + ring + four ticks (a reticle), constant 1 px lines on screen.
         function drawProductMarks(wPx, hPx) {
             if (templateKind() !== 'product') return;
@@ -1559,7 +1584,7 @@
             });
             pop();
         }
- 
+
         // ---- Keyboard navigation of the size / template window ----
         // Rows: [Width, Height] / paper + shape chips / one row per product / [Cancel, Create].
         // 8 / 2 (numpad or arrows) move between rows and switch templates, 4 / 6 move along a row (on the Hanger they change the hook counter), Enter or 5 confirms.
@@ -1623,7 +1648,7 @@
             }
             return true;
         }
- 
+
         function showCanvasModal() {
             document.getElementById('nc-title').textContent = isResizingOnly ? 'Canvas Size' : 'New Canvas';
             document.getElementById('nc-sub').textContent = isResizingOnly
@@ -1636,27 +1661,27 @@
             setTimeout(() => modal.classList.add('show'), 10);
             initModalFocus();
         }
- 
+
         function openNewCanvasModal() {
             isResizingOnly = false;
             createProjectOnReset = true;
             toggleDashboard();
             showCanvasModal();
         }
- 
+
         function openNewCanvasModalFromCorner() {
             isResizingOnly = true;
             createProjectOnReset = false;
             showCanvasModal();
         }
- 
+
         function closeNewCanvasModal() {
             createProjectOnReset = false;
             const modal = document.getElementById('new-canvas-modal');
             modal.classList.remove('show');
             setTimeout(() => modal.style.display = 'none', 300);
         }
- 
+
         function applyNewCanvasSize() {
             let w = readField('canvas-w-input'), h = readField('canvas-h-input');
             if (!sizeIsValid(w) || !sizeIsValid(h)) { refreshModal(); return; }
@@ -1680,7 +1705,7 @@
             setTimeout(refit, 120);
             setTimeout(refit, 400);
         }
- 
+
         // Shows the whole sheet at once (full size of the template, with room for the left-hand labels).
         function fitCanvasToView() {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
@@ -1692,7 +1717,7 @@
             offsetX = W / 2 + labelRoom / 2;
             offsetY = H / 2;
         }
- 
+
         function handleCanvasSizeKey(event) {
             if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.blur(); ensureKeyboardFocus(); return; }
             if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
@@ -1704,7 +1729,7 @@
             event.preventDefault();
             applyNewCanvasSize();
         }
- 
+
         // Scrolling over Width / Height changes the value: 1 mm per notch, 10 mm with Shift (Ctrl: 0.1 mm).
         function stepSize(which, dir, big) {
             const id = which === 'h' ? 'canvas-h-input' : 'canvas-w-input';
@@ -1724,7 +1749,7 @@
                 stepSize(k, e.deltaY < 0 ? 1 : -1, e.shiftKey);
             }, { passive: false });
         });
- 
+
         function toggleDashboard() {
             if(isGameMode) return;
             isDashboardOpen = !isDashboardOpen;
@@ -1744,7 +1769,7 @@
                 clearMenuNavigationFocus();
             }
         }
- 
+
         function updateUIState() {
             // Keep the menu available in Time-lapse so its theme controls remain usable.
             const disabledIds = ['eraser-btn', 'mode-header'];
@@ -1757,7 +1782,7 @@
                 kbdKeys.forEach(k => k.classList.remove('disabled'));
             }
         }
- 
+
         function toggleTimelapseUI() {
             if(isGameMode) return;
             clearTimelapseScreenHold();
@@ -1797,7 +1822,7 @@
             }
             updateUIState(); redraw();
         }
- 
+
         function captureState(force = false) {
             if (!force && tlCaptureStride > 1 && (++tlCaptureCounter % tlCaptureStride !== 0)) return;
             const lastState = tlHistory.length > 0 ? tlHistory[tlHistory.length - 1] : null;
@@ -1819,11 +1844,11 @@
             }
             scheduleProjectSave();
         }
- 
+
         function cycleTlSpeed() { if (tlSpeed === 1) setTlSpeed(2); else if (tlSpeed === 2) setTlSpeed(4); else if (tlSpeed === 4) setTlSpeed(8); else setTlSpeed(1); }
         function setTlSpeed(s) { tlSpeed = s; document.getElementById('tl-cycle-speed').innerText = `${s}x`; if (isPlayingTl) { stopTlPlayback(); startTlPlayback(); } }
         function formatTime(totalSeconds) { const m = Math.floor(totalSeconds / 60); const s = Math.floor(totalSeconds % 60); return `${m}:${s.toString().padStart(2, '0')}`; }
- 
+
         function updateTlProgress() {
             const fill = document.getElementById('tl-fill');
             const totalFrames = Math.max(0, tlHistory.length - 1);
@@ -1834,7 +1859,7 @@
             const totalSeconds = totalFrames * FRAME_DURATION;
             timeDisplay.innerText = `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
         }
- 
+
         function handleTimelineSeek(e) {
             if (tlHistory.length < 2) return;
             const rect = e.currentTarget.getBoundingClientRect();
@@ -1843,14 +1868,14 @@
             tlCurrentFrame = Math.max(0, Math.min(tlCurrentFrame, tlHistory.length - 1));
             applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
         }
- 
+
         function stepTimelapse(delta) {
             if (tlHistory.length === 0) return;
             stopTlPlayback();
             tlCurrentFrame = Math.max(0, Math.min(tlHistory.length - 1, tlCurrentFrame + delta));
             applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
         }
- 
+
         function getTimelapseControls() {
             return [
                 document.getElementById('tl-play-btn'),
@@ -1859,11 +1884,11 @@
                 document.getElementById('tl-close-btn')
             ];
         }
- 
+
         function clearTimelapseNavigationFocus() {
             document.querySelectorAll('.kbd-tl-focus').forEach(item => item.classList.remove('kbd-tl-focus'));
         }
- 
+
         function updateTimelapseNavigationFocus() {
             clearTimelapseNavigationFocus();
             if (!isTimelapseUIOpen) return;
@@ -1875,7 +1900,7 @@
             tlNavIndex = (tlNavIndex + controls.length) % controls.length;
             controls[tlNavIndex].classList.add('kbd-tl-focus');
         }
- 
+
         function handleTimelapseKeyboard(key) {
             const control = resolveShortcut(key);
             if (control === 'escape' || control === 'backspace') {
@@ -1893,13 +1918,13 @@
             if (control === '6') { tlNavIndex++; updateTimelapseNavigationFocus(); return; }
             if (control === '5' || control === 'enter') getTimelapseControls()[tlNavIndex].click();
         }
- 
+
         function clearTimelapseScreenHold() {
             if (tlScreenHold.timer) clearTimeout(tlScreenHold.timer);
             if (tlScreenHold.interval) clearInterval(tlScreenHold.interval);
             tlScreenHold = { pointerId: null, direction: 0, startX: 0, startY: 0, timer: null, interval: null, repeating: false };
         }
- 
+
         function beginTimelapseScreenScrub(e) {
             const toolbarRect = document.getElementById('timelapse-toolbar').getBoundingClientRect();
             if (e.clientX >= toolbarRect.left && e.clientX <= toolbarRect.right && e.clientY >= toolbarRect.top && e.clientY <= toolbarRect.bottom) return false;
@@ -1916,13 +1941,13 @@
             }, 320);
             return true;
         }
- 
+
         function moveTimelapseScreenScrub(e) {
             if (e.pointerId !== tlScreenHold.pointerId) return false;
             const dx = e.clientX - tlScreenHold.startX;
             const dy = e.clientY - tlScreenHold.startY;
             if (Math.hypot(dx, dy) < 10) return true;
- 
+
             // A real drag is always a canvas pan.  Only a motionless hold is a
             // timeline scrub, so both gestures remain available on the same area.
             clearTimelapseScreenHold();
@@ -1936,7 +1961,7 @@
             redraw();
             return false;
         }
- 
+
         function endTimelapseScreenScrub(e) {
             if (e.pointerId !== tlScreenHold.pointerId) return false;
             const { direction, repeating } = tlScreenHold;
@@ -1944,7 +1969,7 @@
             if (!repeating) stepTimelapse(direction);
             return true;
         }
- 
+
         // ---- Time-lapse playback performance ----
         // Playback must cost the same per frame no matter how big the pattern is, so the per-frame work avoids
         // anything proportional to the drawing size: frames are shared (not deep-copied), their path groups and
@@ -1983,7 +2008,7 @@
             specialElements = JSON.parse(JSON.stringify(specialElements));
             invalidateGeometryCache();
         }
- 
+
         function applyFrame(idx) {
             const frame = tlHistory[idx];
             if (!frame) return;
@@ -1992,30 +2017,30 @@
             curI = frame.cursor.i; curJ = frame.cursor.j;
             invalidateGeometryCache();
         }
- 
+
         function pointsMatch(a, b) {
             return a && b && a.x === b.x && a.y === b.y;
         }
- 
+
         function getAddedSegments(fromFrame, toFrame) {
             const before = getFrameSegmentKeys(fromFrame);
             return toFrame.segments.filter(segment => !before.has(segmentKey(segment)));
         }
- 
+
         function getFrameSegmentKeys(frame) {
             if (frame._segmentKeys) return frame._segmentKeys;
             const keys = new Set(frame.segments.map(segmentKey));
             Object.defineProperty(frame, '_segmentKeys', { value: keys, enumerable: false });
             return keys;
         }
- 
+
         function getFrameSpecialSignature(frame) {
             if (frame._specialSignature !== undefined) return frame._specialSignature;
             const signature = JSON.stringify(frame.specialElements);
             Object.defineProperty(frame, '_specialSignature', { value: signature, enumerable: false });
             return signature;
         }
- 
+
         function frameOnlyAddsConnectedLines(fromFrame, toFrame, previousEnd) {
             if (getFrameSpecialSignature(fromFrame) !== getFrameSpecialSignature(toFrame)) return null;
             const before = getFrameSegmentKeys(fromFrame);
@@ -2028,7 +2053,7 @@
             if (previousEnd && !pointsMatch(ordered[0]?.p1, previousEnd)) return null;
             return ordered;
         }
- 
+
         function buildTimelapseBatches() {
             const batches = [];
             for (let start = 0; start < tlHistory.length - 1;) {
@@ -2047,14 +2072,14 @@
             }
             return batches;
         }
- 
+
         function getTimelapseBatches() {
             if (tlBatchCache.historyLength === tlHistory.length) return tlBatchCache.batches;
             const batches = buildTimelapseBatches();
             tlBatchCache = { historyLength: tlHistory.length, batches };
             return batches;
         }
- 
+
         function getTimelapseBatchAt(position) {
             let lo = 0, hi = tlPlaybackBatches.length - 1;
             while (lo <= hi) {
@@ -2063,7 +2088,7 @@
             }
             return null;
         }
- 
+
         // A batch represents one uninterrupted drawn stroke.  While it grows we
         // keep the canvas at the beginning of that stroke and draw all of its
         // additions as a single polyline; replacing the snapshot on every grid
@@ -2074,12 +2099,12 @@
             const displayFrame = Math.floor(safePosition);
             const batch = getTimelapseBatchAt(safePosition);
             const sourceFrame = batch ? batch.start : displayFrame;
- 
+
             if (appliedFrame.index !== sourceFrame) {
                 if (shared) applyFrameShared(sourceFrame); else applyFrame(sourceFrame);
                 appliedFrame.index = sourceFrame;
             }
- 
+
             tlCurrentFrame = displayFrame;
             tlTransition = batch
                 ? {
@@ -2089,9 +2114,9 @@
                 }
                 : null;
         }
- 
+
         function togglePlayTimelapse() { if (isPlayingTl) stopTlPlayback(); else startTlPlayback(); }
- 
+
         function startTlPlayback() {
             if (tlHistory.length < 2) return;
             isPlayingTl = true;
@@ -2127,7 +2152,7 @@
             };
             tlAnimationFrame = requestAnimationFrame(tick);
         }
- 
+
         function stopTlPlayback() {
             isPlayingTl = false;
             endSharedFrames();
@@ -2138,13 +2163,13 @@
             tlTransition = null;
             tlAnimatedTip = null;
         }
- 
+
         function getMp4MimeType() {
             if (!window.MediaRecorder) return null;
             return ['video/mp4;codecs=avc1.42E01E', 'video/mp4']
                 .find(type => MediaRecorder.isTypeSupported(type)) || null;
         }
- 
+
         async function exportTimelapseVideo() {
             if (tlHistory.length < 2) return;
             const mp4MimeType = getMp4MimeType();
@@ -2152,7 +2177,7 @@
                 showActionHint('MP4 export is not supported by this browser', true);
                 return;
             }
- 
+
             showActionHint('Exporting MP4…', true);
             stopTlPlayback();
             tlCurrentFrame = 0;
@@ -2162,7 +2187,7 @@
             updateTlProgress();
             draw();
             await new Promise(resolve => requestAnimationFrame(resolve));
- 
+
             const canvasElem = document.getElementById('defaultCanvas0');
             const stream = canvasElem.captureStream(TL_PLAYBACK_FPS);
             const recorder = new MediaRecorder(stream, { mimeType: mp4MimeType, videoBitsPerSecond: 8_000_000 });
@@ -2180,7 +2205,7 @@
                 };
             });
             recorder.start();
- 
+
             const frameDelay = 1000 / TL_PLAYBACK_FPS;
             tlPlaybackBatches = getTimelapseBatches();
             const appliedFrame = { index: -1 };
@@ -2204,13 +2229,13 @@
             redraw();
             if (isTimelapseUIOpen) showActionHint('Timelapse', true); else showActionHint('Done');
         }
- 
+
         function handleKbdTrigger(action) {
             if ((isTimelapseUIOpen || isDashboardOpen || isGameMode) && action === 'open') return;
             const kbd = document.getElementById('mobile-keyboard');
             if (action === 'open') kbd.classList.add('open'); else if (action === 'close') kbd.classList.remove('open');
         }
- 
+
         function vKeyStart(event, key) {
             if (isTimelapseUIOpen) return;
             if (event) { event.preventDefault(); event.stopPropagation(); }
@@ -2225,7 +2250,7 @@
             if (isGameMode) handleGameControlUp(key);
             else if (String(key).toLowerCase() !== 'enter') handleActionUp(key);
         }
- 
+
         function setTheme(m) { 
             if (m !== 'light' && m !== 'dark') m = 'dark';   // the old 'system' theme no longer exists (saved projects fall back to dark)
             currentTheme = m; document.body.setAttribute('data-theme', m); 
@@ -2245,12 +2270,12 @@
                 }, 1200); 
             }
         }
- 
+
         function saveState() {
             history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
             if(history.length > 200) history.shift(); redoStack = []; 
         }
- 
+
         function undo() { 
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             if(history.length > 0) { 
@@ -2259,7 +2284,7 @@
                 showActionHint('Undo'); redraw(); captureState();
             }
         }
- 
+
         function redo() { 
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             if(redoStack.length > 0) { 
@@ -2278,7 +2303,7 @@
             if (isEraserActive) { eraserBtn.classList.add('active'); let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100); showActionHint(`Eraser: ${percent}%`, true); }
             else { eraserBtn.classList.remove('active'); if (!actionTimeout) indicator.classList.remove('visible'); }
         }
- 
+
         function toggleMode() { 
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             if (isEraserActive) isEraserActive = false; else { isDrawingMode = !isDrawingMode; lastDirection = null; }
@@ -2290,7 +2315,7 @@
             isEraserActive = !isEraserActive; if (isEraserActive && eraserRadius === DEFAULT_ERASER_RADIUS) eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
             updateModeUI(); redraw(); 
         }
- 
+
         function performReset({ preserveUndo = true } = {}) {
             if (isGameMode) return;
             if (isTimelapseUIOpen) {
@@ -2312,14 +2337,14 @@
             offsetX = width / 2; offsetY = height / 2; zoom = 0.48;
             showActionHint(preserveUndo ? 'Canvas cleared — Undo to restore' : 'New Canvas'); updateModeUI(); redraw(); captureState();
         }
- 
+
         function checkCornerClick(worldX, worldY) {
             const kind = templateKind();
             const MM_TO_PX = LINE_WEIGHT / 12;
             const halfW = (paperWidthMm * MM_TO_PX) / 2;
             const halfH = (paperHeightMm * MM_TO_PX) / 2;
             const cs = 30 / zoom;
- 
+
             if (kind === 'circle') {
                 const d = halfW * Math.SQRT1_2;   // the ears sit on the circle at 45 degrees
                 if (Math.hypot(worldX - d, worldY - d) < cs) return 'br';
@@ -2337,7 +2362,7 @@
             if (Math.abs(worldX + halfW) < cs && Math.abs(worldY + halfH) < cs) return 'tl';
             return null;
         }
- 
+
         function isOverUI(x, y) {
             if (document.getElementById('new-canvas-modal').classList.contains('show')) return true;
             if (isTimelapseUIOpen && y > window.innerHeight - 120) return true;
@@ -2356,7 +2381,7 @@
             if (y < 80) return true;
             return false;
         }
- 
+
         function handleStart(x, y) { 
             if (isOverUI(x, y)) return; 
             
@@ -2376,7 +2401,7 @@
             window.lastClickTime = performance.now(); 
             isPanning = true; 
         }
- 
+
         function handleEnd(x, y) {
             if (isResizingCanvas) {
                 if (performance.now() - (window.lastClickTime || 0) < 200) {
@@ -2393,7 +2418,7 @@
                 redraw();
                 return;
             }
- 
+
             if (isPanning && performance.now() - (window.lastClickTime || 0) < 200) {
                 if (!isOverUI(x, y) && !isTimelapseUIOpen && !isGameMode) {
                     let worldX = (x - offsetX) / zoom; let worldY = (y - offsetY) / zoom;
@@ -2403,7 +2428,7 @@
             }
             isPanning = false;
         }
- 
+
         // --- BREAK MAZE LOGIC ---
         function startBreakMaze() {
             // The game always starts from the complete drawing, not from an
@@ -2417,7 +2442,7 @@
             isGameMode = true;
             lives = 3;
             document.body.classList.add('game-active');
- 
+
             // UI Changes
             document.getElementById('mode-text').style.display = 'none';
             document.getElementById('game-hearts').style.display = 'flex';
@@ -2426,22 +2451,22 @@
             let menuBtn = document.getElementById('menu-btn');
             menuBtn.innerHTML = `<svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
             menuBtn.onclick = function(e) { e.stopPropagation(); exitGame(); };
- 
+
             updateHeartsUI();
             
             buildGameBricks();
             calculateGameBounds();
- 
+
             // Set targets for smooth camera fly
             let worldW = gameBounds.maxX - gameBounds.minX;
             let worldH = gameBounds.maxY - gameBounds.minY;
             targetZoom = Math.min(width / worldW, height / worldH) * 0.85;
             targetOffsetX = width/2 - ((gameBounds.minX + gameBounds.maxX)/2) * targetZoom;
             targetOffsetY = height/2 - ((gameBounds.minY + gameBounds.maxY)/2) * targetZoom;
- 
+
             paddle = { w: 8 * STEP, h: LINE_WEIGHT, x: (gameBounds.minX + gameBounds.maxX)/2, y: gameBounds.maxY - LINE_WEIGHT };
             ball = { r: (STEP * 0.7) / 2, x: paddle.x, y: paddle.y - paddle.h/2 - (STEP*0.7)/2, vx: 0, vy: 0, speed: STEP * 0.4 };
- 
+
             gameState = 'loading';
             loadingProgress = 0;
             gameParticles = [];
@@ -2449,7 +2474,7 @@
             showActionHint("Loading Maze...", true);
             loop(); // start animation
         }
- 
+
         function updateHeartsUI() {
             let html = '';
             let heartSVG = `<svg class="pixel-heart" viewBox="0 0 24 24" fill="#FF6666" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
@@ -2457,7 +2482,7 @@
             for(let i=0; i<3; i++) html += (i < lives) ? heartSVG : emptySVG;
             document.getElementById('game-hearts').innerHTML = html;
         }
- 
+
         function buildGameBricks() {
             gameBricks = { lines: [], nodes: [], diamonds: [] };
             segments.forEach((s, idx) => { gameBricks.lines.push({ id: idx, seg: s, active: true }); });
@@ -2467,7 +2492,7 @@
                 if (specialElements[id].isDiamond) gameBricks.diamonds.push({ id: id, x: i*STEP, y: j*STEP, hp: 1 });
             }
         }
- 
+
         function calculateGameBounds() {
             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
             segments.forEach(s => {
@@ -2483,7 +2508,7 @@
             let pad = 4 * STEP;
             gameBounds = { minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad + 15 * STEP };
         }
- 
+
         function handleGameInput(type, val) {
             if (!isGameMode) return;
             if ((gameState === 'start' || gameState === 'gameover' || gameState === 'victory') && (type === 'click' || type === 'keydown')) {
@@ -2492,7 +2517,7 @@
                 ball.vy = -ball.speed; ball.vx = (Math.random() - 0.5) * ball.speed;
             }
         }
- 
+
         function handleGameControlDown(key) {
             const control = resolveShortcut(key);
             if (control === '4') { keys.left = true; return; }
@@ -2500,13 +2525,13 @@
             if (control === '5') { handleGameInput('keydown'); return; }
             if (control === 'backspace') { ignoreBackspaceUntilKeyUp = true; exitGame(); }
         }
- 
+
         function handleGameControlUp(key) {
             const control = resolveShortcut(key);
             if (control === '4') keys.left = false;
             if (control === '6') keys.right = false;
         }
- 
+
         class Particle {
             constructor(x, y, type) {
                 this.x = x; this.y = y;
@@ -2526,7 +2551,7 @@
                 pop();
             }
         }
- 
+
         function destroyLineChain(startIndex) {
             let toDestroy = [startIndex];
             gameBricks.lines[startIndex].active = false;
@@ -2551,7 +2576,7 @@
             });
             gameBricks.lines = gameBricks.lines.filter(l => l.active);
         }
- 
+
         function distToSegmentSquared(p, v, w) {
             let l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
             if (l2 === 0) return (p.x - v.x)**2 + (p.y - v.y)**2;
@@ -2560,7 +2585,7 @@
             let proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
             return { distSq: (p.x - proj.x)**2 + (p.y - proj.y)**2, proj: proj };
         }
- 
+
         function physicsStep() {
             ball.x += ball.vx; ball.y += ball.vy;
             
@@ -2578,13 +2603,13 @@
                 let s = Math.sqrt(ball.vx**2 + ball.vy**2);
                 ball.vx = (ball.vx/s) * ball.speed; ball.vy = (ball.vy/s) * ball.speed;
             }
- 
+
             if (ball.y > gameBounds.maxY) {
                 lives--; updateHeartsUI();
                 if (lives <= 0) { gameState = 'gameover'; }
                 else { gameState = 'start'; ball.x = paddle.x; ball.y = paddle.y - paddle.h/2 - ball.r; }
             }
- 
+
             // Bricks
             for(let i=gameBricks.nodes.length-1; i>=0; i--) {
                 let n = gameBricks.nodes[i];
@@ -2623,7 +2648,7 @@
                     return;
                 }
             }
- 
+
             for(let i=gameBricks.lines.length-1; i>=0; i--) {
                 let l = gameBricks.lines[i].seg;
                 let p1x = l.p1.x * STEP, p1y = l.p1.y * STEP, p2x = l.p2.x * STEP, p2y = l.p2.y * STEP;
@@ -2642,12 +2667,12 @@
                     return;
                 }
             }
- 
+
             if (gameBricks.lines.length === 0 && gameBricks.nodes.length === 0 && gameBricks.diamonds.length === 0) {
                 gameState = 'victory'; showActionHint("YOU WIN!", true);
             }
         }
- 
+
         function drawBreakMaze() {
             background(themeConfig[currentTheme].canvasBg);
             push(); translate(offsetX, offsetY); scale(zoom);
@@ -2656,7 +2681,7 @@
             stroke('rgba(128,128,128,0.2)'); strokeWeight(5); noFill();
             rectMode(CORNER);
             rect(gameBounds.minX, gameBounds.minY, gameBounds.maxX - gameBounds.minX, gameBounds.maxY - gameBounds.minY);
- 
+
             if (gameState === 'loading') {
                 loadingProgress += 0.02;
                 zoom = lerp(zoom, targetZoom, 0.1);
@@ -2667,7 +2692,7 @@
                 if (loadingProgress >= 1.0) { gameState = 'start'; showActionHint("Tap to Start", true); }
                 pop(); return;
             }
- 
+
             // Draw Bricks exactly as SVG
             let ogSeg = segments; let ogSpec = specialElements;
             segments = gameBricks.lines.map(l => l.seg);
@@ -2678,31 +2703,31 @@
             drawGeometry(themeConfig[currentTheme].geomColor, true);
             
             segments = ogSeg; specialElements = ogSpec;
- 
+
             // Particles
             gameParticles.forEach(p => p.update());
             gameParticles = gameParticles.filter(p => p.life > 0);
             gameParticles.forEach(p => p.draw(themeConfig[currentTheme].geomColor));
- 
+
             // Paddle
             fill(themeConfig[currentTheme].geomColor); noStroke(); rectMode(CENTER);
             rect(paddle.x, paddle.y, paddle.w, paddle.h);
- 
+
             // Ball
             fill(themeConfig[currentTheme].cursorColor); noStroke();
             circle(ball.x, ball.y, ball.r * 2);
- 
+
             pop();
- 
+
             if (isGameMode && (gameState === 'playing' || gameState === 'start')) {
                 if (keys.left) paddle.x -= STEP * 0.6;
                 if (keys.right) paddle.x += STEP * 0.6;
                 paddle.x = constrain(paddle.x, gameBounds.minX + paddle.w/2, gameBounds.maxX - paddle.w/2);
                 if (gameState === 'start') ball.x = paddle.x;
             }
- 
+
             if (gameState === 'playing') physicsStep();
- 
+
             if (gameState === 'gameover') {
                 fill(0, 0, 0, 180);
                 noStroke();
@@ -2720,7 +2745,7 @@
                 text("Tap to restart", width/2, height/2 + 30);
             }
         }
- 
+
         function exitGame() {
             isGameMode = false;
             keys.left = false; keys.right = false;
@@ -2738,7 +2763,7 @@
             offsetX = width/2; offsetY = height/2; zoom = 0.48; 
             updateModeUI(); redraw();
         }
- 
+
         // --- CORE P5 ---
         function setup() { 
             let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); offsetX = width/2; offsetY = height/2; 
@@ -2765,18 +2790,18 @@
                     isPanning = false;
                 }
             });
- 
+
             canvasElem.addEventListener('pointermove', (e) => {
                 e.preventDefault();
                 if (isTimelapseUIOpen && moveTimelapseScreenScrub(e)) return;
                 if (activePointers.has(e.pointerId)) {
                     activePointers.set(e.pointerId, e);
                 }
- 
+
                 if (activePointers.size === 1 && e.pointerId === mainPointerId) {
                     let dx = e.clientX - pX; let dy = e.clientY - pY;
                     pX = e.clientX; pY = e.clientY;
- 
+
                     if (isPointerDrawing && !isOverUI(pX, pY)) {
                         if (isGameMode && (gameState === 'playing' || gameState === 'start')) {
                             let worldDx = dx / zoom;
@@ -2800,7 +2825,7 @@
                     lastPinchDist = currentDist; redraw();
                 }
             });
- 
+
             const endPointer = (e) => {
                 e.preventDefault();
                 if (isTimelapseUIOpen && endTimelapseScreenScrub(e)) return;
@@ -2817,16 +2842,16 @@
                     isPointerDrawing = false;
                 }
             };
- 
+
             canvasElem.addEventListener('pointerup', endPointer);
             canvasElem.addEventListener('pointercancel', endPointer);
             canvasElem.addEventListener('pointerout', endPointer);
- 
+
             noLoop();
             captureState();
             redraw();
         }
- 
+
         function getDist(t1, t2) { return Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2)); }
         
         // Keyboard zoom keeps the drawing cursor (the diamond) fixed on screen and zooms towards it.
@@ -2835,23 +2860,23 @@
             if (sx < 0 || sy < 0 || sx > width || sy > height) { sx = width / 2; sy = height / 2; }   // diamond off screen: zoom to the middle
             applyZoom(factor, sx, sy);
         }
- 
+
         function applyZoom(factor, centerX, centerY) {
             let oldZoom = zoom; zoom = constrain(zoom * factor, 0.05, 5);
             let worldX = (centerX - offsetX) / oldZoom; let worldY = (centerY - offsetY) / oldZoom;
             offsetX = centerX - worldX * zoom; offsetY = centerY - worldY * zoom;
             showActionHint(Math.round(zoom * 100) + '%', false); // Zoom Display
         }
- 
+
         function draw() {
             if (isGameMode) { drawBreakMaze(); return; } // Branch directly to game engine
- 
+
             const renderTheme = (isTimelapseUIOpen || isTimelapseExport) ? tlTheme : currentTheme;
             let colors = themeConfig[renderTheme];
             if (isTimelapseUIOpen || isTimelapseExport) background(colors.canvasBg);
             else if (isExporting) clear();
             else background(colors.canvasBg);
- 
+
             push(); translate(offsetX, offsetY); scale(zoom);
             
             if (isPaperVisible && !isExporting && !isTimelapseUIOpen) {
@@ -2862,7 +2887,7 @@
                 drawCanvasEars(wPx, hPx);
                 drawProductMarks(wPx, hPx); 
             }
- 
+
             if (!isExporting || isTimelapseExport) {
                 drawGrid(colors.dotColor, colors.dotAlpha);
             }
@@ -2874,7 +2899,7 @@
             if (!isExporting || isTimelapseExport) drawCursor();
             pop();
         }
- 
+
         function drawGrid(dotRGB, alpha) {
             // At very low zoom the grid becomes visual noise and can create thousands
             // of draw calls. Hide it below the requested 38% threshold.
@@ -2884,7 +2909,7 @@
             let sJ = floor((-offsetY/zoom)/STEP)-2, eJ = ceil(((height-offsetY)/zoom)/STEP)+2;
             for(let i=sI; i<=eI; i++) for(let j=sJ; j<=eJ; j++) circle(i*STEP, j*STEP, 1.5/zoom);
         }
- 
+
         // Bolt holes of the selected product, in world pixels (on grid points).
         // Any line drawn over one of them is cut open there, instantly.
         function getBoltHolesPx() {
@@ -2896,13 +2921,13 @@
                 x: snap(-wPx / 2 + xMm * MM), y: snap(-hPx / 2 + yMm * MM), r: (HOLE_DIAMETER_MM * MM) / 2
             }));
         }
- 
+
         function invalidateGeometryCache() { geometryCache = { source: null, groups: [] }; }
- 
+
         function getVisualLineWeight(theme = ((isTimelapseUIOpen || isTimelapseExport) ? tlTheme : currentTheme)) {
             return (theme === 'dark') ? LINE_WEIGHT - 1 : LINE_WEIGHT;
         }
- 
+
         function drawGeometry(colValue, skipCache = false) {
             const visualLineWeight = getVisualLineWeight();
             let col = isExporting && !isTimelapseExport ? 0 : colValue; let ringD = BASE_STEP_VAL * 2; let innerHoleR = (ringD - visualLineWeight) / 2;
@@ -2922,7 +2947,7 @@
             });
             ctx.stroke();
             ctx.restore(); pop();
- 
+
             // all node rings and diamonds in two native passes (was one p5 call per element)
             if (nodePts.nodes.length) {
                 push(); noFill(); stroke(col); strokeWeight(visualLineWeight);
@@ -2939,11 +2964,11 @@
             }
             drawTimelapseGrowth(col, visualLineWeight, innerHoleR, growthPath);
         }
- 
+
         function segmentKey(segment) {
             return `${segment.p1.x},${segment.p1.y}:${segment.p2.x},${segment.p2.y}`;
         }
- 
+
         function orderTimelapseSegments(segments, cursor) {
             const availableAtPoint = new Map();
             const pointKey = point => `${point.x},${point.y}`;
@@ -2972,7 +2997,7 @@
             }
             return ordered;
         }
- 
+
         function getTimelapseGrowthPath() {
             if (!tlTransition || !tlHistory[tlTransition.from] || !tlHistory[tlTransition.to]) return;
             if (tlGrowthCache.from === tlTransition.from && tlGrowthCache.to === tlTransition.to && tlGrowthCache.historyLength === tlHistory.length) {
@@ -3001,12 +3026,12 @@
                 growthOffset: 1
             });
         }
- 
+
         function cacheTimelapseGrowthPath(path) {
             tlGrowthCache = { from: tlTransition.from, to: tlTransition.to, historyLength: tlHistory.length, path };
             return path;
         }
- 
+
         function drawTimelapseGrowth(col, lineWeight, innerHoleR, growthPath) {
             if (!growthPath) return;
             const { fromFrame, toFrame } = growthPath;
@@ -3038,7 +3063,7 @@
             ctx.restore(); pop();
             tlAnimatedTip = { ...tip, specialElements: toFrame.specialElements, innerHoleR };
         }
- 
+
         function getPathGroups(skipCache = false, sourceSegments = segments) {
             if (!skipCache && sourceSegments === segments && geometryCache.source === segments) return geometryCache.groups;
             if (!skipCache && tlSharedActive && sourceSegments === segments && tlGroupsMemo.has(segments)) {
@@ -3082,11 +3107,11 @@
             if (!skipCache && sourceSegments === segments) { geometryCache = { source: segments, groups }; if (tlSharedActive) tlGroupsMemo.set(segments, groups); }
             return groups;
         }
- 
+
         function isTimelapsePointInsideNode(x, y, specialElements, innerHoleR) {
             return getNodePoints(specialElements).nodes.some(([nx, ny]) => (x - nx) ** 2 + (y - ny) ** 2 < innerHoleR ** 2);
         }
- 
+
         function drawTimelapseLeadCursor() {
             if (!tlAnimatedTip) return;
             const length = Math.hypot(tlAnimatedTip.dx, tlAnimatedTip.dy) || 1;
@@ -3097,7 +3122,7 @@
             if (isTimelapsePointInsideNode(x, y, tlAnimatedTip.specialElements, tlAnimatedTip.innerHoleR)) return;
             push(); translate(x, y); fill(themeConfig[tlTheme].drawCursor); noStroke(); rectMode(CENTER); rotate(QUARTER_PI); rect(0, 0, 20, 20); pop();
         }
- 
+
         function drawCursor() {
             if (isEraserActive && !isTimelapseUIOpen) {
                 let worldMX = (pX - offsetX) / zoom; let worldMY = (pY - offsetY) / zoom;
@@ -3117,12 +3142,12 @@
             if (lastDirection && lastDirection.di !== 0 && lastDirection.dj !== 0) rect(0, 0, 20, 20); else { rotate(QUARTER_PI); rect(0, 0, 20, 20); }
             pop();
         }
- 
+
         function findSegment(x1, y1, x2, y2) {
             let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2}; if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
             return segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
         }
- 
+
         function move(k, isHeld = false) {
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             const m = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]}; if(!m[k]) return;
@@ -3151,7 +3176,7 @@
             }
             redraw(); captureState();
         }
- 
+
         function panCanvas(k, isHeld = false) {
             const directions = {'1':[-1,1],'2':[0,1],'3':[1,1],'4':[-1,0],'6':[1,0],'7':[-1,-1],'8':[0,-1],'9':[1,-1]};
             const direction = directions[k];
@@ -3162,19 +3187,19 @@
             offsetY -= direction[1] * distance;
             redraw();
         }
- 
+
         function updateLastMoveAfterErase() {
             let connected = segments.filter(s => (s.p1.x === curI && s.p1.y === curJ) || (s.p2.x === curI && s.p2.y === curJ));
             if (connected.length >= 1) { let s = connected[connected.length - 1]; let other = (s.p1.x === curI && s.p1.y === curJ) ? s.p2 : s.p1; lastDirection = {di: curI - other.x, dj: curJ - other.y}; }
             else lastDirection = null;
         }
- 
+
         const KEYBOARD_ALIASES = { w: '8', e: '9', d: '6', c: '3', x: '2', z: '1', a: '4', q: '7', s: '5', r: '0', browserback: '/', goback: '/', back: '/' };
         function resolveShortcut(key) { return KEYBOARD_ALIASES[String(key).toLowerCase()] || String(key).toLowerCase(); }
         function isTypingInField(target) { return target && target.id !== 'kbd-sink' && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName); }
         let repeatTimer = null, activeKey = null, ignoreBackspaceUntilKeyUp = false;
         let isEnterPressed = false, isEnterUsedForPan = false, isCanvasNavigationModifier = false;
- 
+
         function handleActionDown(k) {
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             k = resolveShortcut(k);
@@ -3208,7 +3233,7 @@
             if (activeKey === key) { stopRepeat(); activeKey = null; }
         }
         function stopRepeat() { if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } }
- 
+
         function toggleSpecial(t) {
             if (isTimelapseUIOpen || !isDrawingMode || isEraserActive || isDashboardOpen || isGameMode) return;
             if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) return;
@@ -3218,14 +3243,14 @@
             if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
             showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw(); captureState();
         }
- 
+
         function addSeg(x1, y1, x2, y2) {
             let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2}; if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
             let idx = segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
             if(idx !== -1) segments.splice(idx, 1); else segments.push({p1, p2});
             invalidateGeometryCache();
         }
- 
+
         function performEraserActionAt(worldX, worldY) {
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
@@ -3241,90 +3266,107 @@
             if (newSegments.length !== initialLength) { if (!changed) saveState(); segments = newSegments; invalidateGeometryCache(); changed = true; }
             if (changed) { redraw(); captureState(); }
         }
- 
+
+        // Manufacturing drawing for product exports: red dashed bend / pattern-end lines with labels and
+        // engineering-style mm dimensions. Lives in its own <g id="annotations"> so it is easy to hide or delete.
+        function productExportAnnotations() {
+            const k = LINE_WEIGHT / 12;               // px per mm
+            const W = paperWidthMm, H = paperHeightMm;
+            const G = productGeom(activeProductKey, W, H);
+            const hasArms = G.arms.length > 0;
+            const pad = { l: 78 * k, t: 36 * k, r: 40 * k, b: (hasArms ? 36 : 12) * k };
+            const fs = 4.6 * k;                       // text height
+            const fmt = v => String(+v.toFixed(1));
+            const uniq = a => [...new Set(a.map(v => +v.toFixed(2)))].sort((p, q) => p - q);
+            return {
+                pad,
+                svg(dx, dy) {
+                    // coordinates below are in mm from the sheet's top-left corner; X()/Y() convert to file px
+                    const X = v => +(pad.l + v * k).toFixed(2), Y = v => +(pad.t + v * k).toFixed(2);   // the sheet's top-left corner sits at (pad.l, pad.t) in the file
+                    let o = '';
+                    const stroke = `stroke="#000" stroke-width="${+(0.35 * k / 2).toFixed(2)}" fill="none"`;
+                    const arrow = (x, y, ang) => `<path d="M0 0L${-2.4 * k} ${-0.8 * k}L${-2.4 * k} ${0.8 * k}Z" fill="#000" transform="translate(${x} ${y}) rotate(${ang})"/>`;
+                    // horizontal dimension: from a to b (mm) on row yMm, extension lines go down/up from fromY
+                    const dimH = (a, b, yMm, fromY, label) => {
+                        const x1 = X(a), x2 = X(b), y = Y(yMm), fy = Y(fromY), dir = yMm < fromY ? -1 : 1;
+                        let t = `<path d="M${x1} ${fy + dir * 1 * k}V${y + dir * 1.5 * k}M${x2} ${fy + dir * 1 * k}V${y + dir * 1.5 * k}M${x1} ${y}H${x2}" ${stroke}/>`;
+                        t += arrow(x1, y, 180) + arrow(x2, y, 0);
+                        t += `<text x="${+((x1 + x2) / 2).toFixed(2)}" y="${+(y - 1.2 * k).toFixed(2)}" text-anchor="middle" font-size="${fs}">${label}</text>`;
+                        return t;
+                    };
+                    // vertical dimension: from a to b (mm) on column xMm, extension lines go right from fromX
+                    const dimV = (a, b, xMm, fromX, label) => {
+                        const y1 = Y(a), y2 = Y(b), x = X(xMm), fx = X(fromX);
+                        let t = `<path d="M${fx + 1 * k} ${y1}H${x + 1.5 * k}M${fx + 1 * k} ${y2}H${x + 1.5 * k}M${x} ${y1}V${y2}" ${stroke}/>`;
+                        t += arrow(x, y1, -90) + arrow(x, y2, 90);
+                        const cy = +((y1 + y2) / 2).toFixed(2);
+                        t += `<text transform="translate(${+(x - 1.2 * k).toFixed(2)} ${cy}) rotate(-90)" text-anchor="middle" font-size="${fs}">${label}</text>`;
+                        return t;
+                    };
+                    // bend / pattern-end lines: full sheet width (a little beyond), red dashed, label on the left
+                    const lineW = +(0.4 * k).toFixed(2);   // ~0.4 mm so the dashes survive printing and downscaling
+                    G.marks.forEach(m => {
+                        o += `<line x1="${X(0) }" y1="${Y(m.y)}" x2="${X(W)}" y2="${Y(m.y)}" stroke="#e11" stroke-width="${lineW}" stroke-dasharray="${+(4 * k).toFixed(2)} ${+(2 * k).toFixed(2)}"/>`;
+                        o += `<text x="${+(X(0) - 3 * k).toFixed(2)}" y="${+(Y(m.y) + fs * 0.35).toFixed(2)}" text-anchor="end" font-size="${fs}" fill="#000">${m.label}</text>`;
+                    });
+                    // right: chain of every feature level (lines + hole rows), then overall height
+                    const ys = uniq([0, ...G.marks.map(m => m.y), ...G.holes.map(h => h[1]), H]);
+                    for (let i = 0; i < ys.length - 1; i++) o += dimV(ys[i], ys[i + 1], W + 12, W, fmt(ys[i + 1] - ys[i]));
+                    o += dimV(0, H, W + 28, W, fmt(H));
+                    // top: hole spacing across the width, then overall width
+                    const xs = uniq([0, ...G.holes.map(h => h[0]), W]);
+                    for (let i = 0; i < xs.length - 1; i++) o += dimH(xs[i], xs[i + 1], -12, 0, fmt(xs[i + 1] - xs[i]));
+                    o += dimH(0, W, -26, 0, fmt(W));
+                    // hanger: arm width and arm pitch along the bottom edge
+                    if (hasArms) {
+                        const a0 = G.arms[0], aN = G.arms[G.arms.length - 1];
+                        o += dimH(a0[0], a0[1], H + 12, H, fmt(a0[1] - a0[0]));
+                        if (G.arms.length > 1) o += dimH(a0[0], aN[0], H + 24, H, `${G.arms.length - 1}×${fmt(G.arms[1][0] - a0[0])} = ${fmt(aN[0] - a0[0])}`);
+                    }
+                    // bolt holes: Ø note next to the first hole
+                    const hr = HOLE_DIAMETER_MM;
+                    if (G.holes.length) o += `<text x="${X(G.holes[0][0] + 6)}" y="${Y(G.holes[0][1] - 4)}" font-size="${fs * 0.9}" font-family="Arial,Helvetica,sans-serif">Ø${fmt(hr)}</text>`;
+                    return `<g id="annotations" font-family="Arial,Helvetica,sans-serif" fill="#000">${o}</g>`;
+                }
+            };
+        }
+
+        // Product PNG = the same drawing as the SVG (annotations included), rasterised at up to 8000 px.
+        function exportProductPNG() {
+            const r = buildExportSVG();
+            if (!r) return;
+            const scale = Math.min(1, 8000 / Math.max(r.svgWidth, r.svgHeight));
+            const img = new Image();
+            img.onload = () => {
+                const c = document.createElement('canvas');
+                c.width = Math.max(1, Math.round(r.svgWidth * scale)); c.height = Math.max(1, Math.round(r.svgHeight * scale));
+                const x = c.getContext('2d');
+                x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+                x.drawImage(img, 0, 0, c.width, c.height);
+                c.toBlob(blob => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob); a.download = 'drawing.png'; a.click();
+                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                }, 'image/png');
+            };
+            img.onerror = () => showActionHint('PNG export failed');
+            const px = r.svg.replace(/^(<svg [^>]*?) width="[^"]*" height="[^"]*"/, `$1 width="${r.svgWidth}" height="${r.svgHeight}"`);
+            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(px);
+        }
+
         function exportFile(fmt) {
             if (isTimelapseUIOpen || isGameMode) return;
             if(isDashboardOpen) toggleDashboard();
             if(fmt==='svg') {
-                const ringD = BASE_STEP_VAL * 2;
-                const innerHoleR = (ringD - LINE_WEIGHT) / 2;
-                const strokePad = LINE_WEIGHT / 2;
-                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                const includeBounds = (x, y, padding) => {
-                    minX = Math.min(minX, x - padding); minY = Math.min(minY, y - padding);
-                    maxX = Math.max(maxX, x + padding); maxY = Math.max(maxY, y + padding);
-                };
-                segments.forEach(segment => {
-                    includeBounds(segment.p1.x * STEP, segment.p1.y * STEP, strokePad);
-                    includeBounds(segment.p2.x * STEP, segment.p2.y * STEP, strokePad);
-                });
-                for (let id in specialElements) {
-                    const [i, j] = id.split(',').map(Number);
-                    const x = i * STEP, y = j * STEP;
-                    if (specialElements[id].isNode) includeBounds(x, y, ringD / 2 + strokePad);
-                    if (specialElements[id].isDiamond) includeBounds(x, y + LINE_WEIGHT / 2, LINE_WEIGHT / Math.SQRT2);
-                }
-                if (!Number.isFinite(minX)) {
-                    showActionHint('Nothing to export');
-                    return;
-                }
-                // With a canvas (paper) on screen, export exactly that window and nothing outside it.
-                const paperPxW = paperWidthMm * LINE_WEIGHT / 12, paperPxH = paperHeightMm * LINE_WEIGHT / 12;
-                if (isPaperVisible) {
-                    minX = -paperPxW / 2; minY = -paperPxH / 2; maxX = paperPxW / 2; maxY = paperPxH / 2;
-                } else {
-                    const exportPadding = 24;
-                    minX -= exportPadding; minY -= exportPadding; maxX += exportPadding; maxY += exportPadding;
-                }
-                const svgWidth = isPaperVisible ? +paperPxW.toFixed(2) : Math.ceil(maxX - minX);
-                const svgHeight = isPaperVisible ? +paperPxH.toFixed(2) : Math.ceil(maxY - minY);
-                const svgX = x => x - minX, svgY = y => y - minY;
-                let svgContent = "";
-                let masks = "";
-                for (let id in specialElements) if (specialElements[id].isNode) {
-                    const [i, j] = id.split(',').map(Number);
-                    masks += `<circle cx="${svgX(i * STEP)}" cy="${svgY(j * STEP)}" r="${innerHoleR}" fill="black"/>`;
-                }
-                getBoltHolesPx().forEach(h => { masks += `<circle cx="${svgX(h.x)}" cy="${svgY(h.y)}" r="${h.r}" fill="black"/>`; });
-                const maskTag = masks ? `<defs><mask id="holeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="${svgWidth}" height="${svgHeight}"><rect width="${svgWidth}" height="${svgHeight}" fill="white"/>${masks}</mask></defs>` : '';
- 
-                let svgPathData = '';
-                getPathGroups().forEach(g => {
-                    let d = `M ${svgX(g[0].p1.x * STEP)} ${svgY(g[0].p1.y * STEP)}`;
-                    g.forEach(s => d += ` L ${svgX(s.p2.x * STEP)} ${svgY(s.p2.y * STEP)}`);
-                    svgPathData += ` ${d}`;
-                });
-                const peMm = templateKind() === 'product' ? productGeom(activeProductKey, paperWidthMm, paperHeightMm).patternEnd : null;
-                if (peMm != null) {
-                    const peY = peMm * LINE_WEIGHT / 12;
-                    svgContent += `<rect x="0" y="${+peY.toFixed(2)}" width="${svgWidth}" height="${+(svgHeight - peY).toFixed(2)}" fill="black"/>`;
-                }
-                if (svgPathData) svgContent += `<path d="${svgPathData}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
-                for (let id in specialElements) {
-                    let [i, j] = id.split(',').map(Number);
-                    let x = svgX(i * STEP);
-                    let y = svgY(j * STEP);
-                    if (specialElements[id].isNode) {
-                        svgContent += `<circle cx="${x}" cy="${y}" r="${ringD/2}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}"/>`;
-                    }
-                    if (specialElements[id].isDiamond) {
-                        let ry = y + LINE_WEIGHT / 2;
-                        svgContent += `<rect x="${x - LINE_WEIGHT/2}" y="${ry - LINE_WEIGHT/2}" width="${LINE_WEIGHT}" height="${LINE_WEIGHT}" fill="black" transform="rotate(45, ${x}, ${ry})"/>`;
-                    }
-                }
- 
-                // Clip everything to the canvas window; size the file in real millimetres.
-                const clipShape = (templateKind() !== 'free') ? `<path d="${productOutlineD(-minX, -minY)}"/>` : `<rect width="${svgWidth}" height="${svgHeight}"/>`;
-                const clipDefs = isPaperVisible ? `<defs><clipPath id="paperClip">${clipShape}</clipPath></defs>` : '';
-                const body = isPaperVisible ? `<g clip-path="url(#paperClip)">${svgContent}</g>` : svgContent;
-                const outW = isPaperVisible ? `${+paperWidthMm.toFixed(2)}mm` : svgWidth;
-                const outH = isPaperVisible ? `${+paperHeightMm.toFixed(2)}mm` : svgHeight;
-                let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${outW}" height="${outH}">${maskTag}${clipDefs}${body}</svg>`;
-                let b = new Blob([svg], {type:'image/svg+xml'}); 
+                const r = buildExportSVG();
+                if (!r) return;
+                let b = new Blob([r.svg], {type:'image/svg+xml'}); 
                 let a = document.createElement('a'); 
                 a.href = URL.createObjectURL(b); 
                 a.download='drawing.svg'; 
                 a.click();
+            } else if (templateKind() === 'product') {
+                exportProductPNG();
             } else if (isPaperVisible) {
                 exportPaperPNG();
             } else {
@@ -3333,7 +3375,92 @@
                 setTimeout(() => { saveCanvas('drawing', 'png'); isExporting = false; redraw(); }, 100);
             }
         }
- 
+
+        // The SVG of the drawing (also the source of the product PNG, so both files always match).
+        function buildExportSVG() {
+            const ringD = BASE_STEP_VAL * 2;
+            const innerHoleR = (ringD - LINE_WEIGHT) / 2;
+            const strokePad = LINE_WEIGHT / 2;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            const includeBounds = (x, y, padding) => {
+                minX = Math.min(minX, x - padding); minY = Math.min(minY, y - padding);
+                maxX = Math.max(maxX, x + padding); maxY = Math.max(maxY, y + padding);
+            };
+            segments.forEach(segment => {
+                includeBounds(segment.p1.x * STEP, segment.p1.y * STEP, strokePad);
+                includeBounds(segment.p2.x * STEP, segment.p2.y * STEP, strokePad);
+            });
+            for (let id in specialElements) {
+                const [i, j] = id.split(',').map(Number);
+                const x = i * STEP, y = j * STEP;
+                if (specialElements[id].isNode) includeBounds(x, y, ringD / 2 + strokePad);
+                if (specialElements[id].isDiamond) includeBounds(x, y + LINE_WEIGHT / 2, LINE_WEIGHT / Math.SQRT2);
+            }
+            const isProduct = templateKind() === 'product';
+            if (!Number.isFinite(minX)) {
+                if (!isProduct) { showActionHint('Nothing to export'); return null; }
+                minX = minY = 0; maxX = maxY = 1;   // an empty product template is still exported (outline + drawing marks)
+            }
+            // With a canvas (paper) on screen, export exactly that window and nothing outside it.
+            const paperPxW = paperWidthMm * LINE_WEIGHT / 12, paperPxH = paperHeightMm * LINE_WEIGHT / 12;
+            // Products also carry the manufacturing drawing (bend lines, dimensions): it needs margins around the sheet.
+            const ann = isProduct ? productExportAnnotations() : null;
+            const pad = ann ? ann.pad : { l: 0, t: 0, r: 0, b: 0 };
+            if (isPaperVisible) {
+                minX = -paperPxW / 2 - pad.l; minY = -paperPxH / 2 - pad.t; maxX = paperPxW / 2 + pad.r; maxY = paperPxH / 2 + pad.b;
+            } else {
+                const exportPadding = 24;
+                minX -= exportPadding; minY -= exportPadding; maxX += exportPadding; maxY += exportPadding;
+            }
+            const svgWidth = isPaperVisible ? +(paperPxW + pad.l + pad.r).toFixed(2) : Math.ceil(maxX - minX);
+            const svgHeight = isPaperVisible ? +(paperPxH + pad.t + pad.b).toFixed(2) : Math.ceil(maxY - minY);
+            const svgX = x => x - minX, svgY = y => y - minY;
+            let svgContent = "";
+            let masks = "";
+            for (let id in specialElements) if (specialElements[id].isNode) {
+                const [i, j] = id.split(',').map(Number);
+                masks += `<circle cx="${svgX(i * STEP)}" cy="${svgY(j * STEP)}" r="${innerHoleR}" fill="black"/>`;
+            }
+            getBoltHolesPx().forEach(h => { masks += `<circle cx="${svgX(h.x)}" cy="${svgY(h.y)}" r="${h.r}" fill="black"/>`; });
+            const maskTag = masks ? `<defs><mask id="holeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="${svgWidth}" height="${svgHeight}"><rect width="${svgWidth}" height="${svgHeight}" fill="white"/>${masks}</mask></defs>` : '';
+
+            let svgPathData = '';
+            getPathGroups().forEach(g => {
+                let d = `M ${svgX(g[0].p1.x * STEP)} ${svgY(g[0].p1.y * STEP)}`;
+                g.forEach(s => d += ` L ${svgX(s.p2.x * STEP)} ${svgY(s.p2.y * STEP)}`);
+                svgPathData += ` ${d}`;
+            });
+            const peMm = isProduct ? productGeom(activeProductKey, paperWidthMm, paperHeightMm).patternEnd : null;
+            if (peMm != null) {
+                const peY = peMm * LINE_WEIGHT / 12 + pad.t;
+                svgContent += `<rect x="${+pad.l.toFixed(2)}" y="${+peY.toFixed(2)}" width="${+paperPxW.toFixed(2)}" height="${+(pad.t + paperPxH - peY).toFixed(2)}" fill="black"/>`;
+            }
+            if (svgPathData) svgContent += `<path d="${svgPathData}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
+            for (let id in specialElements) {
+                let [i, j] = id.split(',').map(Number);
+                let x = svgX(i * STEP);
+                let y = svgY(j * STEP);
+                if (specialElements[id].isNode) {
+                    svgContent += `<circle cx="${x}" cy="${y}" r="${ringD/2}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}"/>`;
+                }
+                if (specialElements[id].isDiamond) {
+                    let ry = y + LINE_WEIGHT / 2;
+                    svgContent += `<rect x="${x - LINE_WEIGHT/2}" y="${ry - LINE_WEIGHT/2}" width="${LINE_WEIGHT}" height="${LINE_WEIGHT}" fill="black" transform="rotate(45, ${x}, ${ry})"/>`;
+                }
+            }
+
+            // Clip everything to the canvas window; size the file in real millimetres.
+            const clipShape = (templateKind() !== 'free') ? `<path d="${productOutlineD(-minX, -minY)}"/>` : `<rect width="${svgWidth}" height="${svgHeight}"/>`;
+            const clipDefs = isPaperVisible ? `<defs><clipPath id="paperClip">${clipShape}</clipPath></defs>` : '';
+            const annotationsSvg = ann ? ann.svg(-minX, -minY) : '';
+            const body = (isPaperVisible ? `<g clip-path="url(#paperClip)">${svgContent}</g>` : svgContent) + annotationsSvg;
+            // real millimetres: 1 mm = LINE_WEIGHT / 12 drawing units
+            const outW = isPaperVisible ? `${+(svgWidth * 12 / LINE_WEIGHT).toFixed(2)}mm` : svgWidth;
+            const outH = isPaperVisible ? `${+(svgHeight * 12 / LINE_WEIGHT).toFixed(2)}mm` : svgHeight;
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgWidth} ${svgHeight}" width="${outW}" height="${outH}">${maskTag}${clipDefs}${body}</svg>`;
+            return { svg, svgWidth, svgHeight };
+        }
+
         // PNG of the canvas window only: render the paper area 1:1 on a temporary canvas
         // of exactly its size (transparent background), save it, then restore the view.
         function exportPaperPNG() {
@@ -3371,7 +3498,7 @@
             if(!isGameMode) { applyZoom(e.delta > 0 ? 1/1.1 : 1.1, pX || mouseX, pY || mouseY); redraw(); }
             return false; 
         }
- 
+
         function windowResized() { resizeCanvas(windowWidth, windowHeight); redraw(); }
         // Hardware-keyboard events only reach the page once something in it has focus. The canvas swallows its
         // pointer events (preventDefault), so on a fresh load nothing was focused and the numpad stayed dead until a
@@ -3396,7 +3523,7 @@
         window.addEventListener('focus', ensureKeyboardFocus);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) ensureKeyboardFocus(); });
         ensureKeyboardFocus();
- 
+
         // Numpad keys are reported differently by browsers / layouts / NumLock (Enter as 'NumpadEnter' or 'Return',
         // digits as arrows, '.' as ',' or 'Delete'). Normalise them by physical key so the numpad always behaves
         // exactly like the main keys: Enter = Enter, digits = digits, etc.
