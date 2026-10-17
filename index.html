@@ -3332,15 +3332,67 @@
             };
         }
 
-        // Product PNG = the same drawing as the SVG (annotations included), rasterised at up to 8000 px.
+        // Title-block data of the drawing sheet (PNG export of products). Edit here.
+        const DRAWING_INFO = { material: 'Stainless steel', thicknessMm: 2, qty: '1 / 1', density: 7.9 /* g/cm3 */, designer: 'Karakuli' };
+
+        // Product PNG = an engineering drawing sheet: frame, the annotated flat pattern (same drawing as the SVG,
+        // scaled to fit a standard A-format) and a title block at the bottom right.
         function exportProductPNG() {
             const r = buildExportSVG();
             if (!r) return;
-            const scale = Math.min(1, 8000 / Math.max(r.svgWidth, r.svgHeight));
+            const k = LINE_WEIGHT / 12;
+            const cw = r.svgWidth / k, ch = r.svgHeight / k;           // content size in mm
+            const BLOCK_W = 180, BLOCK_H = 58, M = 10;                  // title block, sheet margin (mm)
+            const SHEETS = [['A3', 420, 297], ['A2', 594, 420], ['A1', 841, 594], ['A0', 1189, 841]];
+            const SCALES = [[1, '1:1'], [0.5, '1:2'], [0.4, '1:2.5'], [1 / 3, '1:3'], [0.25, '1:4'], [0.2, '1:5'], [0.1, '1:10'], [0.05, '1:20']];   // smallest sheet (from A3) first, the largest scale that fits
+            let pick = null;
+            outer: for (const [nm, sw, sh] of SHEETS) for (const [sc, scName] of SCALES) {
+                if (cw * sc <= sw - 2 * M - 10 && ch * sc <= sh - 2 * M - BLOCK_H - 10) { pick = { sc, scName, nm, sw, sh }; break outer; }
+            }
+            if (!pick) pick = { sc: 0.05, scName: '1:20', nm: 'A0', sw: 1189, sh: 841 };
+            const { sc, scName, nm, sw, sh } = pick;
+            const ix = M, iy = M, iw = sw - 2 * M, ih = sh - 2 * M;      // inner frame
+            const areaH = ih - BLOCK_H;
+            const px = ix + (iw - cw * sc) / 2, py = iy + (areaH - ch * sc) / 2;
+            const content = r.svg.replace(/^<svg ([^>]*?) width="[^"]*" height="[^"]*"/, `<svg $1 x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${(cw * sc).toFixed(2)}" height="${(ch * sc).toFixed(2)}"`);
+            const g = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
+            const T = DRAWING_INFO.thicknessMm;
+            const kg = paperWidthMm * paperHeightMm * T * DRAWING_INFO.density * 1e-6;
+            const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            const bx = ix + iw - BLOCK_W, by = iy + ih - BLOCK_H;
+            const ln = `stroke="#000" fill="none"`;
+            let tb = `<rect x="${bx}" y="${by}" width="${BLOCK_W}" height="${BLOCK_H}" fill="#fff" ${ln} stroke-width="0.7"/>`;
+            const cell = (x, y, w, h, label, value, vfs = 5) => {
+                tb += `<rect x="${bx + x}" y="${by + y}" width="${w}" height="${h}" ${ln} stroke-width="0.25"/>`;
+                tb += `<text x="${bx + x + 1.2}" y="${by + y + 3}" font-size="2.2" fill="#444">${esc(label)}</text>`;
+                tb += `<text x="${bx + x + 2}" y="${by + y + h - 2.6}" font-size="${vfs}" font-weight="600" fill="#000">${esc(value)}</text>`;
+            };
+            const name = PRODUCTS[activeProductKey].name;
+            const d = new Date();
+            const dateStr = [String(d.getDate()).padStart(2, '0'), String(d.getMonth() + 1).padStart(2, '0'), d.getFullYear()].join('.');
+            cell(0, 0, 120, 18, 'TITLE', name + ' — flat pattern', 7.5);
+            cell(120, 0, 60, 18, 'DRAWING No.', 'KRK-' + activeProductKey.slice(0, 3).toUpperCase() + '-001', 5);
+            cell(0, 18, 60, 14, 'MATERIAL', DRAWING_INFO.material, 4.4);
+            cell(60, 18, 30, 14, 'THICKNESS', T + ' mm', 5);
+            cell(90, 18, 30, 14, 'QTY', DRAWING_INFO.qty, 5);
+            cell(120, 18, 60, 14, 'OVERALL SIZE (FLAT)', `${+paperWidthMm.toFixed(1)} × ${+paperHeightMm.toFixed(1)} mm`, 4.4);
+            cell(0, 32, 60, 14, 'DESIGNED BY', DRAWING_INFO.designer, 4.4);
+            cell(60, 32, 30, 14, 'DATE', dateStr, 4);
+            cell(90, 32, 30, 14, 'SCALE', scName, 5);
+            cell(120, 32, 35, 14, 'WEIGHT (MAX)', `≤ ${kg.toFixed(2)} kg`, 4.4);
+            cell(155, 32, 25, 14, 'SHEET', `1 / 1  ${nm}`, 3.8);
+            tb += `<rect x="${bx}" y="${by + 46}" width="${BLOCK_W}" height="12" ${ln} stroke-width="0.25"/>`;
+            tb += `<text x="${bx + 2}" y="${by + 51}" font-size="2.4" fill="#000">Dimensions in mm. General tolerances ISO 2768-m. Bend lines: red dashed (BEND LINE), PATTERN END: end of pattern.</text>`;
+            tb += `<text x="${bx + 2}" y="${by + 55}" font-size="2.4" fill="#000">Deburr all edges. Hole Ø${HOLE_DIAMETER_MM} mm per template.</text>`;
+            const sheet = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${sw} ${sh}" width="${sw}" height="${sh}" font-family="Arial,Helvetica,sans-serif">`
+                + `<rect width="${sw}" height="${sh}" fill="#fff"/>`
+                + `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" ${ln} stroke-width="0.7"/>`
+                + content + `<g id="title-block">${tb}</g></svg>`;
+            const ppm = Math.min(10, 8000 / Math.max(sw, sh));
             const img = new Image();
             img.onload = () => {
                 const c = document.createElement('canvas');
-                c.width = Math.max(1, Math.round(r.svgWidth * scale)); c.height = Math.max(1, Math.round(r.svgHeight * scale));
+                c.width = Math.round(sw * ppm); c.height = Math.round(sh * ppm);
                 const x = c.getContext('2d');
                 x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
                 x.drawImage(img, 0, 0, c.width, c.height);
@@ -3351,8 +3403,7 @@
                 }, 'image/png');
             };
             img.onerror = () => showActionHint('PNG export failed');
-            const px = r.svg.replace(/^(<svg [^>]*?) width="[^"]*" height="[^"]*"/, `$1 width="${r.svgWidth}" height="${r.svgHeight}"`);
-            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(px);
+            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(sheet);
         }
 
         function exportFile(fmt) {
