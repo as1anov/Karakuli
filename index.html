@@ -3365,8 +3365,8 @@
             const fix = `Fixed to the wall with ${holes} bolts through the holes in the back plate.`;
             const mat = `Cut flat from a single sheet, then bent along the red dashed lines.`;
             if (key === 'hanger') {
-                const n = g.arms.length, P = PRODUCTS.hanger;
-                return `Wall hanger with ${n} hooks for coats, bags, scarves and other everyday items in a hallway, wardrobe or utility room. ` +
+                const P = PRODUCTS.hanger;
+                return `Wall hanger for coats, bags, scarves and other everyday items in a hallway, wardrobe or utility room. ` +
                     `The hooks are evenly spaced arms along the lower edge of the plate. ` +
                     `Two bends form a ${f(P.profile.face)} mm face, a ${f(P.profile.foot)} mm foot and a ${f(P.profile.lip)} mm return lip that carry the hooks. ` +
                     `${mat} ${fix}`;
@@ -3384,26 +3384,30 @@
             }
             return `Sheet-metal part. ${mat}`;
         }
-        function wrapText(text, maxChars) {
+        // Word-wrap by real text width (canvas metrics of the drawing font), so lines run right up to the cell's edge.
+        function wrapText(text, maxMm, fontMm) {
+            const ctx = document.createElement('canvas').getContext('2d');
+            ctx.font = `400 100px ${DRAWING_FONT}`;
+            const w = t => ctx.measureText(t).width / 100 * fontMm;
             const lines = []; let cur = '';
-            text.split(/\s+/).forEach(w => { if ((cur + ' ' + w).trim().length > maxChars) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); });
+            text.split(/\s+/).forEach(word => {
+                const next = cur ? cur + ' ' + word : word;
+                if (cur && w(next) > maxMm) { lines.push(cur); cur = word; } else cur = next;
+            });
             if (cur) lines.push(cur);
             return lines;
         }
 
         // Product PNG = an engineering drawing sheet: frame, the annotated flat pattern (same drawing as the SVG,
         // scaled to fit a standard A-format) and a title block at the bottom right.
-        function exportProductPNG() {
-            getDrawingFontCss().then(css => exportProductPNGUnsafe(css)).catch(err => { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); });
-        }
-        function exportProductPNGUnsafe(css) {
-            const r = buildExportSVG(css, true);
-            if (!r) return;
+        function buildDrawingSheet(css, solidHoles) {
+            const r = buildExportSVG(css, solidHoles);
+            if (!r) return null;
             const k = LINE_WEIGHT / 12;
             const cw = r.svgWidth / k, ch = r.svgHeight / k;           // content size in mm
             const g = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
-            const descLines = wrapText(productDescription(activeProductKey, g, paperWidthMm, paperHeightMm), 100);
-            const DESC_H = 6 + descLines.length * 3.7;                 // DESCRIPTION cell, grows with the text
+            const descLines = wrapText(productDescription(activeProductKey, g, paperWidthMm, paperHeightMm), 174, 2.2);
+            const DESC_H = 6 + descLines.length * 3.5;                 // DESCRIPTION cell, grows with the text
             const BLOCK_W = 180, BLOCK_H = 63 + DESC_H, M = 10;        // title block, sheet margin (mm)
             const SHEETS = [['A3', 420, 297], ['A2', 594, 420], ['A1', 841, 594], ['A0', 1189, 841]];
             const SCALES = [[1, '1:1'], [0.5, '1:2'], [0.4, '1:2.5'], [1 / 3, '1:3'], [0.25, '1:4'], [0.2, '1:5'], [0.1, '1:10'], [0.05, '1:20']];   // smallest sheet (from A3) first, the largest scale that fits
@@ -3416,7 +3420,9 @@
             const ix = M, iy = M, iw = sw - 2 * M, ih = sh - 2 * M;      // inner frame
             const areaH = ih - BLOCK_H;
             const px = ix + (iw - cw * sc) / 2, py = iy + (areaH - ch * sc) / 2;
-            const content = r.svg.replace(/^<svg ([^>]*?) width="[^"]*" height="[^"]*"/, `<svg $1 x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${(cw * sc).toFixed(2)}" height="${(ch * sc).toFixed(2)}"`);
+            // The drawing is placed with a plain transform (no nested <svg> viewport): px -> mm, times the sheet scale.
+            const inner = r.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+            const content = `<g id="drawing" transform="translate(${px.toFixed(3)} ${py.toFixed(3)}) scale(${(sc / k).toFixed(6)})">${inner}</g>`;
             const T = DRAWING_INFO.thicknessMm;
             const kg = paperWidthMm * paperHeightMm * T * DRAWING_INFO.density * 1e-6;
             const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -3435,11 +3441,14 @@
             cell(120, 0, 60, 18, 'DRAWING No.', 'KRK-' + activeProductKey.slice(0, 3).toUpperCase() + '-001', 4.2);
             tb += `<rect x="${bx}" y="${by + 18}" width="${BLOCK_W}" height="${DESC_H}" ${ln} stroke-width="0.25"/>`;
             tb += `<text x="${bx + 1.2}" y="${by + 21}" font-size="2" fill="#444">DESCRIPTION / PURPOSE</text>`;
-            descLines.forEach((l, i) => { tb += `<text x="${bx + 2}" y="${by + 25.5 + i * 3.7}" font-size="2.2" fill="#000">${esc(l)}</text>`; });
+            descLines.forEach((l, i) => { tb += `<text x="${bx + 2}" y="${by + 25.5 + i * 3.5}" font-size="2.2" fill="#000">${esc(l)}</text>`; });
             const R = 18 + DESC_H;                                      // top of the remaining rows
-            cell(0, R, 60, 14, 'MATERIAL', DRAWING_INFO.material, 3.7);
-            cell(60, R, 30, 14, 'THICKNESS', T + ' mm', 4.2);
-            cell(90, R, 30, 14, 'QTY', DRAWING_INFO.qty, 4.2);
+            const hooks = g.arms.length;                                // hanger only
+            const wMat = hooks ? 45 : 60, wThk = hooks ? 25 : 30, wQty = hooks ? 25 : 30, wHook = hooks ? 25 : 0;
+            cell(0, R, wMat, 14, 'MATERIAL', DRAWING_INFO.material, hooks ? 3.3 : 3.7);
+            cell(wMat, R, wThk, 14, 'THICKNESS', T + ' mm', hooks ? 3.6 : 4.2);
+            cell(wMat + wThk, R, wQty, 14, 'QTY', DRAWING_INFO.qty, hooks ? 3.6 : 4.2);
+            if (hooks) cell(wMat + wThk + wQty, R, wHook, 14, 'HOOKS', `${hooks} pcs`, 3.6);
             cell(120, R, 60, 14, 'OVERALL SIZE (FLAT)', `${+paperWidthMm.toFixed(1)} × ${+paperHeightMm.toFixed(1)} mm`, 3.7);
             cell(0, R + 14, 60, 14, 'DESIGNED BY', DRAWING_INFO.designer, 3.7);
             cell(60, R + 14, 30, 14, 'DATE', dateStr, 3.3);
@@ -3458,6 +3467,16 @@
                 + `<rect width="${sw}" height="${sh}" fill="#fff"/>`
                 + `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" ${ln} stroke-width="0.7"/>`
                 + content + `<g id="title-block">${tb}</g></svg>`;
+            return { makeSheet, sw, sh };
+        }
+
+        function exportProductPNG() {
+            getDrawingFontCss().then(async css => { try { await Promise.race([document.fonts.load(`400 20px ${DRAWING_FONT}`), new Promise(r => setTimeout(r, 2500))]); } catch (e) {} exportProductPNGUnsafe(css); }).catch(err => { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); });
+        }
+        function exportProductPNGUnsafe(css) {
+            const sheetInfo = buildDrawingSheet(css, true);
+            if (!sheetInfo) return;
+            const { makeSheet, sw, sh } = sheetInfo;
             // Safari / iPadOS refuse canvases above ~16.7 M pixels (the bitmap comes out empty), so stay well below that.
             let ppm = Math.min(10, 8000 / Math.max(sw, sh), Math.sqrt(12e6 / (sw * sh)));
             const save = blob => {
@@ -3497,9 +3516,11 @@
             if(fmt==='svg') {
                 const isProd = templateKind() === 'product';
                 (isProd ? getDrawingFontCss() : Promise.resolve('')).then(css => {
-                    const r = buildExportSVG(css);
-                    if (!r) return;
-                    let b = new Blob([r.svg], {type:'image/svg+xml'}); 
+                    // Products: the whole drawing sheet (frame, dimensions, title block) in real millimetres; real holes via mask.
+                    let svgText;
+                    if (isProd) { const sheetInfo = buildDrawingSheet(css, false); if (!sheetInfo) return; svgText = sheetInfo.makeSheet(sheetInfo.sw + 'mm', sheetInfo.sh + 'mm'); }
+                    else { const r = buildExportSVG(css); if (!r) return; svgText = r.svg; }
+                    let b = new Blob([svgText], {type:'image/svg+xml'}); 
                     let a = document.createElement('a'); 
                     a.href = URL.createObjectURL(b); 
                     a.download='drawing.svg'; 
