@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -419,15 +418,18 @@
         .field-error:empty { display: none; }
  
         .preset-list { display: flex; flex-direction: column; gap: 8px; }
+        /* hover and selected share one highlight colour: light grey in the light theme, a dark grey in the dark theme */
+        #new-canvas-modal { --card: #dedede; --card-hl: #d0d0d0; }
+        [data-theme="dark"] #new-canvas-modal { --card: #191919; --card-hl: #232323; }
         .preset-card {
             display: flex; align-items: center; gap: 14px; padding: 8px 14px 8px 8px; border-radius: 14px;
-            border: 1px solid var(--border-color); background: var(--panel-bg); cursor: pointer; transition: all 0.15s ease;
+            border: 1px solid var(--border-color); background-color: var(--card); cursor: pointer; transition: background-color 0.15s ease, transform 0.1s ease;
         }
-        .preset-card:hover { background: var(--active-btn-bg); }
+        .preset-card:hover { background-color: var(--card-hl); }
         .preset-card:active { transform: scale(0.98); }
         /* selected card: no dark frame, just a deeper fill */
         .preset-card, .preset-card:focus, .preset-card:focus-visible, .preset-card * { outline: none; -webkit-tap-highlight-color: transparent; }
-        .preset-card.active { border-color: var(--border-color); box-shadow: none; background-color: color-mix(in srgb, var(--text-color) 12%, var(--panel-bg)); }
+        .preset-card.active { border-color: var(--border-color); box-shadow: none; background-color: var(--card-hl); }
         .preset-icon { flex-shrink: 0; border-radius: 10px; overflow: hidden; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-color); line-height: 0; }
         .preset-card .preset-icon svg { display: block; }
         .preset-text { flex: 1; min-width: 0; }
@@ -1120,6 +1122,8 @@
         //  tail     = the fixed bottom block (bends, shelf, lips). The variable part is `h - tail`;
         //             the line at y = h - tail is the "anchor" that everything below is measured from.
         //  folds    = bend lines, as distances below the anchor line
+        //  patternEnd = offset (below the anchor line) where the pattern stops; everything below it is filled black
+        //               (null = no filled zone, e.g. the hanger whose hooks are drawn by the user).
         //  marks    = the dashed guide lines drawn on the canvas (from veshalka_icon1.svg): offset below the anchor line
         //             + label. 'Pattern End' = where the pattern must stop, 'Bend Line' = a fold.
         //  holes    = bolt holes: `inset` from the side edges, `top` row measured from the top edge,
@@ -1129,14 +1133,14 @@
         //             foot depth / lip length / lip angle, or `back` = return towards the wall
         const PRODUCTS = {
             shelf: { name: 'Shelf', def: { w: 894, h: 379 }, tail: 147, minFace: 100, minW: 200, radius: 7.5,
-                     folds: [0, 12, 132], marks: [{ off: 0, label: 'PATTERN END' }, { off: 12, label: 'BEND LINE' }, { off: 132, label: 'BEND LINE' }], holes: { inset: 17.8, top: 69, bottomUp: 17.6 },
+                     patternEnd: 0, folds: [0, 12, 132], marks: [{ off: 0, label: 'PATTERN END' }, { off: 12, label: 'BEND LINE' }, { off: 132, label: 'BEND LINE' }], holes: { inset: 17.8, top: 69, bottomUp: 17.6 },
                      profile: { gap: 20, face: 12, foot: 120, lip: 15, angle: 105 } },
             hanger: { name: 'Hanger', def: { w: 12 + 6 * (24 * 30 * 12 / 58), h: 321 }, tail: 91.4, minFace: 150,
-                      folds: [39.4, 74.4], marks: [{ off: 39.4, label: 'BEND LINE' }, { off: 74.4, label: 'BEND LINE' }], holes: { inset: 17.8, top: 41.6, bottomUp: 44.9 },
+                      patternEnd: null, folds: [39.4, 74.4], marks: [{ off: 39.4, label: 'BEND LINE' }, { off: 74.4, label: 'BEND LINE' }], holes: { inset: 17.8, top: 41.6, bottomUp: 44.9 },
                       hooks: { armW: 12, pitch: 24 * 30 * 12 / 58, min: 4, max: 7 }   /* pitch = 24 grid steps (720 px), so every hook sits on a grid column */,
                       profile: { gap: 20, face: 39.4, foot: 35, lip: 17, angle: 105 } },
             magazine: { name: 'Magazine holder', def: { w: 894, h: 261.8 }, tail: 27, minFace: 120, minW: 200,
-                        folds: [0], marks: [{ off: -10, label: 'PATTERN END' }, { off: 0, label: 'BEND LINE' }], holes: { inset: 17.8, top: 69 },
+                        patternEnd: -10, folds: [0], marks: [{ off: -10, label: 'PATTERN END' }, { off: 0, label: 'BEND LINE' }], holes: { inset: 17.8, top: 69 },
                         profile: { gap: 45, face: 0, back: 45 } }
         };
         // Plain shapes: width = height (side of the square / diameter of the circle).
@@ -1184,7 +1188,7 @@
                 const n = hooksFromWidth(wMm), c = P.hooks;
                 for (let i = 0; i < n; i++) arms.push([i * c.pitch, i * c.pitch + c.armW]);
             }
-            return { anchor, folds: P.folds.map(o => anchor + o), marks: P.marks.map(m => ({ y: anchor + m.off, label: m.label })), holes, arms };
+            return { anchor, folds: P.folds.map(o => anchor + o), marks: P.marks.map(m => ({ y: anchor + m.off, label: m.label })), patternEnd: P.patternEnd == null ? null : anchor + P.patternEnd, holes, arms };
         }
         // Bolt holes of the template currently on the canvas, in mm from the sheet's top-left corner.
         function currentHolesMm() {
@@ -1429,6 +1433,21 @@
         }
  
         // The template's flat drawing on the canvas: contour + dashed bend lines.
+        // The part of a product that carries no pattern (everything below PATTERN END) is solid black,
+        // kept inside the template outline.
+        function fillNoPatternZone() {
+            if (templateKind() !== 'product') return;
+            const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
+            const yMm = productGeom(activeProductKey, paperWidthMm, paperHeightMm).patternEnd;
+            if (yMm == null) return;   // the hanger has no filled zone: its hooks are drawn by the user
+            const ctx = drawingContext;
+            push(); ctx.save();
+            ctx.clip(new Path2D(productOutlineD()));
+            noStroke(); fill(0); rectMode(CORNER);
+            rect(-wPx / 2, -hPx / 2 + yMm * MM, wPx, hPx - yMm * MM);
+            ctx.restore(); pop();
+        }
+ 
         function drawProductTemplate(paperColor) {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const path = new Path2D(productOutlineD());
@@ -1437,6 +1456,13 @@
             fill(paperColor); stroke('rgba(128,128,128,0.4)'); strokeWeight(2 / zoom);
             ctx.fill(path); ctx.stroke(path);
             pop();
+            fillNoPatternZone();
+        }
+ 
+        // Phones, zoomed far out (below 20 %): no text next to the lines and no reticles, just red dots for the holes.
+        function isFarOutOnMobile() {
+            const mobile = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768;
+            return mobile && zoom < 0.2;
         }
  
         // Bend lines: dashed red, over the whole width of the sheet, always ABOVE the pattern (drawn after it),
@@ -1453,6 +1479,7 @@
             ctx.setLineDash([8 / zoom, 6 / zoom]);
             marks.forEach(m => { const y = -hPx / 2 + m.y * MM; line(-wPx / 2, y, wPx / 2, y); });
             ctx.restore();
+            if (isFarOutOnMobile()) { pop(); return; }
             noStroke(); fill(RED); textAlign(RIGHT, CENTER); textSize(9 / zoom); textStyle(NORMAL);
             marks.forEach(m => { const y = -hPx / 2 + m.y * MM; text(m.label, -wPx / 2 - 8 / zoom, y); });
             pop();
@@ -1518,8 +1545,10 @@
             const R = Math.max(HOLE_RING_MM * MM, 6 / zoom);
             const dotD = Math.max(R * 0.55, 3 / zoom);
             strokeWeight(1 / zoom); strokeCap(ROUND);
+            const dotsOnly = isFarOutOnMobile();
             currentHolesMm().forEach(([xMm, yMm]) => {
                 const x = snap(left + xMm * MM), y = snap(top + yMm * MM);
+                if (dotsOnly) { noStroke(); fill(RED); circle(x, y, Math.max(dotD, 4 / zoom)); return; }
                 noFill(); stroke(RED);
                 circle(x, y, R * 2);
                 line(x - R * 1.9, y, x - R * 1.2, y);
@@ -1641,20 +1670,27 @@
             closeNewCanvasModal();
             if (!isResizingOnly) {
                 if (shouldCreateProject) { activeProjectId = null; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
-                performReset({ preserveUndo: false });
+                try { performReset({ preserveUndo: false }); } catch (err) { console.error(err); }
             }
-            fitCanvasToView();
-            redraw();
+            // Show the whole sheet in the middle. Done now, and once more after the window has closed, so nothing
+            // that runs in between (reset, resize, project save) can leave the view at the old zoom.
+            const refit = () => { try { fitCanvasToView(); redraw(); } catch (err) { console.error(err); } };
+            refit();
+            requestAnimationFrame(refit);
+            setTimeout(refit, 120);
+            setTimeout(refit, 400);
         }
  
         // Shows the whole sheet at once (full size of the template, with room for the left-hand labels).
         function fitCanvasToView() {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
+            const W = (typeof width === 'number' && width > 0) ? width : window.innerWidth;
+            const H = (typeof height === 'number' && height > 0) ? height : window.innerHeight;
             const pad = 40, labelRoom = templateKind() === 'product' ? 90 : 0;
-            const z = Math.min((width - 2 * pad - labelRoom) / wPx, (height - 2 * pad) / hPx);
+            const z = Math.min((W - 2 * pad - labelRoom) / wPx, (H - 2 * pad) / hPx);
             zoom = Math.max(0.05, Math.min(2, z));
-            offsetX = width / 2 + labelRoom / 2;
-            offsetY = height / 2;
+            offsetX = W / 2 + labelRoom / 2;
+            offsetY = H / 2;
         }
  
         function handleCanvasSizeKey(event) {
@@ -2831,7 +2867,7 @@
                 drawGrid(colors.dotColor, colors.dotAlpha);
             }
             const clipToProduct = isExporting && !isTimelapseExport && templateKind() !== 'free';
-            if (clipToProduct) { push(); drawingContext.save(); drawingContext.clip(new Path2D(productOutlineD())); }
+            if (clipToProduct) { push(); drawingContext.save(); drawingContext.clip(new Path2D(productOutlineD())); fillNoPatternZone(); }
             drawGeometry(colors.geomColor);
             if (clipToProduct) { drawingContext.restore(); pop(); }
             if (isPaperVisible && !isExporting && !isTimelapseUIOpen) drawBendLines();
@@ -3258,6 +3294,11 @@
                     g.forEach(s => d += ` L ${svgX(s.p2.x * STEP)} ${svgY(s.p2.y * STEP)}`);
                     svgPathData += ` ${d}`;
                 });
+                const peMm = templateKind() === 'product' ? productGeom(activeProductKey, paperWidthMm, paperHeightMm).patternEnd : null;
+                if (peMm != null) {
+                    const peY = peMm * LINE_WEIGHT / 12;
+                    svgContent += `<rect x="0" y="${+peY.toFixed(2)}" width="${svgWidth}" height="${+(svgHeight - peY).toFixed(2)}" fill="black"/>`;
+                }
                 if (svgPathData) svgContent += `<path d="${svgPathData}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2" ${masks !== "" ? 'mask="url(#holeMask)"' : ""}/>`;
                 for (let id in specialElements) {
                     let [i, j] = id.split(',').map(Number);
