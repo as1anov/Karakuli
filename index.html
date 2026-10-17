@@ -3338,6 +3338,9 @@
         // Product PNG = an engineering drawing sheet: frame, the annotated flat pattern (same drawing as the SVG,
         // scaled to fit a standard A-format) and a title block at the bottom right.
         function exportProductPNG() {
+            try { exportProductPNGUnsafe(); } catch (err) { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); }
+        }
+        function exportProductPNGUnsafe() {
             const r = buildExportSVG();
             if (!r) return;
             const k = LINE_WEIGHT / 12;
@@ -3361,7 +3364,7 @@
             const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
             const bx = ix + iw - BLOCK_W, by = iy + ih - BLOCK_H;
             const ln = `stroke="#000" fill="none"`;
-            let tb = `<rect x="${bx}" y="${by}" width="${BLOCK_W}" height="${BLOCK_H}" fill="#fff" ${ln} stroke-width="0.7"/>`;
+            let tb = `<rect x="${bx}" y="${by}" width="${BLOCK_W}" height="${BLOCK_H}" fill="#fff" stroke="#000" stroke-width="0.7"/>`;
             const cell = (x, y, w, h, label, value, vfs = 5) => {
                 tb += `<rect x="${bx + x}" y="${by + y}" width="${w}" height="${h}" ${ln} stroke-width="0.25"/>`;
                 tb += `<text x="${bx + x + 1.2}" y="${by + y + 3}" font-size="2.2" fill="#444">${esc(label)}</text>`;
@@ -3388,22 +3391,35 @@
                 + `<rect width="${sw}" height="${sh}" fill="#fff"/>`
                 + `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" ${ln} stroke-width="0.7"/>`
                 + content + `<g id="title-block">${tb}</g></svg>`;
-            const ppm = Math.min(10, 8000 / Math.max(sw, sh));
+            // Safari / iPadOS refuse canvases above ~16.7 M pixels (the bitmap comes out empty), so stay well below that.
+            let ppm = Math.min(10, 8000 / Math.max(sw, sh), Math.sqrt(12e6 / (sw * sh)));
+            const svgUrl = URL.createObjectURL(new Blob([sheet], { type: 'image/svg+xml;charset=utf-8' }));
+            const save = blob => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); a.download = 'drawing.png';
+                document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+            };
             const img = new Image();
             img.onload = () => {
-                const c = document.createElement('canvas');
-                c.width = Math.round(sw * ppm); c.height = Math.round(sh * ppm);
-                const x = c.getContext('2d');
-                x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
-                x.drawImage(img, 0, 0, c.width, c.height);
-                c.toBlob(blob => {
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob); a.download = 'drawing.png'; a.click();
-                    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-                }, 'image/png');
+                const attempt = () => {
+                    try {
+                        const c = document.createElement('canvas');
+                        c.width = Math.round(sw * ppm); c.height = Math.round(sh * ppm);
+                        const x = c.getContext('2d');
+                        x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+                        x.drawImage(img, 0, 0, c.width, c.height);
+                        c.toBlob(blob => {
+                            if (blob) { save(blob); URL.revokeObjectURL(svgUrl); }
+                            else if (ppm > 2) { ppm /= 2; attempt(); }   // browser could not make the bitmap: retry smaller
+                            else { URL.revokeObjectURL(svgUrl); showActionHint('PNG export failed'); }
+                        }, 'image/png');
+                    } catch (err) { console.error(err); showActionHint('PNG export failed: ' + (err && err.message || err)); }
+                };
+                attempt();
             };
-            img.onerror = () => showActionHint('PNG export failed');
-            img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(sheet);
+            img.onerror = () => { URL.revokeObjectURL(svgUrl); showActionHint('PNG export failed: drawing could not be rendered'); };
+            img.src = svgUrl;
         }
 
         function exportFile(fmt) {
