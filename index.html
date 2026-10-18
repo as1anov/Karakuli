@@ -3577,6 +3577,7 @@
             const svgHeight = isPaperVisible ? +(paperPxH + pad.t + pad.b).toFixed(2) : Math.ceil(maxY - minY);
             const svgX = x => x - minX, svgY = y => y - minY;
             let svgContent = "";
+            let blackFill = "";   // the black no-pattern zone: clipped to the product outline, unlike the pattern
             let masks = "";
             for (let id in specialElements) if (specialElements[id].isNode) {
                 const [i, j] = id.split(',').map(Number);
@@ -3594,7 +3595,7 @@
             const peMm = isProduct ? productGeom(activeProductKey, paperWidthMm, paperHeightMm).patternEnd : null;
             if (peMm != null) {
                 const peY = peMm * LINE_WEIGHT / 12 + pad.t;
-                svgContent += `<rect x="${+pad.l.toFixed(2)}" y="${+peY.toFixed(2)}" width="${+paperPxW.toFixed(2)}" height="${+(pad.t + paperPxH - peY).toFixed(2)}" fill="black"/>`;
+                blackFill += `<rect x="${+pad.l.toFixed(2)}" y="${+peY.toFixed(2)}" width="${+paperPxW.toFixed(2)}" height="${+(pad.t + paperPxH - peY).toFixed(2)}" fill="black"/>`;
             }
             if (svgPathData) svgContent += `<path d="${svgPathData}" fill="none" stroke="black" stroke-width="${LINE_WEIGHT}" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2" ${masks !== "" && !solidHoles ? 'mask="url(#holeMask)"' : ""}/>`;
             // Raster export: no mask (rasterised soft by some browsers) - the holes are painted as crisp white discs over the pattern.
@@ -3614,9 +3615,14 @@
 
             // Clip everything to the canvas window; size the file in real millimetres.
             const clipShape = (templateKind() !== 'free') ? `<path d="${productOutlineD(-minX, -minY)}"/>` : `<rect width="${svgWidth}" height="${svgHeight}"/>`;
-            const clipDefs = isPaperVisible ? `<defs><clipPath id="paperClip">${clipShape}</clipPath></defs>` : '';
+            // Products: the pattern is cut only on the left and right edges of the sheet (drop-shaped endings at the top and
+            // bottom are drawn on purpose and must stay); the black zone still follows the outline.
+            const sideClip = isProduct ? `<clipPath id="patternClip"><rect x="${+pad.l.toFixed(2)}" y="0" width="${+paperPxW.toFixed(2)}" height="${svgHeight}"/></clipPath>` : '';
+            const clipDefs = isPaperVisible ? `<defs><clipPath id="paperClip">${clipShape}</clipPath>${sideClip}</defs>` : '';
             const annotationsSvg = ann ? ann.svg(-minX, -minY) : '';
-            const body = (isPaperVisible ? `<g clip-path="url(#paperClip)">${svgContent}</g>` : svgContent) + annotationsSvg;
+            const body = (isProduct && isPaperVisible
+                ? `<g clip-path="url(#paperClip)">${blackFill}</g><g clip-path="url(#patternClip)">${svgContent}</g>`
+                : (isPaperVisible ? `<g clip-path="url(#paperClip)">${blackFill}${svgContent}</g>` : blackFill + svgContent)) + annotationsSvg;
             // real millimetres: 1 mm = LINE_WEIGHT / 12 drawing units
             const outW = isPaperVisible ? `${+(svgWidth * 12 / LINE_WEIGHT).toFixed(2)}mm` : svgWidth;
             const outH = isPaperVisible ? `${+(svgHeight * 12 / LINE_WEIGHT).toFixed(2)}mm` : svgHeight;
