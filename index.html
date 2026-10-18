@@ -1519,10 +1519,11 @@
 
         // The corner "ears" that resize the canvas.
         //  custom size / A-formats / square : four L-shaped ears in the corners
-        //  products (shelf, hanger, holder) : only the top-left ear (a tap opens the size window)
+        //  products (shelf, hanger, holder) : no ears (the size is fixed; change it in the New Canvas window)
         //  circle                           : four arc-shaped ears sitting on the circle at the diagonals
         function drawCanvasEars(wPx, hPx) {
             const kind = templateKind();
+            if (kind === 'product') return;   // product templates have a fixed size: no ears, so nothing can be dragged by accident
             const col = currentTheme === 'light' ? 160 : 80;
             const halfW = wPx / 2, halfH = hPx / 2, cLen = 20 / zoom;
             push();
@@ -1689,9 +1690,21 @@
             setTimeout(() => modal.style.display = 'none', 300);
         }
 
-        function applyNewCanvasSize() {
+        // A new canvas / template never inherits the previous drawing. The previous one is saved as its own project
+        // first (signed-in users); without an account the person is asked before it is discarded.
+        async function keepCurrentDrawing() {
+            if (!segments.length && !Object.keys(specialElements).length) return true;
+            if (window.karakuliProjects?.isSignedIn()) {
+                try { clearTimeout(projectSaveTimer); await saveCurrentProject(); showActionHint('Previous drawing saved as ' + currentProjectTitle); return true; }
+                catch (err) { console.error('Could not save the previous drawing', err); return confirm('The previous drawing could not be saved. Create the new canvas anyway?'); }
+            }
+            return confirm('The current drawing is not saved (you are not signed in) and will be lost. Create the new canvas anyway?');
+        }
+
+        async function applyNewCanvasSize() {
             let w = readField('canvas-w-input'), h = readField('canvas-h-input');
             if (!sizeIsValid(w) || !sizeIsValid(h)) { refreshModal(); return; }
+            if (!isResizingOnly && !(await keepCurrentDrawing())) return;
             if (PRODUCTS[selectedPresetKey]) { const n = normalizeProductSize(selectedPresetKey, w, h); w = n.w; h = n.h; }
             if (SHAPES[selectedPresetKey]) h = w;
             const shouldCreateProject = !isResizingOnly && createProjectOnReset;
@@ -2348,6 +2361,7 @@
 
         function checkCornerClick(worldX, worldY) {
             const kind = templateKind();
+            if (kind === 'product') return null;   // size of a product template changes only in the New Canvas window
             const MM_TO_PX = LINE_WEIGHT / 12;
             const halfW = (paperWidthMm * MM_TO_PX) / 2;
             const halfH = (paperHeightMm * MM_TO_PX) / 2;
