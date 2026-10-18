@@ -217,8 +217,47 @@
         .dash-btn:active { transform: scale(0.97); }
         .dash-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; flex-shrink: 0; }
         /* My Projects: a tile with the kind of canvas, name + what it is, one "more" button that opens labelled actions */
-        .projects-list { display: none; margin: -2px 0 14px; flex-direction: column; gap: 6px; }
+        .projects-list { display: none; margin: 10px 0 0; flex-direction: column; gap: 8px; }
         .projects-list.open { display: flex; }
+        .dash-btn.active { background: var(--active-btn-bg); }
+        /* My Projects open: everything below the button is hidden and the list takes the whole panel */
+        #dash-home.projects-mode { overflow: hidden; padding-bottom: 12px; }
+        #dash-home.projects-mode > .dash-section:not(:first-child), #dash-home.projects-mode > .login-box { display: none; }
+        #dash-home.projects-mode > .dash-section:first-child { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 0; }
+        #dash-home.projects-mode .projects-list.open { flex: 1; min-height: 0; }
+        .pl-tools { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+        .projects-list.guest .pl-tools, .projects-list.guest .pl-bar { display: none; }
+        .pl-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--disabled-color); }
+        .pl-search svg { width: 15px; height: 15px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
+        .pl-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; -webkit-user-select: text; user-select: text; }
+        .pl-search input::placeholder { color: var(--disabled-color); }
+        .pl-search:focus-within { border-color: var(--text-color); }
+        .pl-row { display: flex; align-items: center; gap: 6px; }
+        .pl-sp { flex: 1; }
+        .pl-chip { height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+        .pl-chip:hover { background: var(--active-btn-bg); }
+        .pl-chip.active { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
+        .pl-tool { height: 28px; min-width: 28px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+        .pl-tool:hover { background: var(--active-btn-bg); }
+        .pl-tool.active { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
+        .pl-tool svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .pl-items { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: none; padding-bottom: 6px; }
+        .pl-items::-webkit-scrollbar { display: none; }
+        .pl-bar { display: none; flex-shrink: 0; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border-color); }
+        .pl-bar.show { display: flex; }
+        .pl-bar .pl-count { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; color: var(--text-color); }
+        .pl-link { border: 0; background: transparent; padding: 0; color: var(--disabled-color); font-family: var(--main-font); font-size: 10px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; margin-left: 6px; }
+        .pl-bar .project-act { flex: 0 0 auto; padding: 0 12px; }
+        .pl-bar .project-act:disabled { opacity: 0.35; cursor: default; }
+        .pl-guest { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 12px; text-align: center; color: var(--disabled-color); font-size: 11px; line-height: 1.5; }
+        .project-check { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; }
+        .project-check i { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--disabled-color); display: grid; place-items: center; transition: background 0.12s, border-color 0.12s; }
+        .project-check i svg { width: 13px; height: 13px; stroke: var(--bg-color); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+        .project-item.selected { border-color: var(--text-color); background: var(--active-btn-bg); }
+        .project-item.selected .project-check i { background: var(--text-color); border-color: var(--text-color); }
+        .project-item.selected .project-check i svg { opacity: 1; }
+        .project-item.na { opacity: 0.55; }
+        .project-pick { cursor: pointer; }
         .project-group { margin: 6px 2px 0; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
         .project-group:first-child { margin-top: 0; }
         .project-item { border-radius: 12px; border: 1px solid var(--border-color); background: var(--panel-bg); overflow: hidden; transition: background 0.15s; }
@@ -237,9 +276,9 @@
         .project-more { width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-color); cursor: pointer; transition: background 0.15s; }
         .project-more:hover, .project-item.open .project-more { background: var(--active-btn-bg); }
         .project-more svg { width: 16px; height: 16px; fill: currentColor; }
-        .project-actions { display: none; gap: 6px; padding: 0 8px 8px; }
+        .project-actions { display: none; flex-wrap: wrap; gap: 6px; padding: 0 8px 8px; }
         .project-item.open .project-actions { display: flex; }
-        .project-act { flex: 1; height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+        .project-act { flex: 1 1 30%; height: 32px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; }
         .project-act:hover { background: var(--active-btn-bg); }
         .project-act svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .project-act.delete:hover { color: #ef4444; border-color: #ef4444; }
@@ -536,6 +575,7 @@
         .share-row input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card); color: var(--text-color); font-family: var(--main-font); font-size: 12px; -webkit-user-select: text; user-select: text; }
         .share-copy { height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card); color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 0.15s; }
         .share-copy:hover { background: var(--card-hl); }
+        .share-text { width: 100%; height: 190px; resize: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card); color: var(--text-color); font-family: var(--main-font); font-size: 11px; line-height: 1.5; -webkit-user-select: text; user-select: text; }
         .share-copy.done { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
         #share-note { font-size: 11px; line-height: 1.5; color: var(--disabled-color); padding: 4px 0 14px; }
         #share-badge { position: fixed; left: 14px; bottom: 14px; z-index: 1500; display: none; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--panel-bg); color: var(--text-color); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); pointer-events: none; }
@@ -568,11 +608,24 @@
                     <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     New Canvas
                 </div>
-                <div class="dash-btn" onclick="toggleProjectsList()">
+                <div class="dash-btn" id="projects-btn" onclick="toggleProjectsList()">
                     <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     My Projects
                 </div>
-                <div class="projects-list" id="projects-list"></div>
+                <div class="projects-list" id="projects-list">
+                    <div class="pl-tools">
+                        <label class="pl-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pl-search" type="text" placeholder="Search projects" autocomplete="off" spellcheck="false" oninput="plSetQuery(this.value)" onkeydown="if (event.key === 'Escape' || event.key === 'Enter') { if (event.key === 'Escape') { this.value = ''; plSetQuery(''); } this.blur(); ensureKeyboardFocus(); }"></label>
+                        <div class="pl-row">
+                            <button class="pl-chip active" data-f="all" onclick="plSetFilter('all')">All</button>
+                            <button class="pl-chip" data-f="shared" onclick="plSetFilter('shared')">Shared</button>
+                            <span class="pl-sp"></span>
+                            <button class="pl-tool" id="pl-sort" onclick="plToggleSort()" title="Sort order"></button>
+                            <button class="pl-tool" id="pl-select" onclick="plToggleSelect()" title="Select several projects"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="pl-items" id="pl-items"></div>
+                    <div class="pl-bar" id="pl-bar"></div>
+                </div>
             </div>
 
             <div class="dash-section">
@@ -1082,6 +1135,9 @@
             people: '<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
             eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
             pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+            copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+            sort: '<svg viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>',
+            tick: '<svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg>',
             dots: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>',
             sheet: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6"/></svg>',
             circleT: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>',
@@ -1105,46 +1161,147 @@
         }
         function toggleProjectActions(btn) { btn.closest('.project-item').classList.toggle('open'); }
 
+        // ---- My Projects panel: search, filter, sort, selection (delete / share several), rename, duplicate ----
+        let plCache = [], plQuery = '', plSort = 'recent', plFilter = 'all', plSelectMode = false, plSelected = new Set();
+
         function projectCardHTML(p, isCurrent) {
             const shared = (p.shareEditToken || p.shareViewToken) ? `<span title="Shared by link">${PROJECT_ICONS.people}</span>` : '';
             const when = isCurrent ? '' : ' · ' + new Date(p.updatedAtMs || p.createdAtMs || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
             const id = isCurrent ? '' : p.id;
+            const key = isCurrent ? activeProjectId : p.id;
+            const selectable = Boolean(key);
+            const sel = plSelectMode && selectable && plSelected.has(key);
+            const meta = `<span class="project-meta">${shared}<span>${escapeProjectText(projectMeta(p) + when)}</span></span>`;
+            const name = `<span class="project-name">${escapeProjectText(p.title || 'Untitled project')}</span>`;
+            const cls = `project-item${isCurrent ? ' current' : ''}${sel ? ' selected' : ''}${plSelectMode && !selectable ? ' na' : ''}`;
+            if (plSelectMode) {
+                return `
+                <div class="${cls}">
+                    <div class="project-main project-pick"${selectable ? ` onclick="plTogglePick('${key}')"` : ''}>
+                        <div class="project-check"><i>${PROJECT_ICONS.tick}</i></div>
+                        <div class="project-open">${name}${meta}</div>
+                    </div>
+                </div>`;
+            }
             return `
-                <div class="project-item${isCurrent ? ' current' : ''}">
+                <div class="${cls}">
                     <div class="project-main">
                         <div class="project-tile">${projectTileIcon(p)}</div>
-                        <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>
-                            <span class="project-name">${escapeProjectText(p.title || 'Untitled project')}</span>
-                            <span class="project-meta">${shared}<span>${escapeProjectText(projectMeta(p) + when)}</span></span>
-                        </div>
+                        <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>${name}${meta}</div>
                         <button class="project-more" aria-label="Project actions" title="Actions" onclick="toggleProjectActions(this)">${PROJECT_ICONS.dots}</button>
                     </div>
                     <div class="project-actions">
                         <button class="project-act" onclick="openShareModal('${id}')">${PROJECT_ICONS.share}Share</button>
                         ${isCurrent ? `<button class="project-act" onclick="saveCurrentProject()">${PROJECT_ICONS.save}Save</button>` : ''}
+                        <button class="project-act" onclick="renameProject('${id}')">${PROJECT_ICONS.pencil}Rename</button>
+                        <button class="project-act" onclick="duplicateProject('${id}')">${PROJECT_ICONS.copy}Duplicate</button>
                         <button class="project-act delete" onclick="${isCurrent ? 'deleteCurrentProject()' : `deleteProject('${p.id}')`}">${PROJECT_ICONS.trash}Delete</button>
                     </div>
                 </div>`;
         }
 
+        function plLive() {
+            return { id: activeProjectId, title: currentProjectTitle, productKey: activeProductKey, isPaperVisible, paperWidthMm, paperHeightMm, shareEditToken: projectShare.edit, shareViewToken: projectShare.view };
+        }
+        function plVisible() {
+            const q = plQuery.trim().toLowerCase();
+            const match = p => (!q || (p.title || '').toLowerCase().includes(q) || projectMeta(p).toLowerCase().includes(q)) && (plFilter !== 'shared' || p.shareEditToken || p.shareViewToken);
+            const others = plCache.filter(p => p.id !== activeProjectId && match(p));
+            others.sort(plSort === 'name'
+                ? (a, b) => (a.title || '').localeCompare(b.title || '', undefined, { numeric: true })
+                : (a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
+            const live = shareSession ? null : plLive();
+            return { cur: live && match(live) ? live : null, others };
+        }
+        function plSelectableIds() { const v = plVisible(); return [...(v.cur && v.cur.id ? [v.cur.id] : []), ...v.others.map(p => p.id)]; }
+
+        function plRender() {
+            const list = document.getElementById('projects-list'), box = document.getElementById('pl-items'), bar = document.getElementById('pl-bar');
+            if (!list || !box) return;
+            if (!window.karakuliProjects?.isSignedIn()) {
+                list.classList.add('guest');
+                box.innerHTML = '<div class="pl-guest"><span>Sign in with Google to save your projects, open them on any device and share them by link.</span><div class="dash-btn google-btn" onclick="document.getElementById(\'google-login-btn\').click()" style="margin:0">Login with Google</div></div>';
+                return;
+            }
+            list.classList.remove('guest');
+            const v = plVisible();
+            // keep only ids that still exist
+            const ids = new Set(plSelectableIds()); plSelected = new Set([...plSelected].filter(id => ids.has(id)));
+            let html = '';
+            if (v.cur) html += '<div class="project-group">Current</div>' + projectCardHTML(v.cur, true);
+            if (v.others.length) html += `<div class="project-group">Saved · ${v.others.length}</div>` + v.others.map(p => projectCardHTML(p, false)).join('');
+            if (!v.cur && !v.others.length) html = `<div class="project-empty">${plQuery || plFilter !== 'all' ? 'No projects match.' : 'No saved projects yet.'}</div>`;
+            const keep = box.scrollTop;
+            box.innerHTML = html; box.scrollTop = keep;
+            document.querySelectorAll('.pl-chip').forEach(c => c.classList.toggle('active', c.dataset.f === plFilter));
+            const sortBtn = document.getElementById('pl-sort');
+            sortBtn.innerHTML = PROJECT_ICONS.sort + (plSort === 'name' ? 'A–Z' : 'Recent');
+            document.getElementById('pl-select').classList.toggle('active', plSelectMode);
+            bar.classList.toggle('show', plSelectMode);
+            if (plSelectMode) {
+                const n = plSelected.size, all = plSelectableIds().length;
+                bar.innerHTML = `<span class="pl-count">${n ? n + ' selected' : 'Select projects'}<button class="pl-link" onclick="plSelectAll()">${n && n === all ? 'None' : 'All'}</button></span>
+                    <button class="project-act" ${n ? '' : 'disabled'} onclick="plShareSelected()">${PROJECT_ICONS.share}Share</button>
+                    <button class="project-act delete" ${n ? '' : 'disabled'} onclick="plDeleteSelected()">${PROJECT_ICONS.trash}Delete</button>`;
+            }
+        }
+        function plSetQuery(v) { plQuery = v || ''; plRender(); }
+        function plSetFilter(f) { plFilter = f; plRender(); }
+        function plToggleSort() { plSort = plSort === 'recent' ? 'name' : 'recent'; plRender(); }
+        function plToggleSelect() { plSelectMode = !plSelectMode; plSelected.clear(); plRender(); }
+        function plTogglePick(id) { if (plSelected.has(id)) plSelected.delete(id); else plSelected.add(id); plRender(); }
+        function plSelectAll() { const ids = plSelectableIds(); plSelected = plSelected.size === ids.length ? new Set() : new Set(ids); plRender(); }
+
+        async function plDeleteSelected() {
+            const ids = [...plSelected]; if (!ids.length) return;
+            if (!confirm(`Delete ${ids.length} project${ids.length > 1 ? 's' : ''} permanently?`)) return;
+            const hadCurrent = ids.includes(activeProjectId);
+            for (const id of ids) { try { await removeProjectCore(id); } catch (err) { console.warn('Could not delete', id, err); } }
+            plSelected.clear(); plSelectMode = false;
+            if (hadCurrent) performReset({ preserveUndo: false });
+            updateCurrentProjectUI();
+            await renderProjectsList();
+            showActionHint(`${ids.length} deleted`);
+        }
+        async function plShareSelected() {
+            const ids = [...plSelected]; if (!ids.length) return;
+            await openShareMany(ids);
+        }
+
+        async function renameProject(id) {
+            const isCur = !id || id === activeProjectId;
+            const old = isCur ? currentProjectTitle : (plCache.find(p => p.id === id)?.title || '');
+            const t = (prompt('Project name', old) || '').trim();
+            if (!t || t === old) return;
+            if (isCur) { currentProjectTitle = t; await saveCurrentProject(); }
+            else await window.karakuliProjects.save(id, { title: t });
+            await renderProjectsList();
+        }
+        async function duplicateProject(id) {
+            const isCur = !id || id === activeProjectId;
+            let data;
+            if (isCur) { await saveCurrentProject(); data = projectSnapshot(); }
+            else data = await window.karakuliProjects.load(id);
+            if (!data) return;
+            data = { ...data };
+            ['id', 'createdAtMs', 'updatedAtMs', 'shareEditToken', 'shareViewToken', 'tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter'].forEach(k => delete data[k]);
+            data.title = (data.title || 'Untitled project') + ' copy';
+            await window.karakuliProjects.create(data);
+            showActionHint('Project duplicated');
+            await renderProjectsList();
+        }
+
         async function renderProjectsList() {
             const list = document.getElementById('projects-list');
             if (!list) return;
-            if (!window.karakuliProjects?.isSignedIn()) {
-                list.innerHTML = '<div class="project-empty">Sign in with Google to save and share projects.</div>';
-                return;
-            }
-            // The current project first (instantly, from the live state), the cloud list after it.
-            const live = { title: currentProjectTitle, productKey: activeProductKey, isPaperVisible, paperWidthMm, paperHeightMm, shareEditToken: projectShare.edit, shareViewToken: projectShare.view };
-            const currentCard = shareSession ? '' : '<div class="project-group">Current</div>' + projectCardHTML(live, true);
-            list.innerHTML = currentCard + '<div class="project-empty">Loading projects…</div>';
+            if (!window.karakuliProjects?.isSignedIn()) { plRender(); return; }
+            plRender();   // instantly, from what is known
             try {
-                const projects = await window.karakuliProjects.list();
-                const others = projects.filter(project => project.id !== activeProjectId);
-                list.innerHTML = currentCard + (others.length ? '<div class="project-group">Saved</div>' + others.map(p => projectCardHTML(p, false)).join('') : '');
+                plCache = await window.karakuliProjects.list();
+                plRender();
             } catch (error) {
                 console.error('Project list error:', error);
-                list.innerHTML = currentCard + '<div class="project-empty">Could not load the cloud project list.</div>';
+                document.getElementById('pl-items').insertAdjacentHTML('beforeend', '<div class="project-empty">Could not load the cloud project list.</div>');
             }
         }
 
@@ -1152,10 +1309,17 @@
             const node = document.createElement('span'); node.textContent = value; return node.innerHTML;
         }
 
-        async function toggleProjectsList() {
+        function setProjectsMode(open) {
             const list = document.getElementById('projects-list');
-            list.classList.toggle('open');
-            if (list.classList.contains('open')) await renderProjectsList();
+            list.classList.toggle('open', open);
+            document.getElementById('dash-home').classList.toggle('projects-mode', open);
+            document.getElementById('projects-btn').classList.toggle('active', open);
+            if (!open) { plSelectMode = false; plSelected.clear(); }
+        }
+        async function toggleProjectsList() {
+            const open = !document.getElementById('projects-list').classList.contains('open');
+            setProjectsMode(open);
+            if (open) { menuNavIndex = 0; await renderProjectsList(); }
         }
 
         // Puts a project (own or shared) on the canvas.
@@ -1209,7 +1373,7 @@
             }
             applyProjectData(data, { fit: false });
             showActionHint('Project opened');
-            document.getElementById('projects-list').classList.remove('open');
+            setProjectsMode(false);
             updateCurrentProjectUI();
         }
 
@@ -1249,7 +1413,7 @@
 
         function copyShareLink(inputId, btn) {
             const input = document.getElementById(inputId);
-            const done = () => { btn.textContent = 'Copied'; btn.classList.add('done'); setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1500); };
+            const label = btn.textContent; const done = () => { btn.textContent = 'Copied'; btn.classList.add('done'); setTimeout(() => { btn.textContent = label; btn.classList.remove('done'); }, 1500); };
             input.select();
             if (navigator.clipboard?.writeText) navigator.clipboard.writeText(input.value).then(done, () => { document.execCommand('copy'); done(); });
             else { document.execCommand('copy'); done(); }
@@ -1265,30 +1429,78 @@
   allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
 }`;
 
+        // Makes sure a project has its edit and view links (publishing them if needed); returns { title, tokens }.
+        async function prepareShare(id) {
+            const isCurrent = !id || id === activeProjectId;
+            let data, title, tokens, pid;
+            if (isCurrent) {
+                await saveCurrentProject();
+                pid = activeProjectId; title = currentProjectTitle; tokens = { ...projectShare }; data = shareSnapshot();
+            } else {
+                const p = await window.karakuliProjects.load(id);
+                if (!p) throw new Error('Project not found');
+                pid = id; title = p.title; tokens = { edit: p.shareEditToken || null, view: p.shareViewToken || null };
+                data = { ...p }; ['tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme', 'id', 'createdAtMs', 'updatedAtMs'].forEach(k => delete data[k]);
+                if (tokens.edit) { const sh = await window.karakuliShare.load(tokens.edit); if (sh?.data) data = sh.data; }
+            }
+            if (!tokens.edit) tokens.edit = await window.karakuliShare.publish('edit', data, title);
+            if (!tokens.view) tokens.view = await window.karakuliShare.publish('view', data, title);
+            else await window.karakuliShare.update(tokens.view, data, title);   // the view link shows the version as of now
+            if (isCurrent) { projectShare = tokens; await saveCurrentProject(); }
+            else await window.karakuliProjects.save(pid, { shareEditToken: tokens.edit, shareViewToken: tokens.view });
+            return { title, tokens };
+        }
+
+        function shareErrorHTML(err) {
+            return `
+                    <div class="share-block">
+                        <div class="share-title">Sharing is not available yet</div>
+                        <div class="share-desc">The shared copy could not be stored (${escapeProjectText(err && (err.code || err.message) || 'error')}). Sharing needs these rules in Firebase Console → Firestore Database → Rules, added to the existing ones:</div>
+                        <pre style="font-size:10px;line-height:1.4;white-space:pre-wrap;user-select:text;-webkit-user-select:text;background:var(--card);padding:10px;border-radius:10px;border:1px solid var(--border-color)">${escapeProjectText(SHARE_RULES)}</pre>
+                    </div>`;
+        }
+
+        // Several projects at once: one list of links, view-only or editable.
+        let shareManyRows = [], shareManyMode = 'view';
+        function renderShareMany() {
+            const base = location.origin + location.pathname;
+            const text = shareManyRows.map(r => `${r.title}\n${base}?${shareManyMode}=${r.tokens[shareManyMode]}`).join('\n\n');
+            document.getElementById('share-body').innerHTML = `
+                <div class="share-block">
+                    <div class="seg" style="margin-bottom:10px">
+                        <button class="${shareManyMode === 'view' ? 'active' : ''}" style="flex:1" onclick="shareManyMode='view';renderShareMany()">View only</button>
+                        <button class="${shareManyMode === 'edit' ? 'active' : ''}" style="flex:1" onclick="shareManyMode='edit';renderShareMany()">Can edit</button>
+                    </div>
+                    <div class="share-desc">${shareManyMode === 'view' ? 'Links that only show the projects as they are now.' : 'Anyone with a link can open that project and change it. No account needed.'}</div>
+                    <textarea id="share-many-text" class="share-text" readonly>${escapeProjectText(text)}</textarea>
+                    <div class="share-row" style="margin-top:8px"><button class="share-copy" style="flex:1" onclick="copyShareLink('share-many-text', this)">Copy all</button></div>
+                </div>`;
+        }
+        async function openShareMany(ids) {
+            if (!window.karakuliProjects?.isSignedIn() || !window.karakuliShare) { showActionHint('Sign in with Google to share'); return; }
+            if (shareSession) { showActionHint('Open your own project to share it'); return; }
+            const modal = document.getElementById('share-modal'), body = document.getElementById('share-body');
+            document.getElementById('share-title').textContent = `Share ${ids.length} project${ids.length > 1 ? 's' : ''}`;
+            modal.style.display = 'flex'; setTimeout(() => modal.classList.add('show'), 10);
+            shareManyRows = []; let firstErr = null;
+            for (let i = 0; i < ids.length; i++) {
+                body.innerHTML = `<div class="share-desc" style="padding:8px 0 18px">Preparing the links… ${i + 1} / ${ids.length}</div>`;
+                try { shareManyRows.push(await prepareShare(ids[i])); } catch (err) { console.error('Share error:', err); firstErr = firstErr || err; }
+            }
+            if (!shareManyRows.length) { body.innerHTML = shareErrorHTML(firstErr); return; }
+            renderShareMany();
+            renderProjectsList();
+        }
+
         async function openShareModal(id) {
             if (!window.karakuliProjects?.isSignedIn() || !window.karakuliShare) { showActionHint('Sign in with Google to share'); return; }
             if (shareSession) { showActionHint('Open your own project to share it'); return; }
             const modal = document.getElementById('share-modal'), body = document.getElementById('share-body');
+            document.getElementById('share-title').textContent = 'Share project';
             body.innerHTML = '<div class="share-desc" style="padding:8px 0 18px">Preparing the links…</div>';
             modal.style.display = 'flex'; setTimeout(() => modal.classList.add('show'), 10);
             try {
-                const isCurrent = !id || id === activeProjectId;
-                let data, title, tokens, pid;
-                if (isCurrent) {
-                    await saveCurrentProject();
-                    pid = activeProjectId; title = currentProjectTitle; tokens = { ...projectShare }; data = shareSnapshot();
-                } else {
-                    const p = await window.karakuliProjects.load(id);
-                    if (!p) throw new Error('Project not found');
-                    pid = id; title = p.title; tokens = { edit: p.shareEditToken || null, view: p.shareViewToken || null };
-                    data = { ...p }; ['tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme', 'id', 'createdAtMs', 'updatedAtMs'].forEach(k => delete data[k]);
-                    if (tokens.edit) { const sh = await window.karakuliShare.load(tokens.edit); if (sh?.data) data = sh.data; }
-                }
-                if (!tokens.edit) tokens.edit = await window.karakuliShare.publish('edit', data, title);
-                if (!tokens.view) tokens.view = await window.karakuliShare.publish('view', data, title);
-                else await window.karakuliShare.update(tokens.view, data, title);   // the view link shows the version as of now
-                if (isCurrent) { projectShare = tokens; await saveCurrentProject(); }
-                else await window.karakuliProjects.save(pid, { shareEditToken: tokens.edit, shareViewToken: tokens.view });
+                const { title, tokens } = await prepareShare(id);
                 const base = location.origin + location.pathname;
                 const editUrl = `${base}?edit=${tokens.edit}`, viewUrl = `${base}?view=${tokens.view}`;
                 body.innerHTML = `
@@ -1305,23 +1517,23 @@
                 renderProjectsList();
             } catch (err) {
                 console.error('Share error:', err);
-                body.innerHTML = `
-                    <div class="share-block">
-                        <div class="share-title">Sharing is not available yet</div>
-                        <div class="share-desc">The shared copy could not be stored (${escapeProjectText(err && (err.code || err.message) || 'error')}). Sharing needs these rules in Firebase Console → Firestore Database → Rules, added to the existing ones:</div>
-                        <pre style="font-size:10px;line-height:1.4;white-space:pre-wrap;user-select:text;-webkit-user-select:text;background:var(--card);padding:10px;border-radius:10px;border:1px solid var(--border-color)">${escapeProjectText(SHARE_RULES)}</pre>
-                    </div>`;
+                body.innerHTML = shareErrorHTML(err);
             }
         }
 
-        async function deleteProject(id) {
-            if (!confirm('Delete this project permanently?')) return;
+        async function removeProjectCore(id) {
             let tokens = null;
             if (id === activeProjectId) tokens = { ...projectShare };
             else { try { const p = await window.karakuliProjects?.load(id); tokens = { edit: p?.shareEditToken, view: p?.shareViewToken }; } catch (e) {} }
             await window.karakuliProjects?.remove(id);
             if (tokens && window.karakuliShare) { window.karakuliShare.remove(tokens.edit); window.karakuliShare.remove(tokens.view); }
             if (activeProjectId === id) { activeProjectId = null; projectShare = { edit: null, view: null }; currentProjectTitle = 'Karakuli #0000'; }
+            plCache = plCache.filter(p => p.id !== id);
+        }
+
+        async function deleteProject(id) {
+            if (!confirm('Delete this project permanently?')) return;
+            await removeProjectCore(id);
             updateCurrentProjectUI();
             await renderProjectsList();
         }
@@ -1335,7 +1547,7 @@
         window.addEventListener('karakuli-auth-change', event => {
             activeProjectId = null;
             if (event.detail.user) { renderProjectsList(); scheduleProjectSave(); }
-            else document.getElementById('projects-list').innerHTML = '';
+            else { plCache = []; plSelected.clear(); plSelectMode = false; plRender(); }
             updateCurrentProjectUI();
         });
 
@@ -1382,7 +1594,7 @@
             const activeTab = document.querySelector('.dash-tab.active');
             const activePanel = activeTab ? document.getElementById(activeTab.id.replace('tab-', 'dash-')) : null;
             if (!activePanel) return [];
-            return [...activePanel.querySelectorAll('.dash-btn, .theme-opt, .project-open, .project-more, .project-act')]
+            return [...activePanel.querySelectorAll('.dash-btn, .theme-opt, .project-open, .project-more, .project-act, .project-pick, .pl-chip, .pl-tool, .pl-link')]
                 .filter(item => !item.classList.contains('disabled') && item.offsetParent !== null);
         }
 
