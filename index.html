@@ -216,21 +216,33 @@
         .dash-btn:hover { background: var(--active-btn-bg); }
         .dash-btn:active { transform: scale(0.97); }
         .dash-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; flex-shrink: 0; }
-        .projects-list { display: none; margin: -2px 0 12px; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; }
-        .projects-list.open { display: block; }
-        .project-item { display: flex; align-items: center; gap: 8px; padding: 10px; border-bottom: 1px solid var(--border-color); }
-        .project-item:last-child { border-bottom: 0; }
+        /* My Projects: a tile with the kind of canvas, name + what it is, one "more" button that opens labelled actions */
+        .projects-list { display: none; margin: -2px 0 14px; flex-direction: column; gap: 6px; }
+        .projects-list.open { display: flex; }
+        .project-group { margin: 6px 2px 0; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
+        .project-group:first-child { margin-top: 0; }
+        .project-item { border-radius: 12px; border: 1px solid var(--border-color); background: var(--panel-bg); overflow: hidden; transition: background 0.15s; }
+        .project-item.current { border-color: color-mix(in srgb, var(--text-color) 35%, transparent); }
+        .project-main { display: flex; align-items: center; gap: 10px; padding: 8px 6px 8px 8px; }
+        .project-tile { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border-radius: 9px; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-color); }
+        .project-tile svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
         .project-open { flex: 1; min-width: 0; cursor: pointer; }
+        .project-item.current .project-open { cursor: default; }
+        .project-open:hover .project-name { text-decoration: underline; text-underline-offset: 2px; }
+        .project-item.current .project-open:hover .project-name { text-decoration: none; }
         .project-name { display: block; font-size: 12px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .project-date { display: block; margin-top: 2px; font-size: 10px; color: var(--disabled-color); }
-        .project-delete { width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: #ef4444; cursor: pointer; font-size: 18px; line-height: 1; }
+        .project-meta { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 10px; color: var(--disabled-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .project-meta svg { width: 11px; height: 11px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .project-empty { padding: 12px; color: var(--disabled-color); font-size: 11px; text-align: center; }
-        .project-current { display: none; align-items: center; gap: 6px; padding: 10px; border-bottom: 1px solid var(--border-color); }
-        .project-current.visible { display: flex; }
-        .project-current-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; color: var(--text-color); }
-        .project-icon-btn { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--border-color); border-radius: 8px; background: transparent; color: var(--text-color); cursor: pointer; }
-        .project-icon-btn svg { width: 15px; height: 15px; }
-        .project-icon-btn.delete { color: #ef4444; }
+        .project-more { width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-color); cursor: pointer; transition: background 0.15s; }
+        .project-more:hover, .project-item.open .project-more { background: var(--active-btn-bg); }
+        .project-more svg { width: 16px; height: 16px; fill: currentColor; }
+        .project-actions { display: none; gap: 6px; padding: 0 8px 8px; }
+        .project-item.open .project-actions { display: flex; }
+        .project-act { flex: 1; height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+        .project-act:hover { background: var(--active-btn-bg); }
+        .project-act svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .project-act.delete:hover { color: #ef4444; border-color: #ef4444; }
 
         .theme-container {
             display: flex; background: var(--panel-bg); border-radius: 12px; border: 1px solid var(--border-color);
@@ -337,13 +349,13 @@
         }
 
         /* --- NEW CANVAS MODAL --- */
-        #new-canvas-modal {
+        #new-canvas-modal, #share-modal {
             position: fixed; inset: 0; z-index: 3000; display: none;
             justify-content: center; align-items: center; padding: 16px;
             background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
             opacity: 0; transition: opacity 0.25s ease;
         }
-        #new-canvas-modal.show { display: flex; opacity: 1; }
+        #new-canvas-modal.show, #share-modal.show { display: flex; opacity: 1; }
         .modal-content {
             width: 100%; max-width: 380px; max-height: min(92vh, 780px);
             display: flex; flex-direction: column; overflow: hidden;
@@ -402,6 +414,27 @@
         .swap-btn:active { transform: scale(0.92); }
         .swap-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
+        .tpl-select { position: relative; margin-top: 12px; }
+        .tpl-btn { width: 100%; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border-color); color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; text-align: left; transition: background-color 0.15s; }
+        .tpl-btn:hover { background-color: var(--card-hl) !important; }
+        .tpl-btn .tpl-ico, .tpl-item .tpl-ico { width: 22px; display: grid; place-items: center; flex-shrink: 0; }
+        .tpl-btn .tpl-ico svg, .tpl-item .tpl-ico svg { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
+        .tpl-btn .tpl-ico { width: 14px; }
+        .tpl-btn .tpl-name { flex: 1; min-width: 0; }
+        .tpl-btn .tpl-dim, .tpl-item .tpl-dim { font-size: 10px; font-weight: 500; color: var(--disabled-color); font-variant-numeric: tabular-nums; }
+        .tpl-btn .tpl-chev { width: 14px; height: 14px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.2s; }
+        .tpl-select.open .tpl-chev { transform: rotate(180deg); }
+        /* floats over the page, so the Products section below never moves */
+        #new-canvas-modal { --tpl-bg: #f7f7f7; }
+        [data-theme="dark"] #new-canvas-modal { --tpl-bg: #2a2a2a; }
+        .tpl-menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; max-height: 260px; overflow-y: auto; padding: 4px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--tpl-bg); box-shadow: 0 12px 32px rgba(0,0,0,0.22); scrollbar-width: thin; }
+        .tpl-select.open .tpl-menu { display: block; }
+        .tpl-group { padding: 8px 10px 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
+        .tpl-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+        .tpl-item .tpl-name { flex: 1; }
+        .tpl-item:hover, .tpl-item.kb { background: var(--active-btn-bg); }
+        .tpl-item.active { background: var(--text-color); color: var(--bg-color); }
+        .tpl-item.active .tpl-dim { color: inherit; opacity: 0.7; }
         .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
         .chip {
             padding: 6px 13px; border-radius: 999px; border: 1px solid var(--border-color); background: transparent;
@@ -421,8 +454,8 @@
 
         .preset-list { display: flex; flex-direction: column; gap: 8px; }
         /* hover and selected share one highlight colour: light grey in the light theme, a dark grey in the dark theme */
-        #new-canvas-modal { --card: #dedede; --card-hl: #d0d0d0; }
-        [data-theme="dark"] #new-canvas-modal { --card: #191919; --card-hl: #232323; }
+        #new-canvas-modal, #share-modal { --card: #dedede; --card-hl: #d0d0d0; }
+        [data-theme="dark"] #new-canvas-modal, [data-theme="dark"] #share-modal { --card: #191919; --card-hl: #232323; }
         .preset-card {
             display: flex; align-items: center; gap: 14px; padding: 8px 14px 8px 8px; border-radius: 14px;
             border: 1px solid var(--border-color); background-color: var(--card); cursor: pointer; transition: background-color 0.15s ease, transform 0.1s ease;
@@ -471,6 +504,7 @@
         #new-canvas-modal .field input,
         #new-canvas-modal .seg,
         #new-canvas-modal .chip,
+        #new-canvas-modal .tpl-btn,
         #new-canvas-modal .swap-btn,
         #new-canvas-modal .nc-close,
         #new-canvas-modal .modal-btn.secondary,
@@ -487,9 +521,26 @@
         #new-canvas-modal .seg button.active,
         #new-canvas-modal .card-hooks,
         #new-canvas-modal .preset-icon { background-color: var(--bg-color); }
-        #new-canvas-modal .mini-btn:not(:disabled):hover,
-        #new-canvas-modal .mini-btn:not(:disabled):active { background-color: var(--card-hl); }
+        /* +/- of the hook counter: a shade of its own, never the colour of the card around it */
+        #new-canvas-modal .mini-btn:not(:disabled):hover { background-color: color-mix(in srgb, var(--text-color) 20%, var(--bg-color)); }
+        #new-canvas-modal .mini-btn:not(:disabled):active { background-color: color-mix(in srgb, var(--text-color) 30%, var(--bg-color)); }
         #new-canvas-modal .field input:focus { border-color: var(--text-color); }
+
+        /* Share window */
+        .share-block { padding: 14px 0; border-top: 1px solid var(--border-color); }
+        .share-block:first-child { border-top: 0; padding-top: 4px; }
+        .share-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+        .share-title svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .share-desc { font-size: 11px; line-height: 1.45; color: var(--disabled-color); margin-bottom: 10px; }
+        .share-row { display: flex; gap: 8px; }
+        .share-row input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card); color: var(--text-color); font-family: var(--main-font); font-size: 12px; -webkit-user-select: text; user-select: text; }
+        .share-copy { height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card); color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; transition: background-color 0.15s; }
+        .share-copy:hover { background: var(--card-hl); }
+        .share-copy.done { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
+        #share-note { font-size: 11px; line-height: 1.5; color: var(--disabled-color); padding: 4px 0 14px; }
+        #share-badge { position: fixed; left: 14px; bottom: 14px; z-index: 1500; display: none; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--panel-bg); color: var(--text-color); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); pointer-events: none; }
+        #share-badge.show { display: inline-flex; }
+        #share-badge svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
         #game-hearts { display: none; gap: 6px; align-items: center; justify-content: center; height: 100%; width: 100%; }
         .pixel-heart { width: 18px; height: 18px; }
@@ -584,6 +635,21 @@
 
     <input id="kbd-sink" type="text" autofocus readonly inputmode="none" autocomplete="off" aria-hidden="true" tabindex="-1">
 
+    <div id="share-badge"></div>
+
+    <!-- Share Modal -->
+    <div id="share-modal" onpointerdown="if (event.target === this) closeShareModal()">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="share-title">
+            <div class="nc-header">
+                <div><h2 id="share-title">Share project</h2></div>
+                <button class="nc-close" onclick="closeShareModal()" aria-label="Close">
+                    <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="nc-body" id="share-body"></div>
+        </div>
+    </div>
+
     <!-- Canvas Size Modal -->
     <div id="new-canvas-modal" onpointerdown="if (event.target === this) closeNewCanvasModal()">
         <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="nc-title">
@@ -614,7 +680,10 @@
                             <span class="field-unit" data-unit-label>mm</span>
                         </div>
                     </div>
-                    <div class="chip-row has-shapes" id="paper-chips"></div>
+                    <div class="tpl-select" id="tpl-select">
+                        <button class="tpl-btn" id="tpl-btn" type="button" onclick="toggleTplMenu()" aria-haspopup="listbox" aria-expanded="false"></button>
+                        <div class="tpl-menu" id="tpl-menu" role="listbox"></div>
+                    </div>
                     <div class="field-error" id="size-error"></div>
                 </div>
 
@@ -726,7 +795,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB2R9HE9a_s6NKWxhVN3uJ5M01_6HkS8Gw",
@@ -799,8 +868,13 @@
                 if (!signedInUser || !id) return;
                 const localProject = { id, ...data, updatedAtMs: Date.now() };
                 saveLocalProject(localProject);
-                try { await setDoc(doc(db, 'users', signedInUser.uid, 'projects', id), localProject, { merge: true }); }
-                catch (error) { console.warn('Cloud project save unavailable; saved locally.', error); }
+                const ref = doc(db, 'users', signedInUser.uid, 'projects', id);
+                // updateDoc replaces whole fields (setDoc+merge keeps deleted keys of specialElements alive); new documents fall back to setDoc.
+                try { await updateDoc(ref, localProject); }
+                catch (error) {
+                    try { await setDoc(ref, localProject, { merge: true }); }
+                    catch (error2) { console.warn('Cloud project save unavailable; saved locally.', error2); }
+                }
             },
             async load(id) {
                 if (!signedInUser) return null;
@@ -816,6 +890,23 @@
                 try { await deleteDoc(doc(db, 'users', signedInUser.uid, 'projects', id)); }
                 catch (error) { console.warn('Cloud project delete unavailable; deleted locally.', error); }
             }
+        };
+
+        // Sharing by link. A shared copy lives in /shared/{token} (the token is the secret in the link):
+        //   kind 'edit' : anyone holding the link can read and change it (no account needed)
+        //   kind 'view' : a read-only version published by the owner
+        // Firestore rules for /shared are listed in the note shown by the Share window.
+        const randomToken = () => { const a = new Uint8Array(20); crypto.getRandomValues(a); return Array.from(a, b => (b % 36).toString(36)).join(''); };
+        window.karakuliShare = {
+            async publish(kind, data, title) {
+                if (!signedInUser) throw new Error('Sign in with Google to share');
+                const token = randomToken(), now = Date.now();
+                await setDoc(doc(db, 'shared', token), { kind, ownerUid: signedInUser.uid, title: title || '', data, createdAtMs: now, updatedAtMs: now });
+                return token;
+            },
+            async update(token, data, title) { await updateDoc(doc(db, 'shared', token), { data, title: title || '', updatedAtMs: Date.now() }); },
+            async load(token) { const snap = await getDoc(doc(db, 'shared', token)); return snap.exists() ? snap.data() : null; },
+            async remove(token) { if (token) { try { await deleteDoc(doc(db, 'shared', token)); } catch (e) { console.warn('Shared copy not removed', e); } } }
         };
 
         onAuthStateChanged(auth, (user) => {
@@ -912,14 +1003,26 @@
         let createProjectOnReset = false;
         let activeProductKey = null;   // product shown on the canvas (shelf / hanger / magazine)
         let selectedPresetKey = null;  // product selected inside the New Canvas window
+        let projectShare = { edit: null, view: null };   // share tokens of the project on the canvas
+        let shareSession = null;       // set while a project opened from a link is on the canvas: { token, mode: 'edit' | 'view' }
+        let isViewOnly = false;        // view-only link: nothing can be drawn, erased or reset
+        let sharedPollTimer = null, sharedSeenMs = 0, sharedDirty = false;
 
         function projectSnapshot() {
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
                 paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
                 productKey: activeProductKey,
+                shareEditToken: projectShare.edit, shareViewToken: projectShare.view,
                 tlHistory, tlCurrentFrame, tlCaptureStride, tlCaptureCounter
             }));
+        }
+
+        // What a shared copy carries: the drawing and the sheet, not the timelapse history (too big, and private to the owner).
+        function shareSnapshot() {
+            const snap = projectSnapshot();
+            ['tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme'].forEach(k => delete snap[k]);
+            return snap;
         }
 
         function updateCurrentProjectUI() {
@@ -935,7 +1038,14 @@
             return `Karakuli #${String(next).padStart(4, '0')}`;
         }
 
+        async function saveSharedSession() {
+            if (!shareSession || shareSession.mode !== 'edit') return;
+            try { await window.karakuliShare.update(shareSession.token, shareSnapshot(), currentProjectTitle); sharedSeenMs = Date.now(); sharedDirty = false; }
+            catch (err) { console.error('Shared save error:', err); showActionHint('Could not save changes to the shared project'); }
+        }
+
         async function saveCurrentProject() {
+            if (shareSession) { await saveSharedSession(); return; }
             if (!window.karakuliProjects?.isSignedIn()) return;
             if (!activeProjectId) {
                 if (!projectCreationPromise) {
@@ -948,11 +1058,15 @@
                 await projectCreationPromise;
             }
             await window.karakuliProjects.save(activeProjectId, projectSnapshot());
+            // an editable link keeps pointing at the latest drawing
+            if (projectShare.edit && window.karakuliShare) window.karakuliShare.update(projectShare.edit, shareSnapshot(), currentProjectTitle).catch(err => console.warn('Shared copy not updated', err));
             updateCurrentProjectUI();
             await renderProjectsList();
         }
 
         function scheduleProjectSave() {
+            if (isViewOnly) return;
+            if (shareSession) { sharedDirty = true; clearTimeout(projectSaveTimer); projectSaveTimer = setTimeout(saveSharedSession, 700); return; }
             if (!window.karakuliProjects?.isSignedIn()) return;
             // The first edit creates the file immediately; subsequent edits are batched.
             if (!activeProjectId) { saveCurrentProject().catch(error => console.error('Project save error:', error)); return; }
@@ -960,40 +1074,77 @@
             projectSaveTimer = setTimeout(() => saveCurrentProject().catch(error => console.error('Project save error:', error)), 700);
         }
 
+        // Icons of the project cards (one family: 24 px grid, 1.8 stroke, round caps)
+        const PROJECT_ICONS = {
+            share: '<svg viewBox="0 0 24 24"><path d="M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>',
+            save: '<svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.3 9.3 4.5 4.5 0 0 0 7 19z"/><path d="m9 13.5 2 2 4-4"/></svg>',
+            trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v5M14 11v5"/></svg>',
+            people: '<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+            eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+            pencil: '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+            dots: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>',
+            sheet: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6"/></svg>',
+            circleT: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>',
+            squareT: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
+            product: '<svg viewBox="0 0 24 24"><path d="M12 3 3 7.5v9L12 21l9-4.5v-9z"/><path d="m3 7.5 9 4.5 9-4.5M12 12v9"/></svg>',
+            free: '<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+            link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>'
+        };
+
+        function projectMeta(p) {
+            const name = PRODUCTS[p.productKey]?.name || SHAPES[p.productKey]?.name || (p.isPaperVisible ? 'Custom sheet' : 'Free canvas');
+            const size = p.isPaperVisible && p.paperWidthMm ? ` · ${+(+p.paperWidthMm).toFixed(0)}×${+(+p.paperHeightMm).toFixed(0)}` : '';
+            return name + size;
+        }
+
+        function projectTileIcon(p) {
+            if (PRODUCTS[p.productKey]) return PROJECT_ICONS.product;
+            if (p.productKey === 'circle') return PROJECT_ICONS.circleT;
+            if (p.productKey === 'square') return PROJECT_ICONS.squareT;
+            return p.isPaperVisible ? PROJECT_ICONS.sheet : PROJECT_ICONS.free;
+        }
+        function toggleProjectActions(btn) { btn.closest('.project-item').classList.toggle('open'); }
+
+        function projectCardHTML(p, isCurrent) {
+            const shared = (p.shareEditToken || p.shareViewToken) ? `<span title="Shared by link">${PROJECT_ICONS.people}</span>` : '';
+            const when = isCurrent ? '' : ' · ' + new Date(p.updatedAtMs || p.createdAtMs || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+            const id = isCurrent ? '' : p.id;
+            return `
+                <div class="project-item${isCurrent ? ' current' : ''}">
+                    <div class="project-main">
+                        <div class="project-tile">${projectTileIcon(p)}</div>
+                        <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>
+                            <span class="project-name">${escapeProjectText(p.title || 'Untitled project')}</span>
+                            <span class="project-meta">${shared}<span>${escapeProjectText(projectMeta(p) + when)}</span></span>
+                        </div>
+                        <button class="project-more" aria-label="Project actions" title="Actions" onclick="toggleProjectActions(this)">${PROJECT_ICONS.dots}</button>
+                    </div>
+                    <div class="project-actions">
+                        <button class="project-act" onclick="openShareModal('${id}')">${PROJECT_ICONS.share}Share</button>
+                        ${isCurrent ? `<button class="project-act" onclick="saveCurrentProject()">${PROJECT_ICONS.save}Save</button>` : ''}
+                        <button class="project-act delete" onclick="${isCurrent ? 'deleteCurrentProject()' : `deleteProject('${p.id}')`}">${PROJECT_ICONS.trash}Delete</button>
+                    </div>
+                </div>`;
+        }
+
         async function renderProjectsList() {
             const list = document.getElementById('projects-list');
             if (!list) return;
             if (!window.karakuliProjects?.isSignedIn()) {
-                list.innerHTML = '<div class="project-empty">Sign in with Google to save projects.</div>';
+                list.innerHTML = '<div class="project-empty">Sign in with Google to save and share projects.</div>';
                 return;
             }
-            // Render the current project first, so it is visible instantly even
-            // while the cloud list is still loading.
-            const currentProject = `
-                <div class="project-current visible">
-                    <span class="project-current-name">${escapeProjectText(currentProjectTitle)}</span>
-                    <button class="project-icon-btn" aria-label="Save project" title="Save project" onclick="saveCurrentProject()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h12l2 2v16H5z"/><path d="M8 3v6h8V3"/><path d="M8 21v-7h8v7"/></svg>
-                    </button>
-                    <button class="project-icon-btn delete" aria-label="Delete project" title="Delete project" onclick="deleteCurrentProject()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M7 6l1 15h8l1-15"/><path d="M10 10v7M14 10v7"/></svg>
-                    </button>
-                </div>`;
-            list.innerHTML = currentProject + '<div class="project-empty">Loading projects…</div>';
+            // The current project first (instantly, from the live state), the cloud list after it.
+            const live = { title: currentProjectTitle, productKey: activeProductKey, isPaperVisible, paperWidthMm, paperHeightMm, shareEditToken: projectShare.edit, shareViewToken: projectShare.view };
+            const currentCard = shareSession ? '' : '<div class="project-group">Current</div>' + projectCardHTML(live, true);
+            list.innerHTML = currentCard + '<div class="project-empty">Loading projects…</div>';
             try {
                 const projects = await window.karakuliProjects.list();
-                const otherProjects = projects.filter(project => project.id !== activeProjectId);
-                list.innerHTML = currentProject + (otherProjects.length ? otherProjects.map(project => `
-                <div class="project-item">
-                    <div class="project-open" onclick="openProject('${project.id}')">
-                        <span class="project-name">${escapeProjectText(project.title || 'Untitled project')}</span>
-                        <span class="project-date">${new Date(project.updatedAtMs || project.createdAtMs).toLocaleString()}</span>
-                    </div>
-                    <button class="project-delete" aria-label="Delete project" onclick="deleteProject('${project.id}')">×</button>
-                </div>`).join('') : '');
+                const others = projects.filter(project => project.id !== activeProjectId);
+                list.innerHTML = currentCard + (others.length ? '<div class="project-group">Saved</div>' + others.map(p => projectCardHTML(p, false)).join('') : '');
             } catch (error) {
                 console.error('Project list error:', error);
-                list.innerHTML = currentProject + '<div class="project-empty">Could not load the cloud project list.</div>';
+                list.innerHTML = currentCard + '<div class="project-empty">Could not load the cloud project list.</div>';
             }
         }
 
@@ -1007,30 +1158,170 @@
             if (list.classList.contains('open')) await renderProjectsList();
         }
 
-        async function openProject(id) {
-            const project = await window.karakuliProjects?.load(id);
-            if (!project) return;
-            activeProjectId = id; currentProjectTitle = project.title || 'Karakuli #0000';
+        // Puts a project (own or shared) on the canvas.
+        function applyProjectData(project, { fit = true } = {}) {
             segments = project.segments || []; specialElements = project.specialElements || {};
             curI = project.curI || 0; curJ = project.curJ || 0; lastDirection = project.lastDirection || null;
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
             if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
-            tlHistory = project.tlHistory || [];
-            tlCurrentFrame = project.tlCurrentFrame || 0;
-            tlCaptureStride = project.tlCaptureStride || 1;
-            tlCaptureCounter = project.tlCaptureCounter || 0;
+            if (project.tlHistory) {
+                tlHistory = project.tlHistory || [];
+                tlCurrentFrame = project.tlCurrentFrame || 0;
+                tlCaptureStride = project.tlCaptureStride || 1;
+                tlCaptureCounter = project.tlCaptureCounter || 0;
+            } else { tlHistory = []; tlCurrentFrame = 0; tlCaptureStride = 1; tlCaptureCounter = 0; }
             if (project.currentTheme) setTheme(project.currentTheme);
-            history = []; redoStack = []; invalidateGeometryCache(); redraw(); showActionHint('Project opened');
+            history = []; redoStack = []; invalidateGeometryCache();
+            if (fit && isPaperVisible) { try { fitCanvasToView(); } catch (e) {} }
+            redraw();
+        }
+
+        function leaveSharedSession() {
+            clearInterval(sharedPollTimer); sharedPollTimer = null;
+            shareSession = null; isViewOnly = false; sharedDirty = false;
+            updateShareBadge();
+            try { window.history.replaceState(null, '', location.pathname); } catch (e) {}
+        }
+
+        function updateShareBadge() {
+            const el = document.getElementById('share-badge');
+            if (!el) return;
+            if (!shareSession) { el.classList.remove('show'); el.innerHTML = ''; return; }
+            el.innerHTML = (isViewOnly ? PROJECT_ICONS.eye : PROJECT_ICONS.pencil) + (isViewOnly ? 'View only' : 'Shared · editing');
+            el.classList.add('show');
+        }
+
+        async function openProject(id) {
+            const project = await window.karakuliProjects?.load(id);
+            if (!project) return;
+            leaveSharedSession();
+            activeProjectId = id; currentProjectTitle = project.title || 'Karakuli #0000';
+            projectShare = { edit: project.shareEditToken || null, view: project.shareViewToken || null };
+            let data = project;
+            // a project with an editable link: take the latest version (others may have changed it)
+            if (projectShare.edit && window.karakuliShare) {
+                try {
+                    const sh = await window.karakuliShare.load(projectShare.edit);
+                    if (sh?.data) data = { ...project, ...sh.data };
+                } catch (err) { console.warn('Shared copy not loaded', err); }
+            }
+            applyProjectData(data, { fit: false });
+            showActionHint('Project opened');
             document.getElementById('projects-list').classList.remove('open');
             updateCurrentProjectUI();
         }
 
+        // Opened from a link (?edit=TOKEN or ?view=TOKEN)
+        async function openSharedProject(token, mode) {
+            let sh = null;
+            try { sh = await window.karakuliShare.load(token); } catch (err) { console.error('Shared project error:', err); }
+            if (!sh || sh.kind !== mode || !sh.data) { showActionHint('Shared project not found'); return; }
+            activeProjectId = null; projectShare = { edit: null, view: null };
+            currentProjectTitle = sh.title || 'Shared project';
+            shareSession = { token, mode }; isViewOnly = mode === 'view';
+            sharedSeenMs = sh.updatedAtMs || 0; sharedDirty = false;
+            applyProjectData(sh.data);
+            updateShareBadge(); updateCurrentProjectUI();
+            showActionHint(isViewOnly ? 'View only' : 'Shared project — your changes are saved for everyone', true);
+            setTimeout(() => showActionHint(isViewOnly ? 'View only' : 'Shared project'), 3500);
+            // pick up changes made by others while nothing of ours is waiting to be saved
+            clearInterval(sharedPollTimer);
+            sharedPollTimer = setInterval(async () => {
+                if (!shareSession || sharedDirty || document.hidden) return;
+                try {
+                    const fresh = await window.karakuliShare.load(shareSession.token);
+                    if (fresh?.data && (fresh.updatedAtMs || 0) > sharedSeenMs && !sharedDirty) {
+                        sharedSeenMs = fresh.updatedAtMs || 0;
+                        applyProjectData(fresh.data, { fit: false });
+                    }
+                } catch (err) { /* offline: try again next time */ }
+            }, 6000);
+        }
+
+        // ---- Share window ----
+        function closeShareModal() {
+            const modal = document.getElementById('share-modal');
+            modal.classList.remove('show');
+            setTimeout(() => { if (!modal.classList.contains('show')) modal.style.display = 'none'; }, 300);
+        }
+
+        function copyShareLink(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const done = () => { btn.textContent = 'Copied'; btn.classList.add('done'); setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1500); };
+            input.select();
+            if (navigator.clipboard?.writeText) navigator.clipboard.writeText(input.value).then(done, () => { document.execCommand('copy'); done(); });
+            else { document.execCommand('copy'); done(); }
+        }
+
+        const SHARE_RULES = `match /shared/{token} {
+  allow get: if true;
+  allow list: if false;
+  allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+  allow update: if (request.auth != null && resource.data.ownerUid == request.auth.uid)
+                || (resource.data.kind == 'edit' && request.resource.data.kind == 'edit'
+                    && request.resource.data.ownerUid == resource.data.ownerUid);
+  allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+}`;
+
+        async function openShareModal(id) {
+            if (!window.karakuliProjects?.isSignedIn() || !window.karakuliShare) { showActionHint('Sign in with Google to share'); return; }
+            if (shareSession) { showActionHint('Open your own project to share it'); return; }
+            const modal = document.getElementById('share-modal'), body = document.getElementById('share-body');
+            body.innerHTML = '<div class="share-desc" style="padding:8px 0 18px">Preparing the links…</div>';
+            modal.style.display = 'flex'; setTimeout(() => modal.classList.add('show'), 10);
+            try {
+                const isCurrent = !id || id === activeProjectId;
+                let data, title, tokens, pid;
+                if (isCurrent) {
+                    await saveCurrentProject();
+                    pid = activeProjectId; title = currentProjectTitle; tokens = { ...projectShare }; data = shareSnapshot();
+                } else {
+                    const p = await window.karakuliProjects.load(id);
+                    if (!p) throw new Error('Project not found');
+                    pid = id; title = p.title; tokens = { edit: p.shareEditToken || null, view: p.shareViewToken || null };
+                    data = { ...p }; ['tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme', 'id', 'createdAtMs', 'updatedAtMs'].forEach(k => delete data[k]);
+                    if (tokens.edit) { const sh = await window.karakuliShare.load(tokens.edit); if (sh?.data) data = sh.data; }
+                }
+                if (!tokens.edit) tokens.edit = await window.karakuliShare.publish('edit', data, title);
+                if (!tokens.view) tokens.view = await window.karakuliShare.publish('view', data, title);
+                else await window.karakuliShare.update(tokens.view, data, title);   // the view link shows the version as of now
+                if (isCurrent) { projectShare = tokens; await saveCurrentProject(); }
+                else await window.karakuliProjects.save(pid, { shareEditToken: tokens.edit, shareViewToken: tokens.view });
+                const base = location.origin + location.pathname;
+                const editUrl = `${base}?edit=${tokens.edit}`, viewUrl = `${base}?view=${tokens.view}`;
+                body.innerHTML = `
+                    <div class="share-block">
+                        <div class="share-title">${PROJECT_ICONS.pencil}Can edit</div>
+                        <div class="share-desc">Anyone with this link can open the project and change it. No account needed. Changes are saved for everyone.</div>
+                        <div class="share-row"><input id="share-edit-url" readonly value="${editUrl}"><button class="share-copy" onclick="copyShareLink('share-edit-url', this)">Copy</button></div>
+                    </div>
+                    <div class="share-block">
+                        <div class="share-title">${PROJECT_ICONS.eye}View only</div>
+                        <div class="share-desc">A version that can only be looked at. It shows the project as it is now; open this window again to publish later changes under the same link.</div>
+                        <div class="share-row"><input id="share-view-url" readonly value="${viewUrl}"><button class="share-copy" onclick="copyShareLink('share-view-url', this)">Copy</button></div>
+                    </div>`;
+                renderProjectsList();
+            } catch (err) {
+                console.error('Share error:', err);
+                body.innerHTML = `
+                    <div class="share-block">
+                        <div class="share-title">Sharing is not available yet</div>
+                        <div class="share-desc">The shared copy could not be stored (${escapeProjectText(err && (err.code || err.message) || 'error')}). Sharing needs these rules in Firebase Console → Firestore Database → Rules, added to the existing ones:</div>
+                        <pre style="font-size:10px;line-height:1.4;white-space:pre-wrap;user-select:text;-webkit-user-select:text;background:var(--card);padding:10px;border-radius:10px;border:1px solid var(--border-color)">${escapeProjectText(SHARE_RULES)}</pre>
+                    </div>`;
+            }
+        }
+
         async function deleteProject(id) {
             if (!confirm('Delete this project permanently?')) return;
+            let tokens = null;
+            if (id === activeProjectId) tokens = { ...projectShare };
+            else { try { const p = await window.karakuliProjects?.load(id); tokens = { edit: p?.shareEditToken, view: p?.shareViewToken }; } catch (e) {} }
             await window.karakuliProjects?.remove(id);
-            if (activeProjectId === id) { activeProjectId = null; currentProjectTitle = 'Karakuli #0000'; }
+            if (tokens && window.karakuliShare) { window.karakuliShare.remove(tokens.edit); window.karakuliShare.remove(tokens.view); }
+            if (activeProjectId === id) { activeProjectId = null; projectShare = { edit: null, view: null }; currentProjectTitle = 'Karakuli #0000'; }
             updateCurrentProjectUI();
             await renderProjectsList();
         }
@@ -1091,7 +1382,7 @@
             const activeTab = document.querySelector('.dash-tab.active');
             const activePanel = activeTab ? document.getElementById(activeTab.id.replace('tab-', 'dash-')) : null;
             if (!activePanel) return [];
-            return [...activePanel.querySelectorAll('.dash-btn, .theme-opt, .project-open, .project-icon-btn, .project-delete')]
+            return [...activePanel.querySelectorAll('.dash-btn, .theme-opt, .project-open, .project-more, .project-act')]
                 .filter(item => !item.classList.contains('disabled') && item.offsetParent !== null);
         }
 
@@ -1410,24 +1701,60 @@
             document.getElementById('swap-btn').disabled = Boolean(selectedPresetKey);
             document.querySelectorAll('#unit-seg button').forEach(b => b.classList.toggle('active', b.dataset.unit === sizeUnit));
             document.querySelectorAll('[data-unit-label]').forEach(el => { el.textContent = sizeUnit; });
-            // Paper sizes: a sheet icon with the true A-series proportion (1 : 1.414), drawn bigger for bigger sheets.
-            // Shapes: a separate icon-only toggle on the right.
-            const sheetIco = (hh) => { const ww = Math.round(hh / 1.414 * 10) / 10; return `<svg class="sheet-ico" viewBox="0 0 ${ww + 2} ${hh + 2}" width="${ww + 2}" height="${hh + 2}"><rect x="1" y="1" width="${ww}" height="${hh}" rx="1"/></svg>`; };
+            // Paper sizes and shapes live in one drop-down list.
+            const sheetIco = (hh) => { const ww = Math.round(hh / 1.414 * 10) / 10; return `<svg viewBox="0 0 ${ww + 2} ${hh + 2}" width="${ww + 2}" height="${hh + 2}"><rect x="1" y="1" width="${ww}" height="${hh}" rx="1"/></svg>`; };
             const sheetH = { A4: 10, A3: 12, A2: 14, A1: 16 };
             const shapeIco = {
-                square: '<svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>',
-                circle: '<svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5"/></svg>'
+                square: '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>',
+                circle: '<svg viewBox="0 0 14 14" width="14" height="14"><circle cx="7" cy="7" r="5"/></svg>'
             };
-            document.getElementById('paper-chips').innerHTML = Object.entries(PAPER_CHIPS).map(([name, [cw, ch]]) => {
-                const on = !selectedPresetKey && Math.abs(modalSizeMm.w - cw) < 0.5 && Math.abs(modalSizeMm.h - ch) < 0.5;
-                return `<button class="chip chip-paper${on ? ' active' : ''}" onclick="selectPaperChip('${name}')">${name}</button>`;
-            }).join('') + '<span class="chip-sep"></span>' + Object.entries(SHAPES).map(([key, sp]) =>
-                `<button class="chip chip-shape${key === selectedPresetKey ? ' active' : ''}" onclick="selectPreset('${key}')">${shapeIco[key]}${sp.name}</button>`).join('');
+            const tplItems = [
+                ...Object.entries(PAPER_CHIPS).map(([name, [cw, ch]]) => ({ kind: 'paper', key: name, name, dim: `${cw} × ${ch} mm`, ico: sheetIco(sheetH[name]), on: !selectedPresetKey && Math.abs(modalSizeMm.w - cw) < 0.5 && Math.abs(modalSizeMm.h - ch) < 0.5 })),
+                ...Object.entries(SHAPES).map(([key, sp]) => ({ kind: 'shape', key, name: sp.name, dim: `${sp.def} mm`, ico: shapeIco[key], on: key === selectedPresetKey }))
+            ];
+            tplItemsCache = tplItems;
+            const cur = tplItems.find(t => t.on);
+            const curIco = cur ? cur.ico : '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>';
+            document.getElementById('tpl-btn').innerHTML =
+                `<span class="tpl-ico">${curIco}</span><span class="tpl-name">${cur ? cur.name : 'Paper & shapes'}</span>` +
+                (cur ? `<span class="tpl-dim">${cur.dim.replace(/^(\d+) × (\d+) mm$/, '$1 × $2')}</span>` : '') +
+                '<svg class="tpl-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
+            const item = (t, n) => `<button class="tpl-item${t.on ? ' active' : ''}${n === tplMenuIdx ? ' kb' : ''}" role="option" type="button" onclick="pickTpl(${n})"><span class="tpl-ico">${t.ico}</span><span class="tpl-name">${t.name}</span><span class="tpl-dim">${t.dim}</span></button>`;
+            document.getElementById('tpl-menu').innerHTML =
+                '<div class="tpl-group">Paper sheets</div>' + tplItems.map((t, n) => t.kind === 'paper' ? item(t, n) : '').join('') +
+                '<div class="tpl-group">Shapes</div>' + tplItems.map((t, n) => t.kind === 'shape' ? item(t, n) : '').join('');
             renderProductCards();
             if (document.getElementById('new-canvas-modal').style.display === 'flex') applyModalFocus(false);
         }
 
+        let tplItemsCache = [], tplMenuIdx = -1;
+        function tplMenuOpen() { return document.getElementById('tpl-select')?.classList.contains('open'); }
+        function setTplMenu(open) {
+            const box = document.getElementById('tpl-select'); if (!box) return;
+            box.classList.toggle('open', open);
+            document.getElementById('tpl-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
+            tplMenuIdx = open ? Math.max(0, tplItemsCache.findIndex(t => t.on)) : -1;
+            document.querySelectorAll('#tpl-menu .tpl-item').forEach(el => el.classList.remove('kb'));
+            if (open) {
+                const act = document.querySelector('#tpl-menu .tpl-item.active');
+                if (act) act.scrollIntoView({ block: 'nearest' });
+            }
+        }
+        document.addEventListener('pointerdown', e => { if (tplMenuOpen() && !e.target.closest('#tpl-select')) setTplMenu(false); }, true);
+        function toggleTplMenu() { setTplMenu(!tplMenuOpen()); }
+        function pickTpl(n) {
+            const t = tplItemsCache[n]; if (!t) return;
+            if (t.kind === 'paper') selectPaperChip(t.key); else selectPreset(t.key);
+            setTplMenu(false);
+        }
+        function moveTplMenu(d) {
+            tplMenuIdx = (tplMenuIdx + d + tplItemsCache.length) % tplItemsCache.length;
+            document.querySelectorAll('#tpl-menu .tpl-item').forEach((el, n) => el.classList.toggle('kb', n === tplMenuIdx));
+            document.querySelectorAll('#tpl-menu .tpl-item')[tplMenuIdx]?.scrollIntoView({ block: 'nearest' });
+        }
+
         function prepareModalPresets() {
+            setTplMenu(false);
             selectedPresetKey = isPaperVisible ? activeProductKey : null;
             if (isPaperVisible) writeSize(paperWidthMm, paperHeightMm); else writeSize(modalSizeMm.w, modalSizeMm.h);
             refreshModal();
@@ -1599,7 +1926,7 @@
         let modalFocus = { r: 0, c: 0 };
         function getModalRows() {
             const rows = [[document.getElementById('field-w'), document.getElementById('field-h')]];
-            rows.push([...document.querySelectorAll('#paper-chips .chip')]);
+            rows.push([document.getElementById('tpl-btn')]);
             document.querySelectorAll('#preset-list .preset-card').forEach(card => rows.push([card]));
             rows.push([...document.querySelectorAll('#new-canvas-modal .modal-actions .modal-btn')]);
             return rows.filter(r => r.length);
@@ -1620,7 +1947,7 @@
             if (selectedPresetKey) {
                 const idx = Object.keys(PRODUCTS).indexOf(selectedPresetKey);
                 if (idx >= 0) { r = 2 + idx; c = 0; }
-                else { r = 1; c = Object.keys(PAPER_CHIPS).length + Object.keys(SHAPES).indexOf(selectedPresetKey); }
+                else { r = 1; c = 0; }
             }
             modalFocus = { r, c }; applyModalFocus();
         }
@@ -1633,6 +1960,13 @@
             const k = modalNavKey(e);
             if (!k) return false;
             e.preventDefault();
+            if (tplMenuOpen()) {   // open template list: 8 / 2 walk the list, Enter / 5 picks, 4 / 6 close it
+                if (k === '8') moveTplMenu(-1);
+                else if (k === '2') moveTplMenu(1);
+                else if (k === 'enter' || k === '5') pickTpl(tplMenuIdx);
+                else setTplMenu(false);
+                return true;
+            }
             const rows = getModalRows();
             const row = rows[modalFocus.r];
             const isCard = el => el.classList && el.classList.contains('preset-card');
@@ -1651,6 +1985,7 @@
                 const el = row[modalFocus.c];
                 if (el.classList.contains('field')) { const inp = el.querySelector('input'); inp.focus(); inp.select(); return true; }
                 if (el.classList.contains('modal-btn')) { el.click(); return true; }
+                if (el.id === 'tpl-btn') { setTplMenu(true); return true; }
                 if (!el.classList.contains('active')) el.click();   // a chip / template that is focused but not yet selected
                 applyNewCanvasSize();
             }
@@ -1694,6 +2029,7 @@
         // first (signed-in users); without an account the person is asked before it is discarded.
         async function keepCurrentDrawing() {
             if (!segments.length && !Object.keys(specialElements).length) return true;
+            if (shareSession) return true;   // a shared project is already stored where it came from
             if (window.karakuliProjects?.isSignedIn()) {
                 try { clearTimeout(projectSaveTimer); await saveCurrentProject(); showActionHint('Previous drawing saved as ' + currentProjectTitle); return true; }
                 catch (err) { console.error('Could not save the previous drawing', err); return confirm('The previous drawing could not be saved. Create the new canvas anyway?'); }
@@ -1705,6 +2041,7 @@
             let w = readField('canvas-w-input'), h = readField('canvas-h-input');
             if (!sizeIsValid(w) || !sizeIsValid(h)) { refreshModal(); return; }
             if (!isResizingOnly && !(await keepCurrentDrawing())) return;
+            if (!isResizingOnly && shareSession) leaveSharedSession();   // a new canvas is the person's own, not the shared one
             if (PRODUCTS[selectedPresetKey]) { const n = normalizeProductSize(selectedPresetKey, w, h); w = n.w; h = n.h; }
             if (SHAPES[selectedPresetKey]) h = w;
             const shouldCreateProject = !isResizingOnly && createProjectOnReset;
@@ -1714,7 +2051,7 @@
             activeProductKey = selectedPresetKey;
             closeNewCanvasModal();
             if (!isResizingOnly) {
-                if (shouldCreateProject) { activeProjectId = null; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
+                if (shouldCreateProject) { activeProjectId = null; projectShare = { edit: null, view: null }; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
                 try { performReset({ preserveUndo: false }); } catch (err) { console.error(err); }
             }
             // Show the whole sheet in the middle. Done now, and once more after the window has closed, so nothing
@@ -2298,6 +2635,7 @@
         }
 
         function undo() { 
+            if (isViewOnly) return;
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             if(history.length > 0) { 
                 redoStack.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
@@ -2307,6 +2645,7 @@
         }
 
         function redo() { 
+            if (isViewOnly) return;
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             if(redoStack.length > 0) { 
                 history.push(JSON.parse(JSON.stringify({segments, specialElements, curI, curJ, lastDirection}))); 
@@ -2339,6 +2678,7 @@
 
         function performReset({ preserveUndo = true } = {}) {
             if (isGameMode) return;
+            if (isViewOnly) { showActionHint('View only'); return; }
             if (isTimelapseUIOpen) {
                 isTimelapseUIOpen = false;
                 const toolbar = document.getElementById('timelapse-toolbar');
@@ -3258,6 +3598,7 @@
         function stopRepeat() { if(repeatTimer) { clearTimeout(repeatTimer); clearInterval(repeatTimer); repeatTimer = null; } }
 
         function toggleSpecial(t) {
+            if (isViewOnly) { showActionHint('View only'); return; }
             if (isTimelapseUIOpen || !isDrawingMode || isEraserActive || isDashboardOpen || isGameMode) return;
             if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) return;
             saveState(); let id = `${curI},${curJ}`; if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
@@ -3268,6 +3609,7 @@
         }
 
         function addSeg(x1, y1, x2, y2) {
+            if (isViewOnly) return;
             let p1 = {x:x1, y:y1}, p2 = {x:x2, y:y2}; if(p1.x > p2.x || (p1.x===p2.x && p1.y>p2.y)) [p1, p2] = [p2, p1];
             let idx = segments.findIndex(s=>s.p1.x===p1.x && s.p1.y===p1.y && s.p2.x===p2.x && s.p2.y===p2.y);
             if(idx !== -1) segments.splice(idx, 1); else segments.push({p1, p2});
@@ -3275,6 +3617,7 @@
         }
 
         function performEraserActionAt(worldX, worldY) {
+            if (isViewOnly) return;
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
             const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
             for (let id in specialElements) {
@@ -3710,13 +4053,27 @@
             const k = NUMPAD_KEYS[e.code] || (e.key === 'Return' ? 'Enter' : null);
             if (k && e.key !== k) { try { Object.defineProperty(e, 'key', { value: k, configurable: true }); } catch (_) {} }
         };
+        // Opened from a share link?
+        (function initSharedLink() {
+            const q = new URLSearchParams(location.search);
+            const mode = q.has('edit') ? 'edit' : (q.has('view') ? 'view' : null);
+            if (!mode) return;
+            const token = q.get(mode);
+            let tries = 0;
+            const timer = setInterval(() => {
+                if (window.karakuliShare && typeof redraw === 'function' && typeof width === 'number' && width > 0) { clearInterval(timer); openSharedProject(token, mode); }
+                else if (++tries > 150) { clearInterval(timer); showActionHint('Could not open the shared project'); }
+            }, 100);
+        })();
+        window.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('share-modal')?.classList.contains('show')) closeShareModal(); });
+
         window.addEventListener('keydown', normalizeNumpadEvent, true);
         window.addEventListener('keyup', normalizeNumpadEvent, true);
         window.addEventListener('keydown', e => {
             if (isTypingInField(e.target)) return;
             const dotKey = e.key === '.' || e.code === 'NumpadDecimal' || e.code === 'Period';
             if (document.getElementById('new-canvas-modal').classList.contains('show')) {
-                if (e.key === 'Escape') { e.preventDefault(); closeNewCanvasModal(); return; }
+                if (e.key === 'Escape') { e.preventDefault(); if (tplMenuOpen()) setTplMenu(false); else closeNewCanvasModal(); return; }
                 if (dotKey) { e.preventDefault(); return; }
                 if (handleModalKey(e)) return;
                 return;
