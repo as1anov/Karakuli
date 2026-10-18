@@ -225,39 +225,22 @@
         #dash-home.projects-mode > .dash-section:not(:first-child), #dash-home.projects-mode > .login-box { display: none; }
         #dash-home.projects-mode > .dash-section:first-child { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: 0; }
         #dash-home.projects-mode .projects-list.open { flex: 1; min-height: 0; }
-        .pl-tools { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
-        .projects-list.guest .pl-tools, .projects-list.guest .pl-bar { display: none; }
-        .pl-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--disabled-color); }
-        .pl-search svg { width: 15px; height: 15px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
-        .pl-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; -webkit-user-select: text; user-select: text; }
-        .pl-search input::placeholder { color: var(--disabled-color); }
-        .pl-search:focus-within { border-color: var(--text-color); }
-        .pl-row { display: flex; align-items: center; gap: 6px; }
-        .pl-sp { flex: 1; }
-        .pl-chip { height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
-        .pl-chip:hover { background: var(--active-btn-bg); }
-        .pl-chip.active { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
-        .pl-tool { height: 28px; min-width: 28px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
-        .pl-tool:hover { background: var(--active-btn-bg); }
-        .pl-tool.active { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
-        .pl-tool svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .projects-list.guest .pl-items { justify-content: center; }
         .pl-items { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; scrollbar-width: none; padding-bottom: 6px; }
         .pl-items::-webkit-scrollbar { display: none; }
-        .pl-bar { display: none; flex-shrink: 0; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border-color); }
-        .pl-bar.show { display: flex; }
-        .pl-bar .pl-count { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; color: var(--text-color); }
-        .pl-link { border: 0; background: transparent; padding: 0; color: var(--disabled-color); font-family: var(--main-font); font-size: 10px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; margin-left: 6px; }
-        .pl-bar .project-act { flex: 0 0 auto; padding: 0 12px; }
-        .pl-bar .project-act:disabled { opacity: 0.35; cursor: default; }
         .pl-guest { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 12px; text-align: center; color: var(--disabled-color); font-size: 11px; line-height: 1.5; }
-        .project-check { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; }
-        .project-check i { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--disabled-color); display: grid; place-items: center; transition: background 0.12s, border-color 0.12s; }
-        .project-check i svg { width: 13px; height: 13px; stroke: var(--bg-color); fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
-        .project-item.selected { border-color: var(--text-color); background: var(--active-btn-bg); }
-        .project-item.selected .project-check i { background: var(--text-color); border-color: var(--text-color); }
-        .project-item.selected .project-check i svg { opacity: 1; }
-        .project-item.na { opacity: 0.55; }
-        .project-pick { cursor: pointer; }
+        .project-swipe { position: relative; flex-shrink: 0; border-radius: 12px; overflow: hidden; --sw: 0; }
+        .project-swipe .project-item { position: relative; touch-action: pan-y; background: linear-gradient(var(--panel-bg), var(--panel-bg)), var(--bg-color); will-change: transform; }
+        .project-swipe .project-item.current { background: linear-gradient(var(--active-btn-bg), var(--active-btn-bg)), var(--bg-color); }
+        .pl-items, .pl-items * { touch-action: pan-y; }
+        .project-del-bg { position: absolute; inset: 0; display: flex; align-items: center; gap: 8px; padding-left: 16px; border-radius: 12px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; opacity: calc(0.35 + var(--sw) * 0.65); }
+        .project-del-bg svg { width: 18px; height: 18px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; transform: scale(calc(0.7 + var(--sw) * 0.3)); transition: transform 0.18s; }
+        .project-del-bg span { opacity: 0; transform: translateX(-6px); transition: opacity 0.15s, transform 0.15s; white-space: nowrap; }
+        .project-swipe.ready .project-del-bg { background: #dc2626; }
+        .project-swipe.ready .project-del-bg svg { animation: trashPop 0.28s ease; transform: scale(1.18); }
+        .project-swipe.ready .project-del-bg span { opacity: 1; transform: none; }
+        @keyframes trashPop { 0% { transform: scale(1); } 45% { transform: scale(1.5) rotate(-12deg); } 100% { transform: scale(1.18); } }
+        .project-hint { margin-top: 4px; text-align: center; font-size: 10px; color: var(--disabled-color); }
         .project-group { margin: 6px 2px 0; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
         .project-group:first-child { margin-top: 0; }
         .project-item { border-radius: 12px; border: 1px solid var(--border-color); background: var(--panel-bg); overflow: hidden; transition: background 0.15s; }
@@ -613,18 +596,7 @@
                     My Projects
                 </div>
                 <div class="projects-list" id="projects-list">
-                    <div class="pl-tools">
-                        <label class="pl-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="pl-search" type="text" placeholder="Search projects" autocomplete="off" spellcheck="false" oninput="plSetQuery(this.value)" onkeydown="if (event.key === 'Escape' || event.key === 'Enter') { if (event.key === 'Escape') { this.value = ''; plSetQuery(''); } this.blur(); ensureKeyboardFocus(); }"></label>
-                        <div class="pl-row">
-                            <button class="pl-chip active" data-f="all" onclick="plSetFilter('all')">All</button>
-                            <button class="pl-chip" data-f="shared" onclick="plSetFilter('shared')">Shared</button>
-                            <span class="pl-sp"></span>
-                            <button class="pl-tool" id="pl-sort" onclick="plToggleSort()" title="Sort order"></button>
-                            <button class="pl-tool" id="pl-select" onclick="plToggleSelect()" title="Select several projects"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></button>
-                        </div>
-                    </div>
                     <div class="pl-items" id="pl-items"></div>
-                    <div class="pl-bar" id="pl-bar"></div>
                 </div>
             </div>
 
@@ -1162,40 +1134,30 @@
         function toggleProjectActions(btn) { btn.closest('.project-item').classList.toggle('open'); }
 
         // ---- My Projects panel: search, filter, sort, selection (delete / share several), rename, duplicate ----
-        let plCache = [], plQuery = '', plSort = 'recent', plFilter = 'all', plSelectMode = false, plSelected = new Set();
+        let plCache = [];
 
         function projectCardHTML(p, isCurrent) {
             const shared = (p.shareEditToken || p.shareViewToken) ? `<span title="Shared by link">${PROJECT_ICONS.people}</span>` : '';
             const when = isCurrent ? '' : ' · ' + new Date(p.updatedAtMs || p.createdAtMs || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
             const id = isCurrent ? '' : p.id;
-            const key = isCurrent ? activeProjectId : p.id;
-            const selectable = Boolean(key);
-            const sel = plSelectMode && selectable && plSelected.has(key);
+            const key = isCurrent ? (activeProjectId || '') : p.id;
             const meta = `<span class="project-meta">${shared}<span>${escapeProjectText(projectMeta(p) + when)}</span></span>`;
             const name = `<span class="project-name">${escapeProjectText(p.title || 'Untitled project')}</span>`;
-            const cls = `project-item${isCurrent ? ' current' : ''}${sel ? ' selected' : ''}${plSelectMode && !selectable ? ' na' : ''}`;
-            if (plSelectMode) {
-                return `
-                <div class="${cls}">
-                    <div class="project-main project-pick"${selectable ? ` onclick="plTogglePick('${key}')"` : ''}>
-                        <div class="project-check"><i>${PROJECT_ICONS.tick}</i></div>
-                        <div class="project-open">${name}${meta}</div>
-                    </div>
-                </div>`;
-            }
             return `
-                <div class="${cls}">
-                    <div class="project-main">
-                        <div class="project-tile">${projectTileIcon(p)}</div>
-                        <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>${name}${meta}</div>
-                        <button class="project-more" aria-label="Project actions" title="Actions" onclick="toggleProjectActions(this)">${PROJECT_ICONS.dots}</button>
-                    </div>
-                    <div class="project-actions">
-                        <button class="project-act" onclick="openShareModal('${id}')">${PROJECT_ICONS.share}Share</button>
-                        ${isCurrent ? `<button class="project-act" onclick="saveCurrentProject()">${PROJECT_ICONS.save}Save</button>` : ''}
-                        <button class="project-act" onclick="renameProject('${id}')">${PROJECT_ICONS.pencil}Rename</button>
-                        <button class="project-act" onclick="duplicateProject('${id}')">${PROJECT_ICONS.copy}Duplicate</button>
-                        <button class="project-act delete" onclick="${isCurrent ? 'deleteCurrentProject()' : `deleteProject('${p.id}')`}">${PROJECT_ICONS.trash}Delete</button>
+                <div class="project-swipe"${key ? ` data-id="${key}"` : ''}${isCurrent ? ' data-current="1"' : ''}>
+                    <div class="project-del-bg">${PROJECT_ICONS.trash}<span>Release to delete</span></div>
+                    <div class="project-item${isCurrent ? ' current' : ''}">
+                        <div class="project-main">
+                            <div class="project-tile">${projectTileIcon(p)}</div>
+                            <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>${name}${meta}</div>
+                            <button class="project-more" aria-label="Project actions" title="Actions" onclick="toggleProjectActions(this)">${PROJECT_ICONS.dots}</button>
+                        </div>
+                        <div class="project-actions">
+                            <button class="project-act" onclick="openShareModal('${id}')">${PROJECT_ICONS.share}Share</button>
+                            ${isCurrent ? `<button class="project-act" onclick="saveCurrentProject()">${PROJECT_ICONS.save}Save</button>` : ''}
+                            <button class="project-act" onclick="renameProject('${id}')">${PROJECT_ICONS.pencil}Rename</button>
+                            <button class="project-act" onclick="duplicateProject('${id}')">${PROJECT_ICONS.copy}Duplicate</button>
+                        </div>
                     </div>
                 </div>`;
         }
@@ -1204,19 +1166,13 @@
             return { id: activeProjectId, title: currentProjectTitle, productKey: activeProductKey, isPaperVisible, paperWidthMm, paperHeightMm, shareEditToken: projectShare.edit, shareViewToken: projectShare.view };
         }
         function plVisible() {
-            const q = plQuery.trim().toLowerCase();
-            const match = p => (!q || (p.title || '').toLowerCase().includes(q) || projectMeta(p).toLowerCase().includes(q)) && (plFilter !== 'shared' || p.shareEditToken || p.shareViewToken);
-            const others = plCache.filter(p => p.id !== activeProjectId && match(p));
-            others.sort(plSort === 'name'
-                ? (a, b) => (a.title || '').localeCompare(b.title || '', undefined, { numeric: true })
-                : (a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
-            const live = shareSession ? null : plLive();
-            return { cur: live && match(live) ? live : null, others };
+            const others = plCache.filter(p => p.id !== activeProjectId)
+                .sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
+            return { cur: shareSession ? null : plLive(), others };
         }
-        function plSelectableIds() { const v = plVisible(); return [...(v.cur && v.cur.id ? [v.cur.id] : []), ...v.others.map(p => p.id)]; }
 
         function plRender() {
-            const list = document.getElementById('projects-list'), box = document.getElementById('pl-items'), bar = document.getElementById('pl-bar');
+            const list = document.getElementById('projects-list'), box = document.getElementById('pl-items');
             if (!list || !box) return;
             if (!window.karakuliProjects?.isSignedIn()) {
                 list.classList.add('guest');
@@ -1225,48 +1181,75 @@
             }
             list.classList.remove('guest');
             const v = plVisible();
-            // keep only ids that still exist
-            const ids = new Set(plSelectableIds()); plSelected = new Set([...plSelected].filter(id => ids.has(id)));
             let html = '';
             if (v.cur) html += '<div class="project-group">Current</div>' + projectCardHTML(v.cur, true);
             if (v.others.length) html += `<div class="project-group">Saved · ${v.others.length}</div>` + v.others.map(p => projectCardHTML(p, false)).join('');
-            if (!v.cur && !v.others.length) html = `<div class="project-empty">${plQuery || plFilter !== 'all' ? 'No projects match.' : 'No saved projects yet.'}</div>`;
+            if (!v.others.length) html += '<div class="project-empty">No other saved projects yet.</div>';
+            else html += '<div class="project-hint">Swipe a project to the right to delete it</div>';
             const keep = box.scrollTop;
             box.innerHTML = html; box.scrollTop = keep;
-            document.querySelectorAll('.pl-chip').forEach(c => c.classList.toggle('active', c.dataset.f === plFilter));
-            const sortBtn = document.getElementById('pl-sort');
-            sortBtn.innerHTML = PROJECT_ICONS.sort + (plSort === 'name' ? 'A–Z' : 'Recent');
-            document.getElementById('pl-select').classList.toggle('active', plSelectMode);
-            bar.classList.toggle('show', plSelectMode);
-            if (plSelectMode) {
-                const n = plSelected.size, all = plSelectableIds().length;
-                bar.innerHTML = `<span class="pl-count">${n ? n + ' selected' : 'Select projects'}<button class="pl-link" onclick="plSelectAll()">${n && n === all ? 'None' : 'All'}</button></span>
-                    <button class="project-act" ${n ? '' : 'disabled'} onclick="plShareSelected()">${PROJECT_ICONS.share}Share</button>
-                    <button class="project-act delete" ${n ? '' : 'disabled'} onclick="plDeleteSelected()">${PROJECT_ICONS.trash}Delete</button>`;
-            }
         }
-        function plSetQuery(v) { plQuery = v || ''; plRender(); }
-        function plSetFilter(f) { plFilter = f; plRender(); }
-        function plToggleSort() { plSort = plSort === 'recent' ? 'name' : 'recent'; plRender(); }
-        function plToggleSelect() { plSelectMode = !plSelectMode; plSelected.clear(); plRender(); }
-        function plTogglePick(id) { if (plSelected.has(id)) plSelected.delete(id); else plSelected.add(id); plRender(); }
-        function plSelectAll() { const ids = plSelectableIds(); plSelected = plSelected.size === ids.length ? new Set() : new Set(ids); plRender(); }
 
-        async function plDeleteSelected() {
-            const ids = [...plSelected]; if (!ids.length) return;
-            if (!confirm(`Delete ${ids.length} project${ids.length > 1 ? 's' : ''} permanently?`)) return;
-            const hadCurrent = ids.includes(activeProjectId);
-            for (const id of ids) { try { await removeProjectCore(id); } catch (err) { console.warn('Could not delete', id, err); } }
-            plSelected.clear(); plSelectMode = false;
-            if (hadCurrent) performReset({ preserveUndo: false });
-            updateCurrentProjectUI();
-            await renderProjectsList();
-            showActionHint(`${ids.length} deleted`);
-        }
-        async function plShareSelected() {
-            const ids = [...plSelected]; if (!ids.length) return;
-            await openShareMany(ids);
-        }
+        // ---- Swipe right to delete ----
+        (function initProjectSwipe() {
+            const box = document.getElementById('pl-items');
+            if (!box) return;
+            let sw = null, suppressClick = false;
+            const THRESHOLD = 0.42;
+            box.addEventListener('pointerdown', e => {
+                if (e.button > 0 || e.target.closest('button')) return;
+                const wrap = e.target.closest('.project-swipe[data-id]');
+                if (!wrap) return;
+                sw = { wrap, item: wrap.querySelector('.project-item'), x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId, w: wrap.offsetWidth };
+            });
+            box.addEventListener('pointermove', e => {
+                if (!sw || e.pointerId !== sw.id) return;
+                const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+                if (!sw.on) {
+                    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }   // it is a scroll
+                    if (dx < 10) return;
+                    sw.on = true; sw.item.style.transition = 'none';
+                    try { box.setPointerCapture(e.pointerId); } catch (_) {}
+                    sw.wrap.classList.add('swiping');
+                }
+                // follows the finger, with a little resistance past the threshold
+                const lim = sw.w * THRESHOLD;
+                sw.dx = dx <= lim ? Math.max(0, dx) : lim + (dx - lim) * 0.55;
+                sw.item.style.transform = `translateX(${sw.dx}px)`;
+                const p = Math.min(1, sw.dx / lim);
+                sw.wrap.style.setProperty('--sw', p.toFixed(3));
+                sw.wrap.classList.toggle('ready', sw.dx >= lim);
+            });
+            const finish = async e => {
+                if (!sw || e.pointerId !== sw.id) return;
+                const s0 = sw; sw = null;
+                if (!s0.on) return;
+                suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+                const { wrap, item } = s0, id = wrap.dataset.id, isCur = wrap.dataset.current === '1';
+                wrap.classList.remove('swiping');
+                const back = () => { item.style.transition = 'transform 0.35s cubic-bezier(.2,1.1,.3,1)'; item.style.transform = ''; wrap.style.setProperty('--sw', 0); wrap.classList.remove('ready'); };
+                if (e.type === 'pointercancel' || s0.dx < s0.w * THRESHOLD) { back(); return; }
+                if (isCur && !confirm('Delete the current project and clear the canvas?')) { back(); return; }
+                // fly out to the right, then the row folds away
+                item.style.transition = 'transform 0.24s cubic-bezier(.5,0,.9,.5)';
+                item.style.transform = `translateX(${s0.w + 20}px)`;
+                wrap.classList.add('removing');
+                await new Promise(r => setTimeout(r, 220));
+                wrap.style.height = wrap.offsetHeight + 'px'; wrap.offsetHeight;
+                wrap.style.transition = 'height 0.22s ease, margin 0.22s ease, opacity 0.22s ease';
+                wrap.style.height = '0px'; wrap.style.marginTop = wrap.style.marginBottom = '-3px'; wrap.style.opacity = '0';
+                await new Promise(r => setTimeout(r, 230));
+                try {
+                    await removeProjectCore(id);
+                    if (isCur) performReset({ preserveUndo: false });
+                } catch (err) { console.warn('Could not delete', id, err); }
+                updateCurrentProjectUI();
+                await renderProjectsList();
+            };
+            box.addEventListener('pointerup', finish);
+            box.addEventListener('pointercancel', finish);
+            box.addEventListener('click', e => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+        })();
 
         async function renameProject(id) {
             const isCur = !id || id === activeProjectId;
@@ -1314,7 +1297,6 @@
             list.classList.toggle('open', open);
             document.getElementById('dash-home').classList.toggle('projects-mode', open);
             document.getElementById('projects-btn').classList.toggle('active', open);
-            if (!open) { plSelectMode = false; plSelected.clear(); }
         }
         async function toggleProjectsList() {
             const open = !document.getElementById('projects-list').classList.contains('open');
@@ -1460,38 +1442,6 @@
                     </div>`;
         }
 
-        // Several projects at once: one list of links, view-only or editable.
-        let shareManyRows = [], shareManyMode = 'view';
-        function renderShareMany() {
-            const base = location.origin + location.pathname;
-            const text = shareManyRows.map(r => `${r.title}\n${base}?${shareManyMode}=${r.tokens[shareManyMode]}`).join('\n\n');
-            document.getElementById('share-body').innerHTML = `
-                <div class="share-block">
-                    <div class="seg" style="margin-bottom:10px">
-                        <button class="${shareManyMode === 'view' ? 'active' : ''}" style="flex:1" onclick="shareManyMode='view';renderShareMany()">View only</button>
-                        <button class="${shareManyMode === 'edit' ? 'active' : ''}" style="flex:1" onclick="shareManyMode='edit';renderShareMany()">Can edit</button>
-                    </div>
-                    <div class="share-desc">${shareManyMode === 'view' ? 'Links that only show the projects as they are now.' : 'Anyone with a link can open that project and change it. No account needed.'}</div>
-                    <textarea id="share-many-text" class="share-text" readonly>${escapeProjectText(text)}</textarea>
-                    <div class="share-row" style="margin-top:8px"><button class="share-copy" style="flex:1" onclick="copyShareLink('share-many-text', this)">Copy all</button></div>
-                </div>`;
-        }
-        async function openShareMany(ids) {
-            if (!window.karakuliProjects?.isSignedIn() || !window.karakuliShare) { showActionHint('Sign in with Google to share'); return; }
-            if (shareSession) { showActionHint('Open your own project to share it'); return; }
-            const modal = document.getElementById('share-modal'), body = document.getElementById('share-body');
-            document.getElementById('share-title').textContent = `Share ${ids.length} project${ids.length > 1 ? 's' : ''}`;
-            modal.style.display = 'flex'; setTimeout(() => modal.classList.add('show'), 10);
-            shareManyRows = []; let firstErr = null;
-            for (let i = 0; i < ids.length; i++) {
-                body.innerHTML = `<div class="share-desc" style="padding:8px 0 18px">Preparing the links… ${i + 1} / ${ids.length}</div>`;
-                try { shareManyRows.push(await prepareShare(ids[i])); } catch (err) { console.error('Share error:', err); firstErr = firstErr || err; }
-            }
-            if (!shareManyRows.length) { body.innerHTML = shareErrorHTML(firstErr); return; }
-            renderShareMany();
-            renderProjectsList();
-        }
-
         async function openShareModal(id) {
             if (!window.karakuliProjects?.isSignedIn() || !window.karakuliShare) { showActionHint('Sign in with Google to share'); return; }
             if (shareSession) { showActionHint('Open your own project to share it'); return; }
@@ -1547,7 +1497,7 @@
         window.addEventListener('karakuli-auth-change', event => {
             activeProjectId = null;
             if (event.detail.user) { renderProjectsList(); scheduleProjectSave(); }
-            else { plCache = []; plSelected.clear(); plSelectMode = false; plRender(); }
+            else { plCache = []; plRender(); }
             updateCurrentProjectUI();
         });
 
@@ -1594,7 +1544,7 @@
             const activeTab = document.querySelector('.dash-tab.active');
             const activePanel = activeTab ? document.getElementById(activeTab.id.replace('tab-', 'dash-')) : null;
             if (!activePanel) return [];
-            return [...activePanel.querySelectorAll('.dash-btn, .theme-opt, .project-open, .project-more, .project-act, .project-pick, .pl-chip, .pl-tool, .pl-link')]
+            return [...activePanel.querySelectorAll('.dash-btn, .theme-opt, .project-open, .project-more, .project-act')]
                 .filter(item => !item.classList.contains('disabled') && item.offsetParent !== null);
         }
 
