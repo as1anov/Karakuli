@@ -3282,8 +3282,7 @@
             const k = LINE_WEIGHT / 12;               // px per mm
             const W = paperWidthMm, H = paperHeightMm;
             const G = productGeom(activeProductKey, W, H);
-            const hasArms = G.arms.length > 0;
-            const pad = { l: 78 * k, t: 24 * k, r: 40 * k, b: (hasArms ? 36 : 12) * k };
+            const pad = { l: 78 * k, t: 24 * k, r: 40 * k, b: 12 * k };
             const fs = 4.2 * k;                       // text height
             const fmt = v => String(+v.toFixed(1));
             const uniq = a => [...new Set(a.map(v => +v.toFixed(2)))].sort((p, q) => p - q);
@@ -3324,12 +3323,6 @@
                     o += dimV(0, H, W + 28, W, fmt(H));
                     // top: overall width
                     o += dimH(0, W, -12, 0, fmt(W));
-                    // hanger: arm width and arm pitch along the bottom edge
-                    if (hasArms) {
-                        const a0 = G.arms[0], aN = G.arms[G.arms.length - 1];
-                        o += dimH(a0[0], a0[1], H + 12, H, fmt(a0[1] - a0[0]));
-                        if (G.arms.length > 1) o += dimH(a0[0], aN[0], H + 24, H, `${G.arms.length - 1}×${fmt(G.arms[1][0] - a0[0])} = ${fmt(aN[0] - a0[0])}`);
-                    }
                     return `<g id="annotations" font-family="${DRAWING_FONT}" fill="#000">${o}</g>`;
                 }
             };
