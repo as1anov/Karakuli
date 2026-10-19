@@ -744,6 +744,9 @@
             </div>
 
             <div class="right-controls-group" id="right-nav-group" style="display: flex; gap: 8px; pointer-events: none;">
+                <div class="control-btn glass-panel" id="v3d-btn" style="display: none" onclick="event.stopPropagation(); open3D()" title="3D view: folded product">
+                    <svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><path d="m3.5 7.5 8.5 4.5 8.5-4.5M12 12v9"/></svg>
+                </div>
                 <div class="control-btn glass-panel" id="eraser-btn" onclick="event.stopPropagation(); toggleEraser()" title="Eraser (F)">
                     <svg viewBox="0 0 24 24" class="theme-svg">
                         <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
@@ -833,6 +836,7 @@
             appId: "1:405624126859:web:215c7b98027fa0ae33c38e",
             measurementId: "G-NKMZCLBC8T"
         };
+        window.karakuliProjectId = firebaseConfig.projectId;
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -1403,14 +1407,26 @@
             else { document.execCommand('copy'); done(); }
         }
 
-        const SHARE_RULES = `match /shared/{token} {
-  allow get: if true;
-  allow list: if false;
-  allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
-  allow update: if (request.auth != null && resource.data.ownerUid == request.auth.uid)
-                || (resource.data.kind == 'edit' && request.resource.data.kind == 'edit'
-                    && request.resource.data.ownerUid == resource.data.ownerUid);
-  allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+        const SHARE_RULES = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid}/projects/{projectId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /shared/{token} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if (request.auth != null && resource.data.ownerUid == request.auth.uid)
+                    || (resource.data.kind == 'edit'
+                        && request.resource.data.kind == 'edit'
+                        && request.resource.data.ownerUid == resource.data.ownerUid);
+      allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+    }
+  }
 }`;
 
         // Makes sure a project has its edit and view links (publishing them if needed); returns { title, tokens }.
@@ -1439,7 +1455,7 @@
             return `
                     <div class="share-block">
                         <div class="share-title">Sharing is not available yet</div>
-                        <div class="share-desc">The shared copy could not be stored (${escapeProjectText(err && (err.code || err.message) || 'error')}). Sharing needs these rules in Firebase Console → Firestore Database → Rules, added to the existing ones:</div>
+                        <div class="share-desc">The shared copy could not be stored (${escapeProjectText(err && (err.code || err.message) || 'error')}). This site writes to the Firebase project <b>${escapeProjectText(window.karakuliProjectId || '?')}</b>. Open <u>exactly this project</u> in Firebase Console → Firestore Database → Rules, replace everything with the text below and press Publish:</div>
                         <pre style="font-size:10px;line-height:1.4;white-space:pre-wrap;user-select:text;-webkit-user-select:text;background:var(--card);padding:10px;border-radius:10px;border:1px solid var(--border-color)">${escapeProjectText(SHARE_RULES)}</pre>
                     </div>`;
         }
@@ -4078,7 +4094,7 @@
         }
 
         // The SVG of the drawing (also the source of the product PNG, so both files always match).
-        function buildExportSVG(fontCss = '', solidHoles = false) {
+        function buildExportSVG(fontCss = '', solidHoles = false, maskOnly = false) {   // maskOnly: just the metal (for the 3D view), no drawing margins or annotations
             const ringD = BASE_STEP_VAL * 2;
             const innerHoleR = (ringD - LINE_WEIGHT) / 2;
             const strokePad = LINE_WEIGHT / 2;
@@ -4105,7 +4121,7 @@
             // With a canvas (paper) on screen, export exactly that window and nothing outside it.
             const paperPxW = paperWidthMm * LINE_WEIGHT / 12, paperPxH = paperHeightMm * LINE_WEIGHT / 12;
             // Products also carry the manufacturing drawing (bend lines, dimensions): it needs margins around the sheet.
-            const ann = isProduct ? productExportAnnotations() : null;
+            const ann = (isProduct && !maskOnly) ? productExportAnnotations() : null;
             const pad = ann ? ann.pad : { l: 0, t: 0, r: 0, b: 0 };
             if (isPaperVisible) {
                 minX = -paperPxW / 2 - pad.l; minY = -paperPxH / 2 - pad.t; maxX = paperPxW / 2 + pad.r; maxY = paperPxH / 2 + pad.b;
@@ -4270,6 +4286,7 @@
         window.addEventListener('keydown', normalizeNumpadEvent, true);
         window.addEventListener('keyup', normalizeNumpadEvent, true);
         window.addEventListener('keydown', e => {
+            if (document.body.classList.contains('v3d-open')) { if (e.key === 'Escape') window.close3D && window.close3D(); return; }   // the 3D view has its own controls
             if (isTypingInField(e.target)) return;
             const dotKey = e.key === '.' || e.code === 'NumpadDecimal' || e.code === 'Period';
             if (document.getElementById('new-canvas-modal').classList.contains('show')) {
@@ -4311,6 +4328,7 @@
             }
         });
         window.addEventListener('keyup', e => {
+            if (document.body.classList.contains('v3d-open')) return;
             if (isTypingInField(e.target)) return;
             if(isGameMode) {
                 const gameControl = e.key === 'ArrowLeft' ? '4' : e.key === 'ArrowRight' ? '6' : e.key;
@@ -4321,5 +4339,810 @@
             }
         });
     </script>
+<script>
+// ===== 3D preview of the folded product (Three.js loaded on demand) =====
+(function () {
+'use strict';
+const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/+esm';
+const ORBIT_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js/+esm';
+
+const MATS = {
+    steel:     { name: 'Stainless, brushed',  color: '#c9ccd0', metal: 1,   rough: 0.55, brushed: true, density: 7.9 },
+    polished:  { name: 'Stainless, polished', color: '#e3e6ea', metal: 1,   rough: 0.07, density: 7.9 },
+    aluminium: { name: 'Aluminium',           color: '#d6d8db', metal: 1,   rough: 0.5,  brushed: true, density: 2.7 },
+    brass:     { name: 'Brass',               color: '#d9b45f', metal: 1,   rough: 0.5,  brushed: true, density: 8.5 },
+    copper:    { name: 'Copper',              color: '#cc7b57', metal: 1,   rough: 0.45, brushed: true, density: 8.96 },
+    powder:    { name: 'Powder coat',         color: '#161616', metal: 0.1, rough: 0.62, density: 7.9 }
+};
+const SWATCHES = ['#161616', '#f1f1f1', '#3d4148', '#8b9099', '#b5342c', '#1f4e8c', '#2f6b4f', '#c9a227'];
+const ENVS = { studio: 'Studio', home: 'Home', office: 'Office', cafe: 'Café' };
+const WALLS = { studio: '#d4d4d4', home: '#e6ddd0', office: '#e9ebed', cafe: '#6e4b39' };
+const K_FACTOR = 0.4;                       // neutral-axis position of the bend (stainless / mild steel)
+// bends of every product (from PRODUCTS marks labelled BEND LINE): signed final angle in degrees, positive = towards the viewer
+const BEND_ANGLES = { shelf: [90, 75], hanger: [90, 75], magazine: [-90] };
+
+const S = { mat: 'powder', color: null, t: 2, env: 'studio', fold: 0, playing: false, auto: false };
+let T = null, OrbitControlsCls = null, R = null, building = false;
+
+// ---------------------------------------------------------------- pure geometry
+// Outline tracing of a binary pixel grid: every boundary edge between a metal pixel and an empty one, linked into closed loops.
+function traceLoops(g, W, H) {
+    const VW = W + 1;
+    let n = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g[y * W + x]) {
+        if (y === 0 || !g[(y - 1) * W + x]) n++;
+        if (x === W - 1 || !g[y * W + x + 1]) n++;
+        if (y === H - 1 || !g[(y + 1) * W + x]) n++;
+        if (x === 0 || !g[y * W + x - 1]) n++;
+    }
+    const sx = new Int32Array(n), sy = new Int32Array(n), ex = new Int32Array(n), ey = new Int32Array(n);
+    const dir = new Uint8Array(n), nxt = new Int32Array(n), head = new Int32Array(VW * (H + 1)).fill(-1), used = new Uint8Array(n);
+    let k = 0;
+    const add = (x0, y0, x1, y1, d) => { sx[k] = x0; sy[k] = y0; ex[k] = x1; ey[k] = y1; dir[k] = d; const v = y0 * VW + x0; nxt[k] = head[v]; head[v] = k; k++; };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g[y * W + x]) {
+        if (y === 0 || !g[(y - 1) * W + x]) add(x, y, x + 1, y, 0);
+        if (x === W - 1 || !g[y * W + x + 1]) add(x + 1, y, x + 1, y + 1, 1);
+        if (y === H - 1 || !g[(y + 1) * W + x]) add(x + 1, y + 1, x, y + 1, 2);
+        if (x === 0 || !g[y * W + x - 1]) add(x, y + 1, x, y, 3);
+    }
+    const loops = [];
+    for (let i = 0; i < n; i++) {
+        if (used[i]) continue;
+        const pts = [];
+        let cur = i;
+        for (;;) {
+            used[cur] = 1;
+            pts.push(sx[cur], sy[cur]);
+            const v = ey[cur] * VW + ex[cur];
+            let best = -1, bestRank = 9;
+            for (let e = head[v]; e !== -1; e = nxt[e]) {
+                if (used[e]) continue;
+                const turn = (dir[e] - dir[cur] + 4) & 3;       // 3 = left, 0 = straight, 1 = right
+                const rank = turn === 3 ? 0 : turn === 0 ? 1 : 2;
+                if (rank < bestRank) { bestRank = rank; best = e; }
+            }
+            if (best === -1) break;
+            cur = best;
+        }
+        if (pts.length >= 6) loops.push(pts);
+    }
+    return loops;
+}
+
+// Smooth outlines: marching squares on the anti-aliased alpha of the mask (sub-pixel accurate, no stair steps).
+// f = Uint8 alpha field W x H whose border is empty. Loops come out closed, with the metal on the RIGHT of the walking
+// direction in y-down coordinates (outer loops: positive area, holes: negative), the same convention as traceLoops.
+function traceContours(f, W, H, thr = 127.5) {
+    const segS = [], segE = [], sx = [], sy = [], ex = [], ey = [];
+    const hid = (x, y) => 2 * (y * W + x), vid = (x, y) => 2 * (y * W + x) + 1;
+    const add = (e0, x0, y0, e1, x1, y1) => { segS.push(e0); segE.push(e1); sx.push(x0); sy.push(y0); ex.push(x1); ey.push(y1); };
+    for (let y = 0; y < H - 1; y++) {
+        const r0 = y * W, r1 = r0 + W;
+        for (let x = 0; x < W - 1; x++) {
+            const a = f[r0 + x], b = f[r0 + x + 1], c = f[r1 + x + 1], d = f[r1 + x];
+            const ci = (a >= thr ? 8 : 0) | (b >= thr ? 4 : 0) | (c >= thr ? 2 : 0) | (d >= thr ? 1 : 0);
+            if (ci === 0 || ci === 15) continue;
+            // crossing points (sample centres sit at +0.5)
+            const T = () => [x + 0.5 + (thr - a) / (b - a), y + 0.5], B = () => [x + 0.5 + (thr - d) / (c - d), y + 1.5];
+            const L = () => [x + 0.5, y + 0.5 + (thr - a) / (d - a)], R = () => [x + 1.5, y + 0.5 + (thr - b) / (c - b)];
+            const eT = hid(x, y), eB = hid(x, y + 1), eL = vid(x, y), eR = vid(x + 1, y);
+            const seg = (e0, p0, e1, p1) => { const u = p0(), v = p1(); add(e0, u[0], u[1], e1, v[0], v[1]); };
+            const LB = () => seg(eL, L, eB, B), BR = () => seg(eB, B, eR, R), RT = () => seg(eR, R, eT, T), TL = () => seg(eT, T, eL, L);
+            const LT = () => seg(eL, L, eT, T), TR = () => seg(eT, T, eR, R), RB = () => seg(eR, R, eB, B), BL = () => seg(eB, B, eL, L);
+            switch (ci) {
+                case 1: LB(); break;   case 2: BR(); break;   case 4: RT(); break;   case 8: TL(); break;
+                case 3: seg(eL, L, eR, R); break;   case 12: seg(eR, R, eL, L); break;
+                case 6: seg(eB, B, eT, T); break;   case 9: seg(eT, T, eB, B); break;
+                case 7: LT(); break;   case 11: TR(); break;   case 13: RB(); break;   case 14: BL(); break;
+                case 10: if ((a + b + c + d) / 4 >= thr) { TR(); BL(); } else { TL(); BR(); } break;
+                case 5:  if ((a + b + c + d) / 4 >= thr) { LT(); RB(); } else { RT(); LB(); } break;
+            }
+        }
+    }
+    const n = segS.length, start = new Map();
+    for (let i = 0; i < n; i++) start.set(segS[i], i);
+    const used = new Uint8Array(n), loops = [];
+    for (let i = 0; i < n; i++) {
+        if (used[i]) continue;
+        const pts = [];
+        let cur = i;
+        while (cur !== undefined && !used[cur]) { used[cur] = 1; pts.push(sx[cur], sy[cur]); cur = start.get(segE[cur]); }
+        if (pts.length >= 6) loops.push(pts);
+    }
+    return loops;
+}
+
+function loopArea(p) {
+    let a = 0;
+    for (let i = 0, n = p.length / 2; i < n; i++) {
+        const j = (i + 1) % n;
+        a += p[2 * i] * p[2 * j + 1] - p[2 * j] * p[2 * i + 1];
+    }
+    return a / 2;
+}
+
+// Douglas-Peucker for a closed loop (flat [x,y,...]).
+function simplifyClosed(p, tol) {
+    const n = p.length / 2;
+    if (n < 8) return p;
+    let far = 0, fd = -1;
+    for (let i = 1; i < n; i++) { const d = (p[2 * i] - p[0]) ** 2 + (p[2 * i + 1] - p[1]) ** 2; if (d > fd) { fd = d; far = i; } }
+    const keep = new Uint8Array(n);
+    keep[0] = 1; keep[far] = 1;
+    const run = (a, b) => {   // indices a..b along the loop (b may wrap to 0 -> n)
+        const stack = [[a, b]];
+        while (stack.length) {
+            const [s, e] = stack.pop();
+            if (e - s < 2) continue;
+            const x0 = p[2 * (s % n)], y0 = p[2 * (s % n) + 1], x1 = p[2 * (e % n)], y1 = p[2 * (e % n) + 1];
+            const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1;
+            let md = -1, mi = -1;
+            for (let i = s + 1; i < e; i++) {
+                const q = i % n;
+                const d = Math.abs((p[2 * q] - x0) * dy - (p[2 * q + 1] - y0) * dx) / len;
+                if (d > md) { md = d; mi = i; }
+            }
+            if (md > tol) { keep[mi % n] = 1; stack.push([s, mi], [mi, e]); }
+        }
+    };
+    run(0, far); run(far, n);
+    const out = [];
+    for (let i = 0; i < n; i++) if (keep[i]) out.push(p[2 * i], p[2 * i + 1]);
+    return out;
+}
+
+function pointInLoop(px, py, p) {
+    let inside = false;
+    for (let i = 0, n = p.length / 2, j = n - 1; i < n; j = i++) {
+        const xi = p[2 * i], yi = p[2 * i + 1], xj = p[2 * j], yj = p[2 * j + 1];
+        if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+}
+
+// loops -> [{outer, holes:[...]}] (outer: positive area, holes: negative)
+function groupLoops(rawLoops, tol) {
+    const outers = [], holes = [];
+    rawLoops.forEach(l => {
+        const s = simplifyClosed(l, tol);
+        if (s.length < 6) return;
+        const a = loopArea(s);
+        if (Math.abs(a) < 4) return;
+        const bb = [Infinity, Infinity, -Infinity, -Infinity];
+        for (let i = 0; i < s.length; i += 2) { bb[0] = Math.min(bb[0], s[i]); bb[1] = Math.min(bb[1], s[i + 1]); bb[2] = Math.max(bb[2], s[i]); bb[3] = Math.max(bb[3], s[i + 1]); }
+        (a > 0 ? outers : holes).push({ pts: s, area: Math.abs(a), bb, holes: [] });
+    });
+    holes.forEach(h => {
+        // a test point strictly inside the hole's box side: use the middle of its first edge, nudged outward is unnecessary - the hole lies inside its outer loop
+        const px = (h.pts[0] + h.pts[2]) / 2, py = (h.pts[1] + h.pts[3]) / 2;
+        let best = null;
+        outers.forEach(o => {
+            if (px < o.bb[0] || px > o.bb[2] || py < o.bb[1] || py > o.bb[3]) return;
+            if (o.area <= h.area) return;
+            if (pointInLoop(px, py, o.pts) && (!best || o.area < best.area)) best = o;
+        });
+        if (best) best.holes.push(h.pts);
+    });
+    return outers;
+}
+
+// Bend geometry of the sheet in the (Y up, Z towards the viewer) plane.
+function bendSpec(key, G, t) {
+    const marks = PRODUCTS[key].marks.filter(m => m.label === 'BEND LINE');
+    const angs = BEND_ANGLES[key] || [];
+    return marks.map((m, i) => {
+        const ang = (angs[i] || 90) * Math.PI / 180;
+        return { y: G.anchor + m.off, ang, ba: Math.abs(ang) * (t + K_FACTOR * t) };   // inner radius = thickness
+    });
+}
+
+// Pieces (flat parts) and bend strips, snapped to the pixel grid of the mask.
+function layoutPieces(h, bends, ppm) {
+    const pieces = [];
+    let y0 = 0;
+    bends.forEach(b => {
+        const y1 = b.y - b.ba / 2;
+        pieces.push({ r0: Math.round(y0 * ppm), r1: Math.round(y1 * ppm) });
+        y0 = b.y + b.ba / 2;
+    });
+    pieces.push({ r0: Math.round(y0 * ppm), r1: Math.round(h * ppm) });
+    const arcs = bends.map((b, i) => ({ len: Math.max(0.1, (pieces[i + 1].r0 - pieces[i].r1) / ppm), ang: b.ang }));
+    return { pieces, arcs };
+}
+
+// Position and direction of every piece for the fold progress p (0 flat ... 1 folded). Vectors are [Y, Z].
+function computeChain(layout, ppm, z0, p) {
+    let P = [0, z0], Tv = [-1, 0];
+    const frames = [], arcs = [];
+    layout.pieces.forEach((pc, i) => {
+        const L = (pc.r1 - pc.r0) / ppm;
+        frames.push({ P: P.slice(), T: Tv.slice(), L });
+        P = [P[0] + Tv[0] * L, P[1] + Tv[1] * L];
+        if (i < layout.arcs.length) {
+            const a = layout.arcs[i], phi = Math.abs(a.ang) * p, sgn = a.ang < 0 ? -1 : 1;
+            const Ns = [sgn * Tv[1], -sgn * Tv[0]];
+            arcs.push({ P: P.slice(), T: Tv.slice(), Ns, phi, len: a.len });
+            if (phi < 1e-5) P = [P[0] + Tv[0] * a.len, P[1] + Tv[1] * a.len];
+            else {
+                const Rr = a.len / phi, s = Math.sin(phi), c = Math.cos(phi);
+                P = [P[0] + Rr * (s * Tv[0] + (1 - c) * Ns[0]), P[1] + Rr * (s * Tv[1] + (1 - c) * Ns[1])];
+                Tv = [Tv[0] * c + Ns[0] * s, Tv[1] * c + Ns[1] * s];
+            }
+        }
+    });
+    return { frames, arcs };
+}
+
+function runsOfRow(g, W, y) {
+    const runs = [];
+    let s = -1;
+    for (let x = 0; x <= W; x++) {
+        const on = x < W && g[y * W + x];
+        if (on && s < 0) s = x;
+        if (!on && s >= 0) { if (x - s >= 3) runs.push([s, x]); s = -1; }
+    }
+    return runs;
+}
+
+// ---------------------------------------------------------------- mask of the metal (what the 2D drawing shows in black)
+// Same picture as the SVG export, painted straight onto a canvas (used when the browser refuses to rasterise the SVG).
+function paintMaskCanvas(ctx, w, h, W, H) {
+    const mm = LINE_WEIGHT / 12, pw = w * mm, ph = h * mm;
+    ctx.save();
+    ctx.scale(W / pw, H / ph); ctx.translate(pw / 2, ph / 2);
+    ctx.fillStyle = '#000'; ctx.strokeStyle = '#000';
+    const G = productGeom(activeProductKey, w, h);
+    if (G.patternEnd != null) {      // the solid zone below PATTERN END, following the outline
+        ctx.save(); ctx.clip(new Path2D(productOutlineD()));
+        ctx.fillRect(-pw / 2, -ph / 2 + G.patternEnd * mm, pw, ph);
+        ctx.restore();
+    }
+    ctx.save();
+    ctx.beginPath(); ctx.rect(-pw / 2, -ph, pw, ph * 2); ctx.clip();      // the pattern is cut only on the left and right
+    ctx.lineWidth = LINE_WEIGHT; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.miterLimit = 2;
+    ctx.beginPath();
+    getPathGroups().forEach(g => { ctx.moveTo(g[0].p1.x * STEP, g[0].p1.y * STEP); g.forEach(sg => ctx.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); });
+    ctx.stroke();
+    const ringD = BASE_STEP_VAL * 2, innerR = (ringD - LINE_WEIGHT) / 2;
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const id in specialElements) if (specialElements[id].isNode) {
+        const [i, j] = id.split(',').map(Number);
+        ctx.beginPath(); ctx.arc(i * STEP, j * STEP, innerR, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    for (const id in specialElements) {
+        const [i, j] = id.split(',').map(Number), x = i * STEP, y = j * STEP;
+        if (specialElements[id].isNode) { ctx.beginPath(); ctx.arc(x, y, ringD / 2, 0, Math.PI * 2); ctx.stroke(); }
+        if (specialElements[id].isDiamond) { ctx.save(); ctx.translate(x, y + LINE_WEIGHT / 2); ctx.rotate(Math.PI / 4); ctx.fillRect(-LINE_WEIGHT / 2, -LINE_WEIGHT / 2, LINE_WEIGHT, LINE_WEIGHT); ctx.restore(); }
+    }
+    ctx.restore(); ctx.restore();
+}
+
+async function rasterMask(w, h) {
+    const ppm = Math.min(6, 4200 / Math.max(w, h));
+    const W = Math.max(8, Math.round(w * ppm)), H = Math.max(8, Math.round(h * ppm));
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    // The pattern is painted straight onto the canvas (the browsers tested refuse to rasterise this SVG as an image);
+    // the SVG export stays as the second way, in case painting ever throws.
+    let drawn = false;
+    try { ctx.clearRect(0, 0, W, H); paintMaskCanvas(ctx, w, h, W, H); drawn = true; }
+    catch (err) { console.warn('3D mask: direct painting failed, trying the SVG export', err); }
+    for (const solid of [false, true]) {
+        if (drawn) break;
+        const built = buildExportSVG('', solid, true);
+        if (!built) return null;
+        const svg = built.svg.replace(/width="[^"]*mm" height="[^"]*mm"/, `width="${W}" height="${H}"`);
+        const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+        const img = new Image();
+        try {
+            await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('svg')); img.src = url; });
+            ctx.clearRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H); drawn = true;
+        } catch (err) { /* try the next way */ }
+        URL.revokeObjectURL(url);
+    }
+    if (!drawn) throw new Error('mask');
+    const d = ctx.getImageData(0, 0, W, H).data;
+    const g = new Uint8Array(W * H), A = new Uint8Array(W * H);   // g: metal yes / no, A: anti-aliased coverage 0..255
+    let count = 0;
+    for (let i = 0, j = 3; i < g.length; i++, j += 4) { A[i] = d[j - 3] < 128 ? d[j] : 0; if (A[i] > 127) { g[i] = 1; count++; } }   // opaque and dark = metal (white discs = holes)
+    // bolt holes are real holes in every part
+    const G = productGeom(activeProductKey, w, h), r = HOLE_DIAMETER_MM / 2 * ppm;
+    G.holes.forEach(([hx, hy]) => {
+        const cx = hx * ppm, cy = hy * ppm;
+        for (let y = Math.max(0, Math.floor(cy - r - 1)); y <= Math.min(H - 1, Math.ceil(cy + r + 1)); y++)
+            for (let x = Math.max(0, Math.floor(cx - r - 1)); x <= Math.min(W - 1, Math.ceil(cx + r + 1)); x++)
+            {
+                const dist = Math.hypot(x + 0.5 - cx, y + 0.5 - cy), v = Math.max(0, Math.min(255, 127.5 + (dist - r) * 255)), i = y * W + x;
+                if (v < A[i]) A[i] = v;
+                if (dist <= r && g[i]) { g[i] = 0; count--; }
+            }
+    });
+    return { g, A, W, H, ppm, count, w, h, G };
+}
+
+// ---------------------------------------------------------------- Three.js parts
+function shapesForRows(mask, r0, r1) {
+    const { A, W, ppm } = mask;
+    const hh = r1 - r0;
+    if (hh < 1) return [];
+    const W2 = W + 2, H2 = hh + 2, sub = new Uint8Array(W2 * H2);
+    let any = false;
+    for (let y = 0; y < hh; y++) for (let x = 0; x < W; x++) { const v = A[(r0 + y) * W + x]; if (v) { sub[(y + 1) * W2 + x + 1] = v; any = true; } }
+    if (!any) return [];
+    const groups = groupLoops(traceContours(sub, W2, H2), 0.12);
+    const toPts = pts => { const v = []; for (let i = 0; i < pts.length; i += 2) v.push(new T.Vector2((pts[i] - 1) / ppm, -(pts[i + 1] - 1) / ppm)); return v; };
+    return groups.map(o => {
+        const s = new T.Shape(toPts(o.pts));
+        o.holes.forEach(hp => s.holes.push(new T.Path(toPts(hp))));
+        return s;
+    });
+}
+
+function makeBrushTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 512;
+    const x = c.getContext('2d');
+    x.fillStyle = '#9a9a9a'; x.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 2600; i++) {
+        const v = 90 + Math.random() * 130, y = Math.random() * 512, len = 40 + Math.random() * 300, x0 = Math.random() * 512;
+        x.strokeStyle = `rgba(${v},${v},${v},${0.18 + Math.random() * 0.3})`; x.lineWidth = 0.6 + Math.random() * 0.9;
+        x.beginPath(); x.moveTo(x0, y); x.lineTo(x0 + len, y + (Math.random() - 0.5) * 1.2); x.stroke();
+    }
+    const tex = new T.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    tex.repeat.set(1 / 220, 1 / 220);     // UVs are in millimetres
+    return tex;
+}
+
+function makeEnvScene(kind) {
+    const sc = new T.Scene();
+    const room = (color, sx, sy, sz) => { const m = new T.Mesh(new T.BoxGeometry(sx, sy, sz), new T.MeshBasicMaterial({ color, side: T.BackSide })); sc.add(m); return m; };
+    const lamp = (geo, color, power, x, y, z) => { const c = new T.Color(color).multiplyScalar(power); const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: c })); m.position.set(x, y, z); sc.add(m); return m; };
+    const panel = (w, h, color, power, x, y, z, ry = 0, rx = 0) => { const m = lamp(new T.PlaneGeometry(w, h), color, power, x, y, z); m.rotation.set(rx, ry, 0); m.material.side = T.DoubleSide; return m; };
+    if (kind === 'studio') {
+        room('#2a2d32', 40, 20, 40);
+        panel(14, 10, '#ffffff', 9, -12, 8, 10, Math.PI / 3.2);        // big softbox, left front
+        panel(3, 12, '#ffffff', 6, 14, 4, 8, -Math.PI / 3);            // strip light, right
+        panel(16, 4, '#ffffff', 5, 0, 18.5, 0, 0, Math.PI / 2);        // overhead
+        panel(18, 4, '#9bb4ff', 1.2, 0, -9, 14, 0, -0.3);              // cool fill from below front
+    } else if (kind === 'home') {
+        room('#c9bba8', 40, 20, 40);
+        panel(9, 11, '#e8f1ff', 12, -19.8, 5, 4, Math.PI / 2);         // window
+        lamp(new T.SphereGeometry(1.4, 16, 12), '#ffb36b', 14, 14, 4, -6);   // warm lamp
+        panel(30, 30, '#8a6a4b', 0.6, 0, -9.9, 0, 0, Math.PI / 2);     // wooden floor
+    } else if (kind === 'office') {
+        room('#d3d6da', 40, 18, 40);
+        [-9, 0, 9].forEach(x => [-8, 8].forEach(z => panel(6, 2.2, '#ffffff', 9, x, 8.9, z, 0, Math.PI / 2)));
+        panel(16, 6, '#cfe3ff', 7, 19.8, 3, 2, -Math.PI / 2);          // window strip
+    } else {
+        room('#2b1d15', 40, 18, 40);
+        [[-10, 6, -6], [-3, 7, 8], [6, 6, -2], [12, 5, 10], [0, 7, -12]].forEach(p => lamp(new T.SphereGeometry(0.8, 12, 10), '#ffb15e', 18, ...p));
+        panel(8, 8, '#9fb8d6', 3.2, -19.8, 3, 6, Math.PI / 2);
+    }
+    return sc;
+}
+
+// ---------------------------------------------------------------- scene
+function modelInfo() {
+    const key = activeProductKey, P = PRODUCTS[key];
+    return { key, P, w: paperWidthMm, h: paperHeightMm };
+}
+
+function disposeModel() {
+    if (!R || !R.model) return;
+    R.scene.remove(R.model);
+    R.model.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    R.model = null; R.pieces = []; R.strips = [];
+}
+
+async function buildModel() {
+    const { key, P, w, h } = modelInfo();
+    if (!R.mask || R.mask.w !== w || R.mask.h !== h || R.mask.key !== key) {
+        R.mask = await rasterMask(w, h);
+        if (R.mask) R.mask.key = key;
+    }
+    const mask = R.mask;
+    disposeModel();
+    if (!mask || mask.count < 10) { return false; }
+    const t = S.t, G = mask.G, ppm = mask.ppm, gap = P.profile.gap;
+    const bends = bendSpec(key, G, t);
+    const layout = layoutPieces(h, bends, ppm);
+    const model = new T.Group();
+    model.position.x = -w / 2;
+    R.model = model; R.layout = layout; R.pieces = []; R.strips = []; R.gap = gap; R.t = t;
+    await new Promise(r => setTimeout(r, 0));
+    layout.pieces.forEach((pc, i) => {
+        const shapes = shapesForRows(mask, pc.r0, pc.r1);
+        if (!shapes.length) { R.pieces.push(null); return; }
+        const geo = new T.ExtrudeGeometry(shapes, { depth: t, bevelEnabled: false, curveSegments: 1, steps: 1 });
+        geo.translate(0, 0, -t / 2);
+        const mesh = new T.Mesh(geo, R.material);
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.matrixAutoUpdate = false;
+        model.add(mesh); R.pieces.push(mesh);
+    });
+    // bend strips: one per run of metal on the bend line
+    layout.arcs.forEach((a, i) => {
+        const row = Math.round((layout.pieces[i].r1 + layout.pieces[i + 1].r0) / 2);
+        const runs = runsOfRow(mask.g, mask.W, Math.min(mask.H - 1, Math.max(0, row)));
+        const list = runs.map(([x0, x1]) => makeStrip(x0 / ppm, x1 / ppm));
+        list.forEach(s => model.add(s.mesh));
+        R.strips.push(list);
+    });
+    // wall standoffs and bolt heads
+    const standoff = new T.CylinderGeometry(4.6, 4.6, gap, 20); standoff.rotateX(Math.PI / 2); standoff.translate(0, 0, gap / 2);
+    const head = new T.CylinderGeometry(5.4, 5.4, 2.4, 20); head.rotateX(Math.PI / 2); head.translate(0, 0, gap + t + 1.2);
+    const shaft = new T.CylinderGeometry(2.6, 2.6, gap + t + 2, 14); shaft.rotateX(Math.PI / 2); shaft.translate(0, 0, (gap + t + 2) / 2);
+    G.holes.forEach(([hx, hy]) => {
+        [standoff, head, shaft].forEach(geo => {
+            const m = new T.Mesh(geo, R.material); m.castShadow = m.receiveShadow = true;
+            m.position.set(hx, -hy, 0); model.add(m);
+        });
+    });
+    R.scene.add(model);
+    R.weightKg = mask.count / (ppm * ppm) * t * MATS[S.mat].density / 1e6;
+    return true;
+}
+
+const ARC_SEG = 14;
+function makeStrip(x0, x1) {
+    const geo = new T.BufferGeometry();
+    const nv = ARC_SEG * 24;
+    geo.setAttribute('position', new T.BufferAttribute(new Float32Array(nv * 3), 3));
+    geo.setAttribute('normal', new T.BufferAttribute(new Float32Array(nv * 3), 3));
+    geo.setAttribute('uv', new T.BufferAttribute(new Float32Array(nv * 2), 2));
+    const mesh = new T.Mesh(geo, R.material);
+    mesh.castShadow = mesh.receiveShadow = true; mesh.frustumCulled = false;
+    return { mesh, x0, x1 };
+}
+
+function updateStrip(strip, arc, t) {
+    const pos = strip.mesh.geometry.attributes.position.array, nor = strip.mesh.geometry.attributes.normal.array, uv = strip.mesh.geometry.attributes.uv.array;
+    const pts = [];
+    for (let k = 0; k <= ARC_SEG; k++) {
+        const u = k / ARC_SEG, phi = arc.phi * u;
+        let Py, Pz, Ty, Tz;
+        if (arc.phi < 1e-5) { Py = arc.P[0] + arc.T[0] * arc.len * u; Pz = arc.P[1] + arc.T[1] * arc.len * u; Ty = arc.T[0]; Tz = arc.T[1]; }
+        else {
+            const Rr = arc.len / arc.phi, s = Math.sin(phi), c = Math.cos(phi);
+            Py = arc.P[0] + Rr * (s * arc.T[0] + (1 - c) * arc.Ns[0]); Pz = arc.P[1] + Rr * (s * arc.T[1] + (1 - c) * arc.Ns[1]);
+            Ty = arc.T[0] * c + arc.Ns[0] * s; Tz = arc.T[1] * c + arc.Ns[1] * s;
+        }
+        pts.push({ Py, Pz, Ny: Tz, Nz: -Ty, s: arc.len * u });
+    }
+    let v = 0;
+    const put = (x, Y, Z, nx, ny, nz, s) => {
+        pos[3 * v] = x; pos[3 * v + 1] = Y; pos[3 * v + 2] = Z;
+        nor[3 * v] = nx; nor[3 * v + 1] = ny; nor[3 * v + 2] = nz;
+        uv[2 * v] = x; uv[2 * v + 1] = s; v++;
+    };
+    const ht = t / 2;
+    for (let k = 0; k < ARC_SEG; k++) {
+        const a = pts[k], b = pts[k + 1];
+        const A = (p, sd) => [p.Py + sd * p.Ny * ht, p.Pz + sd * p.Nz * ht];
+        [1, -1].forEach(sd => {     // the two faces of the sheet
+            const a0 = A(a, sd), b0 = A(b, sd);
+            // counter-clockwise seen from outside: the +side face needs the reverse vertex order of the -side face
+            const A0 = [strip.x0, a0, a], A1 = [strip.x1, a0, a], B0 = [strip.x0, b0, b], B1 = [strip.x1, b0, b];
+            const tri = (u, w, z) => [u, w, z].forEach(([x, q, r]) => put(x, q[0], q[1], 0, sd * r.Ny, sd * r.Nz, r.s));
+            if (sd > 0) { tri(A0, B1, A1); tri(A0, B0, B1); } else { tri(A0, A1, B1); tri(A0, B1, B0); }
+        });
+        [[strip.x0, -1], [strip.x1, 1]].forEach(([x, nx]) => {    // the two cut ends
+            const a1 = A(a, 1), a2 = A(a, -1), b1 = A(b, 1), b2 = A(b, -1);
+            const q = (P, s_) => put(x, P[0], P[1], nx, 0, 0, s_);
+            if (nx < 0) { q(a1, a.s); q(a2, a.s); q(b2, b.s); q(a1, a.s); q(b2, b.s); q(b1, b.s); }
+            else { q(a1, a.s); q(b2, b.s); q(a2, a.s); q(a1, a.s); q(b1, b.s); q(b2, b.s); }
+        });
+    }
+    const g = strip.mesh.geometry;
+    g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.uv.needsUpdate = true;
+}
+
+function updatePose() {
+    if (!R || !R.model) return;
+    const t = R.t, chain = computeChain(R.layout, R.mask.ppm, R.gap + t / 2, S.fold);
+    chain.frames.forEach((f, i) => {
+        const mesh = R.pieces[i];
+        if (!mesh) return;
+        const X = new T.Vector3(1, 0, 0), U = new T.Vector3(0, -f.T[0], -f.T[1]), N = new T.Vector3(0, f.T[1], -f.T[0]);
+        mesh.matrix.makeBasis(X, U, N).setPosition(0, f.P[0], f.P[1]);
+        mesh.matrixWorldNeedsUpdate = true;
+    });
+    chain.arcs.forEach((a, i) => (R.strips[i] || []).forEach(s => updateStrip(s, a, t)));
+}
+
+function applyMaterial() {
+    if (!R) return;
+    const m = MATS[S.mat], mat = R.material;
+    mat.color.set(S.color || m.color);
+    mat.metalness = m.metal; mat.roughness = m.rough;
+    mat.roughnessMap = m.brushed ? R.brush : null;
+    mat.bumpMap = m.brushed ? R.brush : null; mat.bumpScale = 0.5;
+    mat.needsUpdate = true;
+    if (R.mask) R.weightKg = R.mask.count / (R.mask.ppm * R.mask.ppm) * S.t * m.density / 1e6;
+    updateInfo();
+}
+
+function applyEnv() {
+    if (!R) return;
+    if (!R.envs[S.env]) { const es = makeEnvScene(S.env); R.envs[S.env] = R.pmrem.fromScene(es, 0.03).texture; es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+    R.scene.environment = R.envs[S.env];
+    R.scene.background = R.envs[S.env];
+    R.scene.backgroundBlurriness = 0.55;
+    R.wall.material.color.set(WALLS[S.env]);
+}
+
+function fitCamera() {
+    const box = new T.Box3().setFromObject(R.model);
+    const size = box.getSize(new T.Vector3()), c = box.getCenter(new T.Vector3());
+    const dim = Math.max(size.x, size.y, size.z);
+    R.controls.target.copy(c);
+    const tanV = Math.tan(R.camera.fov * Math.PI / 360), asp = R.camera.aspect || 1.6;
+    const dist = Math.max((size.x / 0.6 / 2) / (tanV * asp), (size.y / 0.55 / 2) / tanV) + size.z;
+    const dirv = new T.Vector3(0.42, 0.22, 1).normalize();
+    R.camera.position.copy(c).addScaledVector(dirv, dist);
+    R.controls.minDistance = dim * 0.3; R.controls.maxDistance = dim * 5;
+    R.camera.near = Math.max(1, dim / 200); R.camera.far = dim * 30; R.camera.updateProjectionMatrix();
+    R.controls.update();
+    const L = R.light, s = dim * 0.9;
+    L.position.set(c.x - dim * 0.5, c.y + dim * 0.9, c.z + dim * 1.1);
+    L.target.position.copy(c); R.scene.add(L.target);
+    L.shadow.camera.left = -s; L.shadow.camera.right = s; L.shadow.camera.top = s; L.shadow.camera.bottom = -s;
+    L.shadow.camera.near = 10; L.shadow.camera.far = dim * 4; L.shadow.camera.updateProjectionMatrix();
+    R.wall.position.set(c.x, c.y, -0.5);
+}
+
+// ---------------------------------------------------------------- UI
+let ui = null;
+function buildUI() {
+    if (ui) return ui;
+    const css = document.createElement('style');
+    css.textContent = `
+    #v3d { position: fixed; inset: 0; z-index: 3500; display: none; background: var(--bg-color); color: var(--text-color); font-family: var(--main-font); }
+    #v3d.show { display: block; }
+    #v3d-view { position: absolute; inset: 0; }
+    #v3d-view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    #v3d-title { position: absolute; left: 20px; top: 20px; right: 80px; pointer-events: none; }
+    #v3d-title b { display: block; font-size: 15px; font-weight: 700; text-shadow: 0 1px 8px var(--bg-color); }
+    #v3d-title span { display: block; margin-top: 3px; font-size: 11px; color: var(--disabled-color); text-shadow: 0 1px 8px var(--bg-color); }
+    #v3d-close { position: absolute; right: 20px; top: 20px; }
+    .v3-glass { background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); border-radius: 16px; }
+    #v3d-panel { position: absolute; right: 20px; top: 76px; width: 258px; max-height: calc(100% - 170px); overflow-y: auto; padding: 14px; scrollbar-width: none; }
+    #v3d-panel::-webkit-scrollbar { display: none; }
+    .v3-sec { padding: 10px 0; border-top: 1px solid var(--border-color); }
+    .v3-sec:first-child { border-top: 0; padding-top: 0; }
+    .v3-lab { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
+    .v3-lab em { font-style: normal; letter-spacing: 0; text-transform: none; color: var(--text-color); font-weight: 600; font-size: 11px; }
+    .v3-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .v3-chip { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .v3-chip:hover { background: var(--active-btn-bg); }
+    .v3-chip.on { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
+    .v3-sw { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+    .v3-dot { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border-color); cursor: pointer; padding: 0; position: relative; }
+    .v3-dot.on { outline: 2px solid var(--text-color); outline-offset: 2px; }
+    .v3-dot.orig::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; border: 1.5px dashed rgba(128,128,128,0.9); }
+    .v3-pick { width: 24px; height: 24px; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 50%; overflow: hidden; }
+    .v3-range { width: 100%; accent-color: var(--text-color); }
+    #v3d-bar { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 10px 14px; width: min(520px, calc(100% - 40px)); }
+    #v3-play { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: grid; place-items: center; cursor: pointer; }
+    #v3-play svg { width: 18px; height: 18px; fill: currentColor; }
+    #v3-fold { flex: 1; min-width: 0; }
+    .v3-end { font-size: 10px; font-weight: 600; color: var(--disabled-color); white-space: nowrap; }
+    #v3d-load { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 30px; font-size: 13px; font-weight: 600; background: var(--bg-color); }
+    #v3d-load small { display: block; margin-top: 8px; font-weight: 400; color: var(--disabled-color); font-size: 11px; line-height: 1.5; }
+    #v3d-load.hide { display: none; }
+    @media (max-width: 700px) {
+        #v3d-panel { right: 12px; left: 12px; top: auto; bottom: 84px; width: auto; max-height: 38%; }
+        #v3d-bar { bottom: 12px; width: calc(100% - 24px); }
+        #v3d-title { left: 14px; top: 16px; }
+        #v3d-close { right: 12px; top: 12px; }
+    }`;
+    document.head.appendChild(css);
+    const el = document.createElement('div');
+    el.id = 'v3d';
+    el.innerHTML = `
+        <div id="v3d-view"></div>
+        <div id="v3d-title"><b id="v3-name"></b><span id="v3-info"></span></div>
+        <div id="v3d-close" class="control-btn glass-panel" onclick="close3D()" title="Close (Esc)"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
+        <div id="v3d-panel" class="v3-glass">
+            <div class="v3-sec"><div class="v3-lab">Material</div><div class="v3-chips" id="v3-mats"></div></div>
+            <div class="v3-sec"><div class="v3-lab">Colour</div><div class="v3-sw" id="v3-cols"></div></div>
+            <div class="v3-sec"><div class="v3-lab">Thickness <em id="v3-tval"></em></div><input class="v3-range" id="v3-t" type="range" min="1" max="6" step="0.5"></div>
+            <div class="v3-sec"><div class="v3-lab">Environment</div><div class="v3-chips" id="v3-envs"></div></div>
+            <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button></div></div>
+        </div>
+        <div id="v3d-bar" class="v3-glass">
+            <button id="v3-play" title="Play / replay the folding"></button>
+            <span class="v3-end">Flat</span><input class="v3-range" id="v3-fold" type="range" min="0" max="1" step="0.001"><span class="v3-end">Folded</span>
+        </div>
+        <div id="v3d-load"><div><span id="v3-loadtxt">Loading 3D…</span><small id="v3-loadsub"></small></div></div>`;
+    document.body.appendChild(el);
+    // the page below listens to mouse / touch / wheel on window: keep those out of it
+    ['mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove', 'touchend', 'wheel', 'click', 'dblclick', 'contextmenu'].forEach(ev =>
+        el.addEventListener(ev, e => e.stopPropagation(), { passive: false }));
+    ui = { el };
+    const $ = id => document.getElementById(id);
+    $('v3-mats').innerHTML = Object.entries(MATS).map(([k, m]) => `<button class="v3-chip" data-m="${k}">${m.name}</button>`).join('');
+    $('v3-envs').innerHTML = Object.entries(ENVS).map(([k, n]) => `<button class="v3-chip" data-e="${k}">${n}</button>`).join('');
+    $('v3-mats').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; S.mat = b.dataset.m; applyMaterial(); syncUI(); };
+    $('v3-envs').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.env = b.dataset.e; applyEnv(); syncUI(); };
+    $('v3-auto').onclick = () => { S.auto = !S.auto; if (R) R.controls.autoRotate = S.auto; syncUI(); };
+    $('v3-t').oninput = e => { S.t = +e.target.value; $('v3-tval').textContent = S.t + ' mm'; };
+    $('v3-t').onchange = async e => { S.t = +e.target.value; await rebuild(); };
+    $('v3-fold').oninput = e => { S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
+    $('v3-play').onclick = () => { if (S.fold >= 0.999) S.fold = 0; if (R) R.prog = null; S.playing = true; syncUI(); };
+    return ui;
+}
+
+function swatchesHTML() {
+    const base = MATS[S.mat].color;
+    return `<button class="v3-dot orig${S.color === null ? ' on' : ''}" data-c="" title="Original" style="background:${base}"></button>` +
+        SWATCHES.map(c => `<button class="v3-dot${S.color === c ? ' on' : ''}" data-c="${c}" style="background:${c}"></button>`).join('') +
+        `<input class="v3-pick" type="color" id="v3-custom" value="${S.color || base}" title="Custom colour">`;
+}
+
+function syncUI() {
+    const $ = id => document.getElementById(id);
+    document.querySelectorAll('#v3-mats .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.m === S.mat));
+    document.querySelectorAll('#v3-envs .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.e === S.env));
+    $('v3-auto').classList.toggle('on', S.auto);
+    $('v3-cols').innerHTML = swatchesHTML();
+    $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c || null; applyMaterial(); syncUI(); };
+    $('v3-custom').oninput = e => { S.color = e.target.value; applyMaterial(); document.querySelectorAll('#v3-cols .v3-dot').forEach(d => d.classList.remove('on')); };
+    $('v3-t').value = S.t; $('v3-tval').textContent = S.t + ' mm';
+    $('v3-fold').value = S.fold;
+    $('v3-play').innerHTML = S.playing ? '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>'
+        : S.fold >= 0.999 ? '<svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>';
+}
+
+function updateInfo() {
+    const { key, P, w, h } = modelInfo();
+    document.getElementById('v3-name').textContent = P.name;
+    const wt = R && R.weightKg ? ` · ≈ ${R.weightKg.toFixed(R.weightKg < 10 ? 2 : 1)} kg` : '';
+    document.getElementById('v3-info').textContent = `${+w.toFixed(1)} × ${+h.toFixed(1)} mm flat · ${S.t} mm ${MATS[S.mat].name.toLowerCase()}${wt}`;
+}
+
+function showLoad(text, sub) {
+    const l = document.getElementById('v3d-load');
+    l.classList.remove('hide');
+    document.getElementById('v3-loadtxt').textContent = text;
+    document.getElementById('v3-loadsub').textContent = sub || '';
+}
+const hideLoad = () => document.getElementById('v3d-load').classList.add('hide');
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+
+// ---------------------------------------------------------------- life cycle
+async function loadLibs() {
+    if (T) return;
+    const [three, orbit] = await Promise.all([import(THREE_URL), import(ORBIT_URL)]);
+    T = three; OrbitControlsCls = orbit.OrbitControls;
+}
+
+function initRuntime() {
+    const host = document.getElementById('v3d-view');
+    const renderer = new T.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+    host.appendChild(renderer.domElement);
+    const scene = new T.Scene();
+    const camera = new T.PerspectiveCamera(32, 1, 1, 100000);
+    const controls = new OrbitControlsCls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.08; controls.autoRotateSpeed = 1.4;
+    controls.minAzimuthAngle = -1.35; controls.maxAzimuthAngle = 1.35;      // never behind the wall
+    controls.minPolarAngle = 0.25; controls.maxPolarAngle = Math.PI * 0.62;
+    controls.autoRotate = S.auto;
+    const light = new T.DirectionalLight(0xffffff, 1.6);
+    light.castShadow = true; light.shadow.mapSize.set(2048, 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 4;
+    scene.add(light);
+    const wall = new T.Mesh(new T.PlaneGeometry(40000, 30000), new T.MeshStandardMaterial({ color: WALLS[S.env], roughness: 0.95, metalness: 0 }));
+    wall.receiveShadow = true; scene.add(wall);
+    R = { renderer, scene, camera, controls, light, wall, pmrem: new T.PMREMGenerator(renderer), envs: {}, material: new T.MeshStandardMaterial({ side: T.DoubleSide }), brush: makeBrushTexture(), model: null, pieces: [], strips: [], mask: null, raf: 0, last: 0 };
+    resize();
+}
+
+function resize() {
+    if (!R) return;
+    const host = document.getElementById('v3d-view');
+    const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
+    R.renderer.setSize(w, h);
+    R.camera.aspect = w / h; R.camera.updateProjectionMatrix();
+}
+
+const ease = x => x * x * (3 - 2 * x);
+function invEase(y) { let lo = 0, hi = 1; for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (ease(m) < y) lo = m; else hi = m; } return (lo + hi) / 2; }
+
+function loop(now) {
+    if (!R) return;
+    R.raf = requestAnimationFrame(loop);
+    const dt = Math.min(0.05, (now - (R.last || now)) / 1000); R.last = now;
+    if (S.playing) {
+        R.prog = Math.min(1, (R.prog == null ? invEase(S.fold) : R.prog) + dt / 3.8);
+        S.fold = ease(R.prog);
+        if (R.prog >= 1) { S.playing = false; R.prog = null; }
+        document.getElementById('v3-fold').value = S.fold;
+        updatePose();
+        if (!S.playing) syncUI();
+    }
+    R.controls.update();
+    R.renderer.render(R.scene, R.camera);
+}
+
+async function rebuild() {
+    if (building || !R) return;
+    building = true;
+    showLoad('Rebuilding the model…');
+    await nextFrame();
+    try { const ok = await buildModel(); if (ok) { updatePose(); applyMaterial(); } updateInfo(); } catch (err) { console.error(err); }
+    hideLoad();
+    building = false;
+}
+
+async function open3D() {
+    if (templateKind() !== 'product') return;
+    if (document.body.classList.contains('v3d-open')) return;
+    buildUI();
+    document.body.classList.add('v3d-open');
+    ui.el.classList.add('show');
+    S.fold = 0; S.playing = false;
+    showLoad('Loading the 3D engine…');
+    syncUI();
+    try { await loadLibs(); }
+    catch (err) {
+        console.error(err);
+        showLoad('Could not load the 3D engine.', 'It is loaded from the internet the first time. Check the connection and try again.');
+        return;
+    }
+    if (!document.body.classList.contains('v3d-open')) return;
+    showLoad('Building the model…', 'Cutting the pattern out of the sheet');
+    await nextFrame();
+    try {
+        initRuntime();
+        building = true;
+        const ok = await buildModel();
+        building = false;
+        if (!ok) { showLoad('Nothing to show yet', 'Draw a pattern on the template first: the 3D model is made from the black (metal) parts of your drawing.'); updateInfo(); return; }
+        applyEnv(); applyMaterial(); fitCamera(); updatePose(); updateInfo();
+        hideLoad();
+        S.playing = true; syncUI();
+        R.last = 0; R.raf = requestAnimationFrame(loop);
+    } catch (err) {
+        building = false;
+        console.error(err);
+        showLoad('The 3D model could not be built.', String(err && err.message || err));
+    }
+}
+
+function close3D() {
+    if (!document.body.classList.contains('v3d-open')) return;
+    document.body.classList.remove('v3d-open');
+    if (ui) ui.el.classList.remove('show');
+    S.playing = false;
+    if (R) {
+        cancelAnimationFrame(R.raf);
+        disposeModel();
+        Object.values(R.envs).forEach(t => t.dispose());
+        R.material.dispose(); R.brush.dispose(); R.pmrem.dispose(); R.controls.dispose();
+        R.renderer.dispose(); R.renderer.forceContextLoss && R.renderer.forceContextLoss();
+        R.renderer.domElement.remove();
+        R = null;
+    }
+}
+
+window.addEventListener('resize', resize);
+window.open3D = open3D; window.close3D = close3D;
+window.__v3d = { traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
+
+// the 3D button lives on the canvas, only for the products
+setInterval(() => {
+    const b = document.getElementById('v3d-btn');
+    if (!b) return;
+    const show = typeof templateKind === 'function' && templateKind() === 'product';
+    const want = show ? '' : 'none';
+    if (b.style.display !== want) b.style.display = want;
+}, 400);
+})();
+</script>
 </body>
 </html>
