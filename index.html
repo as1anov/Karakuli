@@ -436,6 +436,8 @@
         .swap-btn:active { transform: scale(0.92); }
         .swap-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
+        .size-row { transition: opacity 0.2s; }
+        .size-row.is-free { opacity: 0.45; }
         .tpl-select { position: relative; margin-top: 12px; }
         .tpl-btn { width: 100%; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border-color); color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; text-align: left; transition: background-color 0.15s; }
         .tpl-btn:hover { background-color: var(--card-hl) !important; }
@@ -449,7 +451,7 @@
         /* floats over the page, so the Products section below never moves */
         #new-canvas-modal { --tpl-bg: #f7f7f7; }
         [data-theme="dark"] #new-canvas-modal { --tpl-bg: #2a2a2a; }
-        .tpl-menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; max-height: 260px; overflow-y: auto; padding: 4px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--tpl-bg); box-shadow: 0 12px 32px rgba(0,0,0,0.22); scrollbar-width: thin; }
+        .tpl-menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; max-height: 310px; overflow-y: auto; padding: 4px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--tpl-bg); box-shadow: 0 12px 32px rgba(0,0,0,0.22); scrollbar-width: thin; }
         .tpl-select.open .tpl-menu { display: block; }
         .tpl-group { padding: 8px 10px 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
         .tpl-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
@@ -1638,6 +1640,7 @@
         const RED = '#FF6666';
         let sizeUnit = 'mm';
         let modalSizeMm = { w: 210, h: 297 };
+        let modalFree = false;   // 'Blank canvas': no sheet, no limits (the free canvas the app used to start with)
 
         // 'free' (custom size and A-formats), 'product', 'square' or 'circle'
         function templateKind() {
@@ -1702,7 +1705,10 @@
             return { w: P.def.w, h: P.def.h };
         }
 
+        function selectFreeCanvas() { modalFree = true; selectedPresetKey = null; refreshModal(); }
+
         function selectPreset(key) {
+            modalFree = false;
             if (SHAPES[key]) {
                 const keep = SHAPES[selectedPresetKey] && sizeIsValid(modalSizeMm.w);
                 const sz = keep ? modalSizeMm.w : SHAPES[key].def;
@@ -1717,6 +1723,7 @@
 
         function selectPaperChip(name) {
             const [w, h] = PAPER_CHIPS[name];
+            modalFree = false;
             selectedPresetKey = null;
             writeSize(w, h);
             refreshModal();
@@ -1724,6 +1731,7 @@
 
         // Custom size: no template. Product: stays selected, its holes / hooks follow the size. Shape: width = height.
         function onSizeInput(which) {
+            modalFree = false;   // typing a size means a sheet of that size
             const w = readField('canvas-w-input'), h = readField('canvas-h-input');
             if (SHAPES[selectedPresetKey]) {
                 const v = which === 'h' ? h : w;
@@ -1857,10 +1865,14 @@
             const wOk = sizeIsValid(w), hOk = sizeIsValid(h);
             document.getElementById('field-w').classList.toggle('invalid', !wOk);
             document.getElementById('field-h').classList.toggle('invalid', !hOk);
-            document.getElementById('size-error').textContent = (wOk && hOk) ? '' :
+            const free = modalFree && !isResizingOnly;
+            document.getElementById('field-w').classList.toggle('invalid', !free && !wOk);
+            document.getElementById('field-h').classList.toggle('invalid', !free && !hOk);
+            document.querySelector('#new-canvas-modal .size-row').classList.toggle('is-free', free);
+            document.getElementById('size-error').textContent = (free || (wOk && hOk)) ? '' :
                 `Each side must be between ${fmtLen(PAPER_MIN_MM)} and ${fmtLen(PAPER_MAX_MM)} ${sizeUnit}.`;
-            document.getElementById('nc-confirm').disabled = !(wOk && hOk);
-            document.getElementById('swap-btn').disabled = Boolean(selectedPresetKey);
+            document.getElementById('nc-confirm').disabled = !(free || (wOk && hOk));
+            document.getElementById('swap-btn').disabled = free || Boolean(selectedPresetKey);
             document.querySelectorAll('#unit-seg button').forEach(b => b.classList.toggle('active', b.dataset.unit === sizeUnit));
             document.querySelectorAll('[data-unit-label]').forEach(el => { el.textContent = sizeUnit; });
             // Paper sizes and shapes live in one drop-down list.
@@ -1870,9 +1882,11 @@
                 square: '<svg viewBox="0 0 14 14" width="14" height="14"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>',
                 circle: '<svg viewBox="0 0 14 14" width="14" height="14"><circle cx="7" cy="7" r="5"/></svg>'
             };
+            const freeIco = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 12c-2-2.7-3.6-4.5-5.5-4.5a4.5 4.5 0 0 0 0 9c1.9 0 3.5-1.8 5.5-4.5zm0 0c2 2.7 3.6 4.5 5.5 4.5a4.5 4.5 0 0 0 0-9c-1.9 0-3.5 1.8-5.5 4.5z"/></svg>';
             const tplItems = [
-                ...Object.entries(PAPER_CHIPS).map(([name, [cw, ch]]) => ({ kind: 'paper', key: name, name, dim: `${cw} × ${ch} mm`, ico: sheetIco(sheetH[name]), on: !selectedPresetKey && Math.abs(modalSizeMm.w - cw) < 0.5 && Math.abs(modalSizeMm.h - ch) < 0.5 })),
-                ...Object.entries(SHAPES).map(([key, sp]) => ({ kind: 'shape', key, name: sp.name, dim: `${sp.def} mm`, ico: shapeIco[key], on: key === selectedPresetKey }))
+                ...(isResizingOnly ? [] : [{ kind: 'free', key: 'free', name: 'Blank canvas', dim: 'No limits', ico: freeIco, on: modalFree, group: 'Canvas' }]),
+                ...Object.entries(PAPER_CHIPS).map(([name, [cw, ch]]) => ({ kind: 'paper', key: name, name, dim: `${cw} × ${ch} mm`, ico: sheetIco(sheetH[name]), on: !modalFree && !selectedPresetKey && Math.abs(modalSizeMm.w - cw) < 0.5 && Math.abs(modalSizeMm.h - ch) < 0.5 })),
+                ...Object.entries(SHAPES).map(([key, sp]) => ({ kind: 'shape', key, name: sp.name, dim: `${sp.def} mm`, ico: shapeIco[key], on: !modalFree && key === selectedPresetKey }))
             ];
             tplItemsCache = tplItems;
             const cur = tplItems.find(t => t.on);
@@ -1883,6 +1897,7 @@
                 '<svg class="tpl-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
             const item = (t, n) => `<button class="tpl-item${t.on ? ' active' : ''}${n === tplMenuIdx ? ' kb' : ''}" role="option" type="button" onclick="pickTpl(${n})"><span class="tpl-ico">${t.ico}</span><span class="tpl-name">${t.name}</span><span class="tpl-dim">${t.dim}</span></button>`;
             document.getElementById('tpl-menu').innerHTML =
+                (isResizingOnly ? '' : '<div class="tpl-group">Canvas</div>' + tplItems.map((t, n) => t.kind === 'free' ? item(t, n) : '').join('')) +
                 '<div class="tpl-group">Paper sheets</div>' + tplItems.map((t, n) => t.kind === 'paper' ? item(t, n) : '').join('') +
                 '<div class="tpl-group">Shapes</div>' + tplItems.map((t, n) => t.kind === 'shape' ? item(t, n) : '').join('');
             renderProductCards();
@@ -1906,7 +1921,8 @@
         function toggleTplMenu() { setTplMenu(!tplMenuOpen()); }
         function pickTpl(n) {
             const t = tplItemsCache[n]; if (!t) return;
-            if (t.kind === 'paper') selectPaperChip(t.key); else selectPreset(t.key);
+            if (t.kind === 'free') selectFreeCanvas();
+            else if (t.kind === 'paper') selectPaperChip(t.key); else selectPreset(t.key);
             setTplMenu(false);
         }
         function moveTplMenu(d) {
@@ -1917,7 +1933,9 @@
 
         function prepareModalPresets() {
             setTplMenu(false);
-            selectedPresetKey = isPaperVisible ? activeProductKey : null;
+            // New Canvas offers the blank (limitless) canvas first; resizing the current sheet keeps its own template
+            modalFree = !isResizingOnly;
+            selectedPresetKey = (isPaperVisible && isResizingOnly) ? activeProductKey : null;
             if (isPaperVisible) writeSize(paperWidthMm, paperHeightMm); else writeSize(modalSizeMm.w, modalSizeMm.h);
             refreshModal();
         }
@@ -2158,7 +2176,7 @@
             document.getElementById('nc-title').textContent = isResizingOnly ? 'Canvas Size' : 'New Canvas';
             document.getElementById('nc-sub').textContent = isResizingOnly
                 ? 'Change the size of the current canvas.'
-                : 'Start from a product or set a custom size.';
+                : 'Start from a blank canvas, a product or a custom size.';
             document.getElementById('nc-confirm').textContent = isResizingOnly ? 'Apply size' : 'Create canvas';
             prepareModalPresets();
             const modal = document.getElementById('new-canvas-modal');
@@ -2167,10 +2185,10 @@
             initModalFocus();
         }
 
-        function openNewCanvasModal() {
+        function openNewCanvasModal(fromStart = false) {
             isResizingOnly = false;
             createProjectOnReset = true;
-            toggleDashboard();
+            if (fromStart !== true) toggleDashboard();
             showCanvasModal();
         }
 
@@ -2200,6 +2218,16 @@
         }
 
         async function applyNewCanvasSize() {
+            if (modalFree && !isResizingOnly) {   // blank canvas: no sheet at all
+                if (!(await keepCurrentDrawing())) return;
+                if (shareSession) leaveSharedSession();
+                const create = createProjectOnReset;
+                isPaperVisible = false; activeProductKey = null;
+                closeNewCanvasModal();
+                if (create) { activeProjectId = null; projectShare = { edit: null, view: null }; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
+                try { performReset({ preserveUndo: false }); } catch (err) { console.error(err); }
+                return;
+            }
             let w = readField('canvas-w-input'), h = readField('canvas-h-input');
             if (!sizeIsValid(w) || !sizeIsValid(h)) { refreshModal(); return; }
             if (!isResizingOnly && !(await keepCurrentDrawing())) return;
@@ -4216,6 +4244,16 @@
             if (k && e.key !== k) { try { Object.defineProperty(e, 'key', { value: k, configurable: true }); } catch (_) {} }
         };
         // Opened from a share link?
+        // First thing a visitor sees: the New Canvas window, with the blank canvas offered first.
+        (function openStartWindow() {
+            if (/[?&](edit|view)=/.test(location.search)) return;
+            let tries = 0;
+            const timer = setInterval(() => {
+                if (typeof width === 'number' && width > 0 && typeof showCanvasModal === 'function') { clearInterval(timer); openNewCanvasModal(true); }
+                else if (++tries > 100) clearInterval(timer);
+            }, 100);
+        })();
+
         (function initSharedLink() {
             const q = new URLSearchParams(location.search);
             const mode = q.has('edit') ? 'edit' : (q.has('view') ? 'view' : null);
