@@ -758,7 +758,7 @@
             </div>
 
             <div class="right-controls-group" id="right-nav-group" style="display: flex; gap: 8px; pointer-events: none;">
-                <div class="control-btn glass-panel" id="v3d-btn" style="display: none" onclick="event.stopPropagation(); open3D()" title="3D view: folded product">
+                <div class="control-btn glass-panel" id="v3d-btn" style="display: none" onpointerenter="window.prefetch3D && prefetch3D()" ontouchstart="window.prefetch3D && prefetch3D()" onclick="event.stopPropagation(); open3D()" title="3D view: folded product">
                     <svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><path d="m3.5 7.5 8.5 4.5 8.5-4.5M12 12v9"/></svg>
                 </div>
                 <div class="control-btn glass-panel" id="eraser-btn" onclick="event.stopPropagation(); toggleEraser()" title="Eraser (F)">
@@ -1485,6 +1485,7 @@
             document.getElementById('cv-title').textContent = currentProjectTitle || '';
             document.querySelector('.cv-tab[data-t="tl"]').disabled = tlHistory.length < 2;
             document.querySelector('.cv-tab[data-t="3d"]').style.display = templateKind() === 'product' ? '' : 'none';
+            if (templateKind() === 'product' && window.prefetch3D) prefetch3D();
             cvSync();
         }
         function exitCustomerView() {
@@ -4488,6 +4489,7 @@ service cloud.firestore {
 (function () {
 'use strict';
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/+esm';
+const GLTF_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/exporters/GLTFExporter.js/+esm';
 const ORBIT_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js/+esm';
 
 const MATS = {
@@ -4580,6 +4582,88 @@ function priceOf() {
     const mat = R.weightKg * (1 + c.waste / 100) * m.kg, cut = (R.mask.cutMm || 0) / 1000 * c.cutPerM, bend = (R.nBends || 0) * c.bend;
     const k = 1 + c.markup / 100, total = (mat + cut + bend + c.setup) * k;
     return total > 0 ? { c, mat: mat * k, cut: cut * k, bend: bend * k, setup: c.setup * k, total } : null;
+}
+
+// ---------------------------------------------------------------- export: DXF of the flat pattern, GLB of the folded model
+function exportName(ext) {
+    const base = (typeof currentProjectTitle === 'string' && currentProjectTitle.trim()) || (modelInfo().P.name || 'karakuli');
+    const safe = base.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '') || 'karakuli';
+    return `${safe}-${S.mat}-${S.t}mm.${ext}`;
+}
+function download(blob, name) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// Flat pattern as an ASCII DXF (R12, mm, Y up): layer CUT = outline, holes and pattern; layer BEND = the bend lines.
+function buildDXF(mask, w, h, key) {
+    const { A, W, H, ppm } = mask, W2 = W + 2, H2 = H + 2, sub = new Uint8Array(W2 * H2);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sub[(y + 1) * W2 + x + 1] = A[y * W + x];
+    const groups = groupLoops(traceContours(sub, W2, H2), 0.12);
+    const f = v => (+v.toFixed(3)).toString();
+    const X = px => Math.min(w, Math.max(0, (px - 1 + 0.5) / ppm)), Y = py => Math.min(h, Math.max(0, h - (py - 1 + 0.5) / ppm));   // pixel centres, kept on the sheet; DXF has Y up
+    const out = [];
+    const put = (c, v) => out.push(String(c), String(v));
+    put(0, 'SECTION'); put(2, 'HEADER'); put(9, '$ACADVER'); put(1, 'AC1009'); put(9, '$INSUNITS'); put(70, 4); put(0, 'ENDSEC');
+    put(0, 'SECTION'); put(2, 'TABLES');
+    put(0, 'TABLE'); put(2, 'LTYPE'); put(70, 1); put(0, 'LTYPE'); put(2, 'CONTINUOUS'); put(70, 0); put(3, 'Solid line'); put(72, 65); put(73, 0); put(40, 0); put(0, 'ENDTAB');
+    put(0, 'TABLE'); put(2, 'LAYER'); put(70, 2);
+    [['CUT', 7], ['BEND', 5]].forEach(([n, c]) => { put(0, 'LAYER'); put(2, n); put(70, 0); put(62, c); put(6, 'CONTINUOUS'); });
+    put(0, 'ENDTAB'); put(0, 'ENDSEC');
+    put(0, 'SECTION'); put(2, 'ENTITIES');
+    let minX = Infinity, maxX = -Infinity, nLoops = 0;
+    const poly = pts => {
+        put(0, 'POLYLINE'); put(8, 'CUT'); put(66, 1); put(70, 1);
+        for (let i = 0; i < pts.length; i += 2) {
+            const x = X(pts[i]), y = Y(pts[i + 1]); minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+            put(0, 'VERTEX'); put(8, 'CUT'); put(10, f(x)); put(20, f(y)); put(30, 0);
+        }
+        put(0, 'SEQEND'); put(8, 'CUT'); nLoops++;
+    };
+    groups.forEach(o => { poly(o.pts); o.holes.forEach(poly); });
+    if (!nLoops) return null;
+    bendSpec(key, mask.G, S.t).forEach(b => {
+        put(0, 'LINE'); put(8, 'BEND'); put(10, f(Math.max(0, minX))); put(20, f(h - b.y)); put(30, 0); put(11, f(Math.min(w, maxX))); put(21, f(h - b.y)); put(31, 0);
+    });
+    put(0, 'ENDSEC'); put(0, 'EOF');
+    return { text: out.join('\n') + '\n', loops: nLoops };
+}
+
+async function exportDXF() {
+    if (!R || !R.mask) { alert('Open a product with a pattern first.'); return; }
+    const { key, w, h } = modelInfo();
+    const d = buildDXF(R.mask, w, h, key);
+    if (!d) { alert('Nothing to export yet.'); return; }
+    download(new Blob([d.text], { type: 'application/dxf' }), exportName('dxf'));
+}
+
+// The folded model as a binary glTF (metres, Y up, standing on y = 0): opens in AR viewers and 3D software.
+async function exportGLB() {
+    if (!R || !R.model) { alert('The 3D model is not ready yet.'); return; }
+    const btn = document.getElementById('v3-glb'), label = btn.textContent; btn.textContent = 'Preparing…'; btn.disabled = true;
+    const model = R.model, fold0 = S.fold, mats = [];
+    try {
+        const { GLTFExporter } = await import(GLTF_URL);
+        S.fold = 1; updatePose();
+        const box = new T.Box3().setFromObject(model), c = box.getCenter(new T.Vector3()), k = 0.001;
+        const m0 = MATS[S.mat], em = R.material.clone();
+        em.roughnessMap = null; em.bumpMap = null; em.name = `${m0.name} ${S.t} mm`; em.roughness = m0.brushed ? Math.min(1, m0.rough + 0.1) : m0.rough;
+        model.traverse(o => { if (o.isMesh) { mats.push([o, o.material]); o.material = em; } });
+        const root = new T.Group(); root.name = 'Karakuli';
+        root.scale.setScalar(k); root.position.set(-c.x * k, -box.min.y * k, -c.z * k);
+        R.scene.remove(model); root.add(model);
+        let buf;
+        try { buf = await new Promise((res, rej) => new GLTFExporter().parse(root, res, rej, { binary: true, onlyVisible: true })); }
+        finally { root.remove(model); R.scene.add(model); }
+        download(new Blob([buf], { type: 'model/gltf-binary' }), exportName('glb'));
+        em.dispose();
+    } catch (err) {
+        console.error(err); alert('The GLB file could not be made: ' + (err && err.message || err));
+    } finally {
+        mats.forEach(([o, m]) => { o.material = m; });
+        S.fold = fold0; if (R.model) updatePose(); syncUI();
+        btn.textContent = label; btn.disabled = false;
+    }
 }
 
 function traceContours(f, W, H, thr = 127.5) {
@@ -4922,7 +5006,7 @@ async function buildModel() {
     const model = new T.Group();
     model.position.x = -w / 2;
     R.model = model; R.layout = layout; R.pieces = []; R.strips = []; R.gap = gap; R.t = t;
-    await new Promise(r => setTimeout(r, 0));
+    showLoad('Cutting the pattern…', 'Making the sheet and its bends', 65); await nextFrame();
     layout.pieces.forEach((pc, i) => {
         const shapes = shapesForRows(mask, pc.r0, pc.r1);
         if (!shapes.length) { R.pieces.push(null); return; }
@@ -5012,6 +5096,7 @@ function updateStrip(strip, arc, t) {
 
 function updatePose() {
     if (!R || !R.model) return;
+    R.dirty = true;
     const t = R.t, chain = computeChain(R.layout, R.mask.ppm, R.gap + t / 2, S.fold);
     chain.frames.forEach((f, i) => {
         const mesh = R.pieces[i];
@@ -5025,6 +5110,7 @@ function updatePose() {
 
 function applyMaterial() {
     if (!R) return;
+    R.dirty = true;
     const m = MATS[S.mat], mat = R.material;
     mat.color.set(S.color || m.color);
     mat.metalness = m.metal; mat.roughness = m.rough;
@@ -5037,6 +5123,7 @@ function applyMaterial() {
 
 function applyEnv() {
     if (!R) return;
+    R.dirty = true;
     if (!R.envs[S.env]) { const es = makeEnvScene(S.env); R.envs[S.env] = R.pmrem.fromScene(es, 0.03).texture; es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     R.scene.environment = R.envs[S.env];
     R.scene.background = R.envs[S.env];
@@ -5117,6 +5204,12 @@ function buildUI() {
     #v3d-load { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 30px; font-size: 13px; font-weight: 600; background: var(--bg-color); }
     #v3d-load small { display: block; margin-top: 8px; font-weight: 400; color: var(--disabled-color); font-size: 11px; line-height: 1.5; }
     #v3d-load.hide { display: none; }
+    .v3-lbox { display: flex; flex-direction: column; align-items: center; max-width: 340px; }
+    .v3-spin { width: 34px; height: 34px; margin-bottom: 16px; border-radius: 50%; border: 3px solid var(--border-color); border-top-color: var(--text-color); animation: v3spin 0.8s linear infinite; }
+    @keyframes v3spin { to { transform: rotate(360deg); } }
+    .v3-bar { width: 200px; height: 3px; margin-top: 12px; border-radius: 2px; background: var(--border-color); overflow: hidden; }
+    .v3-bar i { display: block; height: 100%; width: 0; background: var(--text-color); transition: width 0.35s ease; }
+    #v3-retry { margin-top: 14px; }
     @media (max-width: 700px) {
         #v3d-panel { right: 12px; left: 12px; top: auto; bottom: 84px; width: auto; max-height: 38%; }
         #v3d-bar { bottom: 12px; width: calc(100% - 24px); }
@@ -5136,6 +5229,7 @@ function buildUI() {
             <div class="v3-sec"><div class="v3-lab">Thickness <em id="v3-tval"></em></div><div class="v3-chips" id="v3-ts"></div></div>
             <div class="v3-sec"><div class="v3-lab">Environment</div><div class="v3-chips" id="v3-envs"></div></div>
             <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button><button class="v3-chip" id="v3-shopbtn">Prices &amp; options</button></div></div>
+            <div class="v3-sec"><div class="v3-lab">Download</div><div class="v3-chips"><button class="v3-chip" id="v3-glb" title="Folded 3D model for AR and 3D software">3D model (.glb)</button><button class="v3-chip" id="v3-dxf" title="Flat pattern for laser cutting">Flat pattern (.dxf)</button></div></div>
             <div class="v3-sec" id="v3-price"></div>
         </div>
         <div id="v3-shop"></div>
@@ -5143,7 +5237,7 @@ function buildUI() {
             <button id="v3-play" title="Play / replay the folding"></button>
             <span class="v3-end">Flat</span><input class="v3-range" id="v3-fold" type="range" min="0" max="1" step="0.001"><span class="v3-end">Folded</span>
         </div>
-        <div id="v3d-load"><div><span id="v3-loadtxt">Loading 3D…</span><small id="v3-loadsub"></small></div></div>`;
+        <div id="v3d-load"><div class="v3-lbox"><div class="v3-spin" id="v3-spin"></div><span id="v3-loadtxt">Loading 3D…</span><div class="v3-bar" id="v3-barwrap"><i id="v3-loadbar"></i></div><small id="v3-loadsub"></small><button class="v3-chip" id="v3-retry" style="display:none">Try again</button></div></div>`;
     document.body.appendChild(el);
     // the page below listens to mouse / touch / wheel on window: keep those out of it
     ['mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchmove', 'touchend', 'wheel', 'click', 'dblclick', 'contextmenu'].forEach(ev =>
@@ -5158,6 +5252,8 @@ function buildUI() {
     };
     $('v3-ts').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b || +b.dataset.t === S.t) return; S.t = +b.dataset.t; syncUI(); await rebuild(); syncUI(); };
     $('v3-shopbtn').onclick = openShopEditor;
+    $('v3-glb').onclick = exportGLB;
+    $('v3-dxf').onclick = exportDXF;
     $('v3-envs').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.env = b.dataset.e; applyEnv(); syncUI(); };
     $('v3-auto').onclick = () => { S.auto = !S.auto; if (R) R.controls.autoRotate = S.auto; syncUI(); };
     $('v3-fold').oninput = e => { S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
@@ -5183,7 +5279,8 @@ function syncUI() {
     $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip${k === S.mat ? ' on' : ''}" data-m="${k}">${MATS[k].name}</button>`).join('');
     $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip${t === S.t ? ' on' : ''}" data-t="${t}">${t} mm</button>`).join('');
     $('v3-tval').textContent = S.t + ' mm';
-    $('v3-shopbtn').style.display = window.karakuliShop && window.karakuliShop.isOwner() ? '' : 'none';
+    const owner = window.karakuliShop && window.karakuliShop.isOwner();
+    $('v3-shopbtn').style.display = owner ? '' : 'none'; $('v3-dxf').style.display = owner ? '' : 'none';
     $('v3-fold').value = S.fold;
     $('v3-play').innerHTML = S.playing ? '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>'
         : S.fold >= 0.999 ? '<svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>'
@@ -5224,7 +5321,15 @@ function openShopEditor() {
     };
 }
 
-function showLoad(text, sub) {
+// opt: a number (0-100) shows a progress bar, 'err' shows a retry button, 'info' a plain message
+function showLoad(text, sub, opt) {
+    const $ = id => document.getElementById(id), bad = opt === 'err', info = opt === 'info', pct = typeof opt === 'number' ? opt : null;
+    $('v3-spin').style.display = bad || info ? 'none' : '';
+    $('v3-barwrap').style.display = pct === null ? 'none' : '';
+    if (pct !== null) $('v3-loadbar').style.width = pct + '%';
+    $('v3-retry').style.display = bad ? '' : 'none';
+    $('v3-retry').onclick = () => { close3D(); open3D(); };
+
     const l = document.getElementById('v3d-load');
     l.classList.remove('hide');
     document.getElementById('v3-loadtxt').textContent = text;
@@ -5236,15 +5341,23 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(
 // ---------------------------------------------------------------- life cycle
 async function loadLibs() {
     if (T) return;
-    const [three, orbit] = await Promise.all([import(THREE_URL), import(ORBIT_URL)]);
-    T = three; OrbitControlsCls = orbit.OrbitControls;
+    if (!loadLibs.p) loadLibs.p = (async () => {
+        // browsers remember a failed module import for the same address: a retry needs a fresh one
+        const q = loadLibs.tries ? `?r=${loadLibs.tries}` : '';
+        const [three, orbit] = await Promise.all([import(THREE_URL + q), import(ORBIT_URL + q)]);
+        T = three; OrbitControlsCls = orbit.OrbitControls;
+    })().catch(err => { loadLibs.tries = (loadLibs.tries || 0) + 1; loadLibs.p = null; throw err; });
+    return loadLibs.p;
 }
 
 function initRuntime() {
     const host = document.getElementById('v3d-view');
-    const renderer = new T.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+    // phones and tablets: lower resolution cap and a lighter shadow map
+    const lite = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || Math.min(window.innerWidth, window.innerHeight) < 600;
+    const renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lite ? 1.5 : 2));
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = lite ? T.PCFShadowMap : T.PCFSoftShadowMap;
+    renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); showLoad('The browser paused the 3D view.', 'It happens when the device runs low on graphics memory.', 'err'); });
     renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
     host.appendChild(renderer.domElement);
     const scene = new T.Scene();
@@ -5254,12 +5367,13 @@ function initRuntime() {
     controls.minAzimuthAngle = -1.35; controls.maxAzimuthAngle = 1.35;      // never behind the wall
     controls.minPolarAngle = 0.25; controls.maxPolarAngle = Math.PI * 0.62;
     controls.autoRotate = S.auto;
+    controls.addEventListener('change', () => { if (R) R.dirty = true; });
     const light = new T.DirectionalLight(0xffffff, 1.6);
-    light.castShadow = true; light.shadow.mapSize.set(2048, 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 4;
+    light.castShadow = true; light.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 4;
     scene.add(light);
     const wall = new T.Mesh(new T.PlaneGeometry(40000, 30000), new T.MeshStandardMaterial({ color: WALLS[S.env], roughness: 0.95, metalness: 0 }));
     wall.receiveShadow = true; scene.add(wall);
-    R = { renderer, scene, camera, controls, light, wall, pmrem: new T.PMREMGenerator(renderer), envs: {}, material: new T.MeshStandardMaterial({ side: T.DoubleSide }), brush: makeBrushTexture(), model: null, pieces: [], strips: [], mask: null, raf: 0, last: 0 };
+    R = { renderer, scene, camera, controls, light, wall, pmrem: new T.PMREMGenerator(renderer), envs: {}, material: new T.MeshStandardMaterial({ side: T.DoubleSide }), brush: makeBrushTexture(), model: null, pieces: [], strips: [], mask: null, raf: 0, last: 0, dirty: true, lite, slow: 0, fr: 0 };
     resize();
 }
 
@@ -5268,7 +5382,7 @@ function resize() {
     const host = document.getElementById('v3d-view');
     const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
     R.renderer.setSize(w, h);
-    R.camera.aspect = w / h; R.camera.updateProjectionMatrix();
+    R.camera.aspect = w / h; R.camera.updateProjectionMatrix(); R.dirty = true;
 }
 
 const ease = x => x * x * (3 - 2 * x);
@@ -5286,19 +5400,30 @@ function loop(now) {
         updatePose();
         if (!S.playing) syncUI();
     }
-    R.controls.update();
-    R.renderer.render(R.scene, R.camera);
+    const moved = R.controls.update();
+    // draw only when something changes (animation, camera, auto-rotate, a new look): an idle view costs no battery
+    if (S.playing || S.auto || moved || R.dirty) {
+        R.dirty = false;
+        R.renderer.render(R.scene, R.camera);
+        // too slow on this device: fall back to 1x resolution once
+        if (R.renderer.getPixelRatio() > 1 && (S.playing || S.auto)) {
+            R.fr++; if (dt > 0.034) R.slow++;
+            if (R.fr >= 60) { if (R.slow > 36) { R.renderer.setPixelRatio(1); resize(); } R.fr = 0; R.slow = 0; }
+        }
+    }
 }
 
 async function rebuild() {
     if (building || !R) return;
     building = true;
-    showLoad('Rebuilding the model…');
+    showLoad('Rebuilding the model…', '', 40);
     await nextFrame();
     try { const ok = await buildModel(); if (ok) { updatePose(); applyMaterial(); } updateInfo(); } catch (err) { console.error(err); }
     hideLoad();
     building = false;
 }
+
+window.prefetch3D = () => { loadLibs().catch(() => {}); };   // warm the download while the person is about to open the view
 
 async function open3D() {
     if (templateKind() !== 'product') return;
@@ -5307,23 +5432,24 @@ async function open3D() {
     document.body.classList.add('v3d-open');
     ui.el.classList.add('show');
     S.fold = 0; S.playing = false;
-    showLoad('Loading the 3D engine…');
+    showLoad('Loading the 3D engine…', 'Only the first time', 12);
     syncUI();
     try { await loadLibs(); }
     catch (err) {
         console.error(err);
-        showLoad('Could not load the 3D engine.', 'It is loaded from the internet the first time. Check the connection and try again.');
+        showLoad('Could not load the 3D engine.', 'It is loaded from the internet the first time. Check the connection and try again.', 'err');
         return;
     }
     if (!document.body.classList.contains('v3d-open')) return;
-    showLoad('Building the model…', 'Cutting the pattern out of the sheet');
+    showLoad('Reading your drawing…', 'Finding the metal', 35);
     await nextFrame();
     try {
         initRuntime();
         building = true;
         const ok = await buildModel();
         building = false;
-        if (!ok) { showLoad('Nothing to show yet', 'Draw a pattern on the template first: the 3D model is made from the black (metal) parts of your drawing.'); updateInfo(); return; }
+        if (!ok) { showLoad('Nothing to show yet', 'Draw a pattern on the template first: the 3D model is made from the black (metal) parts of your drawing.', 'info'); updateInfo(); return; }
+        showLoad('Lighting the room…', '', 92); await nextFrame();
         applyEnv(); applyMaterial(); fitCamera(); updatePose(); updateInfo();
         hideLoad();
         S.playing = true; syncUI();
@@ -5331,7 +5457,7 @@ async function open3D() {
     } catch (err) {
         building = false;
         console.error(err);
-        showLoad('The 3D model could not be built.', String(err && err.message || err));
+        showLoad('The 3D model could not be built.', String(err && err.message || err), 'err');
     }
 }
 
@@ -5354,7 +5480,7 @@ function close3D() {
 
 window.addEventListener('resize', resize);
 window.open3D = open3D; window.close3D = close3D;
-window.__v3d = { traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
+window.__v3d = { buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
 // the 3D button lives on the canvas, only for the products
 setInterval(() => {
