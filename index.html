@@ -567,6 +567,15 @@
         #share-badge.show { display: inline-flex; }
         #share-badge svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
+        /* In-app dialog: replaces confirm() / prompt() / alert(), which some browsers and embedded views block (the button then "does nothing") */
+        #app-dialog { position: fixed; inset: 0; z-index: 6000; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.38); }
+        #app-dialog.show { display: flex; }
+        .ad-card { width: min(380px, 100%); padding: 20px; border-radius: 18px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); box-shadow: 0 24px 70px rgba(0,0,0,0.35); font-family: var(--main-font); }
+        .ad-card h3 { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
+        .ad-card p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-color); opacity: 0.85; white-space: pre-line; }
+        .ad-card input { width: 100%; box-sizing: border-box; height: 42px; margin-top: 12px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color); font-family: var(--main-font); font-size: 14px; }
+        .ad-btns { display: flex; gap: 8px; margin-top: 18px; }
+        .ad-btns .modal-btn { flex: 1; height: 42px; }
         /* Customer view (a view-only link): Design / Time-lapse / 3D, no editing tools */
         #cv-head { display: none; }
         body.customer-view #cv-head { display: block; }
@@ -1329,7 +1338,7 @@
                 wrap.classList.remove('swiping');
                 const back = () => { item.style.transition = 'transform 0.35s cubic-bezier(.2,1.1,.3,1)'; item.style.transform = ''; wrap.style.setProperty('--sw', 0); wrap.classList.remove('ready'); };
                 if (e.type === 'pointercancel' || s0.dx < s0.w * THRESHOLD) { back(); return; }
-                if (isCur && !confirm('Delete the current project and clear the canvas?')) { back(); return; }
+                if (isCur && !(await appDialog({ title: 'Delete project', text: 'Delete the current project and clear the canvas?', ok: 'Delete' }))) { back(); return; }
                 // fly out to the right, then the row folds away
                 item.style.transition = 'transform 0.24s cubic-bezier(.5,0,.9,.5)';
                 item.style.transform = `translateX(${s0.w + 20}px)`;
@@ -1354,7 +1363,7 @@
         async function renameProject(id) {
             const isCur = !id || id === activeProjectId;
             const old = isCur ? currentProjectTitle : (plCache.find(p => p.id === id)?.title || '');
-            const t = (prompt('Project name', old) || '').trim();
+            const t = ((await appDialog({ title: 'Project name', input: old, ok: 'Save' })) || '').trim();
             if (!t || t === old) return;
             if (isCur) { currentProjectTitle = t; await saveCurrentProject(); }
             else await window.karakuliProjects.save(id, { title: t });
@@ -1644,7 +1653,7 @@ service cloud.firestore {
         }
 
         async function deleteProject(id) {
-            if (!confirm('Delete this project permanently?')) return;
+            if (!(await appDialog({ title: 'Delete project', text: 'Delete this project permanently?', ok: 'Delete' }))) return;
             await removeProjectCore(id);
             updateCurrentProjectUI();
             await renderProjectsList();
@@ -2340,6 +2349,7 @@ service cloud.firestore {
             document.getElementById('nc-confirm').textContent = isResizingOnly ? 'Apply size' : 'Create canvas';
             prepareModalPresets();
             const modal = document.getElementById('new-canvas-modal');
+            clearTimeout(closeNewCanvasModal.t);   // a window closed a moment ago must not hide this one
             modal.style.display = 'flex';
             setTimeout(() => modal.classList.add('show'), 10);
             initModalFocus();
@@ -2362,8 +2372,35 @@ service cloud.firestore {
             createProjectOnReset = false;
             const modal = document.getElementById('new-canvas-modal');
             modal.classList.remove('show');
-            setTimeout(() => modal.style.display = 'none', 300);
+            clearTimeout(closeNewCanvasModal.t);
+            closeNewCanvasModal.t = setTimeout(() => modal.style.display = 'none', 300);
         }
+
+        // Own dialog instead of confirm() / prompt(): returns true / false for a question, the text / null when `input` is given.
+        function appDialog({ title = '', text = '', ok = 'OK', cancel = 'Cancel', input = null } = {}) {
+            return new Promise(resolve => {
+                let el = document.getElementById('app-dialog');
+                if (!el) { el = document.createElement('div'); el.id = 'app-dialog'; document.body.appendChild(el); }
+                const esc = escapeProjectText;
+                el.innerHTML = `<div class="ad-card" role="dialog" aria-modal="true">${title ? `<h3>${esc(title)}</h3>` : ''}${text ? `<p>${esc(text)}</p>` : ''}${input !== null ? `<input id="ad-input" type="text" maxlength="80" value="${esc(input)}">` : ''}
+                    <div class="ad-btns">${cancel ? `<button class="modal-btn secondary" id="ad-cancel">${esc(cancel)}</button>` : ''}<button class="modal-btn primary" id="ad-ok">${esc(ok)}</button></div></div>`;
+                el.classList.add('show');
+                const inp = document.getElementById('ad-input');
+                const done = v => { el.classList.remove('show'); window.removeEventListener('keydown', onKey, true); resolve(v); };
+                const accept = () => done(inp ? inp.value : true), reject = () => done(inp ? null : false);
+                function onKey(e) {   // the editor listens to the whole keyboard: keep the keys here
+                    e.stopPropagation();
+                    if (e.key === 'Enter') { e.preventDefault(); accept(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); reject(); }
+                }
+                window.addEventListener('keydown', onKey, true);
+                document.getElementById('ad-ok').onclick = accept;
+                const c = document.getElementById('ad-cancel'); if (c) c.onclick = reject;
+                el.onpointerdown = e => { if (e.target === el && cancel) reject(); };
+                setTimeout(() => { if (inp) { inp.focus(); inp.select(); } else document.getElementById('ad-ok').focus(); }, 30);
+            });
+        }
+        window.appDialog = appDialog;
 
         // A new canvas / template never inherits the previous drawing. The previous one is saved as its own project
         // first (signed-in users); without an account the person is asked before it is discarded.
@@ -2372,9 +2409,9 @@ service cloud.firestore {
             if (shareSession) return true;   // a shared project is already stored where it came from
             if (window.karakuliProjects?.isSignedIn()) {
                 try { clearTimeout(projectSaveTimer); await saveCurrentProject(); showActionHint('Previous drawing saved as ' + currentProjectTitle); return true; }
-                catch (err) { console.error('Could not save the previous drawing', err); return confirm('The previous drawing could not be saved. Create the new canvas anyway?'); }
+                catch (err) { console.error('Could not save the previous drawing', err); return appDialog({ title: 'Not saved', text: 'The previous drawing could not be saved. Create the new canvas anyway?', ok: 'Create' }); }
             }
-            return confirm('The current drawing is not saved (you are not signed in) and will be lost. Create the new canvas anyway?');
+            return appDialog({ title: 'Current drawing will be lost', text: 'It is not saved because you are not signed in. Create the new canvas anyway?', ok: 'Create canvas' });
         }
 
         async function applyNewCanvasSize() {
@@ -4597,6 +4634,8 @@ function download(blob, name) {
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
+const note = t => { if (typeof showActionHint === 'function') showActionHint(t); else console.warn(t); };
+
 // Flat pattern as an ASCII DXF (R12, mm, Y up): layer CUT = outline, holes and pattern; layer BEND = the bend lines.
 function buildDXF(mask, w, h, key) {
     const { ppm } = mask, groups = maskGroups(mask);
@@ -4634,16 +4673,16 @@ function buildDXF(mask, w, h, key) {
 }
 
 async function exportDXF() {
-    if (!R || !R.mask) { alert('Open a product with a pattern first.'); return; }
+    if (!R || !R.mask) { note('Open a product with a pattern first.'); return; }
     const { key, w, h } = modelInfo();
     const d = buildDXF(R.mask, w, h, key);
-    if (!d) { alert('Nothing to export yet.'); return; }
+    if (!d) { note('Nothing to export yet.'); return; }
     download(new Blob([d.text], { type: 'application/dxf' }), exportName('dxf'));
 }
 
 // The folded model as a binary glTF (metres, Y up, standing on y = 0): opens in AR viewers and 3D software.
 async function exportGLB() {
-    if (!R || !R.model) { alert('The 3D model is not ready yet.'); return; }
+    if (!R || !R.model) { note('The 3D model is not ready yet.'); return; }
     const btn = document.getElementById('v3-glb'), label = btn.textContent; btn.textContent = 'Preparing…'; btn.disabled = true;
     const model = R.model, fold0 = S.fold, mats = [];
     try {
@@ -4662,7 +4701,7 @@ async function exportGLB() {
         download(new Blob([buf], { type: 'model/gltf-binary' }), exportName('glb'));
         em.dispose();
     } catch (err) {
-        console.error(err); alert('The GLB file could not be made: ' + (err && err.message || err));
+        console.error(err); note('The GLB file could not be made: ' + (err && err.message || err));
     } finally {
         mats.forEach(([o, m]) => { o.material = m; });
         S.fold = fold0; if (R.model) updatePose(); syncUI();
@@ -5488,20 +5527,31 @@ function fitCamera() {
 
 // ---------------------------------------------------------------- UI
 let ui = null;
-function buildUI() {
-    if (ui) return ui;
-    const css = document.createElement('style');
+function ensureCss() {
+    if (document.getElementById('v3-css')) return;
+    const css = document.createElement('style'); css.id = 'v3-css';
     css.textContent = `
     #v3d { position: fixed; inset: 0; z-index: 3500; display: none; background: var(--bg-color); color: var(--text-color); font-family: var(--main-font); }
     #v3d.show { display: block; }
     #v3d-view { position: absolute; inset: 0; }
     #v3d-view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     #v3-price:empty { display: none; }
+    #v3d-panel, #v3d-panel * { touch-action: pan-y; }
+    #v3d-panel { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    .v3-tog { width: 100%; margin: 0 0 8px; padding: 0; border: 0; background: none; font-family: var(--main-font); cursor: pointer; align-items: center; gap: 8px; text-align: left; }
+    .v3-tog > em { margin-left: auto; display: inline-flex; align-items: center; max-width: 60%; overflow: hidden; white-space: nowrap; }
+    .v3-chev { width: 7px; height: 7px; flex: none; margin: -3px 2px 0 2px; border-right: 1.6px solid var(--disabled-color); border-bottom: 1.6px solid var(--disabled-color); transform: rotate(45deg); transition: transform 0.2s; }
+    .v3-sec.closed .v3-chev { transform: rotate(-45deg); margin-top: 0; }
+    .v3-sec.closed .v3-body { display: none; } .v3-sec.closed .v3-tog { margin-bottom: 0; }
+    .v3-dot-s { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border-color); }
+    .v3-handle { display: none; width: 100%; height: 22px; margin: -6px 0 4px; padding: 0; border: 0; background: none; cursor: pointer; }
+    .v3-handle i { display: block; width: 38px; height: 4px; margin: 0 auto; border-radius: 2px; background: var(--disabled-color); opacity: 0.6; }
+    #v3d-panel.min .v3-sec { display: none; }
+    #shop-editor { position: fixed; inset: 0; z-index: 3600; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.38); font-family: var(--main-font); color: var(--text-color); }
+    #shop-editor.show { display: flex; }
     .v3-prow { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 2px 0; }
     .v3-prow.tot { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--border-color); font-size: 13px; font-weight: 700; }
-    #v3-shop { position: absolute; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.35); }
-    #v3-shop.show { display: flex; }
-    .v3-shop-card { width: min(560px, 100%); max-height: 92vh; overflow: auto; padding: 18px; border-radius: 16px; }
+    .v3-shop-card { width: min(560px, 100%); max-height: 92vh; overflow: auto; padding: 18px; border-radius: 16px; background: var(--bg-color) !important; } .v3-shop-card, .v3-shop-card * { touch-action: pan-y; }
     .v3-shop-card h3 { margin: 0 0 4px; font-size: 15px; } .v3-shop-card p { margin: 0 0 12px; font-size: 11px; line-height: 1.5; color: var(--disabled-color); }
     .v3-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
     .v3-f { position: relative; display: block; } .v3-f span { display: block; margin-bottom: 4px; font-size: 10px; font-weight: 600; color: var(--disabled-color); }
@@ -5514,6 +5564,8 @@ function buildUI() {
     #v3d-title b { display: block; font-size: 15px; font-weight: 700; text-shadow: 0 1px 8px var(--bg-color); }
     #v3d-title span { display: block; margin-top: 3px; font-size: 11px; color: var(--disabled-color); text-shadow: 0 1px 8px var(--bg-color); }
     #v3d-close { position: absolute; right: 20px; top: 20px; }
+    #v3d-shop { position: absolute; right: 20px; top: 72px; display: none; }
+    #v3d-shop.owner { display: flex; }
     .v3-glass { background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); border-radius: 16px; }
     #v3d-panel { position: absolute; right: 20px; top: 76px; width: 258px; max-height: calc(100% - 170px); overflow-y: auto; padding: 14px; scrollbar-width: none; }
     #v3d-panel::-webkit-scrollbar { display: none; }
@@ -5546,28 +5598,36 @@ function buildUI() {
     .v3-bar i { display: block; height: 100%; width: 0; background: var(--text-color); transition: width 0.35s ease; }
     #v3-retry { margin-top: 14px; }
     @media (max-width: 700px) {
-        #v3d-panel { right: 12px; left: 12px; top: auto; bottom: 84px; width: auto; max-height: 38%; }
+        #v3d-panel { right: 12px; left: 12px; top: auto; bottom: 84px; width: auto; max-height: 48%; }
+        .v3-handle { display: block; position: sticky; top: -8px; z-index: 2; }
         #v3d-bar { bottom: 12px; width: calc(100% - 24px); }
         #v3d-title { left: 14px; top: 16px; }
         #v3d-close { right: 12px; top: 12px; }
+        #v3d-shop { right: 12px; top: 64px; }
     }`;
     document.head.appendChild(css);
+}
+
+function buildUI() {
+    if (ui) return ui;
+    ensureCss();
     const el = document.createElement('div');
     el.id = 'v3d';
     el.innerHTML = `
         <div id="v3d-view"></div>
         <div id="v3d-title"><b id="v3-name"></b><span id="v3-info"></span></div>
         <div id="v3d-close" class="control-btn glass-panel" onclick="close3D()" title="Close (Esc)"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
+        <div id="v3d-shop" class="control-btn glass-panel" title="Prices &amp; options"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
         <div id="v3d-panel" class="v3-glass">
-            <div class="v3-sec"><div class="v3-lab">Material</div><div class="v3-chips" id="v3-mats"></div></div>
-            <div class="v3-sec"><div class="v3-lab">Colour</div><div class="v3-sw" id="v3-cols"></div></div>
-            <div class="v3-sec"><div class="v3-lab">Thickness <em id="v3-tval"></em></div><div class="v3-chips" id="v3-ts"></div></div>
-            <div class="v3-sec"><div class="v3-lab">Environment</div><div class="v3-chips" id="v3-envs"></div></div>
-            <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button><button class="v3-chip" id="v3-shopbtn">Prices &amp; options</button></div></div>
-            <div class="v3-sec"><div class="v3-lab">Download</div><div class="v3-chips"><button class="v3-chip" id="v3-glb" title="Folded 3D model for AR and 3D software">3D model (.glb)</button><button class="v3-chip" id="v3-dxf" title="Flat pattern for laser cutting">Flat pattern (.dxf)</button></div></div>
-            <div class="v3-sec" id="v3-price"></div>
+            <button id="v3-sheet" class="v3-handle" aria-label="Show or hide the settings"><i></i></button>
+            <div class="v3-sec" data-sec="mat"><button class="v3-lab v3-tog"><span>Material</span><em id="v3-sum-mat"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-mats"></div></div></div>
+            <div class="v3-sec" data-sec="col"><button class="v3-lab v3-tog"><span>Colour</span><em id="v3-sum-col"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-sw" id="v3-cols"></div></div></div>
+            <div class="v3-sec" data-sec="thick"><button class="v3-lab v3-tog"><span>Thickness</span><em id="v3-sum-thick"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-ts"></div></div></div>
+            <div class="v3-sec" data-sec="env"><button class="v3-lab v3-tog"><span>Environment</span><em id="v3-sum-env"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-envs"></div></div></div>
+            <div class="v3-sec" id="v3-price-sec" data-sec="price" style="display:none"><button class="v3-lab v3-tog"><span>Price</span><em id="v3-sum-price"></em><i class="v3-chev"></i></button><div class="v3-body" id="v3-price"></div></div>
+            <div class="v3-sec" data-sec="dl"><button class="v3-lab v3-tog"><span>Download</span><em id="v3-sum-dl"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips"><button class="v3-chip" id="v3-glb" title="Folded 3D model for AR and 3D software">3D model (.glb)</button><button class="v3-chip" id="v3-dxf" title="Flat pattern for laser cutting">Flat pattern (.dxf)</button></div></div></div>
+            <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button></div></div>
         </div>
-        <div id="v3-shop"></div>
         <div id="v3d-bar" class="v3-glass">
             <button id="v3-play" title="Play / replay the folding"></button>
             <span class="v3-end">Flat</span><input class="v3-range" id="v3-fold" type="range" min="0" max="1" step="0.001"><span class="v3-end">Folded</span>
@@ -5586,7 +5646,10 @@ function buildUI() {
         if (S.t !== t0) { await rebuild(); syncUI(); }
     };
     $('v3-ts').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b || +b.dataset.t === S.t) return; S.t = +b.dataset.t; syncUI(); await rebuild(); syncUI(); };
-    $('v3-shopbtn').onclick = openShopEditor;
+    $('v3d-panel').addEventListener('click', e => { const t = e.target.closest('.v3-tog'); if (t) t.parentElement.classList.toggle('closed'); });
+    $('v3d-shop').onclick = openShopEditor;
+    $('v3-sheet').onclick = () => $('v3d-panel').classList.toggle('min');
+    if (window.innerWidth <= 700) document.querySelectorAll('#v3d-panel .v3-sec[data-sec]').forEach(sc => { if (sc.dataset.sec !== 'mat') sc.classList.add('closed'); });
     $('v3-glb').onclick = exportGLB;
     $('v3-dxf').onclick = exportDXF;
     $('v3-envs').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.env = b.dataset.e; applyEnv(); syncUI(); };
@@ -5613,9 +5676,10 @@ function syncUI() {
     ensureSel();
     $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip${k === S.mat ? ' on' : ''}" data-m="${k}">${MATS[k].name}</button>`).join('');
     $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip${t === S.t ? ' on' : ''}" data-t="${t}">${t} mm</button>`).join('');
-    $('v3-tval').textContent = S.t + ' mm';
+    $('v3-sum-mat').textContent = MATS[S.mat].name; $('v3-sum-thick').textContent = S.t + ' mm'; $('v3-sum-env').textContent = ENVS[S.env] || '';
+    $('v3-sum-col').innerHTML = `<span class="v3-dot-s" style="background:${S.color || MATS[S.mat].color}"></span>`;
     const owner = window.karakuliShop && window.karakuliShop.isOwner();
-    $('v3-shopbtn').style.display = owner ? '' : 'none'; $('v3-dxf').style.display = owner ? '' : 'none';
+    $('v3-dxf').style.display = owner ? '' : 'none'; $('v3d-shop').classList.toggle('owner', !!owner);
     $('v3-fold').value = S.fold;
     $('v3-play').innerHTML = S.playing ? '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>'
         : S.fold >= 0.999 ? '<svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>'
@@ -5627,15 +5691,21 @@ function updateInfo() {
     document.getElementById('v3-name').textContent = P.name;
     const wt = R && R.weightKg ? ` · ≈ ${R.weightKg.toFixed(R.weightKg < 10 ? 2 : 1)} kg` : '';
     document.getElementById('v3-info').textContent = `${+w.toFixed(1)} × ${+h.toFixed(1)} mm flat · ${S.t} mm ${MATS[S.mat].name.toLowerCase()}${wt}`;
-    const pr = priceOf(), box = document.getElementById('v3-price');
-    if (!pr) { box.innerHTML = ''; return; }
+    const pr = priceOf(), box = document.getElementById('v3-price'), sec = document.getElementById('v3-price-sec');
+    if (!box) return;
+    if (!pr) { sec.style.display = 'none'; box.innerHTML = ''; return; }
     const f = v => v.toFixed(2), row = (n, v) => v > 0 ? `<div class="v3-prow"><span>${n}</span><span>${f(v)}</span></div>` : '';
-    box.innerHTML = `<div class="v3-lab">Price <em>${pr.c.currency}</em></div>${row('Material', pr.mat)}${row('Laser cutting', pr.cut)}${row('Bending', pr.bend)}${row('Setup', pr.setup)}<div class="v3-prow tot"><span>Total</span><span>${f(pr.total)} ${pr.c.currency}</span></div>`;
+    sec.style.display = '';
+    document.getElementById('v3-sum-price').textContent = `${f(pr.total)} ${pr.c.currency}`;
+    box.innerHTML = `${row('Material', pr.mat)}${row('Laser cutting', pr.cut)}${row('Bending', pr.bend)}${row('Setup', pr.setup)}<div class="v3-prow tot"><span>Total</span><span>${f(pr.total)} ${pr.c.currency}</span></div>`;
 }
 
 // Owner's editor of the shop options (materials sold, thicknesses, price rules)
 function openShopEditor() {
-    const c = window.karakuliShop.getOwn(), box = document.getElementById('v3-shop');
+    ensureCss();
+    let box = document.getElementById('shop-editor');
+    if (!box) { box = document.createElement('div'); box.id = 'shop-editor'; document.body.appendChild(box); }
+    const c = window.karakuliShop.getOwn();
     const num = (id, label, v, unit) => `<label class="v3-f"><span>${label}</span><input id="${id}" type="number" min="0" step="any" value="${v}"><i>${unit}</i></label>`;
     box.innerHTML = `<div class="v3-shop-card v3-glass"><h3>Prices &amp; options</h3>
         <p>Leave a price at 0 to hide it. Saved in this browser; customers see it on the view link after you share it again.</p>
@@ -5814,7 +5884,7 @@ function close3D() {
 }
 
 window.addEventListener('resize', resize);
-window.open3D = open3D; window.close3D = close3D;
+window.open3D = open3D; window.close3D = close3D; window.openShopEditor = openShopEditor;
 window.__v3d = { designPrimitives, rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
 // the 3D button lives on the canvas, only for the products
