@@ -567,6 +567,20 @@
         #share-badge.show { display: inline-flex; }
         #share-badge svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
+        /* Customer view (a view-only link): Design / Time-lapse / 3D, no editing tools */
+        #cv-head { display: none; }
+        body.customer-view #cv-head { display: block; }
+        body.customer-view .top-nav-container, body.customer-view .handle-arrow, body.customer-view #mobile-keyboard,
+        body.customer-view #dashboard, body.customer-view #dashboard-overlay, body.customer-view #share-badge,
+        body.customer-view #tl-export-btn, body.customer-view #tl-close-btn, body.customer-view #v3d-close { display: none !important; }
+        #cv-bar { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 3600; display: flex; gap: 2px; padding: 3px; border-radius: 14px; background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); }
+        .cv-tab { height: 34px; padding: 0 16px; border: 0; border-radius: 11px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+        .cv-tab:hover:not(:disabled) { background: var(--active-btn-bg); }
+        .cv-tab.active { background: var(--text-color); color: var(--bg-color); }
+        .cv-tab:disabled { opacity: 0.35; cursor: default; }
+        #cv-title { position: fixed; left: 20px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; max-width: 24vw; font-size: 13px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+        #cv-brand { position: fixed; right: 20px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--disabled-color); text-decoration: none; }
+        @media (max-width: 700px) { #cv-title, #cv-brand { display: none; } }
         #game-hearts { display: none; gap: 6px; align-items: center; justify-content: center; height: 100%; width: 100%; }
         .pixel-heart { width: 18px; height: 18px; }
     </style>
@@ -929,13 +943,19 @@
         // Firestore rules for /shared are listed in the note shown by the Share window.
         const randomToken = () => { const a = new Uint8Array(20); crypto.getRandomValues(a); return Array.from(a, b => (b % 36).toString(36)).join(''); };
         window.karakuliShare = {
-            async publish(kind, data, title) {
+            async publish(kind, data, title, tl) {
                 if (!signedInUser) throw new Error('Sign in with Google to share');
                 const token = randomToken(), now = Date.now();
-                await setDoc(doc(db, 'shared', token), { kind, ownerUid: signedInUser.uid, title: title || '', data, createdAtMs: now, updatedAtMs: now });
+                const docData = { kind, ownerUid: signedInUser.uid, title: title || '', data, createdAtMs: now, updatedAtMs: now };
+                if (tl) docData.tl = tl;
+                await setDoc(doc(db, 'shared', token), docData);
                 return token;
             },
-            async update(token, data, title) { await updateDoc(doc(db, 'shared', token), { data, title: title || '', updatedAtMs: Date.now() }); },
+            async update(token, data, title, tl) {
+                const upd = { data, title: title || '', updatedAtMs: Date.now() };
+                if (tl !== undefined) upd.tl = tl || null;
+                await updateDoc(doc(db, 'shared', token), upd);
+            },
             async load(token) { const snap = await getDoc(doc(db, 'shared', token)); return snap.exists() ? snap.data() : null; },
             async remove(token) { if (token) { try { await deleteDoc(doc(db, 'shared', token)); } catch (e) { console.warn('Shared copy not removed', e); } } }
         };
@@ -1047,6 +1067,46 @@
                 shareEditToken: projectShare.edit, shareViewToken: projectShare.view,
                 tlHistory, tlCurrentFrame, tlCaptureStride, tlCaptureCounter
             }));
+        }
+
+        // Time-lapse for the view link. A recording is a list of FULL snapshots (far too big for one Firestore document),
+        // so it is stored as differences: per frame the segments added / removed, changed special elements and the cursor.
+        const tlSegKey = sg => sg.p1.x + ',' + sg.p1.y + ',' + sg.p2.x + ',' + sg.p2.y;
+        function packTimelapse(frames) {
+            if (!frames || frames.length < 2) return null;
+            const pack = list => {
+                let prev = new Map(), prevSp = {};
+                const out = list.map(fr => {
+                    const cur = new Map(); (fr.segments || []).forEach(sg => cur.set(tlSegKey(sg), sg));
+                    const add = [], rem = [];
+                    cur.forEach((sg, k) => { if (!prev.has(k)) add.push(sg.p1.x, sg.p1.y, sg.p2.x, sg.p2.y); });
+                    prev.forEach((sg, k) => { if (!cur.has(k)) rem.push(sg.p1.x, sg.p1.y, sg.p2.x, sg.p2.y); });
+                    const sp = {}, now = fr.specialElements || {};
+                    Object.keys(now).forEach(id => { if (JSON.stringify(now[id]) !== JSON.stringify(prevSp[id])) sp[id] = now[id]; });
+                    Object.keys(prevSp).forEach(id => { if (!(id in now)) sp[id] = 0; });
+                    prev = cur; prevSp = now;
+                    return [add, rem, Object.keys(sp).length ? sp : 0, fr.cursor ? fr.cursor.i : 0, fr.cursor ? fr.cursor.j : 0];
+                });
+                return { v: 1, f: out };
+            };
+            let list = frames, packed = pack(list);
+            while (JSON.stringify(packed).length > 600000 && list.length > 3) {   // keep the document under Firestore's 1 MB
+                const last = list.length - 1;
+                list = list.filter((_, i) => i === 0 || i === last || i % 2 === 0);
+                packed = pack(list);
+            }
+            return JSON.stringify(packed).length > 900000 ? null : packed;   // still too big: share without the time-lapse
+        }
+        function unpackTimelapse(pk) {
+            if (!pk || pk.v !== 1 || !Array.isArray(pk.f)) return [];
+            const map = new Map(), sp = {}, frames = [];
+            pk.f.forEach(([add, rem, spd, ci, cj]) => {
+                for (let i = 0; i < rem.length; i += 4) map.delete(rem[i] + ',' + rem[i + 1] + ',' + rem[i + 2] + ',' + rem[i + 3]);
+                for (let i = 0; i < add.length; i += 4) map.set(add[i] + ',' + add[i + 1] + ',' + add[i + 2] + ',' + add[i + 3], { p1: { x: add[i], y: add[i + 1] }, p2: { x: add[i + 2], y: add[i + 3] } });
+                if (spd) Object.keys(spd).forEach(id => { if (spd[id] === 0) delete sp[id]; else sp[id] = spd[id]; });
+                frames.push({ segments: [...map.values()], specialElements: JSON.parse(JSON.stringify(sp)), cursor: { i: ci, j: cj } });
+            });
+            return frames;
         }
 
         // What a shared copy carries: the drawing and the sheet, not the timelapse history (too big, and private to the owner).
@@ -1333,6 +1393,7 @@
         function leaveSharedSession() {
             clearInterval(sharedPollTimer); sharedPollTimer = null;
             shareSession = null; isViewOnly = false; sharedDirty = false;
+            exitCustomerView();
             updateShareBadge();
             try { window.history.replaceState(null, '', location.pathname); } catch (e) {}
         }
@@ -1366,6 +1427,50 @@
         }
 
         // Opened from a link (?edit=TOKEN or ?view=TOKEN)
+        // the drawing of a shared copy; a view link also carries the unpacked time-lapse
+        function sharedDataOf(sh, mode) {
+            const data = { ...sh.data };
+            if (mode === 'view' && sh.tl) { try { data.tlHistory = unpackTimelapse(sh.tl); } catch (err) { console.warn('Time-lapse not readable', err); } }
+            return data;
+        }
+
+        // ---- Customer view (a view-only link): the finished drawing, its time-lapse and the 3D model, nothing to edit ----
+        let cvBuilt = false;
+        function enterCustomerView() {
+            if (!cvBuilt) {
+                cvBuilt = true;
+                const el = document.createElement('div');
+                el.id = 'cv-head';
+                el.innerHTML = `<div id="cv-title"></div>
+                    <div id="cv-bar"><button class="cv-tab" data-t="design">Design</button><button class="cv-tab" data-t="tl">Time-lapse</button><button class="cv-tab" data-t="3d">3D</button></div>
+                    <a id="cv-brand" href="${location.pathname}" title="Open Karakuli">Karakuli</a>`;
+                document.body.appendChild(el);
+                el.querySelector('#cv-bar').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b && !b.disabled) cvGo(b.dataset.t); });
+            }
+            document.body.classList.add('customer-view');
+            document.getElementById('cv-title').textContent = currentProjectTitle || '';
+            document.querySelector('.cv-tab[data-t="tl"]').disabled = tlHistory.length < 2;
+            document.querySelector('.cv-tab[data-t="3d"]').style.display = templateKind() === 'product' ? '' : 'none';
+            cvSync();
+        }
+        function exitCustomerView() {
+            document.body.classList.remove('customer-view');
+            if (document.body.classList.contains('v3d-open')) window.close3D && window.close3D();
+            if (isTimelapseUIOpen) toggleTimelapseUI();
+        }
+        function cvSync() {
+            const tab = document.body.classList.contains('v3d-open') ? '3d' : (isTimelapseUIOpen ? 'tl' : 'design');
+            document.querySelectorAll('.cv-tab').forEach(b => b.classList.toggle('active', b.dataset.t === tab));
+        }
+        async function cvGo(tab) {
+            if (tab !== '3d' && document.body.classList.contains('v3d-open')) window.close3D();
+            if (tab !== 'tl' && isTimelapseUIOpen) toggleTimelapseUI();
+            if (tab === 'tl') { if (!isTimelapseUIOpen) toggleTimelapseUI(); startTlPlayback(); }
+            if (tab === '3d') { if (isTimelapseUIOpen) toggleTimelapseUI(); await window.open3D(); }
+            cvSync();
+        }
+        window.cvSync = cvSync;
+
         async function openSharedProject(token, mode) {
             let sh = null;
             try { sh = await window.karakuliShare.load(token); } catch (err) { console.error('Shared project error:', err); }
@@ -1374,8 +1479,9 @@
             currentProjectTitle = sh.title || 'Shared project';
             shareSession = { token, mode }; isViewOnly = mode === 'view';
             sharedSeenMs = sh.updatedAtMs || 0; sharedDirty = false;
-            applyProjectData(sh.data);
+            applyProjectData(sharedDataOf(sh, mode));
             updateShareBadge(); updateCurrentProjectUI();
+            if (isViewOnly) enterCustomerView();
             showActionHint(isViewOnly ? 'View only' : 'Shared project — your changes are saved for everyone', true);
             setTimeout(() => showActionHint(isViewOnly ? 'View only' : 'Shared project'), 3500);
             // pick up changes made by others while nothing of ours is waiting to be saved
@@ -1386,7 +1492,7 @@
                     const fresh = await window.karakuliShare.load(shareSession.token);
                     if (fresh?.data && (fresh.updatedAtMs || 0) > sharedSeenMs && !sharedDirty) {
                         sharedSeenMs = fresh.updatedAtMs || 0;
-                        applyProjectData(fresh.data, { fit: false });
+                        applyProjectData(sharedDataOf(fresh, shareSession.mode), { fit: false });
                     }
                 } catch (err) { /* offline: try again next time */ }
             }, 6000);
@@ -1432,20 +1538,22 @@ service cloud.firestore {
         // Makes sure a project has its edit and view links (publishing them if needed); returns { title, tokens }.
         async function prepareShare(id) {
             const isCurrent = !id || id === activeProjectId;
-            let data, title, tokens, pid;
+            let data, title, tokens, pid, tlPack = null;
             if (isCurrent) {
                 await saveCurrentProject();
                 pid = activeProjectId; title = currentProjectTitle; tokens = { ...projectShare }; data = shareSnapshot();
+                tlPack = packTimelapse(tlHistory);
             } else {
                 const p = await window.karakuliProjects.load(id);
                 if (!p) throw new Error('Project not found');
+                tlPack = packTimelapse(p.tlHistory);
                 pid = id; title = p.title; tokens = { edit: p.shareEditToken || null, view: p.shareViewToken || null };
                 data = { ...p }; ['tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme', 'id', 'createdAtMs', 'updatedAtMs'].forEach(k => delete data[k]);
                 if (tokens.edit) { const sh = await window.karakuliShare.load(tokens.edit); if (sh?.data) data = sh.data; }
             }
             if (!tokens.edit) tokens.edit = await window.karakuliShare.publish('edit', data, title);
-            if (!tokens.view) tokens.view = await window.karakuliShare.publish('view', data, title);
-            else await window.karakuliShare.update(tokens.view, data, title);   // the view link shows the version as of now
+            if (!tokens.view) tokens.view = await window.karakuliShare.publish('view', data, title, tlPack);
+            else await window.karakuliShare.update(tokens.view, data, title, tlPack);   // the view link shows the version as of now
             if (isCurrent) { projectShare = tokens; await saveCurrentProject(); }
             else await window.karakuliProjects.save(pid, { shareEditToken: tokens.edit, shareViewToken: tokens.view });
             return { title, tokens };
@@ -2385,6 +2493,7 @@ service cloud.firestore {
                 clearTimelapseNavigationFocus();
             }
             updateUIState(); redraw();
+            if (window.cvSync) cvSync();
         }
 
         function captureState(force = false) {
@@ -4286,7 +4395,7 @@ service cloud.firestore {
         window.addEventListener('keydown', normalizeNumpadEvent, true);
         window.addEventListener('keyup', normalizeNumpadEvent, true);
         window.addEventListener('keydown', e => {
-            if (document.body.classList.contains('v3d-open')) { if (e.key === 'Escape') window.close3D && window.close3D(); return; }   // the 3D view has its own controls
+            if (document.body.classList.contains('v3d-open')) { if (e.key === 'Escape' && !document.body.classList.contains('customer-view')) window.close3D && window.close3D(); return; }   // the 3D view has its own controls
             if (isTypingInField(e.target)) return;
             const dotKey = e.key === '.' || e.code === 'NumpadDecimal' || e.code === 'Period';
             if (document.getElementById('new-canvas-modal').classList.contains('show')) {
@@ -5118,6 +5227,7 @@ function close3D() {
     if (!document.body.classList.contains('v3d-open')) return;
     document.body.classList.remove('v3d-open');
     if (ui) ui.el.classList.remove('show');
+    if (window.cvSync) cvSync();
     S.playing = false;
     if (R) {
         cancelAnimationFrame(R.raf);
