@@ -1084,10 +1084,6 @@
         const SHOP_KEY = 'karakuli.shop.v1';
         const SHOP_DEFAULT = { currency: 'AZN', setup: 0, cutPerM: 0, bend: 0, waste: 0, markup: 0, mats: {
             steel:     { on: true, kg: 0, th: [1, 1.5, 2, 3] },
-            polished:  { on: true, kg: 0, th: [1, 1.5, 2, 3] },
-            aluminium: { on: true, kg: 0, th: [1, 1.5, 2, 3] },
-            brass:     { on: true, kg: 0, th: [1, 1.5, 2] },
-            copper:    { on: true, kg: 0, th: [1, 1.5, 2] },
             powder:    { on: true, kg: 0, th: [1.5, 2, 3] } } };
         function shopNorm(x) {
             const num = (v, d) => { v = parseFloat(v); return isFinite(v) && v >= 0 ? v : d; };
@@ -4530,22 +4526,18 @@ const GLTF_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/export
 const ORBIT_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js/+esm';
 
 const MATS = {
-    steel:     { name: 'Stainless, brushed',  color: '#c9ccd0', metal: 1,   rough: 0.55, brushed: true, density: 7.9 },
-    polished:  { name: 'Stainless, polished', color: '#e3e6ea', metal: 1,   rough: 0.07, density: 7.9 },
-    aluminium: { name: 'Aluminium',           color: '#d6d8db', metal: 1,   rough: 0.5,  brushed: true, density: 2.7 },
-    brass:     { name: 'Brass',               color: '#d9b45f', metal: 1,   rough: 0.5,  brushed: true, density: 8.5 },
-    copper:    { name: 'Copper',              color: '#cc7b57', metal: 1,   rough: 0.45, brushed: true, density: 8.96 },
+    steel:     { name: 'Stainless steel',     color: '#c9ccd0', metal: 1,   rough: 0.55, brushed: true, density: 7.9 },
     powder:    { name: 'Powder coat',         color: '#161616', metal: 0.1, rough: 0.62, density: 7.9 }
 };
 const SWATCHES = ['#161616', '#f1f1f1', '#3d4148', '#8b9099', '#b5342c', '#1f4e8c', '#2f6b4f', '#c9a227'];
-const ENVS = { studio: 'Studio', home: 'Home', office: 'Office', cafe: 'Café' };
-const WALLS = { studio: '#d4d4d4', home: '#e6ddd0', office: '#e9ebed', cafe: '#6e4b39' };
+const ENVS = { soft: 'Soft light' };                     // one even light for every product
+const WALLS = { soft: '#dcdee1' };
 const K_FACTOR = 0.4;                       // neutral-axis position of the bend (stainless / mild steel)
 // bends of every product (from PRODUCTS marks labelled BEND LINE): signed final angle in degrees, positive = towards the viewer
 const BEND_ANGLES = { shelf: [90, 75], hanger: [90, 75], magazine: [-90] };
 
 const shopCfg = () => (window.karakuliShop && window.karakuliShop.get()) || null;
-const S = { mat: 'powder', color: null, t: 2, env: 'studio', fold: 0, playing: false, auto: false };
+const S = { mat: 'powder', color: null, t: 2, env: 'soft', view: 'solid', fold: 0, playing: false, auto: false };
 let T = null, OrbitControlsCls = null, R = null, building = false;
 
 // ---------------------------------------------------------------- pure geometry
@@ -4689,7 +4681,7 @@ async function exportGLB() {
         const { GLTFExporter } = await import(GLTF_URL);
         S.fold = 1; updatePose();
         const box = new T.Box3().setFromObject(model), c = box.getCenter(new T.Vector3()), k = 0.001;
-        const m0 = MATS[S.mat], em = R.material.clone();
+        const m0 = MATS[S.mat], em = R.material.clone(); em.wireframe = false;
         em.roughnessMap = null; em.bumpMap = null; em.name = `${m0.name} ${S.t} mm`; em.roughness = m0.brushed ? Math.min(1, m0.rough + 0.1) : m0.rough;
         model.traverse(o => { if (o.isMesh) { mats.push([o, o.material]); o.material = em; } });
         const root = new T.Group(); root.name = 'Karakuli';
@@ -5317,31 +5309,21 @@ function makeBrushTexture() {
     return tex;
 }
 
-function makeEnvScene(kind) {
+function makeEnvScene() {
+    // an even light box: big soft panels from several sides with slightly different strength, so flat faces stay bright
+    // while bends, edges and the cut outline still get a visible gradient
     const sc = new T.Scene();
     const room = (color, sx, sy, sz) => { const m = new T.Mesh(new T.BoxGeometry(sx, sy, sz), new T.MeshBasicMaterial({ color, side: T.BackSide })); sc.add(m); return m; };
-    const lamp = (geo, color, power, x, y, z) => { const c = new T.Color(color).multiplyScalar(power); const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: c })); m.position.set(x, y, z); sc.add(m); return m; };
-    const panel = (w, h, color, power, x, y, z, ry = 0, rx = 0) => { const m = lamp(new T.PlaneGeometry(w, h), color, power, x, y, z); m.rotation.set(rx, ry, 0); m.material.side = T.DoubleSide; return m; };
-    if (kind === 'studio') {
-        room('#2a2d32', 40, 20, 40);
-        panel(14, 10, '#ffffff', 9, -12, 8, 10, Math.PI / 3.2);        // big softbox, left front
-        panel(3, 12, '#ffffff', 6, 14, 4, 8, -Math.PI / 3);            // strip light, right
-        panel(16, 4, '#ffffff', 5, 0, 18.5, 0, 0, Math.PI / 2);        // overhead
-        panel(18, 4, '#9bb4ff', 1.2, 0, -9, 14, 0, -0.3);              // cool fill from below front
-    } else if (kind === 'home') {
-        room('#c9bba8', 40, 20, 40);
-        panel(9, 11, '#e8f1ff', 12, -19.8, 5, 4, Math.PI / 2);         // window
-        lamp(new T.SphereGeometry(1.4, 16, 12), '#ffb36b', 14, 14, 4, -6);   // warm lamp
-        panel(30, 30, '#8a6a4b', 0.6, 0, -9.9, 0, 0, Math.PI / 2);     // wooden floor
-    } else if (kind === 'office') {
-        room('#d3d6da', 40, 18, 40);
-        [-9, 0, 9].forEach(x => [-8, 8].forEach(z => panel(6, 2.2, '#ffffff', 9, x, 8.9, z, 0, Math.PI / 2)));
-        panel(16, 6, '#cfe3ff', 7, 19.8, 3, 2, -Math.PI / 2);          // window strip
-    } else {
-        room('#2b1d15', 40, 18, 40);
-        [[-10, 6, -6], [-3, 7, 8], [6, 6, -2], [12, 5, 10], [0, 7, -12]].forEach(p => lamp(new T.SphereGeometry(0.8, 12, 10), '#ffb15e', 18, ...p));
-        panel(8, 8, '#9fb8d6', 3.2, -19.8, 3, 6, Math.PI / 2);
-    }
+    const panel = (w, h, power, x, y, z, ry = 0, rx = 0) => {
+        const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: new T.Color('#ffffff').multiplyScalar(power), side: T.DoubleSide }));
+        m.position.set(x, y, z); m.rotation.set(rx, ry, 0); sc.add(m); return m;
+    };
+    room('#8d9298', 40, 20, 40);
+    panel(26, 26, 3.2, 0, 19.5, 0, 0, Math.PI / 2);         // overhead
+    panel(16, 14, 3.0, -17, 5, 8, Math.PI / 2.6);            // left front
+    panel(14, 12, 1.9, 17, 3, 8, -Math.PI / 2.6);            // right front, weaker
+    panel(30, 10, 1.5, 0, 2, 19.5, Math.PI);                 // from the viewer's side, low
+    panel(30, 6, 1.0, 0, -9.5, 8, 0, -Math.PI / 2.4);        // floor bounce
     return sc;
 }
 
@@ -5490,6 +5472,8 @@ function applyMaterial() {
     mat.metalness = m.metal; mat.roughness = m.rough;
     mat.roughnessMap = m.brushed ? R.brush : null;
     mat.bumpMap = m.brushed ? R.brush : null; mat.bumpScale = 0.5;
+    mat.wireframe = S.view === 'wire';
+    if (R.wall) R.wall.visible = S.view !== 'wire';
     mat.needsUpdate = true;
     if (R.mask) R.weightKg = R.mask.count / (R.mask.ppm * R.mask.ppm) * S.t * m.density / 1e6;
     updateInfo();
@@ -5498,7 +5482,7 @@ function applyMaterial() {
 function applyEnv() {
     if (!R) return;
     R.dirty = true;
-    if (!R.envs[S.env]) { const es = makeEnvScene(S.env); R.envs[S.env] = R.pmrem.fromScene(es, 0.03).texture; es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+    if (!R.envs[S.env]) { const es = makeEnvScene(); R.envs[S.env] = R.pmrem.fromScene(es, 0.03).texture; es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     R.scene.environment = R.envs[S.env];
     R.scene.background = R.envs[S.env];
     R.scene.backgroundBlurriness = 0.55;
@@ -5623,7 +5607,7 @@ function buildUI() {
             <div class="v3-sec" data-sec="mat"><button class="v3-lab v3-tog"><span>Material</span><em id="v3-sum-mat"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-mats"></div></div></div>
             <div class="v3-sec" data-sec="col"><button class="v3-lab v3-tog"><span>Colour</span><em id="v3-sum-col"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-sw" id="v3-cols"></div></div></div>
             <div class="v3-sec" data-sec="thick"><button class="v3-lab v3-tog"><span>Thickness</span><em id="v3-sum-thick"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-ts"></div></div></div>
-            <div class="v3-sec" data-sec="env"><button class="v3-lab v3-tog"><span>Environment</span><em id="v3-sum-env"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-envs"></div></div></div>
+            <div class="v3-sec" data-sec="view"><button class="v3-lab v3-tog"><span>View</span><em id="v3-sum-view"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-views"><button class="v3-chip" data-v="solid">Solid</button><button class="v3-chip" data-v="wire">Wireframe</button></div></div></div>
             <div class="v3-sec" id="v3-price-sec" data-sec="price" style="display:none"><button class="v3-lab v3-tog"><span>Price</span><em id="v3-sum-price"></em><i class="v3-chev"></i></button><div class="v3-body" id="v3-price"></div></div>
             <div class="v3-sec" data-sec="dl"><button class="v3-lab v3-tog"><span>Download</span><em id="v3-sum-dl"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips"><button class="v3-chip" id="v3-glb" title="Folded 3D model for AR and 3D software">3D model (.glb)</button><button class="v3-chip" id="v3-dxf" title="Flat pattern for laser cutting">Flat pattern (.dxf)</button></div></div></div>
             <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button></div></div>
@@ -5639,7 +5623,6 @@ function buildUI() {
         el.addEventListener(ev, e => e.stopPropagation(), { passive: false }));
     ui = { el };
     const $ = id => document.getElementById(id);
-    $('v3-envs').innerHTML = Object.entries(ENVS).map(([k, n]) => `<button class="v3-chip" data-e="${k}">${n}</button>`).join('');
     $('v3-mats').onclick = async e => {
         const b = e.target.closest('[data-m]'); if (!b) return;
         const t0 = S.t; S.mat = b.dataset.m; ensureSel(); applyMaterial(); syncUI();
@@ -5652,7 +5635,7 @@ function buildUI() {
     if (window.innerWidth <= 700) document.querySelectorAll('#v3d-panel .v3-sec[data-sec]').forEach(sc => { if (sc.dataset.sec !== 'mat') sc.classList.add('closed'); });
     $('v3-glb').onclick = exportGLB;
     $('v3-dxf').onclick = exportDXF;
-    $('v3-envs').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.env = b.dataset.e; applyEnv(); syncUI(); };
+    $('v3-views').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; S.view = b.dataset.v; applyMaterial(); syncUI(); };
     $('v3-auto').onclick = () => { S.auto = !S.auto; if (R) R.controls.autoRotate = S.auto; syncUI(); };
     $('v3-fold').oninput = e => { S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
     $('v3-play').onclick = () => { if (S.fold >= 0.999) S.fold = 0; if (R) R.prog = null; S.playing = true; syncUI(); };
@@ -5668,7 +5651,7 @@ function swatchesHTML() {
 
 function syncUI() {
     const $ = id => document.getElementById(id);
-    document.querySelectorAll('#v3-envs .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.e === S.env));
+    document.querySelectorAll('#v3-views .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.v === S.view));
     $('v3-auto').classList.toggle('on', S.auto);
     $('v3-cols').innerHTML = swatchesHTML();
     $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c || null; applyMaterial(); syncUI(); };
@@ -5676,7 +5659,7 @@ function syncUI() {
     ensureSel();
     $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip${k === S.mat ? ' on' : ''}" data-m="${k}">${MATS[k].name}</button>`).join('');
     $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip${t === S.t ? ' on' : ''}" data-t="${t}">${t} mm</button>`).join('');
-    $('v3-sum-mat').textContent = MATS[S.mat].name; $('v3-sum-thick').textContent = S.t + ' mm'; $('v3-sum-env').textContent = ENVS[S.env] || '';
+    $('v3-sum-mat').textContent = MATS[S.mat].name; $('v3-sum-thick').textContent = S.t + ' mm'; $('v3-sum-view').textContent = S.view === 'wire' ? 'Wireframe' : 'Solid';
     $('v3-sum-col').innerHTML = `<span class="v3-dot-s" style="background:${S.color || MATS[S.mat].color}"></span>`;
     const owner = window.karakuliShop && window.karakuliShop.isOwner();
     $('v3-dxf').style.display = owner ? '' : 'none'; $('v3d-shop').classList.toggle('owner', !!owner);
@@ -5773,9 +5756,10 @@ function initRuntime() {
     controls.minPolarAngle = 0.25; controls.maxPolarAngle = Math.PI * 0.62;
     controls.autoRotate = S.auto;
     controls.addEventListener('change', () => { if (R) R.dirty = true; });
-    const light = new T.DirectionalLight(0xffffff, 1.6);
-    light.castShadow = true; light.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 4;
+    const light = new T.DirectionalLight(0xffffff, 0.9);
+    light.castShadow = true; light.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 8;
     scene.add(light);
+    scene.add(new T.HemisphereLight(0xffffff, 0xaeb3ba, 0.55));
     const wall = new T.Mesh(new T.PlaneGeometry(40000, 30000), new T.MeshStandardMaterial({ color: WALLS[S.env], roughness: 0.95, metalness: 0 }));
     wall.receiveShadow = true; scene.add(wall);
     R = { renderer, scene, camera, controls, light, wall, pmrem: new T.PMREMGenerator(renderer), envs: {}, material: new T.MeshStandardMaterial({ side: T.DoubleSide }), brush: makeBrushTexture(), model: null, pieces: [], strips: [], mask: null, raf: 0, last: 0, dirty: true, lite, slow: 0, fr: 0 };
