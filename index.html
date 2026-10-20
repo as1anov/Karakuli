@@ -4573,7 +4573,10 @@ function cutLengthMm(mask) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sub[(y + 1) * W2 + x + 1] = A[y * W + x];
     let len = 0;
     const per = pts => { for (let i = 0; i < pts.length; i += 2) { const j = (i + 2) % pts.length; len += Math.hypot(pts[j] - pts[i], pts[j + 1] - pts[i + 1]); } };
-    groupLoops(traceContours(sub, W2, H2), 0.12).forEach(o => { per(o.pts); o.holes.forEach(per); });
+    refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm).forEach(o => {
+        if (o.circle) len += 2 * Math.PI * o.circle.r; else per(o.pts);
+        o.holes.forEach((h, i) => { const c = o.holeCircles[i]; if (c) len += 2 * Math.PI * c.r; else per(h); });
+    });
     return len / ppm;
 }
 function priceOf() {
@@ -4599,7 +4602,7 @@ function download(blob, name) {
 function buildDXF(mask, w, h, key) {
     const { A, W, H, ppm } = mask, W2 = W + 2, H2 = H + 2, sub = new Uint8Array(W2 * H2);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sub[(y + 1) * W2 + x + 1] = A[y * W + x];
-    const groups = groupLoops(traceContours(sub, W2, H2), 0.12);
+    const groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm);
     const f = v => (+v.toFixed(3)).toString();
     const X = px => Math.min(w, Math.max(0, (px - 1 + 0.5) / ppm)), Y = py => Math.min(h, Math.max(0, h - (py - 1 + 0.5) / ppm));   // pixel centres, kept on the sheet; DXF has Y up
     const out = [];
@@ -4620,7 +4623,11 @@ function buildDXF(mask, w, h, key) {
         }
         put(0, 'SEQEND'); put(8, 'CUT'); nLoops++;
     };
-    groups.forEach(o => { poly(o.pts); o.holes.forEach(poly); });
+    const circ = c => {   // a true circle stays a CIRCLE entity: exact for the laser
+        const x = X(c.cx), y = Y(c.cy), r = c.r / ppm; minX = Math.min(minX, x - r); maxX = Math.max(maxX, x + r);
+        put(0, 'CIRCLE'); put(8, 'CUT'); put(10, f(x)); put(20, f(y)); put(30, 0); put(40, f(r)); nLoops++;
+    };
+    groups.forEach(o => { o.circle ? circ(o.circle) : poly(o.pts); o.holes.forEach((h, i) => o.holeCircles[i] ? circ(o.holeCircles[i]) : poly(h)); });
     if (!nLoops) return null;
     bendSpec(key, mask.G, S.t).forEach(b => {
         put(0, 'LINE'); put(8, 'BEND'); put(10, f(Math.max(0, minX))); put(20, f(h - b.y)); put(30, 0); put(11, f(Math.min(w, maxX))); put(21, f(h - b.y)); put(31, 0);
@@ -4780,6 +4787,134 @@ function groupLoops(rawLoops, tol) {
     return outers;
 }
 
+// ---------------------------------------------------------------- clean contours: exact circles, smooth curves, sharp corners kept
+// The mask is a picture, so its contours carry pixel noise. Circles are recognised and rebuilt exactly; other curves are
+// smoothed along their length; real corners (turns above ~43 degrees) stay exactly where they are.
+function loopLen(p) {
+    const n = p.length / 2; const cum = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; cum[i + 1] = cum[i] + Math.hypot(p[2 * j] - p[2 * i], p[2 * j + 1] - p[2 * i + 1]); }
+    return cum;
+}
+function loopAt(p, cum, s) {   // point at arc length s (wraps around)
+    const n = p.length / 2, total = cum[n];
+    s = ((s % total) + total) % total;
+    let lo = 0, hi = n;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] <= s) lo = m; else hi = m; }
+    const j = (lo + 1) % n, seg = cum[lo + 1] - cum[lo], t = seg > 0 ? (s - cum[lo]) / seg : 0;
+    return [p[2 * lo] + (p[2 * j] - p[2 * lo]) * t, p[2 * lo + 1] + (p[2 * j + 1] - p[2 * lo + 1]) * t];
+}
+function fitCircle(xs, ys) {
+    const n = xs.length; let mx = 0, my = 0;
+    for (let i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; } mx /= n; my /= n;
+    let Suu = 0, Suv = 0, Svv = 0, Suuu = 0, Svvv = 0, Suvv = 0, Svuu = 0;
+    for (let i = 0; i < n; i++) { const u = xs[i] - mx, v = ys[i] - my; Suu += u * u; Suv += u * v; Svv += v * v; Suuu += u * u * u; Svvv += v * v * v; Suvv += u * v * v; Svuu += v * u * u; }
+    const det = Suu * Svv - Suv * Suv; if (Math.abs(det) < 1e-9) return null;
+    const b1 = 0.5 * (Suuu + Suvv), b2 = 0.5 * (Svvv + Svuu);
+    const uc = (b1 * Svv - b2 * Suv) / det, vc = (Suu * b2 - Suv * b1) / det;
+    return { cx: mx + uc, cy: my + vc, r: Math.sqrt(uc * uc + vc * vc + (Suu + Svv) / n) };
+}
+function circlePoints(c, ppm, sign) {
+    const rmm = c.r / ppm, n = Math.max(48, Math.min(720, Math.ceil(31.4 * Math.sqrt(Math.max(rmm, 0.5))))), out = [];
+    for (let i = 0; i < n; i++) { const a = sign * 2 * Math.PI * i / n; out.push(c.cx + c.r * Math.cos(a), c.cy + c.r * Math.sin(a)); }
+    return out;
+}
+// drops points that lie within tol of the line through their neighbours (straight runs stay straight, curves keep their points)
+function thinClosed(p, tol) {
+    const n = p.length / 2; if (n < 8) return p;
+    const out = [p[0], p[1]]; let ax = p[0], ay = p[1];
+    for (let i = 1; i < n; i++) {
+        const nx = p[2 * ((i + 1) % n)], ny = p[2 * ((i + 1) % n) + 1], x = p[2 * i], y = p[2 * i + 1];
+        const dx = nx - ax, dy = ny - ay, l = Math.hypot(dx, dy) || 1;
+        if (Math.abs((x - ax) * dy - (y - ay) * dx) / l < tol && Math.hypot(x - ax, y - ay) < 40) continue;
+        out.push(x, y); ax = x; ay = y;
+    }
+    return out.length >= 6 ? out : p;
+}
+// -> { pts, circle: {cx, cy, r} | null }   (pts flat, same orientation as the input)
+function refineLoop(p, ppm) {
+    const n = p.length / 2;
+    const cum = loopLen(p), total = cum[n];
+    if (n < 6 || total < 24) return { pts: p, circle: null };
+    const sign = loopArea(p) >= 0 ? 1 : -1;
+    // 1) a circle?  (sample evenly, fit, compare)
+    const m = Math.max(48, Math.round(total)), xs = new Float64Array(m), ys = new Float64Array(m);
+    for (let k = 0; k < m; k++) { const q = loopAt(p, cum, total * k / m); xs[k] = q[0]; ys[k] = q[1]; }
+    const c = fitCircle(xs, ys);
+    if (c && c.r >= 3 && isFinite(c.r)) {
+        let md = 0; for (let k = 0; k < m; k++) md = Math.max(md, Math.abs(Math.hypot(xs[k] - c.cx, ys[k] - c.cy) - c.r));
+        const area = Math.abs(loopArea(p)), full = Math.PI * c.r * c.r;
+        if (md <= Math.max(0.9, 0.03 * c.r) && Math.abs(area - full) < 0.06 * full) return { pts: circlePoints(c, ppm, sign), circle: c };
+    }
+    // 2) corners: the direction changes by more than ~43 degrees between points 4 px before and after
+    const arm = 4, cand = [];
+    for (let i = 0; i < n; i++) {
+        const s = cum[i], a = loopAt(p, cum, s - arm), b = loopAt(p, cum, s + arm), cx = p[2 * i], cy = p[2 * i + 1];
+        const v1x = cx - a[0], v1y = cy - a[1], v2x = b[0] - cx, v2y = b[1] - cy, l1 = Math.hypot(v1x, v1y), l2 = Math.hypot(v2x, v2y);
+        if (l1 < 1e-6 || l2 < 1e-6) continue;
+        const ang = Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (l1 * l2))));
+        if (ang > 0.75) cand.push({ i, s, ang });
+    }
+    const corners = cand.filter(c1 => !cand.some(c2 => c2 !== c1 && (c2.ang > c1.ang || (c2.ang === c1.ang && c2.i < c1.i)) &&
+        Math.min(Math.abs(c2.s - c1.s), total - Math.abs(c2.s - c1.s)) < arm)).sort((a, b) => a.i - b.i);
+    const smooth = (pts, fixedEnds) => {   // [1 2 1] / 4, five passes
+        const k = pts.length / 2;
+        for (let pass = 0; pass < 5; pass++) {
+            const nx = pts.slice();
+            for (let i = 0; i < k; i++) {
+                if (fixedEnds && (i === 0 || i === k - 1)) continue;
+                const a = (i + k - 1) % k, b = (i + 1) % k;
+                nx[2 * i] = (pts[2 * a] + 2 * pts[2 * i] + pts[2 * b]) / 4; nx[2 * i + 1] = (pts[2 * a + 1] + 2 * pts[2 * i + 1] + pts[2 * b + 1]) / 4;
+            }
+            pts = nx;
+        }
+        return pts;
+    };
+    if (!corners.length) {
+        const k = Math.max(12, Math.round(total)), pts = [];
+        for (let j = 0; j < k; j++) { const q = loopAt(p, cum, total * j / k); pts.push(q[0], q[1]); }
+        return { pts: thinClosed(smooth(pts, false), 0.03), circle: null };
+    }
+    const out = [];
+    corners.forEach((c1, ci) => {
+        const c2 = corners[(ci + 1) % corners.length];
+        let len = c2.s - c1.s; if (len <= 0) len += total;
+        const k = Math.max(1, Math.round(len)), pts = [];
+        for (let j = 0; j <= k; j++) { const q = j === 0 ? [p[2 * c1.i], p[2 * c1.i + 1]] : j === k ? [p[2 * c2.i], p[2 * c2.i + 1]] : loopAt(p, cum, c1.s + len * j / k); pts.push(q[0], q[1]); }
+        const sm = k >= 2 ? smooth(pts, true) : pts;
+        for (let j = 0; j < sm.length - 2; j++) out.push(sm[j]);   // the last point is the next chain's first
+    });
+    return { pts: thinClosed(out, 0.03), circle: null };
+}
+// groupLoops result -> same shape, cleaned. holeCircles[i] is the circle of holes[i] (or null)
+function refineGroups(groups, ppm) {
+    return groups.map(o => {
+        const outer = refineLoop(o.pts, ppm), hs = o.holes.map(h => refineLoop(h, ppm));
+        return { pts: outer.pts, circle: outer.circle, holes: hs.map(h => h.pts), holeCircles: hs.map(h => h.circle) };
+    });
+}
+
+// Smooth normals along the cut edge: faces meeting at a gentle angle share a normal, real edges (top / side) stay sharp.
+function creaseNormals(geo, deg) {
+    if (!geo.attributes || !geo.attributes.position || geo.index) return geo;
+    const pos = geo.attributes.position.array, nv = pos.length / 3, nt = Math.floor(nv / 3);
+    if (nt < 1) return geo;
+    const fn = new Float32Array(nt * 3), cosT = Math.cos(deg * Math.PI / 180), map = new Map(), key = i => Math.round(pos[3 * i] * 200) + ',' + Math.round(pos[3 * i + 1] * 200) + ',' + Math.round(pos[3 * i + 2] * 200);
+    for (let t = 0; t < nt; t++) {
+        const a = 9 * t, ux = pos[a + 3] - pos[a], uy = pos[a + 4] - pos[a + 1], uz = pos[a + 5] - pos[a + 2], vx = pos[a + 6] - pos[a], vy = pos[a + 7] - pos[a + 1], vz = pos[a + 8] - pos[a + 2];
+        let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz) || 1;
+        fn[3 * t] = nx / l; fn[3 * t + 1] = ny / l; fn[3 * t + 2] = nz / l;
+        for (let c = 0; c < 3; c++) { const k = key(3 * t + c); let arr = map.get(k); if (!arr) map.set(k, arr = []); arr.push(t); }
+    }
+    const out = new Float32Array(nv * 3);
+    for (let t = 0; t < nt; t++) for (let c = 0; c < 3; c++) {
+        const vi = 3 * t + c, arr = map.get(key(vi)); let sx = 0, sy = 0, sz = 0;
+        for (const u of arr) { const d = fn[3 * t] * fn[3 * u] + fn[3 * t + 1] * fn[3 * u + 1] + fn[3 * t + 2] * fn[3 * u + 2]; if (d >= cosT) { sx += fn[3 * u]; sy += fn[3 * u + 1]; sz += fn[3 * u + 2]; } }
+        const l = Math.hypot(sx, sy, sz) || 1; out[3 * vi] = sx / l; out[3 * vi + 1] = sy / l; out[3 * vi + 2] = sz / l;
+    }
+    geo.setAttribute('normal', new T.BufferAttribute(out, 3));
+    return geo;
+}
+
 // Bend geometry of the sheet in the (Y up, Z towards the viewer) plane.
 function bendSpec(key, G, t) {
     const marks = PRODUCTS[key].marks.filter(m => m.label === 'BEND LINE');
@@ -4924,7 +5059,7 @@ function shapesForRows(mask, r0, r1) {
     let any = false;
     for (let y = 0; y < hh; y++) for (let x = 0; x < W; x++) { const v = A[(r0 + y) * W + x]; if (v) { sub[(y + 1) * W2 + x + 1] = v; any = true; } }
     if (!any) return [];
-    const groups = groupLoops(traceContours(sub, W2, H2), 0.12);
+    const groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm);
     const toPts = pts => { const v = []; for (let i = 0; i < pts.length; i += 2) v.push(new T.Vector2((pts[i] - 1) / ppm, -(pts[i + 1] - 1) / ppm)); return v; };
     return groups.map(o => {
         const s = new T.Shape(toPts(o.pts));
@@ -5010,7 +5145,7 @@ async function buildModel() {
     layout.pieces.forEach((pc, i) => {
         const shapes = shapesForRows(mask, pc.r0, pc.r1);
         if (!shapes.length) { R.pieces.push(null); return; }
-        const geo = new T.ExtrudeGeometry(shapes, { depth: t, bevelEnabled: false, curveSegments: 1, steps: 1 });
+        const geo = creaseNormals(new T.ExtrudeGeometry(shapes, { depth: t, bevelEnabled: false, curveSegments: 1, steps: 1 }), 40);
         geo.translate(0, 0, -t / 2);
         const mesh = new T.Mesh(geo, R.material);
         mesh.castShadow = mesh.receiveShadow = true;
@@ -5480,7 +5615,7 @@ function close3D() {
 
 window.addEventListener('resize', resize);
 window.open3D = open3D; window.close3D = close3D;
-window.__v3d = { buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
+window.__v3d = { refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
 // the 3D button lives on the canvas, only for the products
 setInterval(() => {
