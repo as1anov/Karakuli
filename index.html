@@ -4827,17 +4827,56 @@ function fitLine(Q, a, b) {
 }
 const lineDist = (L, x, y) => Math.abs((x - L.px) * L.dy - (y - L.py) * L.dx);
 const lineProj = (L, x, y) => { const t = (x - L.px) * L.dx + (y - L.py) * L.dy; return [L.px + L.dx * t, L.py + L.dy * t]; };
-const LINE_TOL = 0.32, ARC_TOL = 0.32;
+const LINE_TOL = 0.2, ARC_TOL = 0.25;
+// The exact circles and lines of the drawing itself (rings, bolt holes, stroke edges), in the same coordinates as the contour.
+// Fitted arcs and lines that lie on one of them are replaced by it, so a ring is a true circle and a stroke edge a true line.
+let SNAP = null;
+function shiftDesign(d, dy) { return d && { circles: d.circles.map(c => ({ cx: c.cx, cy: c.cy + dy, r: c.r })), lines: d.lines.map(l => ({ px: l.px, py: l.py + dy, dx: l.dx, dy: l.dy })) }; }
+function snapCircle(c) {
+    if (!SNAP) return c;
+    let best = null, bd = 0.9;
+    for (const d of SNAP.circles) { const dd = Math.hypot(d.cx - c.cx, d.cy - c.cy) + Math.abs(d.r - c.r); if (dd < bd) { bd = dd; best = d; } }
+    return best || c;
+}
+function snapLine(L) {
+    if (!SNAP) return L;
+    let best = null, bd = 0.7;
+    for (const D of SNAP.lines) {
+        if (Math.abs(L.dx * D.dy - L.dy * D.dx) > 0.02) continue;
+        const d = lineDist(D, L.px, L.py); if (d < bd) { bd = d; best = D; }
+    }
+    if (!best) return L;
+    const q = lineProj(best, L.px, L.py); return { px: q[0], py: q[1], dx: best.dx, dy: best.dy };
+}
+// the chain Q[a..b] lies on one of the drawing's circles (and is really curved): an arc of that circle
+function designArc(Q, a, b) {
+    if (!SNAP || b - a < 6) return null;
+    const mi = (a + b) >> 1, mx = Q[2 * mi], my = Q[2 * mi + 1];
+    for (const d of SNAP.circles) {
+        if (Math.abs(Math.hypot(mx - d.cx, my - d.cy) - d.r) > 1.2) continue;
+        let md = 0; const e = Math.min(3, (b - a) >> 2);
+        for (let i = a + e; i <= b - e; i++) md = Math.max(md, Math.abs(Math.hypot(Q[2 * i] - d.cx, Q[2 * i + 1] - d.cy) - d.r));
+        if (md > 0.4) continue;
+        const ch = { px: Q[2 * a], py: Q[2 * a + 1] }, dx = Q[2 * b] - ch.px, dy = Q[2 * b + 1] - ch.py, l = Math.hypot(dx, dy) || 1; ch.dx = dx / l; ch.dy = dy / l;
+        let sag = 0; for (let i = a; i <= b; i++) sag = Math.max(sag, lineDist(ch, Q[2 * i], Q[2 * i + 1]));
+        if (sag < 0.12) continue;   // practically straight
+        let span = 0, prev = Math.atan2(Q[2 * a + 1] - d.cy, Q[2 * a] - d.cx);
+        for (let i = a + 1; i <= b; i++) { const an = Math.atan2(Q[2 * i + 1] - d.cy, Q[2 * i] - d.cx); let t = an - prev; while (t > Math.PI) t -= 2 * Math.PI; while (t < -Math.PI) t += 2 * Math.PI; span += t; prev = an; }
+        if (Math.abs(span) < 5.8 && Math.abs(span) > 0.02) return { t: 'A', c: d, a, b, span };
+    }
+    return null;
+}
 
 // splits the open chain Q[a..b] into lines and arcs: [{t:'L', L, a, b} | {t:'A', c, a, b, span}]
 function primitives(Q, a, b, out) {
     const len = b - a + 1;
     if (len < 4) { out.push({ t: 'P', a, b }); return; }
+    const da = designArc(Q, a, b); if (da) { out.push(da); return; }
     // line? (the first / last two points belong to a chamfered corner, so they are not used for the fit)
     const e = len > 12 ? 3 : 0, L = fitLine(Q, a + e, b - e);
     let md = 0, mi = a;
     for (let i = a + e; i <= b - e; i++) { const d = lineDist(L, Q[2 * i], Q[2 * i + 1]); if (d > md) { md = d; mi = i; } }
-    if (md <= LINE_TOL) { out.push({ t: 'L', L, a, b }); return; }
+    if (md <= LINE_TOL) { out.push({ t: 'L', L: snapLine(L), a, b }); return; }
     // arc?
     if (len >= 8) {
         const xs = [], ys = [];
@@ -4848,7 +4887,7 @@ function primitives(Q, a, b, out) {
             if (cd <= ARC_TOL) {
                 let span = 0, prev = Math.atan2(ys[0] - c.cy, xs[0] - c.cx);
                 for (let i = 1; i < xs.length; i++) { const an = Math.atan2(ys[i] - c.cy, xs[i] - c.cx); let d = an - prev; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; span += d; prev = an; }
-                if (Math.abs(span) < 5.8 && Math.abs(span) > 0.05) { out.push({ t: 'A', c, a, b, span }); return; }
+                if (Math.abs(span) < 5.8 && Math.abs(span) > 0.05) { out.push({ t: 'A', c: snapCircle(c), a, b, span }); return; }
             }
         }
     }
@@ -4877,7 +4916,7 @@ function refineLoop(p, ppm) {
         if (c && c.r >= 3 && isFinite(c.r)) {
             let md = 0; for (let k = 0; k < m; k++) md = Math.max(md, Math.abs(Math.hypot(xs[k] - c.cx, ys[k] - c.cy) - c.r));
             const area = Math.abs(loopArea(p)), full = Math.PI * c.r * c.r;
-            if (md <= Math.max(0.9, 0.03 * c.r) && Math.abs(area - full) < 0.06 * full) return { pts: circlePoints(c, ppm, sign), circle: c };
+            if (md <= Math.max(0.9, 0.03 * c.r) && Math.abs(area - full) < 0.06 * full) { const sc = snapCircle(c); return { pts: circlePoints(sc, ppm, sign), circle: sc }; }
         }
     }
     // 2) corners: the direction changes by more than ~34 degrees between samples 4 px before and after
@@ -4934,6 +4973,8 @@ function refineLoop(p, ppm) {
         for (let k = 0; k < np - 1; k++) {
             const e = ch.prims[k].b, f = ch.prims[k + 1].a, mx = (R[2 * e] + R[2 * f]) / 2, my = (R[2 * e + 1] + R[2 * f + 1]) / 2, P1 = ch.prims[k], P2 = ch.prims[k + 1];
             let jp = [mx, my];
+            const onC = c => { const an = Math.atan2(jp[1] - c.cy, jp[0] - c.cx); jp = [c.cx + c.r * Math.cos(an), c.cy + c.r * Math.sin(an)]; };
+            if (P1.t === 'A') onC(P1.c); else if (P2.t === 'A') onC(P2.c);
             if (P1.t === 'L' && P2.t === 'L') {   // two straight lines meet in their intersection
                 const cr = P1.L.dx * P2.L.dy - P1.L.dy * P2.L.dx;
                 if (Math.abs(cr) > 0.05) { const t = ((P2.L.px - P1.L.px) * P2.L.dy - (P2.L.py - P1.L.py) * P2.L.dx) / cr, x = P1.L.px + P1.L.dx * t, y = P1.L.py + P1.L.dy * t; if (Math.hypot(x - mx, y - my) < 3) jp = [x, y]; }
@@ -4949,7 +4990,7 @@ function refineLoop(p, ppm) {
                 while (sg * d < 0) d += sg * 2 * Math.PI; while (sg * d > 2 * Math.PI) d -= sg * 2 * Math.PI;
                 if (Math.abs(d - span) < 1.2) span = d;   // follow the junctions when they agree with the fit
                 const nseg = Math.max(2, Math.ceil(Math.abs(span) / (2 * Math.acos(Math.max(0, 1 - 0.02 / c.r)))));
-                out.push(s[0], s[1]);
+                out.push(c.cx + c.r * Math.cos(a0), c.cy + c.r * Math.sin(a0));
                 for (let i = 1; i < nseg; i++) { const an = a0 + span * i / nseg; out.push(c.cx + c.r * Math.cos(an), c.cy + c.r * Math.sin(an)); }
             } else if (pr.t === 'P') {   // too short to classify: keep the samples
                 out.push(s[0], s[1]);
@@ -4972,11 +5013,48 @@ function thinClosed(p, tol) {
     return out.length >= 6 ? out : p;
 }
 // groupLoops result -> same shape, cleaned. holeCircles[i] is the circle of holes[i] (or null)
-function refineGroups(groups, ppm) {
-    return groups.map(o => {
-        const outer = refineLoop(o.pts, ppm), hs = o.holes.map(h => refineLoop(h, ppm));
-        return { pts: outer.pts, circle: outer.circle, holes: hs.map(h => h.pts), holeCircles: hs.map(h => h.circle) };
-    });
+function refineGroups(groups, ppm, design) {
+    SNAP = design || null;
+    try {
+        return groups.map(o => {
+            const outer = refineLoop(o.pts, ppm), hs = o.holes.map(h => refineLoop(h, ppm));
+            return { pts: outer.pts, circle: outer.circle, holes: hs.map(h => h.pts), holeCircles: hs.map(h => h.circle) };
+        });
+    } finally { SNAP = null; }
+}
+
+// The exact circles and lines of the drawing (rings, bolt holes, stroke edges), in contour coordinates (image px + 1)
+function designPrimitives(w, h, W, H, ppm) {
+    const mm = LINE_WEIGHT / 12, pw = w * mm, ph = h * mm, sx = W / pw, sy = H / ph, hw = LINE_WEIGHT / 2;
+    const U = (X, Y) => [(X + pw / 2) * sx + 1, (Y + ph / 2) * sy + 1];
+    const circles = [], lines = [];
+    const line = (X1, Y1, X2, Y2) => { const a = U(X1, Y1), b = U(X2, Y2), l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l > 1e-6) lines.push({ px: a[0], py: a[1], dx: (b[0] - a[0]) / l, dy: (b[1] - a[1]) / l }); };
+    const ringD = BASE_STEP_VAL * 2;
+    for (const id in specialElements) {
+        const [i, j] = id.split(',').map(Number), x = i * STEP, y = j * STEP, c = U(x, y);
+        if (specialElements[id].isNode) { circles.push({ cx: c[0], cy: c[1], r: (ringD / 2 + hw) * sx }, { cx: c[0], cy: c[1], r: (ringD / 2 - hw) * sx }); }
+        if (specialElements[id].isDiamond) {   // a square of side LINE_WEIGHT turned by 45 degrees
+            const cx = x, cy = y + hw, k = hw * Math.SQRT2, P = [[cx, cy - k], [cx + k, cy], [cx, cy + k], [cx - k, cy]];
+            P.forEach((q, n) => line(q[0], q[1], P[(n + 1) % 4][0], P[(n + 1) % 4][1]));
+        }
+    }
+    getPathGroups().forEach(g => g.forEach(sg => {
+        const x1 = sg.p1.x * STEP, y1 = sg.p1.y * STEP, x2 = sg.p2.x * STEP, y2 = sg.p2.y * STEP, l = Math.hypot(x2 - x1, y2 - y1);
+        if (l < 1e-6) return;
+        const dx = (x2 - x1) / l, dy = (y2 - y1) / l, nx = -dy * hw, ny = dx * hw;
+        line(x1 + nx, y1 + ny, x2 + nx, y2 + ny); line(x1 - nx, y1 - ny, x2 - nx, y2 - ny);   // the two edges of the stroke
+        line(x1 + nx, y1 + ny, x1 - nx, y1 - ny); line(x2 + nx, y2 + ny, x2 - nx, y2 - ny);   // the butt ends
+    }));
+    // the outline of the product itself: straight edges, the solid zone's top edge, rounded corners, hook arms
+    {
+        const P = PRODUCTS[activeProductKey], G = productGeom(activeProductKey, w, h), L = -pw / 2, R = pw / 2, T = -ph / 2, B = ph / 2;
+        line(L, T, L, B); line(R, T, R, B); line(L, T, R, T); line(L, B, R, B);
+        if (G.patternEnd != null) line(L, T + G.patternEnd * mm, R, T + G.patternEnd * mm);
+        if (P.radius) { const r = P.radius * mm; [[R - r, B - r], [L + r, B - r]].forEach(([cx, cy]) => { const c = U(cx, cy); circles.push({ cx: c[0], cy: c[1], r: r * sx }); }); }
+        if (P.hooks && G.arms) { const sy0 = T + G.anchor * mm; line(L, sy0, R, sy0); G.arms.forEach(a => { line(L + a[0] * mm, sy0, L + a[0] * mm, B); line(L + a[1] * mm, sy0, L + a[1] * mm, B); }); }
+    }
+    productGeom(activeProductKey, w, h).holes.forEach(([hx, hy]) => circles.push({ cx: hx * ppm + 1, cy: hy * ppm + 1, r: HOLE_DIAMETER_MM / 2 * ppm }));
+    return { circles, lines };
 }
 
 // Cleaned contours of the whole mask (cached): used for the cut length, the DXF and the ends of the bend strips.
@@ -4985,7 +5063,7 @@ function maskGroups(mask) {
     if (mask.groups) return mask.groups;
     const { A, W, H, ppm } = mask, W2 = W + 2, H2 = H + 2, sub = new Uint8Array(W2 * H2);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sub[(y + 1) * W2 + x + 1] = A[y * W + x];
-    return (mask.groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm));
+    return (mask.groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm, mask.design));
 }
 // Runs of metal on the horizontal line y (image pixels): where the cleaned outline crosses it, in pairs
 function crossRuns(mask, y) {
@@ -5162,7 +5240,9 @@ async function rasterMask(w, h) {
                 if (dist <= r && g[i]) { g[i] = 0; count--; }
             }
     });
-    return { g, A, W, H, ppm, count, w, h, G };
+    let design = null;
+    try { design = designPrimitives(w, h, W, H, ppm); } catch (err) { console.warn('3D: exact circles not available', err); }
+    return { g, A, W, H, ppm, count, w, h, G, design };
 }
 
 // ---------------------------------------------------------------- Three.js parts
@@ -5174,7 +5254,7 @@ function shapesForRows(mask, r0, r1) {
     let any = false;
     for (let y = 0; y < hh; y++) for (let x = 0; x < W; x++) { const v = A[(r0 + y) * W + x]; if (v) { sub[(y + 1) * W2 + x + 1] = v; any = true; } }
     if (!any) return [];
-    const groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm);
+    const groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm, shiftDesign(mask.design, -r0));
     const toPts = pts => { const v = []; for (let i = 0; i < pts.length; i += 2) v.push(new T.Vector2((pts[i] - 1) / ppm, -(pts[i + 1] - 1) / ppm)); return v; };   // the tracer works on a mask padded by 1 px
     return groups.map(o => {
         const s = new T.Shape(toPts(o.pts));
@@ -5735,7 +5815,7 @@ function close3D() {
 
 window.addEventListener('resize', resize);
 window.open3D = open3D; window.close3D = close3D;
-window.__v3d = { rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
+window.__v3d = { designPrimitives, rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
 // the 3D button lives on the canvas, only for the products
 setInterval(() => {
