@@ -943,17 +943,19 @@
         // Firestore rules for /shared are listed in the note shown by the Share window.
         const randomToken = () => { const a = new Uint8Array(20); crypto.getRandomValues(a); return Array.from(a, b => (b % 36).toString(36)).join(''); };
         window.karakuliShare = {
-            async publish(kind, data, title, tl) {
+            async publish(kind, data, title, tl, shop) {
                 if (!signedInUser) throw new Error('Sign in with Google to share');
                 const token = randomToken(), now = Date.now();
                 const docData = { kind, ownerUid: signedInUser.uid, title: title || '', data, createdAtMs: now, updatedAtMs: now };
                 if (tl) docData.tl = tl;
+                if (shop) docData.shop = shop;
                 await setDoc(doc(db, 'shared', token), docData);
                 return token;
             },
-            async update(token, data, title, tl) {
+            async update(token, data, title, tl, shop) {
                 const upd = { data, title: title || '', updatedAtMs: Date.now() };
                 if (tl !== undefined) upd.tl = tl || null;
+                if (shop !== undefined) upd.shop = shop || null;
                 await updateDoc(doc(db, 'shared', token), upd);
             },
             async load(token) { const snap = await getDoc(doc(db, 'shared', token)); return snap.exists() ? snap.data() : null; },
@@ -1068,6 +1070,38 @@
                 tlHistory, tlCurrentFrame, tlCaptureStride, tlCaptureCounter
             }));
         }
+
+        // ---- Shop options: which materials / thicknesses are sold and the price rules. Prices start at 0 (= not shown) ----
+        const SHOP_KEY = 'karakuli.shop.v1';
+        const SHOP_DEFAULT = { currency: 'AZN', setup: 0, cutPerM: 0, bend: 0, waste: 0, markup: 0, mats: {
+            steel:     { on: true, kg: 0, th: [1, 1.5, 2, 3] },
+            polished:  { on: true, kg: 0, th: [1, 1.5, 2, 3] },
+            aluminium: { on: true, kg: 0, th: [1, 1.5, 2, 3] },
+            brass:     { on: true, kg: 0, th: [1, 1.5, 2] },
+            copper:    { on: true, kg: 0, th: [1, 1.5, 2] },
+            powder:    { on: true, kg: 0, th: [1.5, 2, 3] } } };
+        function shopNorm(x) {
+            const num = (v, d) => { v = parseFloat(v); return isFinite(v) && v >= 0 ? v : d; };
+            const o = JSON.parse(JSON.stringify(SHOP_DEFAULT)); x = x && typeof x === 'object' ? x : {};
+            o.currency = String(x.currency || o.currency).slice(0, 6);
+            ['setup', 'cutPerM', 'bend', 'waste', 'markup'].forEach(k => o[k] = num(x[k], 0));
+            Object.keys(o.mats).forEach(k => {
+                const m = x.mats && x.mats[k]; if (!m) return;
+                o.mats[k].on = m.on !== false; o.mats[k].kg = num(m.kg, 0);
+                const th = [...new Set((Array.isArray(m.th) ? m.th : []).map(Number).filter(v => isFinite(v) && v >= 0.5 && v <= 12))].sort((a, b) => a - b).slice(0, 8);
+                if (th.length) o.mats[k].th = th;
+            });
+            if (!Object.values(o.mats).some(m => m.on)) o.mats.steel.on = true;
+            return o;
+        }
+        let shopOwn = (() => { try { return shopNorm(JSON.parse(localStorage.getItem(SHOP_KEY))); } catch (e) { return shopNorm(null); } })();
+        let shopView = null;   // prices of the shop that made the link (view-only mode)
+        window.karakuliShop = {
+            get: () => shopView || shopOwn, getOwn: () => shopOwn, normalize: shopNorm,
+            set(cfg) { shopOwn = shopNorm(cfg); try { localStorage.setItem(SHOP_KEY, JSON.stringify(shopOwn)); } catch (e) {} },
+            setView(cfg) { shopView = cfg ? shopNorm(cfg) : null; },
+            isOwner: () => !isViewOnly
+        };
 
         // Time-lapse for the view link. A recording is a list of FULL snapshots (far too big for one Firestore document),
         // so it is stored as differences: per frame the segments added / removed, changed special elements and the cursor.
@@ -1393,7 +1427,7 @@
         function leaveSharedSession() {
             clearInterval(sharedPollTimer); sharedPollTimer = null;
             shareSession = null; isViewOnly = false; sharedDirty = false;
-            exitCustomerView();
+            exitCustomerView(); window.karakuliShop.setView(null);
             updateShareBadge();
             try { window.history.replaceState(null, '', location.pathname); } catch (e) {}
         }
@@ -1479,6 +1513,7 @@
             currentProjectTitle = sh.title || 'Shared project';
             shareSession = { token, mode }; isViewOnly = mode === 'view';
             sharedSeenMs = sh.updatedAtMs || 0; sharedDirty = false;
+            window.karakuliShop.setView(mode === 'view' ? sh.shop : null);
             applyProjectData(sharedDataOf(sh, mode));
             updateShareBadge(); updateCurrentProjectUI();
             if (isViewOnly) enterCustomerView();
@@ -1552,8 +1587,8 @@ service cloud.firestore {
                 if (tokens.edit) { const sh = await window.karakuliShare.load(tokens.edit); if (sh?.data) data = sh.data; }
             }
             if (!tokens.edit) tokens.edit = await window.karakuliShare.publish('edit', data, title);
-            if (!tokens.view) tokens.view = await window.karakuliShare.publish('view', data, title, tlPack);
-            else await window.karakuliShare.update(tokens.view, data, title, tlPack);   // the view link shows the version as of now
+            if (!tokens.view) tokens.view = await window.karakuliShare.publish('view', data, title, tlPack, window.karakuliShop.getOwn());
+            else await window.karakuliShare.update(tokens.view, data, title, tlPack, window.karakuliShop.getOwn());   // the view link shows the version as of now
             if (isCurrent) { projectShare = tokens; await saveCurrentProject(); }
             else await window.karakuliProjects.save(pid, { shareEditToken: tokens.edit, shareViewToken: tokens.view });
             return { title, tokens };
@@ -4470,6 +4505,7 @@ const K_FACTOR = 0.4;                       // neutral-axis position of the bend
 // bends of every product (from PRODUCTS marks labelled BEND LINE): signed final angle in degrees, positive = towards the viewer
 const BEND_ANGLES = { shelf: [90, 75], hanger: [90, 75], magazine: [-90] };
 
+const shopCfg = () => (window.karakuliShop && window.karakuliShop.get()) || null;
 const S = { mat: 'powder', color: null, t: 2, env: 'studio', fold: 0, playing: false, auto: false };
 let T = null, OrbitControlsCls = null, R = null, building = false;
 
@@ -4521,6 +4557,31 @@ function traceLoops(g, W, H) {
 // Smooth outlines: marching squares on the anti-aliased alpha of the mask (sub-pixel accurate, no stair steps).
 // f = Uint8 alpha field W x H whose border is empty. Loops come out closed, with the metal on the RIGHT of the walking
 // direction in y-down coordinates (outer loops: positive area, holes: negative), the same convention as traceLoops.
+// Which materials / thicknesses the shop sells; keeps the current choice valid
+function allowedMats() { const c = shopCfg(); const l = Object.keys(MATS).filter(k => !c || (c.mats[k] && c.mats[k].on)); return l.length ? l : Object.keys(MATS); }
+function allowedThick() { const c = shopCfg(); return c && c.mats[S.mat] ? c.mats[S.mat].th : [1, 1.5, 2, 3]; }
+function ensureSel() {
+    const ms = allowedMats(); if (!ms.includes(S.mat)) S.mat = ms[0];
+    const th = allowedThick();
+    if (!th.includes(S.t)) S.t = th.includes(2) ? 2 : th.reduce((a, b) => Math.abs(b - 2) < Math.abs(a - 2) ? b : a);
+}
+// Length of the cut line (outer contour + all holes + pattern) in mm
+function cutLengthMm(mask) {
+    const { A, W, H, ppm } = mask, W2 = W + 2, H2 = H + 2, sub = new Uint8Array(W2 * H2);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sub[(y + 1) * W2 + x + 1] = A[y * W + x];
+    let len = 0;
+    const per = pts => { for (let i = 0; i < pts.length; i += 2) { const j = (i + 2) % pts.length; len += Math.hypot(pts[j] - pts[i], pts[j + 1] - pts[i + 1]); } };
+    groupLoops(traceContours(sub, W2, H2), 0.12).forEach(o => { per(o.pts); o.holes.forEach(per); });
+    return len / ppm;
+}
+function priceOf() {
+    const c = shopCfg(), m = c && c.mats[S.mat];
+    if (!c || !m || !R || !R.mask || !R.weightKg) return null;
+    const mat = R.weightKg * (1 + c.waste / 100) * m.kg, cut = (R.mask.cutMm || 0) / 1000 * c.cutPerM, bend = (R.nBends || 0) * c.bend;
+    const k = 1 + c.markup / 100, total = (mat + cut + bend + c.setup) * k;
+    return total > 0 ? { c, mat: mat * k, cut: cut * k, bend: bend * k, setup: c.setup * k, total } : null;
+}
+
 function traceContours(f, W, H, thr = 127.5) {
     const segS = [], segE = [], sx = [], sy = [], ex = [], ey = [];
     const hid = (x, y) => 2 * (y * W + x), vid = (x, y) => 2 * (y * W + x) + 1;
@@ -4851,11 +4912,13 @@ async function buildModel() {
         if (R.mask) R.mask.key = key;
     }
     const mask = R.mask;
+    if (mask && mask.cutMm === undefined) { try { mask.cutMm = cutLengthMm(mask); } catch (e) { mask.cutMm = 0; } }
     disposeModel();
     if (!mask || mask.count < 10) { return false; }
     const t = S.t, G = mask.G, ppm = mask.ppm, gap = P.profile.gap;
     const bends = bendSpec(key, G, t);
     const layout = layoutPieces(h, bends, ppm);
+    R.nBends = layout.arcs.length;
     const model = new T.Group();
     model.position.x = -w / 2;
     R.model = model; R.layout = layout; R.pieces = []; R.strips = []; R.gap = gap; R.t = t;
@@ -5011,6 +5074,20 @@ function buildUI() {
     #v3d.show { display: block; }
     #v3d-view { position: absolute; inset: 0; }
     #v3d-view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    #v3-price:empty { display: none; }
+    .v3-prow { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 2px 0; }
+    .v3-prow.tot { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--border-color); font-size: 13px; font-weight: 700; }
+    #v3-shop { position: absolute; inset: 0; z-index: 5; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.35); }
+    #v3-shop.show { display: flex; }
+    .v3-shop-card { width: min(560px, 100%); max-height: 92vh; overflow: auto; padding: 18px; border-radius: 16px; }
+    .v3-shop-card h3 { margin: 0 0 4px; font-size: 15px; } .v3-shop-card p { margin: 0 0 12px; font-size: 11px; line-height: 1.5; color: var(--disabled-color); }
+    .v3-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .v3-f { position: relative; display: block; } .v3-f span { display: block; margin-bottom: 4px; font-size: 10px; font-weight: 600; color: var(--disabled-color); }
+    .v3-f i { position: absolute; right: 10px; bottom: 9px; font-style: normal; font-size: 11px; color: var(--disabled-color); }
+    .v3-shop-card input:not([type=checkbox]) { width: 100%; box-sizing: border-box; height: 34px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font-family: var(--main-font); font-size: 12px; }
+    .v3-mh, .v3-mr { display: grid; grid-template-columns: 1.3fr 44px 0.8fr 1.3fr; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 11px; font-weight: 600; }
+    .v3-mh { font-size: 10px; color: var(--disabled-color); }
+    .v3-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
     #v3d-title { position: absolute; left: 20px; top: 20px; right: 80px; pointer-events: none; }
     #v3d-title b { display: block; font-size: 15px; font-weight: 700; text-shadow: 0 1px 8px var(--bg-color); }
     #v3d-title span { display: block; margin-top: 3px; font-size: 11px; color: var(--disabled-color); text-shadow: 0 1px 8px var(--bg-color); }
@@ -5056,10 +5133,12 @@ function buildUI() {
         <div id="v3d-panel" class="v3-glass">
             <div class="v3-sec"><div class="v3-lab">Material</div><div class="v3-chips" id="v3-mats"></div></div>
             <div class="v3-sec"><div class="v3-lab">Colour</div><div class="v3-sw" id="v3-cols"></div></div>
-            <div class="v3-sec"><div class="v3-lab">Thickness <em id="v3-tval"></em></div><input class="v3-range" id="v3-t" type="range" min="1" max="6" step="0.5"></div>
+            <div class="v3-sec"><div class="v3-lab">Thickness <em id="v3-tval"></em></div><div class="v3-chips" id="v3-ts"></div></div>
             <div class="v3-sec"><div class="v3-lab">Environment</div><div class="v3-chips" id="v3-envs"></div></div>
-            <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button></div></div>
+            <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button><button class="v3-chip" id="v3-shopbtn">Prices &amp; options</button></div></div>
+            <div class="v3-sec" id="v3-price"></div>
         </div>
+        <div id="v3-shop"></div>
         <div id="v3d-bar" class="v3-glass">
             <button id="v3-play" title="Play / replay the folding"></button>
             <span class="v3-end">Flat</span><input class="v3-range" id="v3-fold" type="range" min="0" max="1" step="0.001"><span class="v3-end">Folded</span>
@@ -5071,13 +5150,16 @@ function buildUI() {
         el.addEventListener(ev, e => e.stopPropagation(), { passive: false }));
     ui = { el };
     const $ = id => document.getElementById(id);
-    $('v3-mats').innerHTML = Object.entries(MATS).map(([k, m]) => `<button class="v3-chip" data-m="${k}">${m.name}</button>`).join('');
     $('v3-envs').innerHTML = Object.entries(ENVS).map(([k, n]) => `<button class="v3-chip" data-e="${k}">${n}</button>`).join('');
-    $('v3-mats').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; S.mat = b.dataset.m; applyMaterial(); syncUI(); };
+    $('v3-mats').onclick = async e => {
+        const b = e.target.closest('[data-m]'); if (!b) return;
+        const t0 = S.t; S.mat = b.dataset.m; ensureSel(); applyMaterial(); syncUI();
+        if (S.t !== t0) { await rebuild(); syncUI(); }
+    };
+    $('v3-ts').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b || +b.dataset.t === S.t) return; S.t = +b.dataset.t; syncUI(); await rebuild(); syncUI(); };
+    $('v3-shopbtn').onclick = openShopEditor;
     $('v3-envs').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.env = b.dataset.e; applyEnv(); syncUI(); };
     $('v3-auto').onclick = () => { S.auto = !S.auto; if (R) R.controls.autoRotate = S.auto; syncUI(); };
-    $('v3-t').oninput = e => { S.t = +e.target.value; $('v3-tval').textContent = S.t + ' mm'; };
-    $('v3-t').onchange = async e => { S.t = +e.target.value; await rebuild(); };
     $('v3-fold').oninput = e => { S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
     $('v3-play').onclick = () => { if (S.fold >= 0.999) S.fold = 0; if (R) R.prog = null; S.playing = true; syncUI(); };
     return ui;
@@ -5092,13 +5174,16 @@ function swatchesHTML() {
 
 function syncUI() {
     const $ = id => document.getElementById(id);
-    document.querySelectorAll('#v3-mats .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.m === S.mat));
     document.querySelectorAll('#v3-envs .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.e === S.env));
     $('v3-auto').classList.toggle('on', S.auto);
     $('v3-cols').innerHTML = swatchesHTML();
     $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c || null; applyMaterial(); syncUI(); };
     $('v3-custom').oninput = e => { S.color = e.target.value; applyMaterial(); document.querySelectorAll('#v3-cols .v3-dot').forEach(d => d.classList.remove('on')); };
-    $('v3-t').value = S.t; $('v3-tval').textContent = S.t + ' mm';
+    ensureSel();
+    $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip${k === S.mat ? ' on' : ''}" data-m="${k}">${MATS[k].name}</button>`).join('');
+    $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip${t === S.t ? ' on' : ''}" data-t="${t}">${t} mm</button>`).join('');
+    $('v3-tval').textContent = S.t + ' mm';
+    $('v3-shopbtn').style.display = window.karakuliShop && window.karakuliShop.isOwner() ? '' : 'none';
     $('v3-fold').value = S.fold;
     $('v3-play').innerHTML = S.playing ? '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>'
         : S.fold >= 0.999 ? '<svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>'
@@ -5110,6 +5195,33 @@ function updateInfo() {
     document.getElementById('v3-name').textContent = P.name;
     const wt = R && R.weightKg ? ` · ≈ ${R.weightKg.toFixed(R.weightKg < 10 ? 2 : 1)} kg` : '';
     document.getElementById('v3-info').textContent = `${+w.toFixed(1)} × ${+h.toFixed(1)} mm flat · ${S.t} mm ${MATS[S.mat].name.toLowerCase()}${wt}`;
+    const pr = priceOf(), box = document.getElementById('v3-price');
+    if (!pr) { box.innerHTML = ''; return; }
+    const f = v => v.toFixed(2), row = (n, v) => v > 0 ? `<div class="v3-prow"><span>${n}</span><span>${f(v)}</span></div>` : '';
+    box.innerHTML = `<div class="v3-lab">Price <em>${pr.c.currency}</em></div>${row('Material', pr.mat)}${row('Laser cutting', pr.cut)}${row('Bending', pr.bend)}${row('Setup', pr.setup)}<div class="v3-prow tot"><span>Total</span><span>${f(pr.total)} ${pr.c.currency}</span></div>`;
+}
+
+// Owner's editor of the shop options (materials sold, thicknesses, price rules)
+function openShopEditor() {
+    const c = window.karakuliShop.getOwn(), box = document.getElementById('v3-shop');
+    const num = (id, label, v, unit) => `<label class="v3-f"><span>${label}</span><input id="${id}" type="number" min="0" step="any" value="${v}"><i>${unit}</i></label>`;
+    box.innerHTML = `<div class="v3-shop-card v3-glass"><h3>Prices &amp; options</h3>
+        <p>Leave a price at 0 to hide it. Saved in this browser; customers see it on the view link after you share it again.</p>
+        <div class="v3-grid"><label class="v3-f"><span>Currency</span><input id="sh-cur" value="${c.currency}" maxlength="6"></label>
+        ${num('sh-setup', 'Setup per order', c.setup, '')}${num('sh-cut', 'Laser cutting per metre', c.cutPerM, '')}${num('sh-bend', 'Price per bend', c.bend, '')}${num('sh-waste', 'Waste added to material', c.waste, '%')}${num('sh-mark', 'Margin', c.markup, '%')}</div>
+        <div class="v3-mrows"><div class="v3-mh"><span></span><span>Sold</span><span>Price per kg</span><span>Thicknesses, mm</span></div>
+        ${Object.keys(MATS).map(k => `<div class="v3-mr" data-k="${k}"><span>${MATS[k].name}</span><input type="checkbox" class="on"${c.mats[k].on ? ' checked' : ''}><input type="number" class="kg" min="0" step="any" value="${c.mats[k].kg}"><input class="th" value="${c.mats[k].th.join(', ')}"></div>`).join('')}</div>
+        <div class="v3-btns"><button class="v3-chip" id="sh-cancel">Cancel</button><button class="v3-chip on" id="sh-save">Save</button></div></div>`;
+    box.classList.add('show');
+    box.onclick = e => { if (e.target === box) box.classList.remove('show'); };
+    document.getElementById('sh-cancel').onclick = () => box.classList.remove('show');
+    document.getElementById('sh-save').onclick = async () => {
+        const g = id => document.getElementById(id).value, cfg = { currency: g('sh-cur'), setup: g('sh-setup'), cutPerM: g('sh-cut'), bend: g('sh-bend'), waste: g('sh-waste'), markup: g('sh-mark'), mats: {} };
+        box.querySelectorAll('.v3-mr').forEach(r => { cfg.mats[r.dataset.k] = { on: r.querySelector('.on').checked, kg: r.querySelector('.kg').value, th: r.querySelector('.th').value.split(/[;, ]+/).filter(Boolean) }; });
+        window.karakuliShop.set(cfg); box.classList.remove('show');
+        const t0 = S.t, m0 = S.mat; ensureSel(); applyMaterial(); syncUI();
+        if (S.t !== t0 || S.mat !== m0) { await rebuild(); syncUI(); }
+    };
 }
 
 function showLoad(text, sub) {
