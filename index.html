@@ -4569,11 +4569,10 @@ function ensureSel() {
 }
 // Length of the cut line (outer contour + all holes + pattern) in mm
 function cutLengthMm(mask) {
-    const { A, W, H, ppm } = mask, W2 = W + 2, H2 = H + 2, sub = new Uint8Array(W2 * H2);
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sub[(y + 1) * W2 + x + 1] = A[y * W + x];
+    const { ppm } = mask;
     let len = 0;
     const per = pts => { for (let i = 0; i < pts.length; i += 2) { const j = (i + 2) % pts.length; len += Math.hypot(pts[j] - pts[i], pts[j + 1] - pts[i + 1]); } };
-    refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm).forEach(o => {
+    maskGroups(mask).forEach(o => {
         if (o.circle) len += 2 * Math.PI * o.circle.r; else per(o.pts);
         o.holes.forEach((h, i) => { const c = o.holeCircles[i]; if (c) len += 2 * Math.PI * c.r; else per(h); });
     });
@@ -4600,11 +4599,9 @@ function download(blob, name) {
 
 // Flat pattern as an ASCII DXF (R12, mm, Y up): layer CUT = outline, holes and pattern; layer BEND = the bend lines.
 function buildDXF(mask, w, h, key) {
-    const { A, W, H, ppm } = mask, W2 = W + 2, H2 = H + 2, sub = new Uint8Array(W2 * H2);
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sub[(y + 1) * W2 + x + 1] = A[y * W + x];
-    const groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm);
+    const { ppm } = mask, groups = maskGroups(mask);
     const f = v => (+v.toFixed(3)).toString();
-    const X = px => Math.min(w, Math.max(0, (px - 1 + 0.5) / ppm)), Y = py => Math.min(h, Math.max(0, h - (py - 1 + 0.5) / ppm));   // pixel centres, kept on the sheet; DXF has Y up
+    const X = px => Math.min(w, Math.max(0, (px - 1) / ppm)), Y = py => Math.min(h, Math.max(0, h - (py - 1) / ppm));   // image pixels, kept on the sheet; DXF has Y up
     const out = [];
     const put = (c, v) => out.push(String(c), String(v));
     put(0, 'SECTION'); put(2, 'HEADER'); put(9, '$ACADVER'); put(1, 'AC1009'); put(9, '$INSUNITS'); put(70, 4); put(0, 'ENDSEC');
@@ -4787,9 +4784,10 @@ function groupLoops(rawLoops, tol) {
     return outers;
 }
 
-// ---------------------------------------------------------------- clean contours: exact circles, smooth curves, sharp corners kept
-// The mask is a picture, so its contours carry pixel noise. Circles are recognised and rebuilt exactly; other curves are
-// smoothed along their length; real corners (turns above ~43 degrees) stay exactly where they are.
+// ---------------------------------------------------------------- clean contours: vectorise the raster outline
+// The mask is a picture, so its contour carries pixel noise (waves on straight edges, chamfered corners, jagged circles).
+// The contour is rebuilt from what the drawing really contains: exact circles, straight lines that meet in exact corners,
+// and circular arcs (rounded corners); anything else is smoothed. Units: pixels of the mask.
 function loopLen(p) {
     const n = p.length / 2; const cum = new Float64Array(n + 1);
     for (let i = 0; i < n; i++) { const j = (i + 1) % n; cum[i + 1] = cum[i] + Math.hypot(p[2 * j] - p[2 * i], p[2 * j + 1] - p[2 * i + 1]); }
@@ -4818,6 +4816,149 @@ function circlePoints(c, ppm, sign) {
     for (let i = 0; i < n; i++) { const a = sign * 2 * Math.PI * i / n; out.push(c.cx + c.r * Math.cos(a), c.cy + c.r * Math.sin(a)); }
     return out;
 }
+// total-least-squares line through points a..b (indices) of Q: {px,py (point), dx,dy (unit direction)}
+function fitLine(Q, a, b) {
+    let mx = 0, my = 0; const n = b - a + 1;
+    for (let i = a; i <= b; i++) { mx += Q[2 * i]; my += Q[2 * i + 1]; } mx /= n; my /= n;
+    let sxx = 0, sxy = 0, syy = 0;
+    for (let i = a; i <= b; i++) { const u = Q[2 * i] - mx, v = Q[2 * i + 1] - my; sxx += u * u; sxy += u * v; syy += v * v; }
+    const th = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    return { px: mx, py: my, dx: Math.cos(th), dy: Math.sin(th) };
+}
+const lineDist = (L, x, y) => Math.abs((x - L.px) * L.dy - (y - L.py) * L.dx);
+const lineProj = (L, x, y) => { const t = (x - L.px) * L.dx + (y - L.py) * L.dy; return [L.px + L.dx * t, L.py + L.dy * t]; };
+const LINE_TOL = 0.32, ARC_TOL = 0.32;
+
+// splits the open chain Q[a..b] into lines and arcs: [{t:'L', L, a, b} | {t:'A', c, a, b, span}]
+function primitives(Q, a, b, out) {
+    const len = b - a + 1;
+    if (len < 4) { out.push({ t: 'P', a, b }); return; }
+    // line? (the first / last two points belong to a chamfered corner, so they are not used for the fit)
+    const e = len > 12 ? 3 : 0, L = fitLine(Q, a + e, b - e);
+    let md = 0, mi = a;
+    for (let i = a + e; i <= b - e; i++) { const d = lineDist(L, Q[2 * i], Q[2 * i + 1]); if (d > md) { md = d; mi = i; } }
+    if (md <= LINE_TOL) { out.push({ t: 'L', L, a, b }); return; }
+    // arc?
+    if (len >= 8) {
+        const xs = [], ys = [];
+        for (let i = a; i <= b; i++) { xs.push(Q[2 * i]); ys.push(Q[2 * i + 1]); }
+        const c = fitCircle(xs, ys), ea = len > 16 ? 3 : 0;
+        if (c && isFinite(c.r) && c.r >= 2 && c.r < 1e5) {
+            let cd = 0; for (let i = ea; i < xs.length - ea; i++) cd = Math.max(cd, Math.abs(Math.hypot(xs[i] - c.cx, ys[i] - c.cy) - c.r));
+            if (cd <= ARC_TOL) {
+                let span = 0, prev = Math.atan2(ys[0] - c.cy, xs[0] - c.cx);
+                for (let i = 1; i < xs.length; i++) { const an = Math.atan2(ys[i] - c.cy, xs[i] - c.cx); let d = an - prev; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; span += d; prev = an; }
+                if (Math.abs(span) < 5.8 && Math.abs(span) > 0.05) { out.push({ t: 'A', c, a, b, span }); return; }
+            }
+        }
+    }
+    // split where the chain is farthest from its chord
+    const ch = { px: Q[2 * a], py: Q[2 * a + 1] }; const dx = Q[2 * b] - ch.px, dy = Q[2 * b + 1] - ch.py, l = Math.hypot(dx, dy) || 1; ch.dx = dx / l; ch.dy = dy / l;
+    let sd = -1, si = a + 1;
+    for (let i = a + 2; i <= b - 2; i++) { const d = lineDist(ch, Q[2 * i], Q[2 * i + 1]); if (d > sd) { sd = d; si = i; } }
+    if (sd < 0) { out.push({ t: 'P', a, b }); return; }
+    primitives(Q, a, si, out); primitives(Q, si, b, out);
+}
+
+// -> { pts, circle: {cx, cy, r} | null }   (pts flat, same orientation as the input)
+function refineLoop(p, ppm) {
+    const n = p.length / 2;
+    const cum = loopLen(p), total = cum[n];
+    if (n < 6 || total < 24) return { pts: p, circle: null };
+    const sign = loopArea(p) >= 0 ? 1 : -1;
+    // evenly spaced samples (about 1 px apart)
+    const m = Math.max(48, Math.round(total)), Q = new Float64Array(2 * m);
+    for (let k = 0; k < m; k++) { const q = loopAt(p, cum, total * k / m); Q[2 * k] = q[0]; Q[2 * k + 1] = q[1]; }
+    const step = total / m;
+    // 1) one circle?
+    {
+        const xs = [], ys = []; for (let k = 0; k < m; k++) { xs.push(Q[2 * k]); ys.push(Q[2 * k + 1]); }
+        const c = fitCircle(xs, ys);
+        if (c && c.r >= 3 && isFinite(c.r)) {
+            let md = 0; for (let k = 0; k < m; k++) md = Math.max(md, Math.abs(Math.hypot(xs[k] - c.cx, ys[k] - c.cy) - c.r));
+            const area = Math.abs(loopArea(p)), full = Math.PI * c.r * c.r;
+            if (md <= Math.max(0.9, 0.03 * c.r) && Math.abs(area - full) < 0.06 * full) return { pts: circlePoints(c, ppm, sign), circle: c };
+        }
+    }
+    // 2) corners: the direction changes by more than ~34 degrees between samples 4 px before and after
+    const arm = Math.max(2, Math.round(4 / step)), cand = [];
+    for (let k = 0; k < m; k++) {
+        const a = (k - arm + m) % m, b = (k + arm) % m;
+        const v1x = Q[2 * k] - Q[2 * a], v1y = Q[2 * k + 1] - Q[2 * a + 1], v2x = Q[2 * b] - Q[2 * k], v2y = Q[2 * b + 1] - Q[2 * k + 1], l1 = Math.hypot(v1x, v1y), l2 = Math.hypot(v2x, v2y);
+        if (l1 < 1e-6 || l2 < 1e-6) continue;
+        const ang = Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (l1 * l2))));
+        if (ang > 0.6) cand.push({ k, ang });
+    }
+    const cd = (x, y) => Math.min(Math.abs(x - y), m - Math.abs(x - y));
+    const corners = cand.filter(c1 => !cand.some(c2 => c2 !== c1 && (c2.ang > c1.ang || (c2.ang === c1.ang && c2.k < c1.k)) && cd(c2.k, c1.k) < arm)).sort((x, y) => x.k - y.k);
+    // closed smooth loop without corners (ellipse, blob): smoothed samples
+    if (!corners.length) {
+        const smooth = pts => { const k = pts.length / 2; for (let pass = 0; pass < 6; pass++) { const nx = pts.slice(); for (let i = 0; i < k; i++) { const a = (i + k - 1) % k, b = (i + 1) % k; nx[2 * i] = (pts[2 * a] + 2 * pts[2 * i] + pts[2 * b]) / 4; nx[2 * i + 1] = (pts[2 * a + 1] + 2 * pts[2 * i + 1] + pts[2 * b + 1]) / 4; } pts = nx; } return pts; };
+        return { pts: thinClosed(smooth(Array.from(Q)), 0.03), circle: null };
+    }
+    // 3) every chain between two corners -> lines and arcs
+    const chains = corners.map((c1, ci) => {
+        const c2 = corners[(ci + 1) % corners.length]; let b = c2.k; if (b <= c1.k) b += m;
+        const R = new Float64Array(2 * (b - c1.k + 1));
+        for (let i = c1.k; i <= b; i++) { R[2 * (i - c1.k)] = Q[2 * (i % m)]; R[2 * (i - c1.k) + 1] = Q[2 * (i % m) + 1]; }
+        const prims = []; primitives(R, 0, b - c1.k, prims);
+        return { R, prims };
+    });
+    // exact corners: where the last primitive of one chain and the first of the next are both lines, they meet at their intersection
+    const cpt = corners.map((c1, ci) => {
+        const prev = chains[(ci + chains.length - 1) % chains.length].prims, next = chains[ci].prims, pl = prev[prev.length - 1], nl = next[0];
+        const R = chains[ci].R, det = [R[0], R[1]];
+        const lc = (L, c) => {   // the point where the line crosses the circle, the one nearest to the traced corner
+            const fx = L.px - c.cx, fy = L.py - c.cy, b = fx * L.dx + fy * L.dy, q = fx * fx + fy * fy - c.r * c.r, disc = b * b - q;
+            if (disc < 0) return null;
+            const sq = Math.sqrt(disc); let best = null, bd = 3;
+            [-b - sq, -b + sq].forEach(t => { const x = L.px + L.dx * t, y = L.py + L.dy * t, d = Math.hypot(x - det[0], y - det[1]); if (d < bd) { bd = d; best = [x, y]; } });
+            return best;
+        };
+        if (pl.t === 'L' && nl.t === 'A') { const x = lc(pl.L, nl.c); if (x) return x; }
+        if (pl.t === 'A' && nl.t === 'L') { const x = lc(nl.L, pl.c); if (x) return x; }
+        if (pl.t === 'L' && nl.t === 'L') {
+            const cross = pl.L.dx * nl.L.dy - pl.L.dy * nl.L.dx;
+            if (Math.abs(cross) > 0.2) {
+                const t = ((nl.L.px - pl.L.px) * nl.L.dy - (nl.L.py - pl.L.py) * nl.L.dx) / cross, x = pl.L.px + pl.L.dx * t, y = pl.L.py + pl.L.dy * t;
+                if (Math.hypot(x - det[0], y - det[1]) < 3) return [x, y];
+            }
+        }
+        return det;
+    });
+    const out = [];
+    chains.forEach((ch, ci) => {
+        const A0 = cpt[ci], A1 = cpt[(ci + 1) % cpt.length], np = ch.prims.length, R = ch.R;
+        // junction points between consecutive primitives: the middle of where they nearly touch
+        const J = [A0];
+        for (let k = 0; k < np - 1; k++) {
+            const e = ch.prims[k].b, f = ch.prims[k + 1].a, mx = (R[2 * e] + R[2 * f]) / 2, my = (R[2 * e + 1] + R[2 * f + 1]) / 2, P1 = ch.prims[k], P2 = ch.prims[k + 1];
+            let jp = [mx, my];
+            if (P1.t === 'L' && P2.t === 'L') {   // two straight lines meet in their intersection
+                const cr = P1.L.dx * P2.L.dy - P1.L.dy * P2.L.dx;
+                if (Math.abs(cr) > 0.05) { const t = ((P2.L.px - P1.L.px) * P2.L.dy - (P2.L.py - P1.L.py) * P2.L.dx) / cr, x = P1.L.px + P1.L.dx * t, y = P1.L.py + P1.L.dy * t; if (Math.hypot(x - mx, y - my) < 3) jp = [x, y]; }
+            }
+            J.push(jp);
+        }
+        J.push(A1);
+        ch.prims.forEach((pr, k) => {
+            const s = J[k], e = J[k + 1];
+            if (pr.t === 'A') {
+                const c = pr.c, a0 = Math.atan2(s[1] - c.cy, s[0] - c.cx);
+                let span = pr.span; const a1 = Math.atan2(e[1] - c.cy, e[0] - c.cx); let d = a1 - a0; const sg = span >= 0 ? 1 : -1;
+                while (sg * d < 0) d += sg * 2 * Math.PI; while (sg * d > 2 * Math.PI) d -= sg * 2 * Math.PI;
+                if (Math.abs(d - span) < 1.2) span = d;   // follow the junctions when they agree with the fit
+                const nseg = Math.max(2, Math.ceil(Math.abs(span) / (2 * Math.acos(Math.max(0, 1 - 0.02 / c.r)))));
+                out.push(s[0], s[1]);
+                for (let i = 1; i < nseg; i++) { const an = a0 + span * i / nseg; out.push(c.cx + c.r * Math.cos(an), c.cy + c.r * Math.sin(an)); }
+            } else if (pr.t === 'P') {   // too short to classify: keep the samples
+                out.push(s[0], s[1]);
+                for (let i = pr.a + 1; i < pr.b; i++) out.push(R[2 * i], R[2 * i + 1]);
+            } else out.push(s[0], s[1]);
+        });
+    });
+    return { pts: thinClosed(out, 0.03), circle: null };
+}
 // drops points that lie within tol of the line through their neighbours (straight runs stay straight, curves keep their points)
 function thinClosed(p, tol) {
     const n = p.length / 2; if (n < 8) return p;
@@ -4830,67 +4971,35 @@ function thinClosed(p, tol) {
     }
     return out.length >= 6 ? out : p;
 }
-// -> { pts, circle: {cx, cy, r} | null }   (pts flat, same orientation as the input)
-function refineLoop(p, ppm) {
-    const n = p.length / 2;
-    const cum = loopLen(p), total = cum[n];
-    if (n < 6 || total < 24) return { pts: p, circle: null };
-    const sign = loopArea(p) >= 0 ? 1 : -1;
-    // 1) a circle?  (sample evenly, fit, compare)
-    const m = Math.max(48, Math.round(total)), xs = new Float64Array(m), ys = new Float64Array(m);
-    for (let k = 0; k < m; k++) { const q = loopAt(p, cum, total * k / m); xs[k] = q[0]; ys[k] = q[1]; }
-    const c = fitCircle(xs, ys);
-    if (c && c.r >= 3 && isFinite(c.r)) {
-        let md = 0; for (let k = 0; k < m; k++) md = Math.max(md, Math.abs(Math.hypot(xs[k] - c.cx, ys[k] - c.cy) - c.r));
-        const area = Math.abs(loopArea(p)), full = Math.PI * c.r * c.r;
-        if (md <= Math.max(0.9, 0.03 * c.r) && Math.abs(area - full) < 0.06 * full) return { pts: circlePoints(c, ppm, sign), circle: c };
-    }
-    // 2) corners: the direction changes by more than ~43 degrees between points 4 px before and after
-    const arm = 4, cand = [];
-    for (let i = 0; i < n; i++) {
-        const s = cum[i], a = loopAt(p, cum, s - arm), b = loopAt(p, cum, s + arm), cx = p[2 * i], cy = p[2 * i + 1];
-        const v1x = cx - a[0], v1y = cy - a[1], v2x = b[0] - cx, v2y = b[1] - cy, l1 = Math.hypot(v1x, v1y), l2 = Math.hypot(v2x, v2y);
-        if (l1 < 1e-6 || l2 < 1e-6) continue;
-        const ang = Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (l1 * l2))));
-        if (ang > 0.75) cand.push({ i, s, ang });
-    }
-    const corners = cand.filter(c1 => !cand.some(c2 => c2 !== c1 && (c2.ang > c1.ang || (c2.ang === c1.ang && c2.i < c1.i)) &&
-        Math.min(Math.abs(c2.s - c1.s), total - Math.abs(c2.s - c1.s)) < arm)).sort((a, b) => a.i - b.i);
-    const smooth = (pts, fixedEnds) => {   // [1 2 1] / 4, five passes
-        const k = pts.length / 2;
-        for (let pass = 0; pass < 5; pass++) {
-            const nx = pts.slice();
-            for (let i = 0; i < k; i++) {
-                if (fixedEnds && (i === 0 || i === k - 1)) continue;
-                const a = (i + k - 1) % k, b = (i + 1) % k;
-                nx[2 * i] = (pts[2 * a] + 2 * pts[2 * i] + pts[2 * b]) / 4; nx[2 * i + 1] = (pts[2 * a + 1] + 2 * pts[2 * i + 1] + pts[2 * b + 1]) / 4;
-            }
-            pts = nx;
-        }
-        return pts;
-    };
-    if (!corners.length) {
-        const k = Math.max(12, Math.round(total)), pts = [];
-        for (let j = 0; j < k; j++) { const q = loopAt(p, cum, total * j / k); pts.push(q[0], q[1]); }
-        return { pts: thinClosed(smooth(pts, false), 0.03), circle: null };
-    }
-    const out = [];
-    corners.forEach((c1, ci) => {
-        const c2 = corners[(ci + 1) % corners.length];
-        let len = c2.s - c1.s; if (len <= 0) len += total;
-        const k = Math.max(1, Math.round(len)), pts = [];
-        for (let j = 0; j <= k; j++) { const q = j === 0 ? [p[2 * c1.i], p[2 * c1.i + 1]] : j === k ? [p[2 * c2.i], p[2 * c2.i + 1]] : loopAt(p, cum, c1.s + len * j / k); pts.push(q[0], q[1]); }
-        const sm = k >= 2 ? smooth(pts, true) : pts;
-        for (let j = 0; j < sm.length - 2; j++) out.push(sm[j]);   // the last point is the next chain's first
-    });
-    return { pts: thinClosed(out, 0.03), circle: null };
-}
 // groupLoops result -> same shape, cleaned. holeCircles[i] is the circle of holes[i] (or null)
 function refineGroups(groups, ppm) {
     return groups.map(o => {
         const outer = refineLoop(o.pts, ppm), hs = o.holes.map(h => refineLoop(h, ppm));
         return { pts: outer.pts, circle: outer.circle, holes: hs.map(h => h.pts), holeCircles: hs.map(h => h.circle) };
     });
+}
+
+// Cleaned contours of the whole mask (cached): used for the cut length, the DXF and the ends of the bend strips.
+// Coordinates of the points: image pixels + 1 (the contour tracer works on a mask padded by one pixel).
+function maskGroups(mask) {
+    if (mask.groups) return mask.groups;
+    const { A, W, H, ppm } = mask, W2 = W + 2, H2 = H + 2, sub = new Uint8Array(W2 * H2);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) sub[(y + 1) * W2 + x + 1] = A[y * W + x];
+    return (mask.groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm));
+}
+// Runs of metal on the horizontal line y (image pixels): where the cleaned outline crosses it, in pairs
+function crossRuns(mask, y) {
+    const xs = [], cross = pts => {
+        const n = pts.length / 2;
+        for (let i = 0; i < n; i++) {
+            const j = (i + 1) % n, x1 = pts[2 * i] - 1, y1 = pts[2 * i + 1] - 1, x2 = pts[2 * j] - 1, y2 = pts[2 * j + 1] - 1;
+            if ((y1 <= y) !== (y2 <= y)) xs.push(x1 + (x2 - x1) * (y - y1) / (y2 - y1));
+        }
+    };
+    maskGroups(mask).forEach(o => { cross(o.pts); o.holes.forEach(cross); });
+    xs.sort((a, b) => a - b);
+    const runs = []; for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > 0.5) runs.push([xs[i], xs[i + 1]]);
+    return runs;
 }
 
 // Smooth normals along the cut edge: faces meeting at a gentle angle share a normal, real edges (top / side) stay sharp.
@@ -4960,6 +5069,12 @@ function computeChain(layout, ppm, z0, p) {
         }
     });
     return { frames, arcs };
+}
+
+function pickRun(runs, m0, m1) {   // the run that overlaps [m0, m1) most
+    let best = null, bo = 0.5;
+    runs.forEach(r => { const o = Math.min(r[1], m1) - Math.max(r[0], m0); if (o > bo) { bo = o; best = r; } });
+    return best;
 }
 
 function runsOfRow(g, W, y) {
@@ -5060,7 +5175,7 @@ function shapesForRows(mask, r0, r1) {
     for (let y = 0; y < hh; y++) for (let x = 0; x < W; x++) { const v = A[(r0 + y) * W + x]; if (v) { sub[(y + 1) * W2 + x + 1] = v; any = true; } }
     if (!any) return [];
     const groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm);
-    const toPts = pts => { const v = []; for (let i = 0; i < pts.length; i += 2) v.push(new T.Vector2((pts[i] - 1) / ppm, -(pts[i + 1] - 1) / ppm)); return v; };
+    const toPts = pts => { const v = []; for (let i = 0; i < pts.length; i += 2) v.push(new T.Vector2((pts[i] - 1) / ppm, -(pts[i + 1] - 1) / ppm)); return v; };   // the tracer works on a mask padded by 1 px
     return groups.map(o => {
         const s = new T.Shape(toPts(o.pts));
         o.holes.forEach(hp => s.holes.push(new T.Path(toPts(hp))));
@@ -5156,7 +5271,11 @@ async function buildModel() {
     layout.arcs.forEach((a, i) => {
         const row = Math.round((layout.pieces[i].r1 + layout.pieces[i + 1].r0) / 2);
         const runs = runsOfRow(mask.g, mask.W, Math.min(mask.H - 1, Math.max(0, row)));
-        const list = runs.map(([x0, x1]) => makeStrip(x0 / ppm, x1 / ppm));
+        const top = crossRuns(mask, layout.pieces[i].r1 - 0.02), bot = crossRuns(mask, layout.pieces[i + 1].r0 + 0.02);   // exactly where the neighbouring pieces end
+        const list = runs.map(([x0, x1]) => {
+            const ta = pickRun(top, x0, x1) || [x0, x1], tb = pickRun(bot, x0, x1) || [x0, x1];
+            return makeStrip(ta[0] / ppm, ta[1] / ppm, tb[0] / ppm, tb[1] / ppm);   // left / right end at the upper piece, then at the lower one
+        });
         list.forEach(s => model.add(s.mesh));
         R.strips.push(list);
     });
@@ -5176,7 +5295,7 @@ async function buildModel() {
 }
 
 const ARC_SEG = 14;
-function makeStrip(x0, x1) {
+function makeStrip(xa0, xa1, xb0, xb1) {
     const geo = new T.BufferGeometry();
     const nv = ARC_SEG * 24;
     geo.setAttribute('position', new T.BufferAttribute(new Float32Array(nv * 3), 3));
@@ -5184,7 +5303,7 @@ function makeStrip(x0, x1) {
     geo.setAttribute('uv', new T.BufferAttribute(new Float32Array(nv * 2), 2));
     const mesh = new T.Mesh(geo, R.material);
     mesh.castShadow = mesh.receiveShadow = true; mesh.frustumCulled = false;
-    return { mesh, x0, x1 };
+    return { mesh, xa0, xa1, xb0, xb1 };
 }
 
 function updateStrip(strip, arc, t) {
@@ -5211,18 +5330,19 @@ function updateStrip(strip, arc, t) {
     for (let k = 0; k < ARC_SEG; k++) {
         const a = pts[k], b = pts[k + 1];
         const A = (p, sd) => [p.Py + sd * p.Ny * ht, p.Pz + sd * p.Nz * ht];
+        const xl = p => strip.xa0 + (strip.xb0 - strip.xa0) * (p.s / arc.len), xr = p => strip.xa1 + (strip.xb1 - strip.xa1) * (p.s / arc.len);   // edges follow the neighbouring pieces
         [1, -1].forEach(sd => {     // the two faces of the sheet
             const a0 = A(a, sd), b0 = A(b, sd);
             // counter-clockwise seen from outside: the +side face needs the reverse vertex order of the -side face
-            const A0 = [strip.x0, a0, a], A1 = [strip.x1, a0, a], B0 = [strip.x0, b0, b], B1 = [strip.x1, b0, b];
+            const A0 = [xl(a), a0, a], A1 = [xr(a), a0, a], B0 = [xl(b), b0, b], B1 = [xr(b), b0, b];
             const tri = (u, w, z) => [u, w, z].forEach(([x, q, r]) => put(x, q[0], q[1], 0, sd * r.Ny, sd * r.Nz, r.s));
             if (sd > 0) { tri(A0, B1, A1); tri(A0, B0, B1); } else { tri(A0, A1, B1); tri(A0, B1, B0); }
         });
-        [[strip.x0, -1], [strip.x1, 1]].forEach(([x, nx]) => {    // the two cut ends
-            const a1 = A(a, 1), a2 = A(a, -1), b1 = A(b, 1), b2 = A(b, -1);
-            const q = (P, s_) => put(x, P[0], P[1], nx, 0, 0, s_);
-            if (nx < 0) { q(a1, a.s); q(a2, a.s); q(b2, b.s); q(a1, a.s); q(b2, b.s); q(b1, b.s); }
-            else { q(a1, a.s); q(b2, b.s); q(a2, a.s); q(a1, a.s); q(b1, b.s); q(b2, b.s); }
+        [[xl, -1], [xr, 1]].forEach(([xf, nx]) => {    // the two cut ends (they follow the edge, so the normal leans slightly)
+            const a1 = A(a, 1), a2 = A(a, -1), b1 = A(b, 1), b2 = A(b, -1), xa = xf(a), xb = xf(b);
+            const q = (P, s_, x) => put(x, P[0], P[1], nx, 0, 0, s_);
+            if (nx < 0) { q(a1, a.s, xa); q(a2, a.s, xa); q(b2, b.s, xb); q(a1, a.s, xa); q(b2, b.s, xb); q(b1, b.s, xb); }
+            else { q(a1, a.s, xa); q(b2, b.s, xb); q(a2, a.s, xa); q(a1, a.s, xa); q(b1, b.s, xb); q(b2, b.s, xb); }
         });
     }
     const g = strip.mesh.geometry;
@@ -5615,7 +5735,7 @@ function close3D() {
 
 window.addEventListener('resize', resize);
 window.open3D = open3D; window.close3D = close3D;
-window.__v3d = { refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
+window.__v3d = { rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
 // the 3D button lives on the canvas, only for the products
 setInterval(() => {
