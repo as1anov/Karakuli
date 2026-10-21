@@ -5472,6 +5472,60 @@ function supportInfo() {
     return sup;
 }
 
+// terry-cloth look: soft loops as a colour + bump texture made on a canvas
+function terryTexture() {
+    if (R.terry) return R.terry;
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d'); x.fillStyle = '#d8d8d8'; x.fillRect(0, 0, 256, 256);
+    let r = 12345; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 9000; i++) {
+        const px = rnd() * 256, py = rnd() * 256, l = 2 + rnd() * 5, a = rnd() * 6.283, v = Math.floor(120 + rnd() * 135);
+        x.strokeStyle = `rgba(${v},${v},${v},0.8)`; x.lineWidth = 1 + rnd() * 1.4;
+        for (const [ox, oy] of [[0, 0], [-256, 0], [256, 0], [0, -256], [0, 256]]) { x.beginPath(); x.moveTo(px + ox, py + oy); x.lineTo(px + ox + Math.cos(a) * l, py + oy + Math.sin(a) * l); x.stroke(); }
+    }
+    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; R.terry = t;
+    return t;
+}
+
+// A bath towel hung by one point: it is gathered round the arm and falls in soft folds that open towards the bottom hem.
+function makeTowel(seed, depthAvail) {
+    const g = new T.Group();
+    const W = 320, H = 640, NU = 44, NV = 70, GAPZ = 3;
+    const tex = terryTexture();
+    const mat = objMaterial(['#e6e6e4', '#d4d7da', '#c9d6e3', '#e8dccb'][seed % 4], { roughness: 1, map: tex, bumpMap: tex, bumpScale: 1.6, side: T.DoubleSide });
+    const sm = t => t * t * (3 - 2 * t), ph = (seed * 1.7) % 6.28;
+    const zEnd = depthAvail / 2 + 9;                                   // the cloth hangs in front of the hook's lip
+    const pos = [], uvs = [], idx = [];
+    for (let layer = 0; layer < 2; layer++) {
+        for (let j = 0; j <= NV; j++) {
+            const v = j / NV;
+            const hw = 5 + (W / 2 - 5) * Math.pow(v, 0.72);             // gathered at the top, wide at the hem
+            const amp = 3 + 20 * Math.pow(v, 1.15);                      // folds grow towards the bottom
+            const zc = zEnd * Math.min(1, v / 0.1);                      // leaves the arm and falls in front of it
+            for (let i = 0; i <= NU; i++) {
+                const u = i / NU * 2 - 1;
+                const fold = Math.sin(u * 9.4 + ph) * 0.62 + Math.sin(u * 17.5 + ph * 2.1) * 0.24 + Math.sin(u * 3.1 - ph) * 0.5;
+                const curl = v > 0.93 ? Math.sin((v - 0.93) / 0.07 * 1.6) * 12 * Math.abs(u) : 0;   // hem corners lift a little
+                const zz = zc + amp * fold + (layer ? -GAPZ - amp * 0.1 : GAPZ) + curl * (layer ? -1 : 1);
+                pos.push(u * hw + Math.sin(v * 5 + u * 2 + ph) * 2.5 * v, -v * H + (v > 0.93 ? Math.abs(u) * -6 * ((v - 0.93) / 0.07) : 0), zz);
+                uvs.push(u * 3, v * 6);
+            }
+        }
+    }
+    const row = NU + 1, per = (NV + 1) * row;
+    for (let layer = 0; layer < 2; layer++) for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) {
+        const a = layer * per + j * row + i, b = a + 1, c = a + row, d = c + 1;
+        idx.push(a, c, b, b, c, d);
+    }
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.BufferAttribute(new Float32Array(pos), 3));
+    geo.setAttribute('uv', new T.BufferAttribute(new Float32Array(uvs), 2));
+    geo.setIndex(idx);
+    if (geo.computeVertexNormals) geo.computeVertexNormals();
+    const m = new T.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; g.add(m);
+    return { g, w: W, d: 60 };
+}
+
 // one object, base centred on the origin: { g, w (x extent), d (z extent) }
 function makeObject(kind, seed, depthAvail) {
     const g = new T.Group();
@@ -5505,14 +5559,7 @@ function makeObject(kind, seed, depthAvail) {
         });
         return { g, w: 104, d: 104 };
     }
-    if (kind === 'towel') {   // draped over the arm: a roll on top and two layers of cloth
-        const col = ['#6a8fb8', '#b5685a', '#7a9a6b', '#c9b27a'][seed % 4], W = 320, H = 560;
-        const cm = objMaterial(col, { roughness: 0.95 }), sm = objMaterial('#f1f1ee', { roughness: 0.95 });
-        const roll = add(new T.CylinderGeometry(10, 10, W, 18), cm, 0, 0, 0); roll.rotation.z = Math.PI / 2;
-        box(W, H, 5, cm, 0, -H / 2, 9); box(W, H - 70, 5, cm, 0, -(H - 70) / 2, -9);
-        box(W, 14, 5.6, sm, 0, -H + 60, 9); box(W, 14, 5.6, sm, 0, -H + 90, 9);
-        return { g, w: W, d: 30 };
-    }
+    if (kind === 'towel') return makeTowel(seed, depthAvail);
     if (kind === 'jacket') {   // a stylised jacket on a loop, hanging below the arm
         const col = ['#3d4148', '#7a2e2e', '#2f4f6b', '#5a5640'][seed % 4];
         const bm = objMaterial(col, { roughness: 0.85 }), dm = objMaterial('#1d1f22', { roughness: 0.7 }), lm = objMaterial('#8b9099', { roughness: 0.4, metalness: 0.6 });
