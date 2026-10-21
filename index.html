@@ -572,13 +572,11 @@
         #app-dialog.show { display: flex; }
         #hook-auto { position: fixed; z-index: 60; width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.22); touch-action: manipulation;
             opacity: 0; transform: scale(0.3) rotate(-90deg); pointer-events: none; visibility: hidden;
-            transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s; }
+            transition: opacity 0.16s ease, transform 0.16s ease, left 0.12s ease-out, top 0.12s ease-out, visibility 0s linear 0.16s; }
         #hook-auto.show { opacity: 1; transform: scale(1) rotate(0); pointer-events: auto; visibility: visible;
-            transition: opacity 0.18s ease, transform 0.42s cubic-bezier(0.34, 1.7, 0.5, 1), visibility 0s; }
-        #hook-auto.show::after { content: ''; position: absolute; inset: -1px; border-radius: 50%; border: 2px solid var(--text-color); animation: hook-ring 0.75s ease-out 0.12s both; pointer-events: none; }
+            transition: opacity 0.18s ease, transform 0.42s cubic-bezier(0.34, 1.7, 0.5, 1), left 0.12s ease-out, top 0.12s ease-out, visibility 0s; }
         #hook-auto svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
         #hook-auto.show svg { animation: hook-plus 0.5s ease-out 0.1s both; }
-        @keyframes hook-ring { from { transform: scale(1); opacity: 0.55; } to { transform: scale(2.2); opacity: 0; } }
         @keyframes hook-plus { from { transform: rotate(-90deg) scale(0.4); } to { transform: rotate(0) scale(1); } }
         .ad-card { width: min(380px, 100%); padding: 20px; border-radius: 18px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); box-shadow: 0 24px 70px rgba(0,0,0,0.35); font-family: var(--main-font); }
         .ad-card h3 { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
@@ -4052,6 +4050,41 @@ service cloud.firestore {
         function hookAutoAllowed() {
             return isPaperVisible && isDrawingMode && !isEraserActive && !isViewOnly && !isTimelapseUIOpen && !isDashboardOpen && !isGameMode && !hookAuto.busy;
         }
+        // Screen offset (px) from the cursor to the centre of the (+): the nearest free spot that keeps >= 5 px between the button and the
+        // outer edge of any line, node ring or diamond, at every zoom. Cached until the cursor, zoom or drawing change.
+        function hookBadgeOffset() {
+            const nSp = Object.keys(specialElements).length, key = `${curI},${curJ},${zoom},${segments.length},${nSp}`;
+            if (hookAuto.pl && hookAuto.pl.key === key) return hookAuto.pl.o;
+            const R = 19, CLEAR = 5, z = zoom, rb = (R + CLEAR) / z, cx = curI * STEP, cy = curJ * STEP;
+            const LW = getVisualLineWeight(), ringOut = BASE_STEP_VAL + LW / 2, dd = LW / Math.SQRT2;
+            const reach = (260 / z) + ringOut + LW;
+            const near = segments.filter(sg => Math.min(sg.p1.x, sg.p2.x) * STEP < cx + reach && Math.max(sg.p1.x, sg.p2.x) * STEP > cx - reach && Math.min(sg.p1.y, sg.p2.y) * STEP < cy + reach && Math.max(sg.p1.y, sg.p2.y) * STEP > cy - reach);
+            const sp = [];
+            for (const id in specialElements) { const c = id.indexOf(','), i = +id.slice(0, c), j = +id.slice(c + 1); if (Math.abs(i * STEP - cx) < reach && Math.abs(j * STEP - cy) < reach) sp.push([i * STEP, j * STEP, specialElements[id]]); }
+            const segD = (px, py, sg) => {
+                const ax = sg.p1.x * STEP, ay = sg.p1.y * STEP, bx = sg.p2.x * STEP, by = sg.p2.y * STEP, vx = bx - ax, vy = by - ay;
+                const t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / ((vx * vx + vy * vy) || 1)));
+                return Math.hypot(px - (ax + vx * t), py - (ay + vy * t));
+            };
+            const free = (px, py) => {
+                for (const sg of near) if (segD(px, py, sg) < LW / 2 + rb) return false;
+                for (const [x, y, el] of sp) {
+                    if (el.isNode && Math.hypot(px - x, py - y) < ringOut + rb) return false;
+                    if (el.isDiamond && Math.hypot(px - x, py - (y + LW / 2)) < dd + rb) return false;
+                }
+                return true;
+            };
+            let best = null;
+            search: for (const rs of [40, 50, 62, 76, 94, 116, 142, 175, 215, 260]) {
+                for (const ang of [-40, -65, -15, -90, 10, -115, 35, -140, 60, -165, 90, 180]) {
+                    const a = ang * Math.PI / 180, ox = Math.cos(a) * rs, oy = Math.sin(a) * rs;
+                    if (free(cx + ox / z, cy + oy / z)) { best = [ox, oy]; break search; }
+                }
+            }
+            const o = best || [40, -60];
+            hookAuto.pl = { key, o };
+            return o;
+        }
         function updateHookBadge() {
             let el = hookAuto.el;
             if (!el) {
@@ -4069,9 +4102,10 @@ service cloud.firestore {
                 show = hookAuto.src >= 0 && cursorInArm(hookAuto.src);
             }
             if (!show) { el.classList.remove('show'); return; }
-            const x = offsetX + curI * STEP * zoom, y = offsetY + curJ * STEP * zoom;
-            el.style.left = Math.max(8, Math.min(window.innerWidth - 48, x + 34)) + 'px';
-            el.style.top = Math.max(8, Math.min(window.innerHeight - 48, y - 64)) + 'px';
+            const o = hookBadgeOffset();
+            const x = offsetX + curI * STEP * zoom + o[0] - 19, y = offsetY + curJ * STEP * zoom + o[1] - 19;   // (x, y) = top-left of the 38 px button
+            el.style.left = Math.max(8, Math.min(window.innerWidth - 46, x)) + 'px';
+            el.style.top = Math.max(8, Math.min(window.innerHeight - 46, y)) + 'px';
             el.classList.add('show');
         }
         function autoDrawHooks() {
