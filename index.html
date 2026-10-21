@@ -4537,7 +4537,7 @@ const K_FACTOR = 0.4;                       // neutral-axis position of the bend
 const BEND_ANGLES = { shelf: [90, 75], hanger: [90, 75], magazine: [-90] };
 
 const shopCfg = () => (window.karakuliShop && window.karakuliShop.get()) || null;
-const S = { mat: 'powder', color: null, t: 2, env: 'soft', view: 'solid', fold: 0, playing: false, auto: false };
+const S = { mat: 'powder', color: null, t: 2, env: 'soft', cam: 'persp', fold: 0, playing: false, auto: false };
 let T = null, OrbitControlsCls = null, R = null, building = false;
 
 // ---------------------------------------------------------------- pure geometry
@@ -4681,7 +4681,7 @@ async function exportGLB() {
         const { GLTFExporter } = await import(GLTF_URL);
         S.fold = 1; updatePose();
         const box = new T.Box3().setFromObject(model), c = box.getCenter(new T.Vector3()), k = 0.001;
-        const m0 = MATS[S.mat], em = R.material.clone(); em.wireframe = false;
+        const m0 = MATS[S.mat], em = R.material.clone();
         em.roughnessMap = null; em.bumpMap = null; em.name = `${m0.name} ${S.t} mm`; em.roughness = m0.brushed ? Math.min(1, m0.rough + 0.1) : m0.rough;
         model.traverse(o => { if (o.isMesh) { mats.push([o, o.material]); o.material = em; } });
         const root = new T.Group(); root.name = 'Karakuli';
@@ -5472,8 +5472,6 @@ function applyMaterial() {
     mat.metalness = m.metal; mat.roughness = m.rough;
     mat.roughnessMap = m.brushed ? R.brush : null;
     mat.bumpMap = m.brushed ? R.brush : null; mat.bumpScale = 0.5;
-    mat.wireframe = S.view === 'wire';
-    if (R.wall) R.wall.visible = S.view !== 'wire';
     mat.needsUpdate = true;
     if (R.mask) R.weightKg = R.mask.count / (R.mask.ppm * R.mask.ppm) * S.t * m.density / 1e6;
     updateInfo();
@@ -5496,6 +5494,8 @@ function fitCamera() {
     R.controls.target.copy(c);
     const tanV = Math.tan(R.camera.fov * Math.PI / 360), asp = R.camera.aspect || 1.6;
     const dist = Math.max((size.x / 0.6 / 2) / (tanV * asp), (size.y / 0.55 / 2) / tanV) + size.z;
+    R.fit = { c: [c.x, c.y, c.z], dist, dim, sx: size.x, sy: size.y, sz: size.z, tanV, asp };
+    R.cam = null; S.cam = 'persp';
     const dirv = new T.Vector3(0.42, 0.22, 1).normalize();
     R.camera.position.copy(c).addScaledVector(dirv, dist);
     R.controls.minDistance = dim * 0.3; R.controls.maxDistance = dim * 5;
@@ -5507,6 +5507,54 @@ function fitCamera() {
     L.shadow.camera.left = -s; L.shadow.camera.right = s; L.shadow.camera.top = s; L.shadow.camera.bottom = -s;
     L.shadow.camera.near = 10; L.shadow.camera.far = dim * 4; L.shadow.camera.updateProjectionMatrix();
     R.wall.position.set(c.x, c.y, -0.5);
+}
+
+// standard camera views: the camera glides to a fixed direction around the model centre
+const CAM_DIRS = { persp: [0.42, 0.22, 1], front: [0, 0, 1], side: [1, 0, 0], top: [0, 1, 0.0001] };
+function goCamera(name) {
+    if (!R || !R.fit) return;
+    const f = R.fit, d = CAM_DIRS[name]; if (!d) return;
+    const l = Math.hypot(...d), dir = d.map(v => v / l);
+    let dist;
+    if (name === 'front' || name === 'persp') dist = f.dist;
+    else {   // side / top: fit the depth and the other visible extent
+        const w = name === 'side' ? f.sz : f.sx, h = name === 'side' ? f.sy : f.sz;
+        dist = Math.max((w / 0.6 / 2) / (f.tanV * f.asp), (h / 0.55 / 2) / f.tanV) + (name === 'side' ? f.sx : f.sy) / 2;
+    }
+    const p = R.camera.position, c = f.c, o = [p.x - c[0], p.y - c[1], p.z - c[2]], od = Math.hypot(...o) || 1;
+    R.cam = { from: o.map(v => v / od), fd: od, to: dir, td: dist, t: 0 };
+    S.cam = name; R.controls.autoRotate = false; S.auto = false; syncUI();
+}
+function stepCamera(dt) {
+    const a = R.cam; if (!a) return;
+    a.t = Math.min(1, a.t + dt / 0.7);
+    const k = ease(a.t), c = R.fit.c;
+    let v = a.from.map((x, i) => x + (a.to[i] - x) * k); const l = Math.hypot(...v) || 1; v = v.map(x => x / l);
+    const d = a.fd + (a.td - a.fd) * k;
+    R.camera.position.set(c[0] + v[0] * d, c[1] + v[1] * d, c[2] + v[2] * d);
+    R.dirty = true;
+    if (a.t >= 1) R.cam = null;
+}
+
+// picture of the product only: no panels, soft shadow on the neutral wall, 2x resolution
+async function exportPNG() {
+    if (!R || !R.model) { note('The 3D model is not ready yet.'); return; }
+    const btn = document.getElementById('v3-png'), label = btn.textContent; btn.textContent = 'Preparing…'; btn.disabled = true;
+    const r = R.renderer, pr0 = r.getPixelRatio(), host = document.getElementById('v3d-view');
+    try {
+        const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
+        r.setPixelRatio(Math.min(R.lite ? 1.5 : 2, 4096 / Math.max(w, h)));
+        r.setSize(w, h);
+        r.render(R.scene, R.camera);
+        const blob = await new Promise(res => r.domElement.toBlob(res, 'image/png'));
+        if (!blob) throw new Error('empty image');
+        download(blob, exportName('png'));
+    } catch (err) {
+        console.error(err); note('The picture could not be made: ' + (err && err.message || err));
+    } finally {
+        r.setPixelRatio(pr0); resize(); R.dirty = true;
+        btn.textContent = label; btn.disabled = false;
+    }
 }
 
 // ---------------------------------------------------------------- UI
@@ -5544,11 +5592,11 @@ function ensureCss() {
     .v3-mh, .v3-mr { display: grid; grid-template-columns: 1.3fr 44px 0.8fr 1.3fr; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 11px; font-weight: 600; }
     .v3-mh { font-size: 10px; color: var(--disabled-color); }
     .v3-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-    #v3d-title { position: absolute; left: 20px; top: 20px; right: 80px; pointer-events: none; }
+    #v3d-title { position: absolute; left: 20px; top: 20px; right: 130px; pointer-events: none; }
     #v3d-title b { display: block; font-size: 15px; font-weight: 700; text-shadow: 0 1px 8px var(--bg-color); }
     #v3d-title span { display: block; margin-top: 3px; font-size: 11px; color: var(--disabled-color); text-shadow: 0 1px 8px var(--bg-color); }
     #v3d-close { position: absolute; right: 20px; top: 20px; }
-    #v3d-shop { position: absolute; right: 20px; top: 72px; display: none; }
+    #v3d-shop { position: absolute; right: 76px; top: 20px; display: none; }
     #v3d-shop.owner { display: flex; }
     .v3-glass { background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); border-radius: 16px; }
     #v3d-panel { position: absolute; right: 20px; top: 76px; width: 258px; max-height: calc(100% - 170px); overflow-y: auto; padding: 14px; scrollbar-width: none; }
@@ -5587,7 +5635,7 @@ function ensureCss() {
         #v3d-bar { bottom: 12px; width: calc(100% - 24px); }
         #v3d-title { left: 14px; top: 16px; }
         #v3d-close { right: 12px; top: 12px; }
-        #v3d-shop { right: 12px; top: 64px; }
+        #v3d-shop { right: 68px; top: 12px; }
     }`;
     document.head.appendChild(css);
 }
@@ -5607,9 +5655,9 @@ function buildUI() {
             <div class="v3-sec" data-sec="mat"><button class="v3-lab v3-tog"><span>Material</span><em id="v3-sum-mat"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-mats"></div></div></div>
             <div class="v3-sec" data-sec="col"><button class="v3-lab v3-tog"><span>Colour</span><em id="v3-sum-col"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-sw" id="v3-cols"></div></div></div>
             <div class="v3-sec" data-sec="thick"><button class="v3-lab v3-tog"><span>Thickness</span><em id="v3-sum-thick"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-ts"></div></div></div>
-            <div class="v3-sec" data-sec="view"><button class="v3-lab v3-tog"><span>View</span><em id="v3-sum-view"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-views"><button class="v3-chip" data-v="solid">Solid</button><button class="v3-chip" data-v="wire">Wireframe</button></div></div></div>
+            <div class="v3-sec" data-sec="cam"><button class="v3-lab v3-tog"><span>Camera</span><em id="v3-sum-cam"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-cams"><button class="v3-chip" data-cam="persp">3/4</button><button class="v3-chip" data-cam="front">Front</button><button class="v3-chip" data-cam="side">Side</button><button class="v3-chip" data-cam="top">Top</button></div></div></div>
             <div class="v3-sec" id="v3-price-sec" data-sec="price" style="display:none"><button class="v3-lab v3-tog"><span>Price</span><em id="v3-sum-price"></em><i class="v3-chev"></i></button><div class="v3-body" id="v3-price"></div></div>
-            <div class="v3-sec" data-sec="dl"><button class="v3-lab v3-tog"><span>Download</span><em id="v3-sum-dl"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips"><button class="v3-chip" id="v3-glb" title="Folded 3D model for AR and 3D software">3D model (.glb)</button><button class="v3-chip" id="v3-dxf" title="Flat pattern for laser cutting">Flat pattern (.dxf)</button></div></div></div>
+            <div class="v3-sec" data-sec="dl"><button class="v3-lab v3-tog"><span>Download</span><em id="v3-sum-dl"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips"><button class="v3-chip" id="v3-png" title="Picture of the product only">Picture (.png)</button><button class="v3-chip" id="v3-glb" title="Folded 3D model for AR and 3D software">3D model (.glb)</button><button class="v3-chip" id="v3-dxf" title="Flat pattern for laser cutting">Flat pattern (.dxf)</button></div></div></div>
             <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button></div></div>
         </div>
         <div id="v3d-bar" class="v3-glass">
@@ -5633,9 +5681,9 @@ function buildUI() {
     $('v3d-shop').onclick = openShopEditor;
     $('v3-sheet').onclick = () => $('v3d-panel').classList.toggle('min');
     if (window.innerWidth <= 700) document.querySelectorAll('#v3d-panel .v3-sec[data-sec]').forEach(sc => { if (sc.dataset.sec !== 'mat') sc.classList.add('closed'); });
-    $('v3-glb').onclick = exportGLB;
+    $('v3-glb').onclick = exportGLB; $('v3-png').onclick = exportPNG;
+    $('v3-cams').onclick = e => { const b = e.target.closest('[data-cam]'); if (b) goCamera(b.dataset.cam); };
     $('v3-dxf').onclick = exportDXF;
-    $('v3-views').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; S.view = b.dataset.v; applyMaterial(); syncUI(); };
     $('v3-auto').onclick = () => { S.auto = !S.auto; if (R) R.controls.autoRotate = S.auto; syncUI(); };
     $('v3-fold').oninput = e => { S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
     $('v3-play').onclick = () => { if (S.fold >= 0.999) S.fold = 0; if (R) R.prog = null; S.playing = true; syncUI(); };
@@ -5651,15 +5699,16 @@ function swatchesHTML() {
 
 function syncUI() {
     const $ = id => document.getElementById(id);
-    document.querySelectorAll('#v3-views .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.v === S.view));
     $('v3-auto').classList.toggle('on', S.auto);
+    document.querySelectorAll('#v3-cams .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.cam === S.cam));
+    $('v3-sum-cam').textContent = { persp: '3/4', front: 'Front', side: 'Side', top: 'Top' }[S.cam] || 'Free';
     $('v3-cols').innerHTML = swatchesHTML();
     $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c || null; applyMaterial(); syncUI(); };
     $('v3-custom').oninput = e => { S.color = e.target.value; applyMaterial(); document.querySelectorAll('#v3-cols .v3-dot').forEach(d => d.classList.remove('on')); };
     ensureSel();
     $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip${k === S.mat ? ' on' : ''}" data-m="${k}">${MATS[k].name}</button>`).join('');
     $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip${t === S.t ? ' on' : ''}" data-t="${t}">${t} mm</button>`).join('');
-    $('v3-sum-mat').textContent = MATS[S.mat].name; $('v3-sum-thick').textContent = S.t + ' mm'; $('v3-sum-view').textContent = S.view === 'wire' ? 'Wireframe' : 'Solid';
+    $('v3-sum-mat').textContent = MATS[S.mat].name; $('v3-sum-thick').textContent = S.t + ' mm';
     $('v3-sum-col').innerHTML = `<span class="v3-dot-s" style="background:${S.color || MATS[S.mat].color}"></span>`;
     const owner = window.karakuliShop && window.karakuliShop.isOwner();
     $('v3-dxf').style.display = owner ? '' : 'none'; $('v3d-shop').classList.toggle('owner', !!owner);
@@ -5752,10 +5801,11 @@ function initRuntime() {
     const camera = new T.PerspectiveCamera(32, 1, 1, 100000);
     const controls = new OrbitControlsCls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08; controls.autoRotateSpeed = 1.4;
-    controls.minAzimuthAngle = -1.35; controls.maxAzimuthAngle = 1.35;      // never behind the wall
-    controls.minPolarAngle = 0.25; controls.maxPolarAngle = Math.PI * 0.62;
+    controls.minAzimuthAngle = -Math.PI / 2; controls.maxAzimuthAngle = Math.PI / 2;      // never behind the wall
+    controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI * 0.62;
     controls.autoRotate = S.auto;
     controls.addEventListener('change', () => { if (R) R.dirty = true; });
+    controls.addEventListener('start', () => { if (R) { R.cam = null; if (S.cam) { S.cam = null; syncUI(); } } });
     const light = new T.DirectionalLight(0xffffff, 0.9);
     light.castShadow = true; light.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 8;
     scene.add(light);
@@ -5789,6 +5839,7 @@ function loop(now) {
         updatePose();
         if (!S.playing) syncUI();
     }
+    if (R.cam) stepCamera(dt);
     const moved = R.controls.update();
     // draw only when something changes (animation, camera, auto-rotate, a new look): an idle view costs no battery
     if (S.playing || S.auto || moved || R.dirty) {
@@ -5869,7 +5920,7 @@ function close3D() {
 
 window.addEventListener('resize', resize);
 window.open3D = open3D; window.close3D = close3D; window.openShopEditor = openShopEditor;
-window.__v3d = { designPrimitives, rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
+window.__v3d = { get R() { return R; }, designPrimitives, rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
 // the 3D button lives on the canvas, only for the products
 setInterval(() => {
