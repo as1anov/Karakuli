@@ -4019,12 +4019,29 @@ service cloud.firestore {
             const sp = Object.keys(specialElements).filter(id => nodeInBand(id, b));
             return { segs, sp };
         }
-        // index of the one hook that has a pattern while every other hook is still empty (or -1)
+        // The arm zone of hook i: the 12 mm column (one grid column) from the anchor line down. Steps = drawn segments inside it.
+        const HOOK_MIN_STEPS = 15;
+        function armZone(b) {
+            const MM = LINE_WEIGHT / 12, hPx = paperHeightMm * MM;
+            const G = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
+            return { cx: (b.lo + b.hi) / 2, y0: (-hPx / 2 + G.anchor * MM) / STEP };
+        }
+        function armSteps(b) {
+            const z = armZone(b), inZ = q => Math.abs(q.x - z.cx) <= 0.6 && q.y >= z.y0 - 0.6;
+            return segments.filter(sg => inZ(sg.p1) && inZ(sg.p2)).length;
+        }
+        // index of the one hook that has a pattern (>= 15 steps in its arm zone) while every other hook is still empty (or -1)
         function hookSource() {
             const bands = hookBands(); if (!bands || bands.length < 2) return -1;
-            const filled = []; let size = 0;
-            bands.forEach((b, i) => { const k = hookContent(b); if (k.segs.length + k.sp.length) { filled.push(i); size = k.segs.length + k.sp.length; } });
-            return filled.length === 1 && size >= 6 ? filled[0] : -1;
+            const filled = [];
+            bands.forEach((b, i) => { const k = hookContent(b); if (k.segs.length + k.sp.length) filled.push(i); });
+            return filled.length === 1 && armSteps(bands[filled[0]]) >= HOOK_MIN_STEPS ? filled[0] : -1;
+        }
+        // the cursor is in the arm zone of that hook (the plus only appears while you draw there, from either end)
+        function cursorInArm(i) {
+            const bands = hookBands(); if (!bands || !bands[i]) return false;
+            const z = armZone(bands[i]);
+            return Math.abs(curI - z.cx) <= 1.5 && curJ >= z.y0 - 1.5;
         }
         function hookAutoAllowed() {
             return isPaperVisible && isDrawingMode && !isEraserActive && !isViewOnly && !isTimelapseUIOpen && !isDashboardOpen && !isGameMode && !hookAuto.busy;
@@ -4043,7 +4060,7 @@ service cloud.firestore {
             if (hookAutoAllowed() && templateKind() === 'product' && activeProductKey === 'hanger') {
                 const sig = `${segments.length}|${Object.keys(specialElements).length}|${paperWidthMm}`;
                 if (sig !== hookAuto.sig) { hookAuto.sig = sig; hookAuto.src = hookSource(); }
-                show = hookAuto.src >= 0;
+                show = hookAuto.src >= 0 && cursorInArm(hookAuto.src);
             }
             if (!show) { el.classList.remove('show'); return; }
             const x = offsetX + curI * STEP * zoom, y = offsetY + curJ * STEP * zoom;
@@ -5487,6 +5504,29 @@ function supportInfo() {
 }
 
 // terry-cloth look: small soft loops, drawn as dots on a tileable canvas (colour + bump)
+// Sunburst finish of the stainless cap: fine rays from the centre with two bright and two dark fans, like turned and brushed steel
+function sunburstTexture() {
+    if (R.sunburst) return R.sunburst;
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d'); x.fillStyle = '#9a9ea4'; x.fillRect(0, 0, 256, 256);
+    let r = 424242; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
+    const N = 720;
+    for (let i = 0; i < N; i++) {
+        const a0 = i / N * Math.PI * 2, a1 = (i + 1.4) / N * Math.PI * 2;
+        const fan = Math.pow(Math.abs(Math.cos(a0 * 2 + 0.6)), 3);                 // two bright fans opposite each other
+        const v = Math.max(60, Math.min(250, Math.floor(95 + 140 * fan + (rnd() - 0.5) * 34)));
+        x.fillStyle = `rgb(${v},${v},${Math.min(255, v + 4)})`;
+        x.beginPath(); x.moveTo(128, 128); x.arc(128, 128, 182, a0, a1); x.closePath(); x.fill();
+    }
+    for (let i = 0; i < 520; i++) {                                                   // hair-thin rays on top
+        const a = rnd() * Math.PI * 2, v = Math.floor(70 + rnd() * 180);
+        x.strokeStyle = `rgba(${v},${v},${v},0.35)`; x.lineWidth = 0.6;
+        x.beginPath(); x.moveTo(128 + Math.cos(a) * 6, 128 + Math.sin(a) * 6); x.lineTo(128 + Math.cos(a) * 128, 128 + Math.sin(a) * 128); x.stroke();
+    }
+    const t = new T.CanvasTexture(c); R.sunburst = t;
+    return t;
+}
+
 function terryTexture() {
     if (R.terry) return R.terry;
     const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -5741,8 +5781,10 @@ async function buildModel() {
     for (let i = 1; i <= 6; i++) { const a = i / 6 * Math.PI / 2; capPts.push([5.8 - rr + rr * Math.cos(a), 4 - rr + rr * Math.sin(a)]); }   // rounded outer edge
     capPts.push([0, 4]);
     const cap = new T.LatheGeometry(capPts.map(q => new T.Vector2(q[0], q[1])), 40); cap.rotateX(Math.PI / 2); cap.translate(0, 0, zTop + 1);
+    const face = new T.CircleGeometry(5.8 - rr - 0.05, 56); face.translate(0, 0, zTop + 1 + 4 + 0.02);   // the flat top of the cap with the sunburst
+    const faceMat = new T.MeshStandardMaterial({ color: 0xffffff, map: sunburstTexture(), metalness: 1, roughness: 0.3 });
     holesMm().forEach(([hx, hy]) => {
-        [[barrel, steel], [stud, steel], [washer, rubberMat], [cap, capMat]].forEach(([geo, mt]) => {
+        [[barrel, steel], [stud, steel], [washer, rubberMat], [cap, capMat], [face, faceMat]].forEach(([geo, mt]) => {
             const m = new T.Mesh(geo, mt); m.castShadow = mt !== rubberMat; m.receiveShadow = true;
             m.position.set(hx, -hy, 0); model.add(m);
         });
