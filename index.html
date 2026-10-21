@@ -570,6 +570,10 @@
         /* In-app dialog: replaces confirm() / prompt() / alert(), which some browsers and embedded views block (the button then "does nothing") */
         #app-dialog { position: fixed; inset: 0; z-index: 6000; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.38); }
         #app-dialog.show { display: flex; }
+        #hook-auto { position: fixed; z-index: 60; width: 38px; height: 38px; padding: 0; border-radius: 50%; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: none; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.22); touch-action: manipulation; animation: hook-pop 0.22s ease-out; }
+        #hook-auto.show { display: flex; }
+        #hook-auto svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+        @keyframes hook-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .ad-card { width: min(380px, 100%); padding: 20px; border-radius: 18px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); box-shadow: 0 24px 70px rgba(0,0,0,0.35); font-family: var(--main-font); }
         .ad-card h3 { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
         .ad-card p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-color); opacity: 0.85; white-space: pre-line; }
@@ -1022,6 +1026,7 @@
         // The ring is 4% larger than the previous version; line weight stays visually consistent.
         const BASE_STEP_VAL = 66.6611712; let STEP = 30; let LINE_WEIGHT = 58; 
         let segments = []; let specialElements = {}; 
+        let hookAuto = { sig: null, src: -1, busy: false, el: null };   // (+) that repeats one hook's pattern on the others
         let curI = 0, curJ = 0; let lastDirection = null; 
         let isDrawingMode = false; let isEraserActive = false;
         const DEFAULT_ERASER_RADIUS = 40; let eraserRadius = DEFAULT_ERASER_RADIUS * 0.25; 
@@ -3645,6 +3650,7 @@ service cloud.firestore {
             if (isPaperVisible && !isExporting && !isTimelapseUIOpen) drawBendLines();
             if (!isExporting || isTimelapseExport) drawCursor();
             pop();
+            if (!isExporting) updateHookBadge();
         }
 
         function drawGrid(dotRGB, alpha) {
@@ -3669,7 +3675,7 @@ service cloud.firestore {
             }));
         }
 
-        function invalidateGeometryCache() { geometryCache = { source: null, groups: [] }; }
+        function invalidateGeometryCache() { hookAuto.sig = null; geometryCache = { source: null, groups: [] }; }
 
         function getVisualLineWeight(theme = ((isTimelapseUIOpen || isTimelapseExport) ? tlTheme : currentTheme)) {
             return (theme === 'dark') ? LINE_WEIGHT - 1 : LINE_WEIGHT;
@@ -3953,6 +3959,7 @@ service cloud.firestore {
             if (k === 'enter') { isEnterPressed = true; isEnterUsedForPan = false; return; }
             if (activeKey === k) return; activeKey = k;
             if(k === ' ' || k === 'space' || k === 'm') { toggleMode(); return; }
+            if(k === 'h') { if (hookAuto.el && hookAuto.el.classList.contains('show')) autoDrawHooks(); return; }
             if(k === 'f') { toggleEraser(); return; } if(k === '/') { undo(); return; } if(k === '*') { redo(); return; }
             if(k === '+' || k === '=') { zoomAtCursor(1.1); redraw(); return; }
             if(k === '-') { zoomAtCursor(1 / 1.1); redraw(); return; }
@@ -3990,6 +3997,87 @@ service cloud.firestore {
             if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
             if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
             showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw(); captureState();
+        }
+
+
+        // ---- Hanger: after the pattern of ONE hook is drawn, a (+) near the cursor repeats it on all the other hooks ----
+        // A hook's cell is the vertical band `pitch` wide around its arm. Hook i is centred at (i - (n-1)/2) * 24 grid steps.
+        function hookBands() {
+            if (templateKind() !== 'product' || !PRODUCTS[activeProductKey].hooks) return null;
+            const n = hooksFromWidth(paperWidthMm), c = PRODUCTS[activeProductKey].hooks;
+            const half = Math.round(c.pitch * (LINE_WEIGHT / 12) / STEP) / 2, out = [];
+            for (let i = 0; i < n; i++) { const cx = Math.round((i - (n - 1) / 2) * half * 2); out.push({ lo: cx - half, hi: cx + half }); }
+            return out;
+        }
+        const inBand = (sg, b) => sg.p1.x >= b.lo && sg.p2.x <= b.hi && sg.p1.x < b.hi;
+        const nodeInBand = (id, b) => { const x = +id.split(',')[0]; return x >= b.lo && x < b.hi; };
+        function hookContent(b) {
+            const segs = segments.filter(sg => inBand(sg, b));
+            const sp = Object.keys(specialElements).filter(id => nodeInBand(id, b));
+            return { segs, sp };
+        }
+        // index of the one hook that has a pattern while every other hook is still empty (or -1)
+        function hookSource() {
+            const bands = hookBands(); if (!bands || bands.length < 2) return -1;
+            const filled = []; let size = 0;
+            bands.forEach((b, i) => { const k = hookContent(b); if (k.segs.length + k.sp.length) { filled.push(i); size = k.segs.length + k.sp.length; } });
+            return filled.length === 1 && size >= 6 ? filled[0] : -1;
+        }
+        function hookAutoAllowed() {
+            return isPaperVisible && isDrawingMode && !isEraserActive && !isViewOnly && !isTimelapseUIOpen && !isDashboardOpen && !isGameMode && !hookAuto.busy;
+        }
+        function updateHookBadge() {
+            let el = hookAuto.el;
+            if (!el) {
+                el = hookAuto.el = document.createElement('button');
+                el.id = 'hook-auto'; el.type = 'button'; el.title = 'Draw this pattern on all the other hooks (H)'; el.setAttribute('aria-label', 'Draw this pattern on all the other hooks');
+                el.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+                el.addEventListener('pointerdown', e => e.stopPropagation());
+                el.addEventListener('click', e => { e.stopPropagation(); autoDrawHooks(); });
+                document.body.appendChild(el);
+            }
+            let show = false;
+            if (hookAutoAllowed() && templateKind() === 'product' && activeProductKey === 'hanger') {
+                const sig = `${segments.length}|${Object.keys(specialElements).length}|${paperWidthMm}`;
+                if (sig !== hookAuto.sig) { hookAuto.sig = sig; hookAuto.src = hookSource(); }
+                show = hookAuto.src >= 0;
+            }
+            if (!show) { el.classList.remove('show'); return; }
+            const x = offsetX + curI * STEP * zoom, y = offsetY + curJ * STEP * zoom;
+            el.style.left = Math.max(8, Math.min(window.innerWidth - 48, x + 16)) + 'px';
+            el.style.top = Math.max(8, Math.min(window.innerHeight - 48, y - 46)) + 'px';
+            el.classList.add('show');
+        }
+        function autoDrawHooks() {
+            if (!hookAutoAllowed()) return;
+            const src = hookSource(); if (src < 0) return;
+            const bands = hookBands(), sb = bands[src], k = hookContent(sb);
+            const order = bands.map((b, i) => i).filter(i => i !== src).sort((a, b) => Math.abs(a - src) - Math.abs(b - src) || a - b);
+            saveState();   // one undo takes all the copies away
+            hookAuto.busy = true; hookAuto.el && hookAuto.el.classList.remove('show');
+            const has = (x1, y1, x2, y2) => segments.some(q => q.p1.x === x1 && q.p1.y === y1 && q.p2.x === x2 && q.p2.y === y2);
+            // the copies appear hook after hook, a stroke at a time
+            const jobs = [];
+            order.forEach(t => {
+                const dx = bands[t].lo - sb.lo;
+                jobs.push({ t, items: [...k.segs.map(sg => ({ sg, dx })), ...k.sp.map(id => ({ id, dx }))] });
+            });
+            const perHook = Math.max(10, Math.round(2200 / Math.max(1, order.length) / 16));   // frames per hook (~16 ms each)
+            let ji = 0, done = 0;
+            const step = () => {
+                const job = jobs[ji];
+                if (!job) { hookAuto.busy = false; hookAuto.sig = null; showActionHint(`Pattern repeated on ${order.length} hooks`); redraw(); return; }
+                const per = Math.max(1, Math.ceil(job.items.length / perHook)), end = Math.min(job.items.length, done + per);
+                for (; done < end; done++) {
+                    const it = job.items[done];
+                    if (it.sg) { const a = { x: it.sg.p1.x + it.dx, y: it.sg.p1.y }, b = { x: it.sg.p2.x + it.dx, y: it.sg.p2.y }; if (!has(a.x, a.y, b.x, b.y)) segments.push({ p1: a, p2: b }); }
+                    else { const [i, j] = it.id.split(',').map(Number); specialElements[`${i + it.dx},${j}`] = JSON.parse(JSON.stringify(specialElements[it.id])); }
+                }
+                invalidateGeometryCache(); redraw();
+                if (done >= job.items.length) { captureState(true); ji++; done = 0; }
+                requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
         }
 
         function addSeg(x1, y1, x2, y2) {
