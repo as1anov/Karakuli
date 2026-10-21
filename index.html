@@ -4625,7 +4625,7 @@ const K_FACTOR = 0.4;                       // neutral-axis position of the bend
 const BEND_ANGLES = { shelf: [90, 75], hanger: [90, 75], magazine: [-90] };
 
 const shopCfg = () => (window.karakuliShop && window.karakuliShop.get()) || null;
-const S = { mat: 'powder', color: null, t: 2, env: 'soft', cam: 'persp', fold: 0, playing: false, auto: false };
+const S = { mat: 'powder', color: null, t: 2, env: 'soft', cam: 'persp', objs: [], objKey: null, fold: 0, playing: false, auto: false };
 let T = null, OrbitControlsCls = null, R = null, building = false;
 
 // ---------------------------------------------------------------- pure geometry
@@ -5426,6 +5426,134 @@ function disposeModel() {
     R.scene.remove(R.model);
     R.model.traverse(o => { if (o.geometry) o.geometry.dispose(); });
     R.model = null; R.pieces = []; R.strips = [];
+    if (R.objs) { R.scene.remove(R.objs); R.objs = null; }
+}
+
+
+// ---------------------------------------------------------------- objects catalog (stage 10)
+// Procedural things that stand on the folded product. They are placed on its horizontal surface and shown once the sheet is folded.
+const OBJ_KINDS = {
+    book:     { name: 'Book',     icon: '<rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M10 3v18"/>' },
+    magazine: { name: 'Magazine', icon: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/>' },
+    vase:     { name: 'Vase',     icon: '<path d="M9 3h6M10 3c0 4-5 6-5 11a7 7 0 0 0 14 0c0-5-5-7-5-11"/>' },
+    glass:    { name: 'Glass',    icon: '<path d="M6 4h12l-1.5 16h-9z"/><path d="M7 10h10"/>' }
+};
+const BOOK_COLS = ['#8b2e2e', '#2e4a8b', '#2f6b4f', '#b88a1e', '#4a3a2a', '#5b3f77'];
+let objSeed = 1;
+
+function objMaterial(color, o = {}) {
+    R.om = R.om || {};
+    const key = color + JSON.stringify(o);
+    if (!R.om[key]) R.om[key] = new T.MeshStandardMaterial(Object.assign({ color, roughness: 0.6, metalness: 0 }, o));
+    return R.om[key];
+}
+
+// Where things can stand: the largest horizontal piece of the product folded to the end. Shelf and magazine holder only.
+function supportInfo() {
+    if (!R || !R.layout || !R.mask) return null;
+    const { key, w } = modelInfo();
+    if (key !== 'shelf' && key !== 'magazine') return null;
+    const chain = computeChain(R.layout, R.mask.ppm, R.gap + R.t / 2, 1);
+    let best = null;
+    chain.frames.forEach(f => {
+        if (Math.abs(f.T[0]) < 0.25 && Math.abs(f.T[1]) > 0.85 && f.L > 15 && (!best || f.L > best.L)) best = f;
+    });
+    if (!best) return null;
+    const za = best.P[1], zb = best.P[1] + best.T[1] * best.L;
+    return { y: best.P[0] + R.t / 2, z0: Math.min(za, zb), z1: Math.max(za, zb), depth: best.L, w };
+}
+
+// one object, base centred on the origin: { g, w (x extent), d (z extent) }
+function makeObject(kind, seed, depthAvail) {
+    const g = new T.Group();
+    const add = (geo, mat, x, y, z, shadow = true) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = shadow; g.add(m); return m; };
+    const box = (w, h, d, mat, x, y, z) => add(new T.BoxGeometry(w, h, d), mat, x, y, z);
+    if (kind === 'book') {
+        const th = 20 + (seed * 7) % 13, h = 200 + (seed * 11) % 40, D = 150, cover = BOOK_COLS[seed % BOOK_COLS.length];
+        const cm = objMaterial(cover, { roughness: 0.7 }), pm = objMaterial('#f1ead8', { roughness: 0.9 });
+        box(th - 4, h - 4, D - 4, pm, 0, h / 2, -1);                          // pages
+        box(2.2, h, D, cm, -th / 2 + 1.1, h / 2, 0); box(2.2, h, D, cm, th / 2 - 1.1, h / 2, 0);   // boards
+        box(th, h, 2.2, cm, 0, h / 2, D / 2 - 1.1);                            // spine (towards the viewer)
+        const out = depthAvail >= 100;                                          // too shallow: stands with the cover towards the viewer
+        if (!out) g.rotation.y = Math.PI / 2;
+        return { g, w: out ? th : D, d: out ? D : th };
+    }
+    if (kind === 'magazine') {
+        const W = 215, H = 275;
+        box(W, H, 3, objMaterial('#f4f4f1', { roughness: 0.55 }), 0, H / 2, 0);
+        box(W - 24, 46, 0.8, objMaterial(BOOK_COLS[seed % BOOK_COLS.length]), 0, H - 50, 1.7);
+        box(W - 24, 70, 0.8, objMaterial('#d9d9d4'), 0, 90, 1.7);
+        g.rotation.x = -0.09;                                                   // leans against the wall
+        return { g, w: W, d: 8 };
+    }
+    if (kind === 'vase') {
+        const pts = [[0, 0], [34, 0], [44, 10], [52, 50], [46, 110], [26, 150], [22, 172], [28, 188]].map(p => new T.Vector2(p[0], p[1]));
+        add(new T.LatheGeometry(pts, 40), objMaterial('#d8d4cc', { roughness: 0.35, side: T.DoubleSide }), 0, 0, 0);
+        [[-0.35, '#b5342c'], [0.05, '#c9a227'], [0.4, '#b5342c']].forEach(([a, c], i) => {
+            const len = 150 + i * 14;
+            add(new T.CylinderGeometry(1.3, 1.3, len, 6), objMaterial('#3f6b3a'), Math.sin(a) * len / 2, 150 + Math.cos(a) * len / 2, 0).rotation.z = -a;
+            add(new T.SphereGeometry(13, 14, 10), objMaterial(c, { roughness: 0.8 }), Math.sin(a) * len, 150 + Math.cos(a) * len, 0);
+        });
+        return { g, w: 104, d: 104 };
+    }
+    // glass with some water
+    const shell = [[0, 0], [29, 0], [29.5, 6], [37, 98], [36, 98], [28, 8], [0, 8]].map(p => new T.Vector2(p[0], p[1]));
+    const gm = objMaterial('#dfeaf2', { roughness: 0.05, transparent: true, opacity: 0.34, side: T.DoubleSide, depthWrite: false });
+    add(new T.LatheGeometry(shell, 36), gm, 0, 0, 0, false);
+    const water = [[0, 8], [28, 8], [33, 62], [0, 62]].map(p => new T.Vector2(p[0], p[1]));
+    add(new T.LatheGeometry(water, 36), objMaterial('#7fb4d8', { roughness: 0.1, transparent: true, opacity: 0.5, depthWrite: false }), 0, 0, 0, false);
+    return { g, w: 75, d: 75 };
+}
+
+function placeObjects() {
+    if (!R) return;
+    if (R.objs) { R.scene.remove(R.objs); R.objs.traverse(o => { if (o.geometry) o.geometry.dispose(); }); R.objs = null; }
+    const key = modelInfo().key;
+    if (S.objKey !== key) { S.objs = []; S.objKey = key; }
+    R.support = supportInfo();
+    const sup = R.support;
+    if (sup && S.objs.length) {
+        const GAP = 14, built = [];
+        let total = -GAP;
+        for (const it of S.objs) {
+            const o = makeObject(it.k, it.s, sup.depth);
+            if (total + GAP + o.w > sup.w - 40) break;          // no more room on this product
+            total += GAP + o.w; built.push(o);
+        }
+        S.objs.length = built.length;
+        const root = new T.Group(); let x = -total / 2;
+        built.forEach(o => { o.g.position.set(x + o.w / 2, sup.y, (sup.z0 + sup.z1) / 2); root.add(o.g); x += o.w + GAP; });
+        R.objs = root; R.scene.add(root);
+    }
+    R.objs && (R.objs.visible = S.fold >= 0.995);
+    R.dirty = true;
+}
+
+function objAdd(kind) {
+    if (!R || !R.support) return;
+    const n0 = S.objs.length;
+    S.objs.push({ k: kind, s: objSeed++ });
+    placeObjects();
+    if (S.objs.length === n0) note('There is no room for one more on this ' + modelInfo().P.name.toLowerCase() + '.');
+    else if (S.fold < 0.995) { S.fold = 1; S.playing = false; R.prog = null; updatePose(); }   // things stand on the folded product
+    syncUI();
+}
+function objAct(i, act) {
+    if (act === 'del') S.objs.splice(i, 1);
+    else if (act === 'left' && i > 0) [S.objs[i - 1], S.objs[i]] = [S.objs[i], S.objs[i - 1]];
+    else if (act === 'right' && i < S.objs.length - 1) [S.objs[i + 1], S.objs[i]] = [S.objs[i], S.objs[i + 1]];
+    else if (act === 'clear') S.objs = [];
+    placeObjects(); syncUI();
+}
+function objUI() {
+    const cat = document.getElementById('v3-cat'); if (!cat) return;
+    const ok = !!(R && R.support);
+    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok ? '' : ' disabled'}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
+    const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
+    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button><button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
+        + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
+    document.getElementById('v3-objnote').textContent = ok ? '' : (R && R.model ? 'Things can stand on the Shelf and the Magazine holder. Things for the Hanger come later.' : '');
+    document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
 
 async function buildModel() {
@@ -5479,6 +5607,7 @@ async function buildModel() {
         });
     });
     R.scene.add(model);
+    placeObjects();
     R.weightKg = mask.count / (ppm * ppm) * t * MATS[S.mat].density / 1e6;
     return true;
 }
@@ -5550,6 +5679,7 @@ function updatePose() {
         mesh.matrixWorldNeedsUpdate = true;
     });
     chain.arcs.forEach((a, i) => (R.strips[i] || []).forEach(s => updateStrip(s, a, t)));
+    if (R.objs) R.objs.visible = S.fold >= 0.995;   // things stand on the folded product only
 }
 
 function applyMaterial() {
@@ -5667,6 +5797,13 @@ function ensureCss() {
     .v3-handle { display: none; width: 100%; height: 22px; margin: -6px 0 4px; padding: 0; border: 0; background: none; cursor: pointer; }
     .v3-handle i { display: block; width: 38px; height: 4px; margin: 0 auto; border-radius: 2px; background: var(--disabled-color); opacity: 0.6; }
     #v3d-panel.min .v3-sec { display: none; }
+    .v3-cat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .v3-card { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 6px; border-radius: 10px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 10px; font-weight: 600; cursor: pointer; }
+    .v3-card svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .v3-card:hover:not(:disabled) { background: var(--hover-bg, rgba(128,128,128,0.12)); } .v3-card:disabled { opacity: 0.4; cursor: default; }
+    .v3-orow { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 11px; font-weight: 600; }
+    .v3-orow button { width: 24px; height: 24px; margin-left: 3px; border-radius: 7px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-size: 14px; line-height: 1; cursor: pointer; }
+    .v3-clear { margin-top: 8px; } .v3-note { margin-top: 6px; font-size: 10px; line-height: 1.45; color: var(--disabled-color); } .v3-note:empty { display: none; }
     #shop-editor { position: fixed; inset: 0; z-index: 3600; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.38); font-family: var(--main-font); color: var(--text-color); }
     #shop-editor.show { display: flex; }
     .v3-prow { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 2px 0; }
@@ -5744,6 +5881,7 @@ function buildUI() {
             <div class="v3-sec" data-sec="col"><button class="v3-lab v3-tog"><span>Colour</span><em id="v3-sum-col"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-sw" id="v3-cols"></div></div></div>
             <div class="v3-sec" data-sec="thick"><button class="v3-lab v3-tog"><span>Thickness</span><em id="v3-sum-thick"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-ts"></div></div></div>
             <div class="v3-sec" data-sec="cam"><button class="v3-lab v3-tog"><span>Camera</span><em id="v3-sum-cam"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-cams"><button class="v3-chip" data-cam="persp">3/4</button><button class="v3-chip" data-cam="front">Front</button><button class="v3-chip" data-cam="side">Side</button><button class="v3-chip" data-cam="top">Top</button></div></div></div>
+            <div class="v3-sec" data-sec="obj"><button class="v3-lab v3-tog"><span>Objects</span><em id="v3-sum-obj"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-cat" id="v3-cat"></div><div id="v3-objlist"></div><div class="v3-note" id="v3-objnote"></div></div></div>
             <div class="v3-sec" id="v3-price-sec" data-sec="price" style="display:none"><button class="v3-lab v3-tog"><span>Price</span><em id="v3-sum-price"></em><i class="v3-chev"></i></button><div class="v3-body" id="v3-price"></div></div>
             <div class="v3-sec" data-sec="dl"><button class="v3-lab v3-tog"><span>Download</span><em id="v3-sum-dl"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips"><button class="v3-chip" id="v3-png" title="Picture of the product only">Picture (.png)</button><button class="v3-chip" id="v3-glb" title="Folded 3D model for AR and 3D software">3D model (.glb)</button><button class="v3-chip" id="v3-dxf" title="Flat pattern for laser cutting">Flat pattern (.dxf)</button></div></div></div>
             <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button></div></div>
@@ -5770,6 +5908,10 @@ function buildUI() {
     $('v3-sheet').onclick = () => $('v3d-panel').classList.toggle('min');
     if (window.innerWidth <= 700) document.querySelectorAll('#v3d-panel .v3-sec[data-sec]').forEach(sc => { if (sc.dataset.sec !== 'mat') sc.classList.add('closed'); });
     $('v3-glb').onclick = exportGLB; $('v3-png').onclick = exportPNG;
+    $('v3d-panel').addEventListener('click', e => {
+        const c = e.target.closest('[data-ok]'); if (c) { objAdd(c.dataset.ok); return; }
+        const a = e.target.closest('[data-oa]'); if (a) objAct(a.dataset.oi === undefined ? -1 : +a.dataset.oi, a.dataset.oa);
+    });
     $('v3-cams').onclick = e => { const b = e.target.closest('[data-cam]'); if (b) goCamera(b.dataset.cam); };
     $('v3-dxf').onclick = exportDXF;
     $('v3-auto').onclick = () => { S.auto = !S.auto; if (R) R.controls.autoRotate = S.auto; syncUI(); };
@@ -5789,6 +5931,7 @@ function syncUI() {
     const $ = id => document.getElementById(id);
     $('v3-auto').classList.toggle('on', S.auto);
     document.querySelectorAll('#v3-cams .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.cam === S.cam));
+    objUI();
     $('v3-sum-cam').textContent = { persp: '3/4', front: 'Front', side: 'Side', top: 'Top' }[S.cam] || 'Free';
     $('v3-cols').innerHTML = swatchesHTML();
     $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c || null; applyMaterial(); syncUI(); };
