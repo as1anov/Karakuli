@@ -5436,7 +5436,10 @@ const OBJ_KINDS = {
     book:     { name: 'Book',     icon: '<rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M10 3v18"/>' },
     magazine: { name: 'Magazine', icon: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/>' },
     vase:     { name: 'Vase',     icon: '<path d="M9 3h6M10 3c0 4-5 6-5 11a7 7 0 0 0 14 0c0-5-5-7-5-11"/>' },
-    glass:    { name: 'Glass',    icon: '<path d="M6 4h12l-1.5 16h-9z"/><path d="M7 10h10"/>' }
+    glass:    { name: 'Glass',    icon: '<path d="M6 4h12l-1.5 16h-9z"/><path d="M7 10h10"/>' },
+    towel:    { name: 'Towel',    hook: true, icon: '<path d="M4 6h16"/><path d="M6 6v14h12V6"/><path d="M6 15h12"/>' },
+    jacket:   { name: 'Jacket',   hook: true, icon: '<path d="M9 3l-5 4 1 13h4V9M15 3l5 4-1 13h-4V9M9 3c1 2 5 2 6 0"/>' },
+    umbrella: { name: 'Umbrella', hook: true, icon: '<path d="M12 3v1M4 14c0-5 3.5-9 8-9s8 4 8 9c-1.5-1.5-3-1.5-4 0-1-1.5-3-1.5-4 0-1-1.5-3-1.5-4 0-1-1.5-2.5-1.5-4 0z"/><path d="M12 14v6a2 2 0 0 0 4 0"/>' }
 };
 const BOOK_COLS = ['#8b2e2e', '#2e4a8b', '#2f6b4f', '#b88a1e', '#4a3a2a', '#5b3f77'];
 let objSeed = 1;
@@ -5452,7 +5455,7 @@ function objMaterial(color, o = {}) {
 function supportInfo() {
     if (!R || !R.layout || !R.mask) return null;
     const { key, w } = modelInfo();
-    if (key !== 'shelf' && key !== 'magazine') return null;
+    if (key !== 'shelf' && key !== 'magazine' && key !== 'hanger') return null;
     const chain = computeChain(R.layout, R.mask.ppm, R.gap + R.t / 2, 1);
     let best = null;
     chain.frames.forEach(f => {
@@ -5460,7 +5463,13 @@ function supportInfo() {
     });
     if (!best) return null;
     const za = best.P[1], zb = best.P[1] + best.T[1] * best.L;
-    return { y: best.P[0] + R.t / 2, z0: Math.min(za, zb), z1: Math.max(za, zb), depth: best.L, w };
+    const sup = { type: 'surface', y: best.P[0] + R.t / 2, z0: Math.min(za, zb), z1: Math.max(za, zb), depth: best.L, w };
+    if (key === 'hanger') {   // things hang from the J-shaped arms: one spot per hook, x in the centred scene
+        const n = hooksFromWidth(w), pitch = PRODUCTS.hanger.hooks.pitch;
+        sup.type = 'hooks'; sup.hooks = [];
+        for (let i = 0; i < n; i++) sup.hooks.push((i - (n - 1) / 2) * pitch);
+    }
+    return sup;
 }
 
 // one object, base centred on the origin: { g, w (x extent), d (z extent) }
@@ -5496,6 +5505,38 @@ function makeObject(kind, seed, depthAvail) {
         });
         return { g, w: 104, d: 104 };
     }
+    if (kind === 'towel') {   // draped over the arm: a roll on top and two layers of cloth
+        const col = ['#6a8fb8', '#b5685a', '#7a9a6b', '#c9b27a'][seed % 4], W = 320, H = 560;
+        const cm = objMaterial(col, { roughness: 0.95 }), sm = objMaterial('#f1f1ee', { roughness: 0.95 });
+        const roll = add(new T.CylinderGeometry(10, 10, W, 18), cm, 0, 0, 0); roll.rotation.z = Math.PI / 2;
+        box(W, H, 5, cm, 0, -H / 2, 9); box(W, H - 70, 5, cm, 0, -(H - 70) / 2, -9);
+        box(W, 14, 5.6, sm, 0, -H + 60, 9); box(W, 14, 5.6, sm, 0, -H + 90, 9);
+        return { g, w: W, d: 30 };
+    }
+    if (kind === 'jacket') {   // a stylised jacket on a loop, hanging below the arm
+        const col = ['#3d4148', '#7a2e2e', '#2f4f6b', '#5a5640'][seed % 4];
+        const bm = objMaterial(col, { roughness: 0.85 }), dm = objMaterial('#1d1f22', { roughness: 0.7 }), lm = objMaterial('#8b9099', { roughness: 0.4, metalness: 0.6 });
+        add(new T.TorusGeometry(10, 2, 8, 20), lm, 0, -8, 0);                                  // loop around the arm
+        box(300, 34, 70, bm, 0, -52, 0); box(330, 540, 78, bm, 0, -52 - 17 - 270, 0);           // shoulders + body
+        box(120, 30, 82, dm, 0, -48, 0);                                                          // collar
+        box(3, 520, 3, lm, 0, -52 - 17 - 260, 40);                                               // zip
+        box(70, 18, 4, dm, -100, -300, 40); box(70, 18, 4, dm, 100, -300, 40);                   // pockets
+        [-1, 1].forEach(sd => {
+            const pv = new T.Group(); pv.position.set(sd * 178, -60, 0); pv.rotation.z = sd * 0.09; g.add(pv);
+            const m = new T.Mesh(new T.BoxGeometry(92, 560, 70), bm); m.position.set(0, -280, 0); m.castShadow = m.receiveShadow = true; pv.add(m);
+        });
+        return { g, w: 460, d: 78 };
+    }
+    if (kind === 'umbrella') {   // closed umbrella hung by its J-handle
+        const col = ['#1f4e8c', '#2d2d30', '#8b2e2e', '#2f6b4f'][seed % 4];
+        const cm = objMaterial(col, { roughness: 0.8 }), hm = objMaterial('#2a2a2a', { roughness: 0.4 }), tm = objMaterial('#b8bcc2', { roughness: 0.3, metalness: 0.8 });
+        const arc = add(new T.TorusGeometry(13, 3.2, 8, 20, Math.PI), hm, 0, 0, 0);               // handle over the arm
+        box(6.4, 46, 6.4, hm, 13, -23, 0);                                                          // short end of the handle
+        add(new T.CylinderGeometry(3.2, 3.2, 360, 10), tm, -13, -180, 0);                         // shaft
+        add(new T.CylinderGeometry(18, 7, 420, 16), cm, -13, -360 - 210 + 40, 0);                 // folded canopy
+        add(new T.CylinderGeometry(2.4, 2.4, 60, 8), tm, -13, -360 - 420 + 40 - 30, 0);          // tip
+        return { g, w: 60, d: 40 };
+    }
     // glass with some water
     const shell = [[0, 0], [29, 0], [29.5, 6], [37, 98], [36, 98], [28, 8], [0, 8]].map(p => new T.Vector2(p[0], p[1]));
     const gm = objMaterial('#dfeaf2', { roughness: 0.05, transparent: true, opacity: 0.34, side: T.DoubleSide, depthWrite: false });
@@ -5512,7 +5553,19 @@ function placeObjects() {
     if (S.objKey !== key) { S.objs = []; S.objKey = key; }
     R.support = supportInfo();
     const sup = R.support;
-    if (sup && S.objs.length) {
+    if (sup && sup.type === 'hooks' && S.objs.length) {
+        // item j hangs on the j-th hook counted from the middle outwards; neighbours are shifted in depth so wide items do not cut each other
+        const n = sup.hooks.length, mid = (n - 1) / 2;
+        const seq = sup.hooks.map((x, i) => i).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b);
+        S.objs.length = Math.min(S.objs.length, n);
+        const root = new T.Group();
+        S.objs.forEach((it, j) => {
+            const hi = seq[j], o = makeObject(it.k, it.s, sup.depth);
+            o.g.position.set(sup.hooks[hi], sup.y + 2, (sup.z0 + sup.z1) / 2 + (hi % 3) * 36);
+            root.add(o.g);
+        });
+        R.objs = root; R.scene.add(root);
+    } else if (sup && S.objs.length) {
         const GAP = 14, built = [];
         let total = -GAP;
         for (const it of S.objs) {
@@ -5547,12 +5600,12 @@ function objAct(i, act) {
 }
 function objUI() {
     const cat = document.getElementById('v3-cat'); if (!cat) return;
-    const ok = !!(R && R.support);
-    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok ? '' : ' disabled'}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
+    const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks';
+    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !!o.hook === onHooks ? '' : ' disabled'}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button><button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
         + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
-    document.getElementById('v3-objnote').textContent = ok ? '' : (R && R.model ? 'Things can stand on the Shelf and the Magazine holder. Things for the Hanger come later.' : '');
+    document.getElementById('v3-objnote').textContent = !R || !R.model ? '' : onHooks ? 'The hanger takes the items that hang: towel, jacket, umbrella. One per hook.' : ok ? 'The shelf and the magazine holder take the items that stand: books, magazine, vase, glass.' : '';
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
 
@@ -5798,6 +5851,7 @@ function ensureCss() {
     .v3-handle i { display: block; width: 38px; height: 4px; margin: 0 auto; border-radius: 2px; background: var(--disabled-color); opacity: 0.6; }
     #v3d-panel.min .v3-sec { display: none; }
     .v3-cat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    @media (max-width: 700px) { .v3-card span { font-size: 9px; } }
     .v3-card { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 6px; border-radius: 10px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 10px; font-weight: 600; cursor: pointer; }
     .v3-card svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
     .v3-card:hover:not(:disabled) { background: var(--hover-bg, rgba(128,128,128,0.12)); } .v3-card:disabled { opacity: 0.4; cursor: default; }
