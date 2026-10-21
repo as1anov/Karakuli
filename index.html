@@ -1788,17 +1788,20 @@ service cloud.firestore {
         //  hooks    = hanger arms: `armW` wide, always `pitch` mm apart; width = armW + (n - 1) * pitch
         //  profile  = side view (icon only): gap to the wall, `face` = face length below the anchor,
         //             foot depth / lip length / lip angle, or `back` = return towards the wall
+        // Wall mount: a 26 x 11.6 mm barrel is screwed to the wall, the product sits on its end, a 7 mm bolt with a rubber washer (1 mm) and a stainless cap (11.6 x 4 mm) holds it.
+        // So every product stands exactly 26 mm away from the wall.
+        const WALL_GAP_MM = 26;
         const PRODUCTS = {
             shelf: { name: 'Shelf', def: { w: 894, h: 379 }, tail: 147, minFace: 100, minW: 200, radius: 7.5,
                      patternEnd: 0, folds: [0, 12, 132], marks: [{ off: 0, label: 'PATTERN END' }, { off: 12, label: 'BEND LINE' }, { off: 132, label: 'BEND LINE' }], holes: { inset: 17.8, top: 69, bottomUp: 17.6 },
-                     profile: { gap: 20, face: 12, foot: 120, lip: 15, angle: 105 } },
+                     profile: { gap: WALL_GAP_MM, face: 12, foot: 120, lip: 15, angle: 105 } },
             hanger: { name: 'Hanger', def: { w: 12 + 6 * (24 * 30 * 12 / 58), h: 321 }, tail: 91.4, minFace: 150,
                       patternEnd: null, folds: [39.4, 74.4], marks: [{ off: 39.4, label: 'BEND LINE' }, { off: 74.4, label: 'BEND LINE' }], holes: { inset: 17.8, top: 41.6, bottomUp: 44.9 },
                       hooks: { armW: 12, pitch: 24 * 30 * 12 / 58, min: 4, max: 7 }   /* pitch = 24 grid steps (720 px), so every hook sits on a grid column */,
-                      profile: { gap: 20, face: 39.4, foot: 35, lip: 17, angle: 105 } },
+                      profile: { gap: WALL_GAP_MM, face: 39.4, foot: 35, lip: 17, angle: 105 } },
             magazine: { name: 'Magazine holder', def: { w: 894, h: 261.8 }, tail: 27, minFace: 120, minW: 200,
                         patternEnd: -10, folds: [0], marks: [{ off: -10, label: 'PATTERN END' }, { off: 0, label: 'BEND LINE' }], holes: { inset: 17.8, top: 69 },
-                        profile: { gap: 45, face: 0, back: 45 } }
+                        profile: { gap: WALL_GAP_MM, face: 0, back: WALL_GAP_MM } }
         };
         // Plain shapes: width = height (side of the square / diameter of the circle).
         const SHAPES = { square: { name: 'Square', def: 500 }, circle: { name: 'Circle', def: 500 } };
@@ -4947,6 +4950,13 @@ function fitLine(Q, a, b) {
 const lineDist = (L, x, y) => Math.abs((x - L.px) * L.dy - (y - L.py) * L.dx);
 const lineProj = (L, x, y) => { const t = (x - L.px) * L.dx + (y - L.py) * L.dy; return [L.px + L.dx * t, L.py + L.dy * t]; };
 const LINE_TOL = 0.2, ARC_TOL = 0.25;
+// Centres of the bolt holes exactly as they are drawn on the canvas (they sit on grid points), in mm from the sheet's top-left corner.
+// The raster cut, the snapping circles and the wall barrels all use these, so the barrel is always in the middle of its hole.
+function holesMm() {
+    const MM = LINE_WEIGHT / 12, { w, h } = modelInfo();
+    return getBoltHolesPx().map(q => [q.x / MM + w / 2, q.y / MM + h / 2]);
+}
+
 // The exact circles and lines of the drawing itself (rings, bolt holes, stroke edges), in the same coordinates as the contour.
 // Fitted arcs and lines that lie on one of them are replaced by it, so a ring is a true circle and a stroke edge a true line.
 let SNAP = null;
@@ -5172,7 +5182,7 @@ function designPrimitives(w, h, W, H, ppm) {
         if (P.radius) { const r = P.radius * mm; [[R - r, B - r], [L + r, B - r]].forEach(([cx, cy]) => { const c = U(cx, cy); circles.push({ cx: c[0], cy: c[1], r: r * sx }); }); }
         if (P.hooks && G.arms) { const sy0 = T + G.anchor * mm; line(L, sy0, R, sy0); G.arms.forEach(a => { line(L + a[0] * mm, sy0, L + a[0] * mm, B); line(L + a[1] * mm, sy0, L + a[1] * mm, B); }); }
     }
-    productGeom(activeProductKey, w, h).holes.forEach(([hx, hy]) => circles.push({ cx: hx * ppm + 1, cy: hy * ppm + 1, r: HOLE_DIAMETER_MM / 2 * ppm }));
+    holesMm().forEach(([hx, hy]) => circles.push({ cx: hx * ppm + 1, cy: hy * ppm + 1, r: HOLE_DIAMETER_MM / 2 * ppm }));
     return { circles, lines };
 }
 
@@ -5349,7 +5359,7 @@ async function rasterMask(w, h) {
     for (let i = 0, j = 3; i < g.length; i++, j += 4) { A[i] = d[j - 3] < 128 ? d[j] : 0; if (A[i] > 127) { g[i] = 1; count++; } }   // opaque and dark = metal (white discs = holes)
     // bolt holes are real holes in every part
     const G = productGeom(activeProductKey, w, h), r = HOLE_DIAMETER_MM / 2 * ppm;
-    G.holes.forEach(([hx, hy]) => {
+    holesMm().forEach(([hx, hy]) => {
         const cx = hx * ppm, cy = hy * ppm;
         for (let y = Math.max(0, Math.floor(cy - r - 1)); y <= Math.min(H - 1, Math.ceil(cy + r + 1)); y++)
             for (let x = Math.max(0, Math.floor(cx - r - 1)); x <= Math.min(W - 1, Math.ceil(cx + r + 1)); x++)
@@ -5717,13 +5727,23 @@ async function buildModel() {
         list.forEach(s => model.add(s.mesh));
         R.strips.push(list);
     });
-    // wall standoffs and bolt heads
-    const standoff = new T.CylinderGeometry(4.6, 4.6, gap, 20); standoff.rotateX(Math.PI / 2); standoff.translate(0, 0, gap / 2);
-    const head = new T.CylinderGeometry(5.4, 5.4, 2.4, 20); head.rotateX(Math.PI / 2); head.translate(0, 0, gap + t + 1.2);
-    const shaft = new T.CylinderGeometry(2.6, 2.6, gap + t + 2, 14); shaft.rotateX(Math.PI / 2); shaft.translate(0, 0, (gap + t + 2) / 2);
-    G.holes.forEach(([hx, hy]) => {
-        [standoff, head, shaft].forEach(geo => {
-            const m = new T.Mesh(geo, R.material); m.castShadow = m.receiveShadow = true;
+    // Wall mount, exactly as drawn: a barrel 26 x 11.6 mm is screwed to the wall, the product sits on its end (hole over the barrel),
+    // a 7 mm bolt goes through the hole into the barrel, under the head: a clear rubber washer (1 mm) and a stainless cap 11.6 x 4 mm.
+    // The bolt + washer are 15 mm long together.
+    const steel = objMaterial('#a9adb2', { roughness: 0.5, metalness: 0.9 }), capMat = objMaterial('#cfd2d6', { roughness: 0.28, metalness: 1 });
+    const rubberMat = objMaterial('#e6eef0', { roughness: 0.2, transparent: true, opacity: 0.45, depthWrite: false });
+    const zTop = WALL_GAP_MM + t;                                                                  // upper face of the product
+    const along = (geo, z0) => { geo.rotateX(Math.PI / 2); geo.translate(0, 0, z0); return geo; };   // axis along z, starting at z0 (cylinders are centred)
+    const barrel = along(new T.CylinderGeometry(5.8, 5.8, WALL_GAP_MM, 40), WALL_GAP_MM / 2);
+    const stud = along(new T.CylinderGeometry(3.5, 3.5, 14, 24), zTop + 1 - 15 + 7);              // 14 mm of thread + the 1 mm washer = 15 mm
+    const washer = along(new T.CylinderGeometry(5.8, 5.8, 1, 40), zTop + 0.5);
+    const rr = 1.2, capPts = [[0, 0], [5.8, 0], [5.8, 4 - rr]];
+    for (let i = 1; i <= 6; i++) { const a = i / 6 * Math.PI / 2; capPts.push([5.8 - rr + rr * Math.cos(a), 4 - rr + rr * Math.sin(a)]); }   // rounded outer edge
+    capPts.push([0, 4]);
+    const cap = new T.LatheGeometry(capPts.map(q => new T.Vector2(q[0], q[1])), 40); cap.rotateX(Math.PI / 2); cap.translate(0, 0, zTop + 1);
+    holesMm().forEach(([hx, hy]) => {
+        [[barrel, steel], [stud, steel], [washer, rubberMat], [cap, capMat]].forEach(([geo, mt]) => {
+            const m = new T.Mesh(geo, mt); m.castShadow = mt !== rubberMat; m.receiveShadow = true;
             m.position.set(hx, -hy, 0); model.add(m);
         });
     });
