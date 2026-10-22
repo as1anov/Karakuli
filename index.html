@@ -5503,7 +5503,7 @@ const OBJ_KINDS = {
     book:     { name: 'Book',     icon: '<rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M10 3v18"/>' },
     magazine: { name: 'Magazine', hook: 'both', icon: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/>' },
     vase:     { name: 'Vase',     icon: '<path d="M9 3h6M10 3c0 4-5 6-5 11a7 7 0 0 0 14 0c0-5-5-7-5-11"/>' },
-    glass:    { name: 'Glass',    icon: '<path d="M6 4h12l-1.5 16h-9z"/><path d="M7 10h10"/>' },
+    pencils:  { name: 'Pencils',  icon: '<path d="M7 11h10l-1 9H8z"/><path d="M9 11 8 4M12 11V3M15 11l1-7"/>' },
     towel:    { name: 'Towel',    hook: true, icon: '<path d="M4 6h16"/><path d="M6 6v14h12V6"/><path d="M6 15h12"/>' },
     jacket:   { name: 'Jacket',   hook: true, off: true, icon: '<path d="M9 3l-5 4 1 13h4V9M15 3l5 4-1 13h-4V9M9 3c1 2 5 2 6 0"/>' },
     umbrella: { name: 'Umbrella', hook: true, off: true, icon: '<path d="M12 3v1M4 14c0-5 3.5-9 8-9s8 4 8 9c-1.5-1.5-3-1.5-4 0-1-1.5-3-1.5-4 0-1-1.5-3-1.5-4 0-1-1.5-2.5-1.5-4 0z"/><path d="M12 14v6a2 2 0 0 0 4 0"/>' }
@@ -5674,6 +5674,58 @@ function makeTowel(seed, ctx) {
     return { g, w: 300, d: 60 };
 }
 
+// Ceramic glazes: every one has its own colour way and structure (dipped glaze with drips, ombre, speckled, banded). Colours stay away from the wall grey.
+const GLAZES = [
+    { k: 'drip', a: '#1f5f7a', b: '#0f3a4d', clay: '#d9c7a3' }, { k: 'ombre', a: '#9b2f2c', b: '#3f1010' },
+    { k: 'speckle', a: '#c9922b', b: '#6b4310' }, { k: 'bands', a: '#2f5d46', b: '#e6dcc0' },
+    { k: 'ombre', a: '#6a4690', b: '#1f1233' }, { k: 'speckle', a: '#c4552f', b: '#5a210f' },
+    { k: 'drip', a: '#23407f', b: '#122550', clay: '#e6dcc0' }, { k: 'bands', a: '#2b2b2e', b: '#c9922b' }
+];
+function glazeMat(i) {
+    R.glz = R.glz || {};
+    i = ((i % GLAZES.length) + GLAZES.length) % GLAZES.length;
+    if (R.glz[i]) return R.glz[i];
+    const G = GLAZES[i], c = document.createElement('canvas'); c.width = 512; c.height = 512;
+    const x = c.getContext('2d'); let r = 1357 + i * 7919; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
+    const lin = (y0, y1, c0, c1) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, c0); g.addColorStop(1, c1); return g; };
+    if (G.k === 'drip') {                                                              // glaze dipped from the top over raw clay
+        x.fillStyle = G.clay; x.fillRect(0, 0, 512, 512);
+        x.fillStyle = lin(0, 340, G.a, G.b); x.beginPath(); x.moveTo(0, 0); x.lineTo(512, 0);
+        for (let px = 512; px >= 0; px -= 8) x.lineTo(px, 300 + Math.sin(px / 37) * 26 + Math.sin(px / 11 + i) * 10 + (rnd() < 0.07 ? rnd() * 70 : 0));
+        x.closePath(); x.fill();
+    } else if (G.k === 'ombre') {                                                       // colour deepens towards the foot
+        x.fillStyle = lin(0, 512, G.a, G.b); x.fillRect(0, 0, 512, 512);
+        x.fillStyle = 'rgba(255,255,255,0.16)'; x.fillRect(0, 40, 512, 5); x.fillRect(0, 52, 512, 2);
+    } else if (G.k === 'speckle') {
+        x.fillStyle = lin(0, 512, G.a, G.b); x.fillRect(0, 0, 512, 512);
+        for (let n = 0; n < 2600; n++) { x.fillStyle = rnd() < 0.5 ? 'rgba(30,18,8,0.55)' : 'rgba(255,240,210,0.35)'; x.beginPath(); x.arc(rnd() * 512, rnd() * 512, 0.7 + rnd() * 1.8, 0, 6.2832); x.fill(); }
+    } else {                                                                            // bands of different weight
+        x.fillStyle = G.a; x.fillRect(0, 0, 512, 512);
+        [[70, 22], [120, 6], [138, 6], [250, 46], [330, 5], [420, 30]].forEach(([y, hh]) => { x.fillStyle = G.b; x.fillRect(0, y, 512, hh); });
+    }
+    for (let n = 0; n < 900; n++) { x.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)'; x.fillRect(rnd() * 512, rnd() * 512, 1 + rnd() * 2, 6 + rnd() * 40); }   // fine streaks of the potter's wheel
+    const t = new T.CanvasTexture(c); if (T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; t.wrapS = T.RepeatWrapping;
+    const o = { color: 0xffffff, map: t, roughness: 0.3, metalness: 0 };
+    if (T.MeshPhysicalMaterial) { o.clearcoat = 0.7; o.clearcoatRoughness = 0.18; }
+    return (R.glz[i] = new (T.MeshPhysicalMaterial || T.MeshStandardMaterial)(o));
+}
+// smooth curve through control points (Catmull-Rom), flat base kept
+function smoothCurve(ctrl, per) {
+    const P = [ctrl[0], ...ctrl, ctrl[ctrl.length - 1]], out = [];
+    for (let i = 1; i < P.length - 2; i++) for (let k = 0; k < per; k++) {
+        const u = k / per, u2 = u * u, u3 = u2 * u, f = (a, b, c, d) => 0.5 * ((2 * b) + (-a + c) * u + (2 * a - 5 * b + 4 * c - d) * u2 + (-a + 3 * b - 3 * c + d) * u3);
+        out.push([Math.max(0, f(P[i - 1][0], P[i][0], P[i + 1][0], P[i + 2][0])), f(P[i - 1][1], P[i][1], P[i + 1][1], P[i + 2][1])]);
+    }
+    out.push(ctrl[ctrl.length - 1]); return out;
+}
+const VASE_STYLES = [
+    [[0, 0], [.17, 0], [.2, .02], [.27, .26], [.26, .5], [.17, .74], [.095, .88], [.095, .95], [.125, 1]],      // ovoid with a narrow neck
+    [[0, 0], [.1, 0], [.115, .02], [.12, .35], [.1, .6], [.045, .8], [.042, .95], [.06, 1]],                    // tall bottle
+    [[0, 0], [.09, 0], [.15, .05], [.2, .32], [.17, .62], [.1, .8], [.12, .93], [.15, 1]],                      // amphora with a flared lip
+    [[0, 0], [.1, 0], [.2, .1], [.25, .3], [.21, .55], [.08, .72], [.07, .86], [.1, 1]]                         // round, low neck
+];
+const FLOWERS = [['#e8553f', '#f2b134'], ['#f4f0e6', '#e9a8c1'], ['#8e5bd0', '#f2d24b'], ['#f28b30', '#d9344f']];
+
 // one object, base centred on the origin: { g, w (x extent), d (z extent) }
 function makeObject(kind, seed, depthAvail, ctx) {
     const g = new T.Group();
@@ -5710,15 +5762,21 @@ function makeObject(kind, seed, depthAvail, ctx) {
         g.rotation.x = (pocket ? 1 : -1) * Math.asin(off / H);                    // top edge rests on the plate
         return { g, w: W, d: th, at: { y: sup.y + 0.2, z: pocket ? zP - th - off : zP + off } };
     }
-    if (kind === 'vase') {
-        const pts = [[0, 0], [34, 0], [44, 10], [52, 50], [46, 110], [26, 150], [22, 172], [28, 188]].map(p => new T.Vector2(p[0], p[1]));
-        add(new T.LatheGeometry(pts, 40), objMaterial('#d8d4cc', { roughness: 0.35, side: T.DoubleSide }), 0, 0, 0);
-        [[-0.35, '#b5342c'], [0.05, '#c9a227'], [0.4, '#b5342c']].forEach(([a, c], i) => {
-            const len = 150 + i * 14;
-            add(new T.CylinderGeometry(1.3, 1.3, len, 6), objMaterial('#3f6b3a'), Math.sin(a) * len / 2, 150 + Math.cos(a) * len / 2, 0).rotation.z = -a;
-            add(new T.SphereGeometry(13, 14, 10), objMaterial(c, { roughness: 0.8 }), Math.sin(a) * len, 150 + Math.cos(a) * len, 0);
+    if (kind === 'vase') {   // every new vase differs in shape, size, glaze and flowers
+        const n = ctx.n || 0, H = 190 * [0.85, 1.2, 1.0, 0.72, 1.1][n % 5], st = VASE_STYLES[n % VASE_STYLES.length];
+        const out = smoothCurve(st.map(p => [p[0] * H, p[1] * H]), 12), rim = out[out.length - 1][0], rmax = Math.max(...out.map(p => p[0]));
+        add(new T.LatheGeometry(out.map(p => new T.Vector2(p[0], p[1])), 72), glazeMat(n * 3 + (n >> 2)), 0, 0, 0);
+        const inn = [[rim - 2.5, H], [rim - 3, H - 18], [0, H - 24]].map(p => new T.Vector2(p[0], p[1]));
+        add(new T.LatheGeometry(inn, 40), objMaterial('#2a1f1a', { roughness: 0.8, side: T.DoubleSide }), 0, 0, 0);
+        const fl = FLOWERS[n % FLOWERS.length], sm3 = objMaterial('#3f6b3a');
+        [[-0.4, 0.95, 0], [-0.12, 1.12, 1], [0.15, 1.02, 0], [0.42, 0.88, 1]].forEach(([a, f, ci]) => {
+            const len = H * f + 40, y0 = H - 22;
+            add(new T.CylinderGeometry(1.2, 1.2, len, 6), sm3, Math.sin(a) * len / 2, y0 + Math.cos(a) * len / 2, 0).rotation.z = -a;
+            const hx = Math.sin(a) * len, hy = y0 + Math.cos(a) * len;
+            add(new T.SphereGeometry(11 + H / 40, 16, 12), objMaterial(fl[ci], { roughness: 0.8 }), hx, hy, 0);
+            add(new T.SphereGeometry(4, 10, 8), objMaterial('#e9c34a', { roughness: 0.9 }), hx, hy + 3, 7 + H / 60);
         });
-        return { g, w: 104, d: 104 };
+        return { g, w: 2 * rmax + 16, d: 2 * rmax + 16 };
     }
     if (kind === 'towel') return makeTowel(seed, ctx);
     if (kind === 'jacket') {   // a stylised jacket on a loop, hanging below the arm
@@ -5745,13 +5803,23 @@ function makeObject(kind, seed, depthAvail, ctx) {
         add(new T.CylinderGeometry(2.4, 2.4, 60, 8), tm, -13, -360 - 420 + 40 - 30, 0);          // tip
         return { g, w: 60, d: 40 };
     }
-    // glass with some water
-    const shell = [[0, 0], [29, 0], [29.5, 6], [37, 98], [36, 98], [28, 8], [0, 8]].map(p => new T.Vector2(p[0], p[1]));
-    const gm = objMaterial('#dfeaf2', { roughness: 0.05, transparent: true, opacity: 0.34, side: T.DoubleSide, depthWrite: false });
-    add(new T.LatheGeometry(shell, 36), gm, 0, 0, 0, false);
-    const water = [[0, 8], [28, 8], [33, 62], [0, 62]].map(p => new T.Vector2(p[0], p[1]));
-    add(new T.LatheGeometry(water, 36), objMaterial('#7fb4d8', { roughness: 0.1, transparent: true, opacity: 0.5, depthWrite: false }), 0, 0, 0, false);
-    return { g, w: 75, d: 75 };
+    // ceramic pot with coloured pencils
+    const n = ctx.n || 0, Rp = 40 + (n % 3) * 4, Hp = (88 + (n % 4) * 8);
+    const outer = smoothCurve([[0, 0], [Rp - 5, 0], [Rp - 1, 3], [Rp + 1, Hp * 0.5], [Rp - 1, Hp - 4], [Rp - 3, Hp]], 8).map(p => new T.Vector2(p[0], p[1]));
+    add(new T.LatheGeometry(outer, 64), glazeMat(n * 2 + 5), 0, 0, 0);
+    add(new T.LatheGeometry([[Rp - 3, Hp], [Rp - 6, Hp - 2], [Rp - 6.5, 12], [0, 10]].map(p => new T.Vector2(p[0], p[1])), 48), objMaterial('#e9e2d3', { roughness: 0.5, side: T.DoubleSide }), 0, 0, 0);
+    const PC = ['#d62828', '#f77f00', '#fcbf49', '#80b918', '#2a9d8f', '#1d70b8', '#5e60ce', '#d63384', '#6d4c41', '#26262a', '#00b4d8', '#ff6f91'];
+    let rr = 2468 + n * 131; const rd = () => (rr = (rr * 16807) % 2147483647) / 2147483647;
+    for (let k = 0; k < 16; k++) {
+        const col = PC[(k * 5 + n) % PC.length], a = rd() * 6.2832, rad = Math.sqrt(rd()) * (Rp - 16), L = 150 + rd() * 40;
+        const maxT = Math.atan((Rp - 9 - rad) / (Hp - 10)), tl = Math.min(maxT * 0.9, 0.06 + 0.3 * (rad / (Rp - 16)) + rd() * 0.06);
+        const pg = new T.Group(); pg.position.set(Math.cos(a) * rad, 10, Math.sin(a) * rad); pg.rotation.set(tl * Math.sin(a), 0, -tl * Math.cos(a)); g.add(pg);
+        const part = (geo, mat, y) => { const m = new T.Mesh(geo, mat); m.position.y = y; m.castShadow = m.receiveShadow = true; pg.add(m); };
+        part(new T.CylinderGeometry(3.6, 3.6, L, 6), objMaterial(col, { roughness: 0.5 }), L / 2);              // hexagonal body
+        part(new T.CylinderGeometry(1.5, 3.6, 13, 6), objMaterial('#e6c79a', { roughness: 0.8 }), L + 6.5);   // sharpened wood
+        part(new T.CylinderGeometry(0.2, 1.5, 5, 6), objMaterial(col, { roughness: 0.5 }), L + 15.5);          // coloured lead
+    }
+    return { g, w: 2 * Rp + 10, d: 2 * Rp + 10 };
 }
 
 function placeObjects() {
@@ -5825,7 +5893,7 @@ function objUI() {
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button><button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
         + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
-    document.getElementById('v3-objnote').textContent = !R || !R.model ? '' : onHooks ? 'The hanger takes the items that hang: towel, jacket, umbrella, magazine. One per hook.' : ok ? 'The shelf and the magazine holder take the items that stand: books, magazine, vase, glass.' : '';
+    document.getElementById('v3-objnote').textContent = !R || !R.model ? '' : onHooks ? 'The hanger takes the items that hang: towel, jacket, umbrella, magazine. One per hook.' : ok ? 'The shelf and the magazine holder take the items that stand: books, magazine, vase, pencils.' : '';
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
 
