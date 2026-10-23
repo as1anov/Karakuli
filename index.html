@@ -5621,7 +5621,7 @@ function towelData() {
 }
 
 // The towel is the owner's mesh, used exactly as modelled: no vertex is moved relative to another (one uniform scale, one turn, one shift), the
-// topology and the UV are untouched. It hangs over the lip of the hook with its top 35 mm above the foot, tilted 3 degrees forward so that its
+// topology and the UV are untouched. It hangs over the lip of the hook with its top 28 mm above the foot, tilted 3 degrees forward so that its
 // back never touches the patterned plate. Numerically checked against the arm: nothing of the cloth passes through the metal.
 const TOWEL_CH_Z = 4.4;   // z (model units) of the rear end of the channel that the hook lip goes through
 function towelSize() {
@@ -5636,7 +5636,7 @@ function makeTowel(seed, ctx) {
     for (let i = 0; i < d.nv; i++) if (d.pos[i * 3 + 1] > d.pmax[1] - 0.5) { xc += d.pos[i * 3]; nx++; }
     xc /= Math.max(1, nx);
     const ca = Math.cos(3 * Math.PI / 180), sa = Math.sin(3 * Math.PI / 180);
-    const dy = 35, dzCh = sup.z0 + 32.3, z0c = sup.z0 + 19.8;                       // apex above the foot, channel position, pivot of the tilt
+    const dy = 28, dzCh = sup.z0 + 32.3, z0c = sup.z0 + 19.8;                       // apex above the foot, channel position, pivot of the tilt
     const pos = new Float32Array(d.pos.length);
     for (let i = 0; i < d.nv; i++) {
         const yy = dy + (d.pos[i * 3 + 1] - d.pmax[1]) * SC, dzc = dzCh + (d.pos[i * 3 + 2] - TOWEL_CH_Z) * SC - z0c;
