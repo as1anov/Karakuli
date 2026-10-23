@@ -2601,16 +2601,35 @@ service cloud.firestore {
 
         function cycleTlSpeed() { if (tlSpeed === 1) setTlSpeed(2); else if (tlSpeed === 2) setTlSpeed(4); else if (tlSpeed === 4) setTlSpeed(8); else setTlSpeed(1); }
         function setTlSpeed(s) { tlSpeed = s; document.getElementById('tl-cycle-speed').innerText = `${s}x`; if (isPlayingTl) { stopTlPlayback(); startTlPlayback(); } }
+        // Playback time of every recorded frame. A frame lasts FRAME_DURATION per drawn grid step it adds, so a big drawing (recorded with fewer,
+        // larger frames) is drawn at the same pace as a small one instead of racing through.
+        let tlTimeCache = null;
+        function tlTimeline() {
+            const h = tlHistory, last = h[h.length - 1];
+            if (tlTimeCache && tlTimeCache.h === h && tlTimeCache.n === h.length && tlTimeCache.last === last) return tlTimeCache.cum;
+            const size = f => f.segments.length + Object.keys(f.specialElements || {}).length, cum = [0];
+            for (let i = 0; i < h.length - 1; i++) cum.push(cum[i] + FRAME_DURATION * Math.min(64, Math.max(1, Math.abs(size(h[i + 1]) - size(h[i])))));
+            tlTimeCache = { h, n: h.length, last, cum };
+            return cum;
+        }
+        function tlTimeOfPos(pos) { const c = tlTimeline(), i = Math.max(0, Math.min(c.length - 2, Math.floor(pos))); return c.length < 2 ? 0 : c[i] + (c[i + 1] - c[i]) * Math.max(0, Math.min(1, pos - i)); }
+        function tlPosAtTime(t) {
+            const c = tlTimeline(); if (t <= 0) return 0; if (t >= c[c.length - 1]) return c.length - 1;
+            let lo = 0, hi = c.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (c[m] <= t) lo = m; else hi = m; }
+            return lo + (t - c[lo]) / (c[hi] - c[lo]);
+        }
+
         function formatTime(totalSeconds) { const m = Math.floor(totalSeconds / 60); const s = Math.floor(totalSeconds % 60); return `${m}:${s.toString().padStart(2, '0')}`; }
 
         function updateTlProgress() {
             const fill = document.getElementById('tl-fill');
             const totalFrames = Math.max(0, tlHistory.length - 1);
-            const percent = totalFrames > 0 ? (tlCurrentFrame / totalFrames) * 100 : 0;
+            const tlTotal = totalFrames > 0 ? tlTimeline()[totalFrames] : 0;
+            const percent = totalFrames > 0 ? (tlTimeOfPos(tlCurrentFrame) / tlTotal) * 100 : 0;
             fill.style.width = `${Math.min(100, percent)}%`;
             const timeDisplay = document.getElementById('tl-current-time');
-            const currentSeconds = tlCurrentFrame * FRAME_DURATION;
-            const totalSeconds = totalFrames * FRAME_DURATION;
+            const currentSeconds = totalFrames > 0 ? tlTimeOfPos(tlCurrentFrame) : 0;
+            const totalSeconds = tlTotal;
             timeDisplay.innerText = `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
         }
 
@@ -2618,7 +2637,7 @@ service cloud.firestore {
             if (tlHistory.length < 2) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const percentage = (e.clientX - rect.left) / rect.width;
-            tlCurrentFrame = Math.floor(percentage * (tlHistory.length - 1));
+            tlCurrentFrame = Math.floor(tlPosAtTime(Math.max(0, Math.min(1, percentage)) * tlTimeline()[tlHistory.length - 1]));
             tlCurrentFrame = Math.max(0, Math.min(tlCurrentFrame, tlHistory.length - 1));
             applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
         }
@@ -2888,7 +2907,7 @@ service cloud.firestore {
                 const elapsed = now - tlPlaybackStart;
                 const framePosition = Math.min(
                     tlHistory.length - 1,
-                    tlPlaybackStartFrame + elapsed / ((FRAME_DURATION * 1000) / tlSpeed)
+                    tlPosAtTime(tlTimeOfPos(tlPlaybackStartFrame) + elapsed * tlSpeed / 1000)
                 );
                 const previousFrame = tlCurrentFrame;
                 renderTimelapsePosition(framePosition, appliedFrame, true);
@@ -2964,9 +2983,9 @@ service cloud.firestore {
             tlPlaybackBatches = getTimelapseBatches();
             const appliedFrame = { index: -1 };
             const lastFrame = tlHistory.length - 1;
-            const frameCount = Math.max(1, Math.ceil((lastFrame * FRAME_DURATION * 1000) / (tlSpeed * frameDelay)));
+            const frameCount = Math.max(1, Math.ceil((tlTimeline()[lastFrame] * 1000) / (tlSpeed * frameDelay)));
             for (let outputFrame = 0; outputFrame < frameCount; outputFrame++) {
-                const framePosition = Math.min(lastFrame, outputFrame * tlSpeed * frameDelay / (FRAME_DURATION * 1000));
+                const framePosition = Math.min(lastFrame, tlPosAtTime(outputFrame * tlSpeed * frameDelay / 1000));
                 renderTimelapsePosition(framePosition, appliedFrame);
                 updateTlProgress();
                 draw();
