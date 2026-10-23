@@ -5724,7 +5724,42 @@ const VASE_STYLES = [
     [[0, 0], [.09, 0], [.15, .05], [.2, .32], [.17, .62], [.1, .8], [.12, .93], [.15, 1]],                      // amphora with a flared lip
     [[0, 0], [.1, 0], [.2, .1], [.25, .3], [.21, .55], [.08, .72], [.07, .86], [.1, 1]]                         // round, low neck
 ];
-const FLOWERS = [['#e8553f', '#f2b134'], ['#f4f0e6', '#e9a8c1'], ['#8e5bd0', '#f2d24b'], ['#f28b30', '#d9344f']];
+// Flower heads, built from real petals. Local +y is the stem direction, the base of the head is the origin.
+const FLOWER_SETS = [
+    { k: 'daisy', c: [['#f6f3ea', '#e6b422'], ['#f4b6c8', '#e6b422'], ['#d9c6ef', '#f2d24b']] },
+    { k: 'tulip', c: [['#e0405a', '#f28b30'], ['#f5d24b', '#e8553f'], ['#8e5bd0', '#e48fb8']] },
+    { k: 'wheat', c: [['#d8b765', '#b9954a'], ['#c9a24a', '#e2c98a'], ['#b98d4a', '#d8b765']] }
+];
+function flowerHead(kind, cols, sc, rnd) {
+    const g = new T.Group(), M = (geo, mat, x, y, z, sx, sy, sz) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = m.receiveShadow = true; return m; };
+    const sph = new T.SphereGeometry(1, 10, 7);
+    if (kind === 'daisy') {
+        const pet = objMaterial(cols[0], { roughness: 0.75 }), cen = objMaterial(cols[1], { roughness: 0.9 });
+        g.add(M(new T.SphereGeometry(1, 14, 10), cen, 0, 2.5 * sc, 0, 6 * sc, 3.4 * sc, 6 * sc));
+        for (let layer = 0; layer < 2; layer++) for (let i = 0; i < 15; i++) {
+            const pv = new T.Group(); pv.rotation.y = (i + layer * 0.5) / 15 * Math.PI * 2 + rnd() * 0.08; g.add(pv);
+            const pm = M(sph, pet, 0, (layer ? -0.7 : 0.4) * sc, (12.5 - layer) * sc, 2.1 * sc, 0.5 * sc, (9.2 - layer * 1.2) * sc);
+            pm.rotation.x = -0.1 - rnd() * 0.18 + layer * 0.12; pv.add(pm);
+        }
+        return { g, len: 6 * sc, rad: 22 * sc };
+    }
+    if (kind === 'tulip') {
+        const pet = objMaterial(cols[0], { roughness: 0.6 }), pet2 = objMaterial(cols[1], { roughness: 0.6 });
+        for (let layer = 0; layer < 2; layer++) for (let i = 0; i < 3; i++) {
+            const pv = new T.Group(); pv.rotation.y = (i + layer * 0.5) / 3 * Math.PI * 2 + 0.3; g.add(pv);
+            const pm = M(sph, layer ? pet2 : pet, 0, (17 - layer * 1.5) * sc, (7.4 - layer * 1.6) * sc, 7.2 * sc, 18 * sc, 4.4 * sc);
+            pm.rotation.x = -0.2 - layer * 0.06; pv.add(pm);
+        }
+        return { g, len: 35 * sc, rad: 14 * sc };
+    }
+    const gm = objMaterial(cols[0], { roughness: 0.85 }), gm2 = objMaterial(cols[1], { roughness: 0.85 });   // wheat / dried grass ear
+    for (let k = 0; k < 11; k++) for (let sd = -1; sd <= 1; sd += 2) {
+        const pv = new T.Group(); pv.position.y = k * 6.4 * sc; pv.rotation.y = sd * Math.PI / 2 + k * 0.5; g.add(pv);
+        const gr = M(sph, k % 2 ? gm : gm2, 0, 3.4 * sc, 2.4 * sc, 1.9 * sc, 5.4 * sc, 1.9 * sc); gr.rotation.x = 0.5; pv.add(gr);
+    }
+    g.add(M(sph, gm, 0, 70 * sc, 0, 1.8 * sc, 6 * sc, 1.8 * sc));
+    return { g, len: 76 * sc, rad: 9 * sc };
+}
 
 // one object, base centred on the origin: { g, w (x extent), d (z extent) }
 function makeObject(kind, seed, depthAvail, ctx) {
@@ -5751,32 +5786,45 @@ function makeObject(kind, seed, depthAvail, ctx) {
         return { g, w: out ? th : D, d: out ? D : th };
     }
     if (kind === 'magazine') {
-        const sup = ctx.sup, pocket = ctx.key === 'magazine', th = 4;
-        const k = Math.min(ctx.key === 'hanger' ? (ctx.pitch ? ctx.pitch + 44 : 140) / 215 : 1, (-sup.y - 10) / 275), W = 215 * k, H = 275 * k;   // stays inside the plate, one per hook on the hanger
-        const zP = pocket ? R.gap - 0.2 : R.gap + R.t + 0.2;                       // plane of the patterned plate the magazine leans on
-        const off = Math.max(5, Math.min(0.1 * H, pocket ? zP - th - sup.z0 - 1 : sup.z1 - zP - 14));
+        const sup = ctx.sup, pocket = ctx.key === 'magazine', th = 4, onWall = pocket && (ctx.n || 0) % 2 === 1;   // in the holder they lean on the plate and on the wall in turn
+        const k = Math.min(ctx.key === 'hanger' ? (ctx.pitch ? ctx.pitch + 44 : 140) / 215 : 1, (-sup.y - 10) / 275, (ctx.hmax || 275) / 275), W = 215 * k, H = 275 * k;
+        const zP = pocket ? (onWall ? 0.2 : R.gap - 0.2) : R.gap + R.t + 0.2;       // plane the top edge rests on: the wall, or the patterned plate
+        const off = Math.max(5, Math.min(0.1 * H, pocket ? (onWall ? sup.z1 - 1 - th - zP : zP - th - sup.z0 - 1) : sup.z1 - zP - 14));
         const cov = magCover(ctx.n || 0), edge = objMaterial('#f1ece0', { roughness: 0.9 }), back = objMaterial('#e6e3dc', { roughness: 0.7 });
         const m = new T.Mesh(new T.BoxGeometry(W, H, th), [edge, edge, edge, edge, cov, back]);   // +z face = cover
         m.position.set(0, H / 2, th / 2); m.castShadow = m.receiveShadow = true;
         g.add(m);
-        g.rotation.x = (pocket ? 1 : -1) * Math.asin(off / H);                    // top edge rests on the plate
-        return { g, w: W, d: th, at: { y: sup.y + 0.2, z: pocket ? zP - th - off : zP + off } };
+        g.rotation.x = (pocket && !onWall ? 1 : -1) * Math.asin(off / H);          // the top edge rests on the plate (tilt forward) or on the wall (tilt back)
+        return { g, w: W, d: th, at: { y: sup.y + 0.2, z: pocket ? (onWall ? zP + off : zP - th - off) : zP + off } };
     }
     if (kind === 'vase') {   // every new vase differs in shape, size, glaze and flowers
-        const n = ctx.n || 0, H = 190 * [0.85, 1.2, 1.0, 0.72, 1.1][n % 5], st = VASE_STYLES[n % VASE_STYLES.length];
+        const n = ctx.n || 0, H = 170 * [0.85, 1.2, 1.0, 0.72, 1.1][n % 5], st = VASE_STYLES[n % VASE_STYLES.length];
         const out = smoothCurve(st.map(p => [p[0] * H, p[1] * H]), 12), rim = out[out.length - 1][0], rmax = Math.max(...out.map(p => p[0]));
         add(new T.LatheGeometry(out.map(p => new T.Vector2(p[0], p[1])), 72), glazeMat(n * 3 + (n >> 2)), 0, 0, 0);
         const inn = [[rim - 2.5, H], [rim - 3, H - 18], [0, H - 24]].map(p => new T.Vector2(p[0], p[1]));
         add(new T.LatheGeometry(inn, 40), objMaterial('#2a1f1a', { roughness: 0.8, side: T.DoubleSide }), 0, 0, 0);
-        const fl = FLOWERS[n % FLOWERS.length], sm3 = objMaterial('#3f6b3a');
-        [[-0.4, 0.95, 0], [-0.12, 1.12, 1], [0.15, 1.02, 0], [0.42, 0.88, 1]].forEach(([a, f, ci]) => {
-            const len = H * f + 40, y0 = H - 22;
-            add(new T.CylinderGeometry(1.2, 1.2, len, 6), sm3, Math.sin(a) * len / 2, y0 + Math.cos(a) * len / 2, 0).rotation.z = -a;
-            const hx = Math.sin(a) * len, hy = y0 + Math.cos(a) * len;
-            add(new T.SphereGeometry(11 + H / 40, 16, 12), objMaterial(fl[ci], { roughness: 0.8 }), hx, hy, 0);
-            add(new T.SphereGeometry(4, 10, 8), objMaterial('#e9c34a', { roughness: 0.9 }), hx, hy + 3, 7 + H / 60);
-        });
-        return { g, w: 2 * rmax + 16, d: 2 * rmax + 16 };
+        // a bouquet of 7 stems on curved stalks, with leaves; vase and flowers together never rise above 370 mm
+        const fs = FLOWER_SETS[n % 3], cols = fs.c[(n / 3 | 0) % fs.c.length], MAXH = 370, y0 = H - 24, sm3 = objMaterial('#3f6b3a', { roughness: 0.7 });
+        let rr = 777 + n * 977; const rnd = () => (rr = (rr * 16807) % 2147483647) / 2147483647;
+        let reach = rmax;
+        for (let i = 0; i < 7; i++) {
+            const sc = 0.9 + rnd() * 0.35, hd = flowerHead(fs.k, i % 2 || fs.k !== 'tulip' ? cols : [cols[1], cols[0]], sc, rnd);
+            const ph = i * 2.4 + n, tl = i === 0 ? 0.05 : 0.14 + 0.34 * ((i % 3) / 2) + rnd() * 0.08;
+            const top = Math.min(MAXH - hd.len - 4, H + (MAXH - H) * (0.5 + 0.45 * rnd()) - hd.len), L = Math.max(60, (top - y0) / Math.cos(tl));
+            const tip = new T.Vector3(Math.sin(tl) * Math.cos(ph) * L, y0 + Math.cos(tl) * L, Math.sin(tl) * Math.sin(ph) * L);
+            const mid = new T.Vector3(tip.x * 0.45 + Math.cos(ph) * L * 0.07, y0 + (tip.y - y0) * 0.5, tip.z * 0.45 + Math.sin(ph) * L * 0.07);
+            const curve = new T.CatmullRomCurve3([new T.Vector3(0, y0, 0), mid, tip]);
+            add(new T.TubeGeometry(curve, 20, fs.k === 'wheat' ? 0.9 : 1.3, 6), sm3, 0, 0, 0);
+            const hg = hd.g; hg.position.copy(tip); hg.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), curve.getTangent(1)); g.add(hg);
+            if (fs.k !== 'wheat') for (let q = 0; q < 2; q++) {                                      // leaves on the stalk
+                const u = 0.3 + q * 0.22 + rnd() * 0.08, pt = curve.getPoint(u), lg = new T.Group(); lg.position.copy(pt);
+                lg.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), curve.getTangent(u)); g.add(lg);
+                const sd = q ? 1 : -1, lf = new T.Mesh(new T.SphereGeometry(1, 10, 6), sm3); lf.scale.set(5, 19, 0.8); lf.position.set(7 * sd, 15, 0); lf.rotation.z = -0.55 * sd; lf.castShadow = true; lg.add(lf);
+            }
+            reach = Math.max(reach, Math.hypot(tip.x, tip.z) + hd.rad);
+        }
+        const ww = 2 * reach + 12;
+        return { g, w: ww, d: ww };
     }
     if (kind === 'towel') return makeTowel(seed, ctx);
     if (kind === 'jacket') {   // a stylised jacket on a loop, hanging below the arm
@@ -5809,16 +5857,20 @@ function makeObject(kind, seed, depthAvail, ctx) {
     add(new T.LatheGeometry(outer, 64), glazeMat(n * 2 + 5), 0, 0, 0);
     add(new T.LatheGeometry([[Rp - 3, Hp], [Rp - 6, Hp - 2], [Rp - 6.5, 12], [0, 10]].map(p => new T.Vector2(p[0], p[1])), 48), objMaterial('#e9e2d3', { roughness: 0.5, side: T.DoubleSide }), 0, 0, 0);
     const PC = ['#d62828', '#f77f00', '#fcbf49', '#80b918', '#2a9d8f', '#1d70b8', '#5e60ce', '#d63384', '#6d4c41', '#26262a', '#00b4d8', '#ff6f91'];
+    // Pencils stand on rings (1 + 6 + 12, 8 mm apart) and every one leans along the ray from one common point below the pot, so
+    // the axes only ever diverge: the pencils cannot cross or touch each other, and none touches the wall of the pot.
     let rr = 2468 + n * 131; const rd = () => (rr = (rr * 16807) % 2147483647) / 2147483647;
-    for (let k = 0; k < 16; k++) {
-        const col = PC[(k * 5 + n) % PC.length], a = rd() * 6.2832, rad = Math.sqrt(rd()) * (Rp - 16), L = 150 + rd() * 40;
-        const maxT = Math.atan((Rp - 9 - rad) / (Hp - 10)), tl = Math.min(maxT * 0.9, 0.06 + 0.3 * (rad / (Rp - 16)) + rd() * 0.06);
-        const pg = new T.Group(); pg.position.set(Math.cos(a) * rad, 10, Math.sin(a) * rad); pg.rotation.set(tl * Math.sin(a), 0, -tl * Math.cos(a)); g.add(pg);
+    const ringR = [0, 8.4, 16.8], ringN = [1, 6, 12], base = [];
+    ringR.forEach((r0, ri) => { const off = rd() * 6.28; for (let q = 0; q < ringN[ri]; q++) base.push([r0 * Math.cos(off + q / ringN[ri] * 6.2832), r0 * Math.sin(off + q / ringN[ri] * 6.2832)]); });
+    const cc = Math.max(60, 16.8 * (Hp - 10) / Math.max(4, Rp - 10 - 16.8) + 6);                      // depth of the common point below the floor
+    base.forEach((b, k) => {
+        const col = PC[(k * 5 + n) % PC.length], L = 150 + rd() * 40, d = new T.Vector3(b[0], cc, b[1]).normalize();
+        const pg = new T.Group(); pg.position.set(b[0], 10, b[1]); pg.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d); g.add(pg);
         const part = (geo, mat, y) => { const m = new T.Mesh(geo, mat); m.position.y = y; m.castShadow = m.receiveShadow = true; pg.add(m); };
         part(new T.CylinderGeometry(3.6, 3.6, L, 6), objMaterial(col, { roughness: 0.5 }), L / 2);              // hexagonal body
         part(new T.CylinderGeometry(1.5, 3.6, 13, 6), objMaterial('#e6c79a', { roughness: 0.8 }), L + 6.5);   // sharpened wood
         part(new T.CylinderGeometry(0.2, 1.5, 5, 6), objMaterial(col, { roughness: 0.5 }), L + 15.5);          // coloured lead
-    }
+    });
     return { g, w: 2 * Rp + 10, d: 2 * Rp + 10 };
 }
 
@@ -5855,14 +5907,30 @@ function placeObjects() {
     } else if (sup && S.objs.length) {
         const GAP = 14, built = [];
         let total = 0; const cn = {}; let prev = null;
+        // wall bolts: barrels cross the pocket, so magazines either stay below the lowest one or stand between them
+        let hmax = 275, forbid = [];
+        if (key === 'magazine') {
+            const w0 = modelInfo().w, bar = holesMm().map(([hx, hy]) => [hx - w0 / 2, -hy]);
+            const above = bar.filter(b => b[1] - 10 > sup.y);
+            forbid = above.map(b => [b[0] - 10, b[0] + 10]);                  // full-size magazines stand in the gaps between the barrels
+        }
         for (const it of S.objs) {
-            const o = makeObject(it.k, it.s, sup.depth, { sup, key, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
+            const o = makeObject(it.k, it.s, sup.depth, { sup, key, hmax, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
             const gb = prev ? (prev === 'book' && it.k === 'book' ? 1 : GAP) : 0;     // books stand shoulder to shoulder
             if (total + gb + o.w > sup.w - 40) break;          // no more room on this product
             total += gb + o.w; o.gb = gb; built.push(o); prev = it.k;
         }
         S.objs.length = built.length;
         const root = new T.Group(); let x = -total / 2;
+        if (forbid.length && built.length) {   // fit the magazines into the free stretches between the barrels
+            const lim = sup.w / 2 - 20; let segs = [[-lim, lim]];
+            forbid.forEach(([a, b]) => { segs = segs.flatMap(([p, q]) => (b <= p || a >= q) ? [[p, q]] : [[p, Math.max(p, a)], [Math.min(q, b), q]]).filter(([p, q]) => q - p > 1); });
+            const slots = []; segs.forEach(([p, q]) => { let cx = p; const w1 = built[0].w; while (cx + w1 <= q + 0.01) { slots.push(cx + w1 / 2); cx += w1 + 14; } });
+            slots.sort((a, b) => Math.abs(a) - Math.abs(b)); const use = slots.slice(0, built.length).sort((a, b) => a - b);
+            built.length = Math.min(built.length, use.length); S.objs.length = built.length;
+            built.forEach((o, q) => { o.g.position.set(use[q], o.at.y, o.at.z); root.add(o.g); });
+            R.objs = root; R.scene.add(root); R.objs.visible = S.fold >= 0.995; R.dirty = true; return;
+        }
         built.forEach(o => { x += o.gb; o.g.position.set(x + o.w / 2, o.at ? o.at.y : sup.y, o.at ? o.at.z : (sup.z0 + sup.z1) / 2); root.add(o.g); x += o.w; });
         R.objs = root; R.scene.add(root);
     }
@@ -5888,12 +5956,12 @@ function objAct(i, act) {
 }
 function objUI() {
     const cat = document.getElementById('v3-cat'); if (!cat) return;
-    const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks';
-    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
+    const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine';
+    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button><button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
         + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
-    document.getElementById('v3-objnote').textContent = !R || !R.model ? '' : onHooks ? 'The hanger takes the items that hang: towel, jacket, umbrella, magazine. One per hook.' : ok ? 'The shelf and the magazine holder take the items that stand: books, magazine, vase, pencils.' : '';
+    document.getElementById('v3-objnote').textContent = !R || !R.model ? '' : onHooks ? 'The hanger takes the items that hang: towel, jacket, umbrella, magazine. One per hook.' : ok ? (mag ? 'The magazine holder takes magazines: they lean on the plate and on the wall in turn, between the wall bolts.' : 'The shelf takes the items that stand: books, magazine, vase, pencils.') : '';
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
 
@@ -6505,7 +6573,7 @@ function close3D() {
 
 window.addEventListener('resize', resize);
 window.open3D = open3D; window.close3D = close3D; window.openShopEditor = openShopEditor;
-window.__v3d = { get R() { return R; }, designPrimitives, rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
+window.__v3d = { get R() { return R; }, holesMm, designPrimitives, rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
 // the 3D button lives on the canvas, only for the products
 setInterval(() => {
