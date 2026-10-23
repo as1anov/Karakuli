@@ -856,7 +856,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteField, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB2R9HE9a_s6NKWxhVN3uJ5M01_6HkS8Gw",
@@ -887,11 +887,16 @@
         const projectsRef = () => collection(db, 'users', signedInUser.uid, 'projects');
         const localProjectsKey = () => `karakuli-projects-${signedInUser.uid}`;
         const readLocalProjects = () => JSON.parse(localStorage.getItem(localProjectsKey()) || '[]');
-        const writeLocalProjects = projects => localStorage.setItem(localProjectsKey(), JSON.stringify(projects));
+        // Local copies never carry the time-lapse (it is huge); a full storage must never break drawing.
+        const writeLocalProjects = projects => {
+            try { localStorage.setItem(localProjectsKey(), JSON.stringify(projects)); }
+            catch (error) { console.warn('Local project copy not stored', error); }
+        };
         const saveLocalProject = project => {
             const projects = readLocalProjects();
             const index = projects.findIndex(item => item.id === project.id);
             if (index === -1) projects.push(project); else projects[index] = { ...projects[index], ...project };
+            projects.forEach(q => { delete q.tlHistory; delete q.tlJson; });
             writeLocalProjects(projects);
         };
         window.karakuliProjects = {
@@ -902,8 +907,9 @@
                 try {
                     const snapshot = await getDocs(query(projectsRef(), orderBy('updatedAtMs', 'desc')));
                     const cloud = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-                    return [...new Map([...local, ...cloud].map(project => [project.id, project])).values()]
-                        .sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
+                    const byId = new Map(cloud.map(project => [project.id, project]));
+                    local.forEach(l => { const c = byId.get(l.id); if (!c) byId.set(l.id, l); else if ((l.updatedAtMs || 0) > (c.updatedAtMs || 0)) byId.set(l.id, { ...c, ...l }); });   // the newer copy wins
+                    return [...byId.values()].sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
                 } catch (error) {
                     console.warn('Cloud project list unavailable; using local projects.', error);
                     return local.sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
@@ -932,9 +938,12 @@
                 saveLocalProject(localProject);
                 const ref = doc(db, 'users', signedInUser.uid, 'projects', id);
                 // updateDoc replaces whole fields (setDoc+merge keeps deleted keys of specialElements alive); new documents fall back to setDoc.
-                try { await updateDoc(ref, localProject); }
+                const cloudData = { ...localProject };
+                if (data.segments) cloudData.tlHistory = deleteField();   // old projects stored every full frame here: far over Firestore's limit
+                try { await updateDoc(ref, cloudData); }
                 catch (error) {
-                    try { await setDoc(ref, localProject, { merge: true }); }
+                    delete cloudData.tlHistory;
+                    try { await setDoc(ref, cloudData, { merge: true }); }
                     catch (error2) { console.warn('Cloud project save unavailable; saved locally.', error2); }
                 }
             },
@@ -942,7 +951,10 @@
                 if (!signedInUser) return null;
                 try {
                     const snapshot = await getDoc(doc(db, 'users', signedInUser.uid, 'projects', id));
-                    if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() };
+                    if (snapshot.exists()) {
+                        const cloud = { id: snapshot.id, ...snapshot.data() }, l = readLocalProjects().find(project => project.id === id);
+                        return l && (l.updatedAtMs || 0) > (cloud.updatedAtMs || 0) ? { ...cloud, ...l } : cloud;   // what was drawn last wins
+                    }
                 } catch (error) { console.warn('Cloud project load unavailable; using local project.', error); }
                 return readLocalProjects().find(project => project.id === id) || null;
             },
@@ -964,14 +976,14 @@
                 if (!signedInUser) throw new Error('Sign in with Google to share');
                 const token = randomToken(), now = Date.now();
                 const docData = { kind, ownerUid: signedInUser.uid, title: title || '', data, createdAtMs: now, updatedAtMs: now };
-                if (tl) docData.tl = tl;
+                if (tl) docData.tl = typeof tl === 'string' ? tl : JSON.stringify(tl);   // Firestore has no nested arrays
                 if (shop) docData.shop = shop;
                 await setDoc(doc(db, 'shared', token), docData);
                 return token;
             },
             async update(token, data, title, tl, shop) {
                 const upd = { data, title: title || '', updatedAtMs: Date.now() };
-                if (tl !== undefined) upd.tl = tl || null;
+                if (tl !== undefined) upd.tl = tl ? (typeof tl === 'string' ? tl : JSON.stringify(tl)) : null;
                 if (shop !== undefined) upd.shop = shop || null;
                 await updateDoc(doc(db, 'shared', token), upd);
             },
@@ -1079,13 +1091,14 @@
         let isViewOnly = false;        // view-only link: nothing can be drawn, erased or reset
         let sharedPollTimer = null, sharedSeenMs = 0, sharedDirty = false;
 
-        function projectSnapshot() {
+        function projectSnapshot(withTl = false) {
+            const tlPart = withTl ? { tlJson: (() => { const pk = packTimelapse(tlHistory); const j = pk ? JSON.stringify(pk) : null; return j && j.length < 750000 ? j : null; })() } : {};
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
                 paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
                 productKey: activeProductKey,
                 shareEditToken: projectShare.edit, shareViewToken: projectShare.view,
-                tlHistory, tlCurrentFrame, tlCaptureStride, tlCaptureCounter
+                tlCurrentFrame, tlCaptureStride, tlCaptureCounter, ...tlPart
             }));
         }
 
@@ -1146,6 +1159,7 @@
             return JSON.stringify(packed).length > 900000 ? null : packed;   // still too big: share without the time-lapse
         }
         function unpackTimelapse(pk) {
+            if (typeof pk === 'string') { try { pk = JSON.parse(pk); } catch (e) { return []; } }
             if (!pk || pk.v !== 1 || !Array.isArray(pk.f)) return [];
             const map = new Map(), sp = {}, frames = [];
             pk.f.forEach(([add, rem, spd, ci, cj]) => {
@@ -1160,7 +1174,7 @@
         // What a shared copy carries: the drawing and the sheet, not the timelapse history (too big, and private to the owner).
         function shareSnapshot() {
             const snap = projectSnapshot();
-            ['tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme'].forEach(k => delete snap[k]);
+            ['tlHistory', 'tlJson', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme'].forEach(k => delete snap[k]);
             return snap;
         }
 
@@ -1183,7 +1197,15 @@
             catch (err) { console.error('Shared save error:', err); showActionHint('Could not save changes to the shared project'); }
         }
 
-        async function saveCurrentProject() {
+        // Saves never overlap: they run one after another (a caller that awaits gets its own save done, so switching projects loses nothing).
+        // The time-lapse is stored at most every 30 s (and when the page is hidden), the drawing itself on every pause.
+        let projectSavePromise = Promise.resolve(), lastTlSave = 0;
+        function saveCurrentProject(opts = {}) {
+            if (shareSession) return saveSharedSession();
+            projectSavePromise = projectSavePromise.catch(() => {}).then(() => saveCurrentProjectNow(opts));
+            return projectSavePromise;
+        }
+        async function saveCurrentProjectNow(opts = {}) {
             if (shareSession) { await saveSharedSession(); return; }
             if (!window.karakuliProjects?.isSignedIn()) return;
             if (!activeProjectId) {
@@ -1196,22 +1218,38 @@
                 }
                 await projectCreationPromise;
             }
-            await window.karakuliProjects.save(activeProjectId, projectSnapshot());
+            const withTl = Boolean(opts.tl) || Date.now() - lastTlSave > 30000;
+            await window.karakuliProjects.save(activeProjectId, projectSnapshot(withTl));
+            if (withTl) lastTlSave = Date.now();
             // an editable link keeps pointing at the latest drawing
             if (projectShare.edit && window.karakuliShare) window.karakuliShare.update(projectShare.edit, shareSnapshot(), currentProjectTitle).catch(err => console.warn('Shared copy not updated', err));
             updateCurrentProjectUI();
-            await renderProjectsList();
+            const pl = document.getElementById('projects-list');
+            if (pl && pl.getClientRects().length) await renderProjectsList();   // the list is refreshed only while it is open
         }
 
-        function scheduleProjectSave() {
+        let projectSaveFirstAt = 0;
+        function scheduleProjectSave(tl = false) {
             if (isViewOnly) return;
-            if (shareSession) { sharedDirty = true; clearTimeout(projectSaveTimer); projectSaveTimer = setTimeout(saveSharedSession, 700); return; }
+            if (shareSession) { sharedDirty = true; clearTimeout(projectSaveTimer); projectSaveTimer = setTimeout(saveSharedSession, 1500); return; }
             if (!window.karakuliProjects?.isSignedIn()) return;
-            // The first edit creates the file immediately; subsequent edits are batched.
+            // The first edit creates the file immediately; later edits wait for a pause of 1.5 s (but never longer than 10 s in a row), so
+            // continuous drawing is not interrupted by saving.
             if (!activeProjectId) { saveCurrentProject().catch(error => console.error('Project save error:', error)); return; }
+            const now = Date.now();
+            if (!projectSaveFirstAt) projectSaveFirstAt = now;
             clearTimeout(projectSaveTimer);
-            projectSaveTimer = setTimeout(() => saveCurrentProject().catch(error => console.error('Project save error:', error)), 700);
+            const wait = Math.max(0, Math.min(1500, projectSaveFirstAt + 10000 - now));
+            projectSaveTimer = setTimeout(() => { projectSaveFirstAt = 0; saveCurrentProject({ tl }).catch(error => console.error('Project save error:', error)); }, wait);
         }
+        // Leaving the page or switching away: store what is on the canvas right now (the local copy is written at once, the cloud as far as it gets).
+        function flushProjectSave() {
+            if (isViewOnly || shareSession || !activeProjectId || !window.karakuliProjects?.isSignedIn()) return;
+            clearTimeout(projectSaveTimer); projectSaveFirstAt = 0;
+            saveCurrentProject({ tl: true }).catch(error => console.error('Project save error:', error));
+        }
+        document.addEventListener('visibilitychange', () => { if (document.hidden) flushProjectSave(); });
+        window.addEventListener('pagehide', flushProjectSave);
 
         // Icons of the project cards (one family: 24 px grid, 1.8 stroke, round caps)
         const PROJECT_ICONS = {
@@ -1381,7 +1419,7 @@
             else data = await window.karakuliProjects.load(id);
             if (!data) return;
             data = { ...data };
-            ['id', 'createdAtMs', 'updatedAtMs', 'shareEditToken', 'shareViewToken', 'tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter'].forEach(k => delete data[k]);
+            ['id', 'createdAtMs', 'updatedAtMs', 'shareEditToken', 'shareViewToken', 'tlHistory', 'tlJson', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter'].forEach(k => delete data[k]);
             data.title = (data.title || 'Untitled project') + ' copy';
             await window.karakuliProjects.create(data);
             showActionHint('Project duplicated');
@@ -1426,8 +1464,9 @@
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
             if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
-            if (project.tlHistory) {
-                tlHistory = project.tlHistory || [];
+            const tlLoaded = project.tlHistory || (project.tlJson ? unpackTimelapse(project.tlJson) : null);
+            if (tlLoaded && tlLoaded.length) {
+                tlHistory = tlLoaded;
                 tlCurrentFrame = project.tlCurrentFrame || 0;
                 tlCaptureStride = project.tlCaptureStride || 1;
                 tlCaptureCounter = project.tlCaptureCounter || 0;
@@ -1596,9 +1635,9 @@ service cloud.firestore {
             } else {
                 const p = await window.karakuliProjects.load(id);
                 if (!p) throw new Error('Project not found');
-                tlPack = packTimelapse(p.tlHistory);
+                tlPack = packTimelapse(p.tlHistory || (p.tlJson ? unpackTimelapse(p.tlJson) : null));
                 pid = id; title = p.title; tokens = { edit: p.shareEditToken || null, view: p.shareViewToken || null };
-                data = { ...p }; ['tlHistory', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme', 'id', 'createdAtMs', 'updatedAtMs'].forEach(k => delete data[k]);
+                data = { ...p }; ['tlHistory', 'tlJson', 'tlCurrentFrame', 'tlCaptureStride', 'tlCaptureCounter', 'shareEditToken', 'shareViewToken', 'currentTheme', 'id', 'createdAtMs', 'updatedAtMs'].forEach(k => delete data[k]);
                 if (tokens.edit) { const sh = await window.karakuliShare.load(tokens.edit); if (sh?.data) data = sh.data; }
             }
             if (!tokens.edit) tokens.edit = await window.karakuliShare.publish('edit', data, title);
@@ -2582,8 +2621,9 @@ service cloud.firestore {
             const lastState = tlHistory.length > 0 ? tlHistory[tlHistory.length - 1] : null;
             const currentSegments = JSON.stringify(segments);
             const currentSpecials = JSON.stringify(specialElements);
-            const signature = `${currentSegments}\u0000${currentSpecials}`;
-            const previousSignature = lastState?._signature || (lastState && `${JSON.stringify(lastState.segments)}\u0000${JSON.stringify(lastState.specialElements)}`);
+            const hashOf = str => { let h = 2166136261 >>> 0; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return str.length + ':' + h; };   // a short key instead of a copy of the whole drawing
+            const signature = hashOf(`${currentSegments}\u0000${currentSpecials}`);
+            const previousSignature = lastState?._signature || (lastState && hashOf(`${JSON.stringify(lastState.segments)}\u0000${JSON.stringify(lastState.specialElements)}`));
             if (previousSignature === signature) return;
             const snapshot = { segments: JSON.parse(currentSegments), specialElements: JSON.parse(currentSpecials), cursor: { i: curI, j: curJ } };
             // Runtime-only comparison key: omitted from project saves, so it does
@@ -2592,7 +2632,9 @@ service cloud.firestore {
             tlHistory.push(snapshot);
             // Keep recordings bounded on long drawings. Older frames are sampled rather
             // than discarded, so playback still starts at the first stroke.
-            if (tlHistory.length > TL_MAX_FRAMES) {
+            // Memory budget: about 400 000 stored segments in all, so a big drawing keeps fewer frames instead of exhausting the tab.
+            const maxFrames = Math.max(60, Math.min(TL_MAX_FRAMES, Math.floor(400000 / Math.max(1, segments.length))));
+            if (tlHistory.length > maxFrames) {
                 tlHistory = tlHistory.filter((_, index) => index === 0 || index === tlHistory.length - 1 || index % 2 === 0);
                 tlCaptureStride = Math.min(64, tlCaptureStride * 2);
             }
