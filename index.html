@@ -5801,14 +5801,16 @@ function makeObject(kind, seed, depthAvail, ctx) {
         const n = ctx.n || 0, H = 170 * [0.85, 1.2, 1.0, 0.72, 1.1][n % 5], st = VASE_STYLES[n % VASE_STYLES.length];
         const out = smoothCurve(st.map(p => [p[0] * H, p[1] * H]), 12), rim = out[out.length - 1][0], rmax = Math.max(...out.map(p => p[0]));
         add(new T.LatheGeometry(out.map(p => new T.Vector2(p[0], p[1])), 72), glazeMat(n * 3 + (n >> 2)), 0, 0, 0);
-        const inn = [[rim - 2.5, H], [rim - 3, H - 18], [0, H - 24]].map(p => new T.Vector2(p[0], p[1]));
+        // the inside follows the outer wall (2.5 mm thick), so it never sticks out where the neck is narrower than the rim
+        const yb = H - 24, ip = out.filter(p => p[1] >= yb).map(p => [Math.max(0.6, p[0] - 2.5), p[1]]), innerMin = Math.min(...ip.map(p => p[0]));
+        const inn = [[0, yb], ...ip].map(p => new T.Vector2(p[0], p[1]));
         add(new T.LatheGeometry(inn, 40), objMaterial('#2a1f1a', { roughness: 0.8, side: T.DoubleSide }), 0, 0, 0);
         // a bouquet of 7 stems on curved stalks, with leaves; vase and flowers together never rise above 370 mm
         const fs = FLOWER_SETS[n % 3], cols = fs.c[(n / 3 | 0) % fs.c.length], MAXH = 370, y0 = H - 24, sm3 = objMaterial('#3f6b3a', { roughness: 0.7 });
         let rr = 777 + n * 977; const rnd = () => (rr = (rr * 16807) % 2147483647) / 2147483647;
         let reach = rmax;
         // stems stand in the neck of the vase (inside its opening, spread on a ring) and only fan out above the rim; the bouquet is also kept in front of the patterned plate
-        const avail = Math.max(1.5, rim - 4.4), NS = Math.max(2, Math.min(7, Math.floor(Math.PI / Math.asin(Math.min(1, 1.5 / Math.max(1.6, avail)))))), zMin = (ctx.zc !== undefined ? R.gap + R.t + 3 - ctx.zc : -1e9);
+        const avail = Math.max(1.2, innerMin - 1.9), NS = Math.max(2, Math.min(7, Math.floor(Math.PI / Math.asin(Math.min(1, 1.5 / Math.max(1.6, avail)))))), zMin = (ctx.zc !== undefined ? R.gap + R.t + 3 - ctx.zc : -1e9);
         for (let i = 0; i < NS; i++) {
             const sc = 0.9 + rnd() * 0.35, hd = flowerHead(fs.k, i % 2 || fs.k !== 'tulip' ? cols : [cols[1], cols[0]], sc, rnd);
             const ph = i * (6.2832 / NS) + n, bx = Math.cos(ph) * avail * (NS > 2 ? 1 : 0.5), bz = Math.sin(ph) * avail * (NS > 2 ? 1 : 0.5);
