@@ -5807,19 +5807,28 @@ function makeObject(kind, seed, depthAvail, ctx) {
         const fs = FLOWER_SETS[n % 3], cols = fs.c[(n / 3 | 0) % fs.c.length], MAXH = 370, y0 = H - 24, sm3 = objMaterial('#3f6b3a', { roughness: 0.7 });
         let rr = 777 + n * 977; const rnd = () => (rr = (rr * 16807) % 2147483647) / 2147483647;
         let reach = rmax;
-        for (let i = 0; i < 7; i++) {
+        // stems stand in the neck of the vase (inside its opening, spread on a ring) and only fan out above the rim; the bouquet is also kept in front of the patterned plate
+        const avail = Math.max(1.5, rim - 4.4), NS = Math.max(2, Math.min(7, Math.floor(Math.PI / Math.asin(Math.min(1, 1.5 / Math.max(1.6, avail)))))), zMin = (ctx.zc !== undefined ? R.gap + R.t + 3 - ctx.zc : -1e9);
+        for (let i = 0; i < NS; i++) {
             const sc = 0.9 + rnd() * 0.35, hd = flowerHead(fs.k, i % 2 || fs.k !== 'tulip' ? cols : [cols[1], cols[0]], sc, rnd);
-            const ph = i * 2.4 + n, tl = i === 0 ? 0.05 : 0.14 + 0.34 * ((i % 3) / 2) + rnd() * 0.08;
-            const top = Math.min(MAXH - hd.len - 4, H + (MAXH - H) * (0.5 + 0.45 * rnd()) - hd.len), L = Math.max(60, (top - y0) / Math.cos(tl));
-            const tip = new T.Vector3(Math.sin(tl) * Math.cos(ph) * L, y0 + Math.cos(tl) * L, Math.sin(tl) * Math.sin(ph) * L);
-            const mid = new T.Vector3(tip.x * 0.45 + Math.cos(ph) * L * 0.07, y0 + (tip.y - y0) * 0.5, tip.z * 0.45 + Math.sin(ph) * L * 0.07);
-            const curve = new T.CatmullRomCurve3([new T.Vector3(0, y0, 0), mid, tip]);
-            add(new T.TubeGeometry(curve, 20, fs.k === 'wheat' ? 0.9 : 1.3, 6), sm3, 0, 0, 0);
+            const ph = i * (6.2832 / NS) + n, bx = Math.cos(ph) * avail * (NS > 2 ? 1 : 0.5), bz = Math.sin(ph) * avail * (NS > 2 ? 1 : 0.5);
+            let tl = i === 0 ? 0.12 : 0.2 + 0.32 * ((i % 3) / 2) + rnd() * 0.08, tip, L;
+            const top = Math.min(MAXH - hd.len - 4, H + (MAXH - H) * (0.5 + 0.45 * rnd()) - hd.len), hr = Math.max(hd.rad, 20);
+            for (let it = 0; it < 14; it++) {   // lean less while the head would reach into the plate
+                L = Math.max(40, (top - H) / Math.cos(tl));
+                tip = new T.Vector3(bx + Math.sin(tl) * Math.cos(ph) * L, H + Math.cos(tl) * L, bz + Math.sin(tl) * Math.sin(ph) * L);
+                if (tip.z - hr >= zMin) break; tl *= 0.8;
+            }
+            if (tip.z - hr < zMin) tip.z = zMin + hr;
+            const p0 = new T.Vector3(bx, H - 24, bz), p1 = new T.Vector3(bx, H + 5, bz);
+            const mid = new T.Vector3(bx + (tip.x - bx) * 0.5, H + (tip.y - H) * 0.5, bz + (tip.z - bz) * 0.5);
+            const curve = new T.CatmullRomCurve3([p0, p1, mid, tip]);
+            add(new T.TubeGeometry(curve, 24, fs.k === 'wheat' ? 0.9 : 1.3, 6), sm3, 0, 0, 0);
             const hg = hd.g; hg.position.copy(tip); hg.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), curve.getTangent(1)); g.add(hg);
-            if (fs.k !== 'wheat') for (let q = 0; q < 2; q++) {                                      // leaves on the stalk
-                const u = 0.3 + q * 0.22 + rnd() * 0.08, pt = curve.getPoint(u), lg = new T.Group(); lg.position.copy(pt);
+            if (fs.k !== 'wheat') for (let q = 0; q < 2; q++) {                                      // leaves on the stalk, above the rim
+                const u = 0.55 + q * 0.18 + rnd() * 0.06, pt = curve.getPoint(u), lg = new T.Group(); lg.position.copy(pt);
                 lg.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), curve.getTangent(u)); g.add(lg);
-                const sd = q ? 1 : -1, lf = new T.Mesh(new T.SphereGeometry(1, 10, 6), sm3); lf.scale.set(5, 19, 0.8); lf.position.set(7 * sd, 15, 0); lf.rotation.z = -0.55 * sd; lf.castShadow = true; lg.add(lf);
+                const sd = q ? 1 : -1, lf = new T.Mesh(new T.SphereGeometry(1, 10, 6), sm3); lf.scale.set(4.5, 16, 0.8); lf.position.set(6 * sd, 13, 0); lf.rotation.z = -0.5 * sd; lf.castShadow = true; lg.add(lf);
             }
             reach = Math.max(reach, Math.hypot(tip.x, tip.z) + hd.rad);
         }
@@ -5871,7 +5880,8 @@ function makeObject(kind, seed, depthAvail, ctx) {
         part(new T.CylinderGeometry(1.5, 3.6, 13, 6), objMaterial('#e6c79a', { roughness: 0.8 }), L + 6.5);   // sharpened wood
         part(new T.CylinderGeometry(0.2, 1.5, 5, 6), objMaterial(col, { roughness: 0.5 }), L + 15.5);          // coloured lead
     });
-    return { g, w: 2 * Rp + 10, d: 2 * Rp + 10 };
+    g.scale.setScalar(0.8);                                                                           // 20 % smaller
+    return { g, w: (2 * Rp + 10) * 0.8, d: (2 * Rp + 10) * 0.8 };
 }
 
 function placeObjects() {
@@ -5915,7 +5925,7 @@ function placeObjects() {
             forbid = above.map(b => [b[0] - 10, b[0] + 10]);                  // full-size magazines stand in the gaps between the barrels
         }
         for (const it of S.objs) {
-            const o = makeObject(it.k, it.s, sup.depth, { sup, key, hmax, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
+            const o = makeObject(it.k, it.s, sup.depth, { sup, key, hmax, zc: (sup.z0 + sup.z1) / 2, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
             const gb = prev ? (prev === 'book' && it.k === 'book' ? 1 : GAP) : 0;     // books stand shoulder to shoulder
             if (total + gb + o.w > sup.w - 40) break;          // no more room on this product
             total += gb + o.w; o.gb = gb; built.push(o); prev = it.k;
