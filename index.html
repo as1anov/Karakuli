@@ -5973,7 +5973,7 @@ function objUI() {
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button><button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
         + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
-    document.getElementById('v3-objnote').textContent = !R || !R.model ? '' : onHooks ? 'The hanger takes the items that hang: towel, jacket, umbrella, magazine. One per hook.' : ok ? (mag ? 'The magazine holder takes magazines: they lean on the plate and on the wall in turn, between the wall bolts.' : 'The shelf takes the items that stand: books, magazine, vase, pencils.') : '';
+    document.getElementById('v3-objnote').style.display = 'none';   // only icons and names in Objects
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
 
