@@ -4746,7 +4746,7 @@ const K_FACTOR = 0.4;                       // neutral-axis position of the bend
 const BEND_ANGLES = { shelf: [90, 75], hanger: [90, 75], magazine: [-90] };
 
 const shopCfg = () => (window.karakuliShop && window.karakuliShop.get()) || null;
-const S = { mat: 'powder', color: null, t: 2, env: 'soft', cam: 'persp', objs: [], objKey: null, fold: 0, playing: false, auto: false };
+const S = { mat: 'powder', color: null, t: 2, env: 'soft', cam: 'persp', objs: [], objKey: null, fold: 0, playing: false, auto: false, fx: { name: null, speed: 1, range: 60, zoom: 35, dir: 1, loop: true } };
 let T = null, OrbitControlsCls = null, R = null, building = false;
 
 // ---------------------------------------------------------------- pure geometry
@@ -6214,7 +6214,49 @@ function goCamera(name) {
     }
     const p = R.camera.position, c = f.c, o = [p.x - c[0], p.y - c[1], p.z - c[2]], od = Math.hypot(...o) || 1;
     R.cam = { from: o.map(v => v / od), fd: od, to: dir, td: dist, t: 0 };
-    S.cam = name; R.controls.autoRotate = false; S.auto = false; syncUI();
+    fxStop(); S.cam = name; syncUI();
+}
+// ---- camera effects: moves of the camera around the product (one button in the bar opens the list and the settings) ----
+const FX = {
+    rotate:    { name: 'Rotate',     period: 22, uses: ['speed', 'dir'], icon: '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4h-4"/>' },
+    boomerang: { name: 'Boomerang',  period: 8,  uses: ['speed', 'range', 'dir'], icon: '<path d="M4 8c6-5 14-3 16 3-5-2-8-1-9 2 3 2 6 2 9-1"/><path d="M4 8l3-1M4 8l1 3"/>' },
+    push:      { name: 'Push-in',    period: 7,  uses: ['speed', 'zoom'], icon: '<rect x="8" y="8" width="8" height="8" rx="1"/><path d="M3 3l4 4M21 3l-4 4M3 21l4-4M21 21l-4-4"/>' },
+    crane:     { name: 'Crane',      period: 9,  uses: ['speed', 'range'], icon: '<path d="M12 21V5M12 5l-4 4M12 5l4 4"/><path d="M5 21h14"/>' },
+    spiral:    { name: 'Spiral',     period: 18, uses: ['speed', 'zoom', 'dir'], icon: '<path d="M12 12m0 0a1.5 1.5 0 0 1 3 0 4 4 0 0 1-7 0 7 7 0 0 1 12 0"/>' },
+    figure8:   { name: 'Figure 8',   period: 12, uses: ['speed', 'range', 'dir'], icon: '<path d="M12 12c-2-4-8-4-8 0s6 4 8 0 8-4 8 0-6 4-8 0z"/>' }
+};
+function camPose() {
+    const c = R.fit.c, p = R.camera.position, x = p.x - c[0], y = p.y - c[1], z = p.z - c[2], d = Math.hypot(x, y, z) || 1;
+    return { th: Math.atan2(x, z), ph: Math.asin(Math.max(-1, Math.min(1, y / d))), d };
+}
+function fxStart(name) {
+    if (!R || !R.fit) return;
+    R.cam = null;
+    S.fx.name = name; R.fxRun = { t: 0, base: camPose() };
+    S.cam = null; R.dirty = true; syncUI();
+}
+function fxStop() {
+    if (R) { R.fxRun = null; R.fxHold = false; }
+    if (S.fx.name) { S.fx.name = null; syncUI(); }
+}
+function stepFx(dt) {
+    const run = R.fxRun, fx = S.fx, def = FX[fx.name]; if (!run || !def) return;
+    run.t += dt * fx.speed;
+    let u = run.t / def.period, done = false;
+    if (!fx.loop && u >= 1) { u = 1; done = true; }
+    const b = run.base, w = 2 * Math.PI * u, A = fx.range * Math.PI / 180, Z = fx.zoom / 100, bump = 0.5 - 0.5 * Math.cos(w);
+    let th = b.th, ph = b.ph, d = b.d;
+    if (fx.name === 'rotate') th = b.th + fx.dir * w;
+    else if (fx.name === 'boomerang') th = b.th + fx.dir * A * Math.sin(w);
+    else if (fx.name === 'push') d = b.d * (1 - Z * bump);
+    else if (fx.name === 'crane') ph = b.ph + A * 0.5 * Math.sin(w);
+    else if (fx.name === 'spiral') { th = b.th + fx.dir * w; d = b.d * (1 - Z * bump); }
+    else if (fx.name === 'figure8') { th = b.th + fx.dir * A * 0.6 * Math.sin(w); ph = b.ph + A * 0.3 * Math.sin(2 * w); }
+    ph = Math.max(-0.12, Math.min(1.45, ph));
+    const c = R.fit.c, cp = Math.cos(ph);
+    R.camera.position.set(c[0] + d * cp * Math.sin(th), c[1] + d * Math.sin(ph), c[2] + d * cp * Math.cos(th));
+    R.dirty = true;
+    if (done) fxStop();
 }
 function stepCamera(dt) {
     const a = R.cam; if (!a) return;
@@ -6267,7 +6309,7 @@ function ensureCss() {
     .v3-sec.closed .v3-chev { transform: rotate(-45deg); margin-top: 0; }
     .v3-sec.closed .v3-body { display: none; } .v3-sec.closed .v3-tog { margin-bottom: 0; }
     .v3-dot-s { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border-color); }
-    .v3-handle { display: none; width: 100%; height: 22px; margin: -6px 0 4px; padding: 0; border: 0; background: none; cursor: pointer; }
+    .v3-handle { display: none; width: 100%; height: 14px; margin: -4px 0 2px; padding: 0; border: 0; background: none; cursor: pointer; }
     .v3-handle i { display: block; width: 38px; height: 4px; margin: 0 auto; border-radius: 2px; background: var(--disabled-color); opacity: 0.6; }
     #v3d-panel.min .v3-sec { display: none; }
     .v3-cat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -6323,6 +6365,23 @@ function ensureCss() {
     #v3-play { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: grid; place-items: center; cursor: pointer; }
     #v3-play svg { width: 18px; height: 18px; fill: currentColor; }
     #v3-fold { flex: 1; min-width: 0; }
+    #v3-fxbtn { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); display: grid; place-items: center; cursor: pointer; }
+    #v3-fxbtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    #v3-fxbtn:hover { background: var(--active-btn-bg); }
+    #v3-fxbtn.on { background: var(--text-color); color: var(--bg-color); }
+    #v3-fx { position: absolute; left: 50%; bottom: 86px; transform: translateX(-50%); width: min(380px, calc(100% - 24px)); padding: 14px; display: none; z-index: 5; max-height: calc(100% - 180px); overflow-y: auto; scrollbar-width: none; }
+    #v3-fx.show { display: block; }
+    #v3-fx::-webkit-scrollbar { display: none; }
+    .v3-fxh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
+    .v3-fxg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+    .v3-fxc { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 4px 8px; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 10px; font-weight: 600; cursor: pointer; }
+    .v3-fxc svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .v3-fxc:hover { background: var(--active-btn-bg); }
+    .v3-fxc.on { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
+    .v3-fxr { display: grid; grid-template-columns: 62px 1fr 44px; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 11px; font-weight: 600; }
+    .v3-fxr.off { opacity: 0.35; pointer-events: none; }
+    .v3-fxr b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .v3-fxo { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
     .v3-end { font-size: 10px; font-weight: 600; color: var(--disabled-color); white-space: nowrap; }
     #v3d-load { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 30px; font-size: 13px; font-weight: 600; background: var(--bg-color); }
     #v3d-load small { display: block; margin-top: 8px; font-weight: 400; color: var(--disabled-color); font-size: 11px; line-height: 1.5; }
@@ -6334,9 +6393,11 @@ function ensureCss() {
     .v3-bar i { display: block; height: 100%; width: 0; background: var(--text-color); transition: width 0.35s ease; }
     #v3-retry { margin-top: 14px; }
     @media (max-width: 700px) {
-        #v3d-panel { right: 12px; left: 12px; top: auto; bottom: 84px; width: auto; max-height: 48%; }
+        #v3d-panel { right: 12px; left: 12px; top: auto; bottom: 84px; width: auto; max-height: 48%; padding: 8px 12px 12px; }
+        #v3d-panel.min { padding-bottom: 6px; }
         .v3-handle { display: block; position: sticky; top: -8px; z-index: 2; }
         #v3d-bar { bottom: 12px; width: calc(100% - 24px); }
+        #v3-fx { bottom: 112px; max-height: calc(100% - 190px); }
         #v3d-title { left: 14px; top: 16px; }
         #v3d-close { right: 12px; top: 12px; }
         #v3d-shop { right: 68px; top: 12px; }
@@ -6359,16 +6420,16 @@ function buildUI() {
             <div class="v3-sec" data-sec="mat"><button class="v3-lab v3-tog"><span>Material</span><em id="v3-sum-mat"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-mats"></div></div></div>
             <div class="v3-sec" data-sec="col"><button class="v3-lab v3-tog"><span>Colour</span><em id="v3-sum-col"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-sw" id="v3-cols"></div></div></div>
             <div class="v3-sec" data-sec="thick"><button class="v3-lab v3-tog"><span>Thickness</span><em id="v3-sum-thick"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-ts"></div></div></div>
-            <div class="v3-sec" data-sec="cam"><button class="v3-lab v3-tog"><span>Camera</span><em id="v3-sum-cam"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-cams"><button class="v3-chip" data-cam="persp">3/4</button><button class="v3-chip" data-cam="front">Front</button><button class="v3-chip" data-cam="side">Side</button><button class="v3-chip" data-cam="top">Top</button></div></div></div>
             <div class="v3-sec" data-sec="obj"><button class="v3-lab v3-tog"><span>Objects</span><em id="v3-sum-obj"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-cat" id="v3-cat"></div><div id="v3-objlist"></div><div class="v3-note" id="v3-objnote"></div></div></div>
             <div class="v3-sec" id="v3-price-sec" data-sec="price" style="display:none"><button class="v3-lab v3-tog"><span>Price</span><em id="v3-sum-price"></em><i class="v3-chev"></i></button><div class="v3-body" id="v3-price"></div></div>
             <div class="v3-sec" data-sec="dl"><button class="v3-lab v3-tog"><span>Download</span><em id="v3-sum-dl"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips"><button class="v3-chip" id="v3-png" title="Picture of the product only">Picture (.png)</button><button class="v3-chip" id="v3-glb" title="Folded 3D model for AR and 3D software">3D model (.glb)</button><button class="v3-chip" id="v3-dxf" title="Flat pattern for laser cutting">Flat pattern (.dxf)</button></div></div></div>
-            <div class="v3-sec"><div class="v3-chips"><button class="v3-chip" id="v3-auto">Auto-rotate</button></div></div>
         </div>
         <div id="v3d-bar" class="v3-glass">
             <button id="v3-play" title="Play / replay the folding"></button>
             <span class="v3-end">Flat</span><input class="v3-range" id="v3-fold" type="range" min="0" max="1" step="0.001"><span class="v3-end">Folded</span>
+            <button id="v3-fxbtn" title="Camera effects"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="14" height="10" rx="2"/><path d="M16 11l6-3v8l-6-3"/></svg></button>
         </div>
+        <div id="v3-fx" class="v3-glass"></div>
         <div id="v3d-load"><div class="v3-lbox"><div class="v3-spin" id="v3-spin"></div><span id="v3-loadtxt">Loading 3D…</span><div class="v3-bar" id="v3-barwrap"><i id="v3-loadbar"></i></div><small id="v3-loadsub"></small><button class="v3-chip" id="v3-retry" style="display:none">Try again</button></div></div>`;
     document.body.appendChild(el);
     // the page below listens to mouse / touch / wheel on window: keep those out of it
@@ -6384,16 +6445,23 @@ function buildUI() {
     $('v3-ts').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b || +b.dataset.t === S.t) return; S.t = +b.dataset.t; syncUI(); await rebuild(); syncUI(); };
     $('v3d-panel').addEventListener('click', e => { const t = e.target.closest('.v3-tog'); if (t) t.parentElement.classList.toggle('closed'); });
     $('v3d-shop').onclick = openShopEditor;
-    $('v3-sheet').onclick = () => $('v3d-panel').classList.toggle('min');
+    $('v3-sheet').onclick = () => { const m = $('v3d-panel').classList.toggle('min'); if (!m && window.innerWidth <= 700) $('v3-fx').classList.remove('show'); };
     if (window.innerWidth <= 700) document.querySelectorAll('#v3d-panel .v3-sec[data-sec]').forEach(sc => { if (sc.dataset.sec !== 'mat') sc.classList.add('closed'); });
     $('v3-glb').onclick = exportGLB; $('v3-png').onclick = exportPNG;
     $('v3d-panel').addEventListener('click', e => {
         const c = e.target.closest('[data-ok]'); if (c) { objAdd(c.dataset.ok); return; }
         const a = e.target.closest('[data-oa]'); if (a) objAct(a.dataset.oi === undefined ? -1 : +a.dataset.oi, a.dataset.oa);
     });
-    $('v3-cams').onclick = e => { const b = e.target.closest('[data-cam]'); if (b) goCamera(b.dataset.cam); };
     $('v3-dxf').onclick = exportDXF;
-    $('v3-auto').onclick = () => { S.auto = !S.auto; if (R) R.controls.autoRotate = S.auto; syncUI(); };
+    buildFxUI();
+    // The effects window stays open while the model is turned or zoomed; only its button closes it. On a phone only one window is open at a time:
+    // opening the effects folds the 3D settings under their handle, unfolding the settings closes the effects.
+    $('v3-fxbtn').onclick = e => {
+        e.stopPropagation();
+        const open = $('v3-fx').classList.toggle('show');
+        if (open && window.innerWidth <= 700) $('v3d-panel').classList.add('min');
+        syncUI();
+    };
     $('v3-fold').oninput = e => { S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
     $('v3-play').onclick = () => { if (S.fold >= 0.999) S.fold = 0; if (R) R.prog = null; S.playing = true; syncUI(); };
     return ui;
@@ -6406,12 +6474,47 @@ function swatchesHTML() {
         `<input class="v3-pick" type="color" id="v3-custom" value="${S.color || base}">`;
 }
 
+function buildFxUI() {
+    const box = document.getElementById('v3-fx');
+    box.innerHTML = `<div class="v3-fxh"><span>Camera</span></div>
+        <div class="v3-chips" id="v3-cams" style="margin-bottom:12px"><button class="v3-chip" data-cam="persp">3/4</button><button class="v3-chip" data-cam="front">Front</button><button class="v3-chip" data-cam="side">Side</button><button class="v3-chip" data-cam="top">Top</button></div>
+        <div class="v3-fxh"><span>Effects</span><button class="v3-chip" id="v3-fxstop">Stop</button></div>
+        <div class="v3-fxg">${Object.entries(FX).map(([k, f]) => `<button class="v3-fxc" data-fx="${k}"><svg viewBox="0 0 24 24">${f.icon}</svg>${f.name}</button>`).join('')}</div>
+        <div class="v3-fxr" data-u="speed"><span>Speed</span><input class="v3-range" id="v3-fxs" type="range" min="0.25" max="3" step="0.05"><b id="v3-fxsv"></b></div>
+        <div class="v3-fxr" data-u="range"><span>Swing</span><input class="v3-range" id="v3-fxr" type="range" min="10" max="120" step="1"><b id="v3-fxrv"></b></div>
+        <div class="v3-fxr" data-u="zoom"><span>Zoom</span><input class="v3-range" id="v3-fxz" type="range" min="10" max="60" step="1"><b id="v3-fxzv"></b></div>
+        <div class="v3-fxo"><button class="v3-chip" id="v3-fxd"></button><button class="v3-chip" id="v3-fxl"></button></div>`;
+    box.onpointerdown = e => e.stopPropagation();
+    box.onclick = e => {
+        const cb = e.target.closest('[data-cam]'); if (cb) { goCamera(cb.dataset.cam); return; }
+        const c = e.target.closest('[data-fx]'); if (!c) return;
+        if (S.fx.name === c.dataset.fx) fxStop(); else fxStart(c.dataset.fx);
+    };
+    const restart = () => { if (S.fx.name) fxStart(S.fx.name); else syncFx(); };
+    const bind = (id, key) => { document.getElementById(id).oninput = e => { S.fx[key] = +e.target.value; syncFx(); if (key !== 'speed' && S.fx.name) restart(); }; };
+    bind('v3-fxs', 'speed'); bind('v3-fxr', 'range'); bind('v3-fxz', 'zoom');
+    document.getElementById('v3-fxd').onclick = () => { S.fx.dir = -S.fx.dir; restart(); };
+    document.getElementById('v3-fxl').onclick = () => { S.fx.loop = !S.fx.loop; restart(); };
+    document.getElementById('v3-fxstop').onclick = fxStop;
+}
+function syncFx() {
+    const $ = id => document.getElementById(id); if (!$('v3-fx')) return;
+    const f = S.fx, def = FX[f.name];
+    $('v3-fxbtn').classList.toggle('on', !!f.name);
+    document.querySelectorAll('#v3-fx .v3-fxc').forEach(b => b.classList.toggle('on', b.dataset.fx === f.name));
+    $('v3-fxs').value = f.speed; $('v3-fxsv').textContent = f.speed.toFixed(2).replace(/0$/, '') + '×';
+    $('v3-fxr').value = f.range; $('v3-fxrv').textContent = f.range + '°';
+    $('v3-fxz').value = f.zoom; $('v3-fxzv').textContent = f.zoom + '%';
+    document.querySelectorAll('#v3-fx .v3-fxr').forEach(r => r.classList.toggle('off', !!def && !def.uses.includes(r.dataset.u)));
+    $('v3-fxd').textContent = f.dir > 0 ? 'Clockwise' : 'Counter-clockwise'; $('v3-fxd').style.opacity = !def || def.uses.includes('dir') ? 1 : 0.35;
+    $('v3-fxl').textContent = f.loop ? 'Loop: on' : 'Loop: off'; $('v3-fxl').classList.toggle('on', f.loop);
+}
+
 function syncUI() {
     const $ = id => document.getElementById(id);
-    $('v3-auto').classList.toggle('on', S.auto);
+    syncFx();
     document.querySelectorAll('#v3-cams .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.cam === S.cam));
     objUI();
-    $('v3-sum-cam').textContent = { persp: '3/4', front: 'Front', side: 'Side', top: 'Top' }[S.cam] || 'Free';
     $('v3-cols').innerHTML = swatchesHTML();
     $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c || null; applyMaterial(); syncUI(); };
     $('v3-custom').oninput = e => { S.color = e.target.value; applyMaterial(); document.querySelectorAll('#v3-cols .v3-dot').forEach(d => d.classList.remove('on')); };
@@ -6513,9 +6616,11 @@ function initRuntime() {
     controls.enableDamping = true; controls.dampingFactor = 0.08; controls.autoRotateSpeed = 1.4;
     controls.minAzimuthAngle = -Math.PI / 2; controls.maxAzimuthAngle = Math.PI / 2;      // never behind the wall
     controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI * 0.62;
-    controls.autoRotate = S.auto;
+    controls.autoRotate = false;
     controls.addEventListener('change', () => { if (R) R.dirty = true; });
-    controls.addEventListener('start', () => { if (R) { R.cam = null; if (S.cam) { S.cam = null; syncUI(); } } });
+    controls.addEventListener('end', () => { if (R) R.dragging = false; });
+    // Turning or zooming by hand does not stop an effect: it waits while the model is moved and carries on from the new position.
+    controls.addEventListener('start', () => { if (R) { R.cam = null; if (R.fxRun) R.fxHold = true; R.dragging = true; if (S.cam) { S.cam = null; syncUI(); } } });
     const light = new T.DirectionalLight(0xffffff, 0.9);
     light.castShadow = true; light.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 8;
     scene.add(light);
@@ -6527,6 +6632,9 @@ function initRuntime() {
 }
 
 function resize() {
+    // Switching to a wide window (full screen) must never leave the settings folded under the phone handle: that shows an empty strip.
+    const pn = document.getElementById('v3d-panel');
+    if (pn && window.innerWidth > 700 && pn.classList.contains('min')) pn.classList.remove('min');
     if (!R) return;
     const host = document.getElementById('v3d-view');
     const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
@@ -6550,13 +6658,15 @@ function loop(now) {
         if (!S.playing) syncUI();
     }
     if (R.cam) stepCamera(dt);
+    if (R.fxRun && !R.fxHold) stepFx(dt);
     const moved = R.controls.update();
+    if (R.fxHold && !moved && !R.dragging) { R.fxHold = false; if (R.fxRun) R.fxRun = { t: 0, base: camPose() }; }   // rebase on the new position
     // draw only when something changes (animation, camera, auto-rotate, a new look): an idle view costs no battery
-    if (S.playing || S.auto || moved || R.dirty) {
+    if (S.playing || R.fxRun || moved || R.dirty) {
         R.dirty = false;
         R.renderer.render(R.scene, R.camera);
         // too slow on this device: fall back to 1x resolution once
-        if (R.renderer.getPixelRatio() > 1 && (S.playing || S.auto)) {
+        if (R.renderer.getPixelRatio() > 1 && (S.playing || R.fxRun)) {
             R.fr++; if (dt > 0.034) R.slow++;
             if (R.fr >= 60) { if (R.slow > 36) { R.renderer.setPixelRatio(1); resize(); } R.fr = 0; R.slow = 0; }
         }
@@ -6629,6 +6739,7 @@ function close3D() {
 }
 
 window.addEventListener('resize', resize);
+document.addEventListener('fullscreenchange', () => { resize(); if (R) R.dirty = true; });
 window.open3D = open3D; window.close3D = close3D; window.openShopEditor = openShopEditor;
 window.__v3d = { get R() { return R; }, holesMm, designPrimitives, rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
