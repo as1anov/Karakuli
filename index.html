@@ -5649,7 +5649,9 @@ function makeTowel(seed, ctx) {
     geo.setAttribute('uv', new T.BufferAttribute(d.uv, 2));
     geo.setIndex(new T.BufferAttribute(d.idx, 1));
     if (geo.computeVertexNormals) geo.computeVertexNormals();
-    const m = new T.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; g.add(m);
+    // Layers of the cloth lie millimetres apart, so the shadow map makes dark blotches where one layer shades the other: the towel casts a shadow
+    // (on the wall) but does not receive one, which keeps its surface clean.
+    const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; g.add(m);
     return { g, w: towelSize().w, d: 60 };
 }
 
