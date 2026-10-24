@@ -4746,7 +4746,7 @@ const K_FACTOR = 0.4;                       // neutral-axis position of the bend
 const BEND_ANGLES = { shelf: [90, 75], hanger: [90, 75], magazine: [-90] };
 
 const shopCfg = () => (window.karakuliShop && window.karakuliShop.get()) || null;
-const S = { mat: 'powder', color: null, t: 2, env: 'soft', cam: 'persp', objs: [], objKey: null, fold: 0, playing: false, auto: false, fx: { name: null, speed: 1, range: 60, zoom: 35, dir: 1, loop: true } };
+const S = { mat: 'powder', color: null, t: 2, env: 'soft', cam: 'persp', objs: [], objKey: null, fold: 0, playing: false, auto: false, fx: { name: null, speed: 1, range: 60, zoom: 35, dir: 1, loop: true }, dof: { on: false, amount: 0.5, zone: 0.25, p: null, pick: false } };
 let T = null, OrbitControlsCls = null, R = null, building = false;
 
 // ---------------------------------------------------------------- pure geometry
@@ -6218,12 +6218,12 @@ function goCamera(name) {
 }
 // ---- camera effects: moves of the camera around the product (one button in the bar opens the list and the settings) ----
 const FX = {
-    rotate:    { name: 'Rotate',     period: 22, uses: ['speed', 'dir'], icon: '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4h-4"/>' },
-    boomerang: { name: 'Boomerang',  period: 8,  uses: ['speed', 'range', 'dir'], icon: '<path d="M4 8c6-5 14-3 16 3-5-2-8-1-9 2 3 2 6 2 9-1"/><path d="M4 8l3-1M4 8l1 3"/>' },
-    push:      { name: 'Push-in',    period: 7,  uses: ['speed', 'zoom'], icon: '<rect x="8" y="8" width="8" height="8" rx="1"/><path d="M3 3l4 4M21 3l-4 4M3 21l4-4M21 21l-4-4"/>' },
-    crane:     { name: 'Crane',      period: 9,  uses: ['speed', 'range'], icon: '<path d="M12 21V5M12 5l-4 4M12 5l4 4"/><path d="M5 21h14"/>' },
-    spiral:    { name: 'Spiral',     period: 18, uses: ['speed', 'zoom', 'dir'], icon: '<path d="M12 12m0 0a1.5 1.5 0 0 1 3 0 4 4 0 0 1-7 0 7 7 0 0 1 12 0"/>' },
-    figure8:   { name: 'Figure 8',   period: 12, uses: ['speed', 'range', 'dir'], icon: '<path d="M12 12c-2-4-8-4-8 0s6 4 8 0 8-4 8 0-6 4-8 0z"/>' }
+    rotate:    { name: 'Rotate',     period: 22, uses: ['speed', 'dir'], icon: '<path d="M12 3l4.6 2.5v4.6L12 12.6 7.4 10.1V5.5zM12 8v4.6M7.4 5.5L12 8l4.6-2.5"/><path d="M5 14.3C3.8 14.8 3 15.6 3 16.5c0 2 4 3.5 9 3.5s9-1.5 9-3.5c0-.9-.8-1.7-2-2.2"/>' },
+    boomerang: { name: 'Boomerang',  period: 8,  uses: ['speed', 'range', 'dir'], icon: '<path d="M17 2.5l3.5 3.5L17 9.5M3.5 11v-1a4 4 0 0 1 4-4h13M7 21.5L3.5 18 7 14.5M20.5 13v1a4 4 0 0 1-4 4h-13"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/>' },
+    push:      { name: 'Push-in',    period: 7,  uses: ['speed', 'zoom'], icon: '<path d="M3 8V4h4M21 8V4h-4M3 16v4h4M21 16v4h-4"/><rect x="9" y="9.5" width="6" height="5" rx=".8"/><path d="M7 7l2.2 2.2M17 7l-2.2 2.2M7 17l2.2-2.2M17 17l-2.2-2.2"/>' },
+    crane:     { name: 'Crane',      period: 9,  uses: ['speed', 'range'], icon: '<path d="M6.5 3v18M4 5.5L6.5 3 9 5.5M4 18.5L6.5 21 9 18.5"/><path d="M9.5 12H12"/><rect x="12" y="8.5" width="6.5" height="7" rx="1.3"/><path d="M18.5 10.6l3-1.7v6.2l-3-1.7"/>' },
+    spiral:    { name: 'Spiral',     period: 18, uses: ['speed', 'zoom', 'dir'], icon: '<g transform="translate(-1.5 .5)"><path d="M12 12a1.5 1.5 0 0 1 1.5-1.5 3 3 0 0 1 3 3 4.5 4.5 0 0 1-4.5 4.5 6 6 0 0 1-6-6 7.5 7.5 0 0 1 7.5-7.5 7.5 7.5 0 0 1 7.5 7.5"/></g>' },
+    figure8:   { name: 'Figure 8',   period: 12, uses: ['speed', 'range', 'dir'], icon: '<path d="M12 12c-2.5-4.2-8.5-4.2-8.5 0s6 4.2 8.5 0 8.5-4.2 8.5 0-6 4.2-8.5 0z"/>' }
 };
 function camPose() {
     const c = R.fit.c, p = R.camera.position, x = p.x - c[0], y = p.y - c[1], z = p.z - c[2], d = Math.hypot(x, y, z) || 1;
@@ -6276,9 +6276,9 @@ async function exportPNG() {
     const r = R.renderer, pr0 = r.getPixelRatio(), host = document.getElementById('v3d-view');
     try {
         const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
-        r.setPixelRatio(Math.min(R.lite ? 1.5 : 2, 4096 / Math.max(w, h)));
+        r.setPixelRatio(Math.min(R.lite ? 1.5 : 2, 4096 / Math.max(w, h), S.dof.on ? Math.sqrt(3.2e6 / (w * h)) : 9));
         r.setSize(w, h);
-        r.render(R.scene, R.camera);
+        drawScene();
         const blob = await new Promise(res => r.domElement.toBlob(res, 'image/png'));
         if (!blob) throw new Error('empty image');
         download(blob, exportName('png'));
@@ -6348,6 +6348,7 @@ function ensureCss() {
     .v3-lab em { font-style: normal; letter-spacing: 0; text-transform: none; color: var(--text-color); font-weight: 600; font-size: 11px; }
     .v3-chips { display: flex; flex-wrap: wrap; gap: 5px; }
     .v3-chip { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .v3-camg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
     .v3-chip:hover { background: var(--active-btn-bg); }
     .v3-chip.on { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
     .v3-sw { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
@@ -6365,21 +6366,41 @@ function ensureCss() {
     #v3-play { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: grid; place-items: center; cursor: pointer; }
     #v3-play svg { width: 18px; height: 18px; fill: currentColor; }
     #v3-fold { flex: 1; min-width: 0; }
+    .v3-sep { width: 1px; align-self: stretch; margin: 2px 0; background: var(--border-color); flex-shrink: 0; }
     #v3-fxbtn { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); display: grid; place-items: center; cursor: pointer; }
     #v3-fxbtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
     #v3-fxbtn:hover { background: var(--active-btn-bg); }
     #v3-fxbtn.on { background: var(--text-color); color: var(--bg-color); }
-    #v3-fx { position: absolute; left: 50%; bottom: 86px; transform: translateX(-50%); width: min(380px, calc(100% - 24px)); padding: 14px; display: none; z-index: 5; max-height: calc(100% - 180px); overflow-y: auto; scrollbar-width: none; }
+    #v3-fxbtn .ic-stop { display: none; }
+    #v3-fxbtn.run { background: #1fa65a; border-color: #1fa65a; color: #fff; animation: fxpulse 1.8s ease-in-out infinite; }
+    #v3-fxbtn.run.stopmode .ic-cam { display: none; }
+    #v3-fxbtn.run.stopmode .ic-stop { display: block; }
+    @keyframes fxpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(31,166,90,.45); } 50% { box-shadow: 0 0 0 6px rgba(31,166,90,0); } }
+    #v3-fx { position: absolute; left: 50%; bottom: 86px; transform: translateX(-50%); width: min(520px, calc(100% - 40px)); box-sizing: border-box; padding: 14px; display: none; z-index: 5; max-height: calc(100% - 180px); overflow-y: auto; scrollbar-width: none; }
     #v3-fx.show { display: block; }
     #v3-fx::-webkit-scrollbar { display: none; }
+    .v3-fxs { padding: 8px 0; }
+    .v3-fxs:first-child { padding-top: 0; }
+    .v3-fxs:last-child { padding-bottom: 0; }
+    .v3-fxs + .v3-fxs { border-top: 1px solid var(--border-color); }
+    .v3-fxs .v3-fxh { min-height: 30px; margin-bottom: 6px; }
+    .v3-fxh { cursor: pointer; user-select: none; }
+    .v3-fxh span { display: inline-flex; align-items: center; gap: 4px; }
+    .v3-chev { width: 6px; height: 6px; margin: 0 6px 3px 3px; border: solid currentColor; border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); transition: transform 0.15s; flex-shrink: 0; }
+    .v3-fxs.closed .v3-chev { transform: rotate(-45deg); margin: 0 8px 0 1px; }
+    .v3-fxs.closed .v3-fxb { display: none; }
+    .v3-fxs.closed .v3-fxh { margin-bottom: 0 !important; }
     .v3-fxh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
     .v3-fxg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
     .v3-fxc { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 4px 8px; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 10px; font-weight: 600; cursor: pointer; }
-    .v3-fxc svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .v3-fxc svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
     .v3-fxc:hover { background: var(--active-btn-bg); }
     .v3-fxc.on { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
     .v3-fxr { display: grid; grid-template-columns: 62px 1fr 44px; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 11px; font-weight: 600; }
     .v3-fxr.off { opacity: 0.35; pointer-events: none; }
+    #v3-focus { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.35); pointer-events: none; display: none; z-index: 3; }
+    #v3-focus::after { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+    #v3d-view.picking canvas { cursor: crosshair; }
     .v3-fxr b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
     .v3-fxo { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
     .v3-end { font-size: 10px; font-weight: 600; color: var(--disabled-color); white-space: nowrap; }
@@ -6394,10 +6415,13 @@ function ensureCss() {
     #v3-retry { margin-top: 14px; }
     @media (max-width: 700px) {
         #v3d-panel { right: 12px; left: 12px; top: auto; bottom: 84px; width: auto; max-height: 48%; padding: 8px 12px 12px; }
-        #v3d-panel.min { padding-bottom: 6px; }
+        #v3d-panel.min { padding: 0; background: none; border-color: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; overflow: visible; }
+        #v3d-panel.min .v3-handle { margin: 0; height: 22px; display: flex; align-items: center; }
+        #v3d-panel.min .v3-handle i { width: 38px; height: 4px; opacity: 0.85; background: var(--disabled-color); }
         .v3-handle { display: block; position: sticky; top: -8px; z-index: 2; }
         #v3d-bar { bottom: 12px; width: calc(100% - 24px); }
-        #v3-fx { bottom: 112px; max-height: calc(100% - 190px); }
+        #v3-fx { bottom: 84px; width: calc(100% - 24px); max-height: calc(100% - 170px); }
+        #v3d-panel.fxopen { display: none; }
         #v3d-title { left: 14px; top: 16px; }
         #v3d-close { right: 12px; top: 12px; }
         #v3d-shop { right: 68px; top: 12px; }
@@ -6411,7 +6435,7 @@ function buildUI() {
     const el = document.createElement('div');
     el.id = 'v3d';
     el.innerHTML = `
-        <div id="v3d-view"></div>
+        <div id="v3d-view"><div id="v3-focus"></div></div>
         <div id="v3d-title"><b id="v3-name"></b><span id="v3-info"></span></div>
         <div id="v3d-close" class="control-btn glass-panel" onclick="close3D()" title="Close (Esc)"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
         <div id="v3d-shop" class="control-btn glass-panel" title="Prices &amp; options"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
@@ -6427,7 +6451,8 @@ function buildUI() {
         <div id="v3d-bar" class="v3-glass">
             <button id="v3-play" title="Play / replay the folding"></button>
             <span class="v3-end">Flat</span><input class="v3-range" id="v3-fold" type="range" min="0" max="1" step="0.001"><span class="v3-end">Folded</span>
-            <button id="v3-fxbtn" title="Camera effects"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="14" height="10" rx="2"/><path d="M16 11l6-3v8l-6-3"/></svg></button>
+            <i class="v3-sep"></i>
+            <button id="v3-fxbtn" title="Camera effects"><svg class="ic-cam" viewBox="0 0 24 24"><rect x="2" y="7" width="14" height="10" rx="2"/><path d="M16 11l6-3v8l-6-3"/></svg><svg class="ic-stop" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
         </div>
         <div id="v3-fx" class="v3-glass"></div>
         <div id="v3d-load"><div class="v3-lbox"><div class="v3-spin" id="v3-spin"></div><span id="v3-loadtxt">Loading 3D…</span><div class="v3-bar" id="v3-barwrap"><i id="v3-loadbar"></i></div><small id="v3-loadsub"></small><button class="v3-chip" id="v3-retry" style="display:none">Try again</button></div></div>`;
@@ -6445,7 +6470,7 @@ function buildUI() {
     $('v3-ts').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b || +b.dataset.t === S.t) return; S.t = +b.dataset.t; syncUI(); await rebuild(); syncUI(); };
     $('v3d-panel').addEventListener('click', e => { const t = e.target.closest('.v3-tog'); if (t) t.parentElement.classList.toggle('closed'); });
     $('v3d-shop').onclick = openShopEditor;
-    $('v3-sheet').onclick = () => { const m = $('v3d-panel').classList.toggle('min'); if (!m && window.innerWidth <= 700) $('v3-fx').classList.remove('show'); };
+    $('v3-sheet').onclick = () => { const m = $('v3d-panel').classList.toggle('min'); if (!m && window.innerWidth <= 700) $('v3-fx').classList.remove('show'); $('v3d-panel').classList.remove('fxopen'); };
     if (window.innerWidth <= 700) document.querySelectorAll('#v3d-panel .v3-sec[data-sec]').forEach(sc => { if (sc.dataset.sec !== 'mat') sc.classList.add('closed'); });
     $('v3-glb').onclick = exportGLB; $('v3-png').onclick = exportPNG;
     $('v3d-panel').addEventListener('click', e => {
@@ -6458,8 +6483,10 @@ function buildUI() {
     // opening the effects folds the 3D settings under their handle, unfolding the settings closes the effects.
     $('v3-fxbtn').onclick = e => {
         e.stopPropagation();
+        if (S.fx.name && !$('v3-fx').classList.contains('show')) { fxStop(); return; }   // effect running, window folded: the button stops it
         const open = $('v3-fx').classList.toggle('show');
         if (open && window.innerWidth <= 700) $('v3d-panel').classList.add('min');
+        $('v3d-panel').classList.toggle('fxopen', open);
         syncUI();
     };
     $('v3-fold').oninput = e => { S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
@@ -6476,16 +6503,29 @@ function swatchesHTML() {
 
 function buildFxUI() {
     const box = document.getElementById('v3-fx');
-    box.innerHTML = `<div class="v3-fxh"><span>Camera</span></div>
-        <div class="v3-chips" id="v3-cams" style="margin-bottom:12px"><button class="v3-chip" data-cam="persp">3/4</button><button class="v3-chip" data-cam="front">Front</button><button class="v3-chip" data-cam="side">Side</button><button class="v3-chip" data-cam="top">Top</button></div>
-        <div class="v3-fxh"><span>Effects</span><button class="v3-chip" id="v3-fxstop">Stop</button></div>
+    box.innerHTML = `<section class="v3-fxs" data-k="cam"><div class="v3-fxh"><span><i class="v3-chev"></i>Camera</span></div><div class="v3-fxb">
+        <div class="v3-camg" id="v3-cams"><button class="v3-fxc" data-cam="persp"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg>3/4</button><button class="v3-fxc" data-cam="front"><svg viewBox="0 0 24 24"><path d="M4 8h12v12H4zM4 8l4-4h12l-4 4M16 8l4-4v12l-4 4"/><path d="M4 8h12v12H4z" fill="currentColor" fill-opacity=".35"/></svg>Front</button><button class="v3-fxc" data-cam="side"><svg viewBox="0 0 24 24"><path d="M4 8h12v12H4zM4 8l4-4h12l-4 4M16 8l4-4v12l-4 4"/><path d="M16 8l4-4v12l-4 4z" fill="currentColor" fill-opacity=".35"/></svg>Side</button><button class="v3-fxc" data-cam="top"><svg viewBox="0 0 24 24"><path d="M4 8h12v12H4zM4 8l4-4h12l-4 4M16 8l4-4v12l-4 4"/><path d="M4 8l4-4h12l-4 4z" fill="currentColor" fill-opacity=".35"/></svg>Top</button></div></div></section>
+        <section class="v3-fxs" data-k="fx"><div class="v3-fxh"><span><i class="v3-chev"></i>Effects</span><button class="v3-chip" id="v3-fxstop">Stop</button></div><div class="v3-fxb">
         <div class="v3-fxg">${Object.entries(FX).map(([k, f]) => `<button class="v3-fxc" data-fx="${k}"><svg viewBox="0 0 24 24">${f.icon}</svg>${f.name}</button>`).join('')}</div>
         <div class="v3-fxr" data-u="speed"><span>Speed</span><input class="v3-range" id="v3-fxs" type="range" min="0.25" max="3" step="0.05"><b id="v3-fxsv"></b></div>
         <div class="v3-fxr" data-u="range"><span>Swing</span><input class="v3-range" id="v3-fxr" type="range" min="10" max="120" step="1"><b id="v3-fxrv"></b></div>
         <div class="v3-fxr" data-u="zoom"><span>Zoom</span><input class="v3-range" id="v3-fxz" type="range" min="10" max="60" step="1"><b id="v3-fxzv"></b></div>
-        <div class="v3-fxo"><button class="v3-chip" id="v3-fxd"></button><button class="v3-chip" id="v3-fxl"></button></div>`;
+        <div class="v3-fxo"><button class="v3-chip" id="v3-fxd"></button><button class="v3-chip" id="v3-fxl"></button></div></div></section>
+        <section class="v3-fxs" data-k="dof"><div class="v3-fxh"><span><i class="v3-chev"></i>Depth of field</span><button class="v3-chip" id="v3-dof"></button></div><div class="v3-fxb">
+        <div class="v3-fxr v3-dr"><span>Blur</span><input class="v3-range" id="v3-dofa" type="range" min="5" max="100" step="1"><b id="v3-dofav"></b></div>
+        <div class="v3-fxr v3-dr"><span>Sharp zone</span><input class="v3-range" id="v3-dofz" type="range" min="0" max="100" step="1"><b id="v3-dofzv"></b></div>
+        <div class="v3-fxo v3-dr"><button class="v3-chip" id="v3-dofp">Pick focus point</button><button class="v3-chip" id="v3-dofc">Centre</button></div></div></section>`;
+    // each block folds on its own, so the product can be seen; the choice is remembered
+    let closed = []; try { closed = JSON.parse(localStorage.getItem('kk-fx-closed') || '[]'); } catch (e) {}
+    box.querySelectorAll('.v3-fxs').forEach(sc => sc.classList.toggle('closed', closed.includes(sc.dataset.k)));
     box.onpointerdown = e => e.stopPropagation();
     box.onclick = e => {
+        const hd = e.target.closest('.v3-fxh');
+        if (hd && !e.target.closest('button')) {
+            const sc = hd.parentElement; sc.classList.toggle('closed');
+            try { localStorage.setItem('kk-fx-closed', JSON.stringify([...box.querySelectorAll('.v3-fxs.closed')].map(x => x.dataset.k))); } catch (err) {}
+            return;
+        }
         const cb = e.target.closest('[data-cam]'); if (cb) { goCamera(cb.dataset.cam); return; }
         const c = e.target.closest('[data-fx]'); if (!c) return;
         if (S.fx.name === c.dataset.fx) fxStop(); else fxStart(c.dataset.fx);
@@ -6496,16 +6536,35 @@ function buildFxUI() {
     document.getElementById('v3-fxd').onclick = () => { S.fx.dir = -S.fx.dir; restart(); };
     document.getElementById('v3-fxl').onclick = () => { S.fx.loop = !S.fx.loop; restart(); };
     document.getElementById('v3-fxstop').onclick = fxStop;
+    const dofChanged = () => { if (R) R.dirty = true; syncFx(); };
+    document.getElementById('v3-dof').onclick = () => { S.dof.on = !S.dof.on; S.dof.pick = S.dof.on && !S.dof.p; if (S.dof.on) R.dofShowUntil = performance.now() + 1200; dofChanged(); };
+    document.getElementById('v3-dofa').oninput = e => { S.dof.amount = e.target.value / 100; dofChanged(); };
+    document.getElementById('v3-dofz').oninput = e => { S.dof.zone = e.target.value / 100; dofChanged(); };
+    document.getElementById('v3-dofp').onclick = () => { S.dof.pick = !S.dof.pick; dofChanged(); };
+    document.getElementById('v3-dofc').onclick = () => { S.dof.p = null; S.dof.pick = false; dofChanged(); };
 }
 function syncFx() {
     const $ = id => document.getElementById(id); if (!$('v3-fx')) return;
     const f = S.fx, def = FX[f.name];
-    $('v3-fxbtn').classList.toggle('on', !!f.name);
+    const menuOpen = $('v3-fx').classList.contains('show');
+    $('v3-fxbtn').classList.toggle('on', menuOpen);
+    $('v3-fxbtn').classList.toggle('run', !!f.name);
+    $('v3-fxbtn').classList.toggle('stopmode', !!f.name && !menuOpen);
+    $('v3-fxbtn').title = f.name && !menuOpen ? 'Stop camera effect' : 'Camera effects';
     document.querySelectorAll('#v3-fx .v3-fxc').forEach(b => b.classList.toggle('on', b.dataset.fx === f.name));
     $('v3-fxs').value = f.speed; $('v3-fxsv').textContent = f.speed.toFixed(2).replace(/0$/, '') + '×';
     $('v3-fxr').value = f.range; $('v3-fxrv').textContent = f.range + '°';
     $('v3-fxz').value = f.zoom; $('v3-fxzv').textContent = f.zoom + '%';
-    document.querySelectorAll('#v3-fx .v3-fxr').forEach(r => r.classList.toggle('off', !!def && !def.uses.includes(r.dataset.u)));
+    document.querySelectorAll('#v3-fx .v3-fxr[data-u]').forEach(r => r.classList.toggle('off', !!def && !def.uses.includes(r.dataset.u)));
+    const dd = S.dof;
+    $('v3-dof').textContent = dd.on ? 'On' : 'Off'; $('v3-dof').classList.toggle('on', dd.on);
+    $('v3-dofa').value = Math.round(dd.amount * 100); $('v3-dofav').textContent = Math.round(dd.amount * 100) + '%';
+    $('v3-dofz').value = Math.round(dd.zone * 100); $('v3-dofzv').textContent = Math.round(dd.zone * 100) + '%';
+    document.querySelectorAll('#v3-fx .v3-dr').forEach(e => e.classList.toggle('off', !dd.on));
+    $('v3-dofp').textContent = dd.pick ? 'Tap the product…' : (dd.p ? 'Change focus point' : 'Pick focus point'); $('v3-dofp').classList.toggle('on', dd.pick);
+    $('v3-dofc').style.opacity = dd.p ? 1 : 0.35;
+    $('v3d-view').classList.toggle('picking', dd.on && dd.pick);
+    if (!dd.on && R && R.dof) dofFree();
     $('v3-fxd').textContent = f.dir > 0 ? 'Clockwise' : 'Counter-clockwise'; $('v3-fxd').style.opacity = !def || def.uses.includes('dir') ? 1 : 0.35;
     $('v3-fxl').textContent = f.loop ? 'Loop: on' : 'Loop: off'; $('v3-fxl').classList.toggle('on', f.loop);
 }
@@ -6513,7 +6572,7 @@ function syncFx() {
 function syncUI() {
     const $ = id => document.getElementById(id);
     syncFx();
-    document.querySelectorAll('#v3-cams .v3-chip').forEach(b => b.classList.toggle('on', b.dataset.cam === S.cam));
+    document.querySelectorAll('#v3-cams [data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === S.cam));
     objUI();
     $('v3-cols').innerHTML = swatchesHTML();
     $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c || null; applyMaterial(); syncUI(); };
@@ -6617,6 +6676,13 @@ function initRuntime() {
     controls.minAzimuthAngle = -Math.PI / 2; controls.maxAzimuthAngle = Math.PI / 2;      // never behind the wall
     controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI * 0.62;
     controls.autoRotate = false;
+    // a short tap on the product sets the focus point while "Pick focus point" is armed
+    let tap = null;
+    renderer.domElement.addEventListener('pointerdown', e => { tap = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    renderer.domElement.addEventListener('pointerup', e => {
+        const t0 = tap; tap = null;
+        if (R && R.model && S.dof.on && S.dof.pick && t0 && Math.hypot(e.clientX - t0.x, e.clientY - t0.y) < 8 && performance.now() - t0.t < 600) dofPick(e.clientX, e.clientY);
+    });
     controls.addEventListener('change', () => { if (R) R.dirty = true; });
     controls.addEventListener('end', () => { if (R) R.dragging = false; });
     // Turning or zooming by hand does not stop an effect: it waits while the model is moved and carries on from the new position.
@@ -6629,6 +6695,108 @@ function initRuntime() {
     wall.receiveShadow = true; scene.add(wall);
     R = { renderer, scene, camera, controls, light, wall, pmrem: new T.PMREMGenerator(renderer), envs: {}, material: new T.MeshStandardMaterial({ side: T.DoubleSide }), brush: makeBrushTexture(), model: null, pieces: [], strips: [], mask: null, raf: 0, last: 0, dirty: true, lite, slow: 0, fr: 0 };
     resize();
+}
+
+// ---------------------------------------------------------------- depth of field
+// The scene is drawn into a colour target (linear light, shadows included) and a depth target; a final pass blurs every pixel by its distance
+// from the focus point (a tapped spot on the product), then applies tone mapping and colour space like the normal screen draw.
+const DOF_FRAG = `
+#include <common>
+#include <packing>
+uniform sampler2D tColor; uniform sampler2D tDepth;
+uniform vec2 texel; uniform float cNear, cFar, fd, zone, ramp, maxR;
+varying vec2 vUv;
+float distAt(vec2 uv) { return -perspectiveDepthToViewZ(unpackRGBAToDepth(texture2D(tDepth, uv)), cNear, cFar); }
+float cocOf(float d) { return maxR * smoothstep(0.0, 1.0, (abs(d - fd) - zone) / ramp); }
+void main() {
+    vec3 sum = texture2D(tColor, vUv).rgb; float ws = 1.0;
+    float c0 = cocOf(distAt(vUv));
+    if (c0 > 0.6) {
+        float ang0 = 6.2831853 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        for (int i = 0; i < TAPS; i++) {
+            float fi = float(i);
+            float rad = sqrt((fi + 0.5) / float(TAPS)) * c0;
+            float a = fi * 2.39996323 + ang0;
+            vec2 uv = vUv + vec2(cos(a), sin(a)) * rad * texel;
+            float w = clamp(cocOf(distAt(uv)) - rad + 1.0, 0.0, 1.0);
+            sum += texture2D(tColor, uv).rgb * w; ws += w;
+        }
+    }
+    gl_FragColor = vec4(sum / ws, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+}`;
+function dofFree() {
+    const d = R && R.dof; if (!d) return;
+    d.col.dispose(); d.dep.dispose(); d.depthMat.dispose(); d.mat.dispose(); d.quad.geometry.dispose();
+    R.dof = null;
+}
+function dofBuild(w, h) {
+    const r = R.renderer, ex = r.extensions;
+    const hdr = ex.has('EXT_color_buffer_float') || ex.has('EXT_color_buffer_half_float');
+    const col = new T.WebGLRenderTarget(w, h, { type: hdr ? T.HalfFloatType : T.UnsignedByteType, samples: (R.lite || w * h > 2.6e6) ? 0 : 4 });
+    const dep = new T.WebGLRenderTarget(w, h, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+    const depthMat = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking, side: T.DoubleSide });
+    const mat = new T.ShaderMaterial({
+        defines: { TAPS: R.lite ? 20 : 32 },
+        uniforms: { tColor: { value: col.texture }, tDepth: { value: dep.texture }, texel: { value: new T.Vector2(1 / w, 1 / h) },
+                    cNear: { value: 1 }, cFar: { value: 1e5 }, fd: { value: 1 }, zone: { value: 1 }, ramp: { value: 1 }, maxR: { value: 1 } },
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+        fragmentShader: DOF_FRAG, depthTest: false, depthWrite: false
+    });
+    const quad = new T.Mesh(new T.PlaneGeometry(2, 2), mat); quad.frustumCulled = false;
+    const scene = new T.Scene(); scene.add(quad);
+    return { w, h, col, dep, depthMat, mat, quad, scene, cam: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+}
+function dofFocusPoint() { return S.dof.p ? new T.Vector3(...S.dof.p) : new T.Vector3(...R.fit.c); }
+function dofRender() {
+    const r = R.renderer, sc = R.scene, cam = R.camera;
+    const sz = r.getDrawingBufferSize(new T.Vector2()), w = Math.round(sz.x), h = Math.round(sz.y);
+    let d = R.dof;
+    if (!d || d.w !== w || d.h !== h) { dofFree(); d = R.dof = dofBuild(w, h); }
+    const bg = sc.background, sa = r.shadowMap.autoUpdate, cc = r.getClearColor(new T.Color()), ca = r.getClearAlpha();
+    try {
+        r.setRenderTarget(d.col); r.render(sc, cam);
+        sc.background = null; sc.overrideMaterial = d.depthMat; r.shadowMap.autoUpdate = false; r.setClearColor(0xffffff, 1);
+        r.setRenderTarget(d.dep); r.render(sc, cam);
+    } finally {
+        sc.background = bg; sc.overrideMaterial = null; r.shadowMap.autoUpdate = sa; r.setClearColor(cc, ca); r.setRenderTarget(null);
+    }
+    cam.updateMatrixWorld();
+    const dir = cam.getWorldDirection(new T.Vector3()), fd = Math.max(1, dofFocusPoint().sub(cam.position).dot(dir));
+    const dim = R.fit.dim, u = d.mat.uniforms;
+    u.cNear.value = cam.near; u.cFar.value = cam.far; u.fd.value = fd;
+    u.zone.value = (0.02 + S.dof.zone * 0.4) * dim; u.ramp.value = dim * 0.7;
+    u.maxR.value = S.dof.amount * 0.026 * h;
+    r.render(d.scene, d.cam);
+}
+// every draw of the 3D view goes through here, so pictures and the screen agree
+function drawScene() {
+    if (S.dof.on && S.dof.amount > 0.02) {
+        try { dofRender(); dofMarker(); return; }
+        catch (err) { console.error(err); dofFree(); S.dof.on = false; S.dof.pick = false; syncFx(); note('Depth of field is not supported on this device.'); }
+    }
+    R.renderer.render(R.scene, R.camera);
+    dofMarker();
+}
+function dofMarker() {
+    const el = document.getElementById('v3-focus'); if (!el) return;
+    const show = S.dof.on && R.dofShowUntil > performance.now() || (S.dof.on && document.getElementById('v3-fx').classList.contains('show'));
+    if (!show) { el.style.display = 'none'; return; }
+    const v = dofFocusPoint().project(R.camera), host = document.getElementById('v3d-view');
+    if (v.z > 1) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.style.left = ((v.x + 1) / 2 * host.clientWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * host.clientHeight) + 'px';
+}
+function dofPick(cx, cy) {
+    const el = R.renderer.domElement, b = el.getBoundingClientRect();
+    const rc = new T.Raycaster(); rc.setFromCamera(new T.Vector2((cx - b.left) / b.width * 2 - 1, -((cy - b.top) / b.height) * 2 + 1), R.camera);
+    R.model.updateMatrixWorld(true);
+    const hit = rc.intersectObject(R.model, true)[0];
+    if (!hit) { note('Tap the product to set where the picture is sharp.'); return; }
+    S.dof.p = hit.point.toArray(); S.dof.pick = false; R.dofShowUntil = performance.now() + 1200;
+    R.dirty = true; syncFx();
+    setTimeout(() => { if (R) R.dirty = true; }, 1300);
 }
 
 function resize() {
@@ -6664,7 +6832,7 @@ function loop(now) {
     // draw only when something changes (animation, camera, auto-rotate, a new look): an idle view costs no battery
     if (S.playing || R.fxRun || moved || R.dirty) {
         R.dirty = false;
-        R.renderer.render(R.scene, R.camera);
+        drawScene();
         // too slow on this device: fall back to 1x resolution once
         if (R.renderer.getPixelRatio() > 1 && (S.playing || R.fxRun)) {
             R.fr++; if (dt > 0.034) R.slow++;
