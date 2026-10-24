@@ -451,7 +451,7 @@
         /* floats over the page, so the Products section below never moves */
         #new-canvas-modal { --tpl-bg: #f7f7f7; }
         [data-theme="dark"] #new-canvas-modal { --tpl-bg: #2a2a2a; }
-        .tpl-menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; max-height: 316px; overflow-y: auto; padding: 4px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--tpl-bg); box-shadow: 0 12px 32px rgba(0,0,0,0.22); scrollbar-width: thin; }
+        .tpl-menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; max-height: min(460px, calc(100vh - 160px)); overflow-y: auto; overscroll-behavior: contain; padding: 4px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--tpl-bg); box-shadow: 0 12px 32px rgba(0,0,0,0.22); scrollbar-width: thin; }
         .tpl-select.open .tpl-menu { display: block; }
         .tpl-group { padding: 8px 10px 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
         .tpl-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
