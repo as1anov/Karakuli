@@ -6398,7 +6398,9 @@ function ensureCss() {
     .v3-fxc.on { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
     .v3-fxr { display: grid; grid-template-columns: 62px 1fr 44px; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 11px; font-weight: 600; }
     .v3-fxr.off { opacity: 0.35; pointer-events: none; }
-    #v3-focus { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.35); pointer-events: none; display: none; z-index: 3; }
+    #v3-focus { pointer-events: auto; cursor: grab; touch-action: none; }
+    #v3-focus.grab { cursor: grabbing; transform: scale(1.15); }
+    #v3-focus { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.35); display: none; z-index: 3; }
     #v3-focus::after { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
     #v3d-view.picking canvas { cursor: crosshair; }
     .v3-fxr b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -6785,8 +6787,27 @@ function dofMarker() {
     if (!show) { el.style.display = 'none'; return; }
     const v = dofFocusPoint().project(R.camera), host = document.getElementById('v3d-view');
     if (v.z > 1) { el.style.display = 'none'; return; }
-    el.style.display = 'block';
+    el.style.display = 'block'; dofDragInit();
     el.style.left = ((v.x + 1) / 2 * host.clientWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * host.clientHeight) + 'px';
+}
+function dofHit(cx, cy) {
+    const el = R.renderer.domElement, b = el.getBoundingClientRect();
+    const rc = new T.Raycaster(); rc.setFromCamera(new T.Vector2((cx - b.left) / b.width * 2 - 1, -((cy - b.top) / b.height) * 2 + 1), R.camera);
+    R.model.updateMatrixWorld(true);
+    return rc.intersectObject(R.model, true)[0] || null;
+}
+// the focus ring can be held and dragged over the product
+function dofDragInit() {
+    const el = document.getElementById('v3-focus'); if (!el || el.dataset.drag) return; el.dataset.drag = 1;
+    let on = false;
+    el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); on = true; el.setPointerCapture(e.pointerId); el.classList.add('grab'); });
+    el.addEventListener('pointermove', e => {
+        if (!on || !R || !R.model) return;
+        const h = dofHit(e.clientX, e.clientY); if (!h) return;
+        S.dof.p = h.point.toArray(); S.dof.pick = false; R.dirty = true;
+    });
+    const end = () => { if (!on) return; on = false; el.classList.remove('grab'); syncFx(); };
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
 }
 function dofPick(cx, cy) {
     const el = R.renderer.domElement, b = el.getBoundingClientRect();
