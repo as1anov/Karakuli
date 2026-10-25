@@ -2511,10 +2511,13 @@ service cloud.firestore {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const W = (typeof width === 'number' && width > 0) ? width : window.innerWidth;
             const H = (typeof height === 'number' && height > 0) ? height : window.innerHeight;
-            const pad = 40, labelRoom = 0;
-            const z = Math.min((W - 2 * pad - labelRoom) / wPx, (H - 2 * pad) / hPx);
+            // On the web the side labels must stay visible: keep room for them on the left, but still centre on the product alone
+            // (the same room is kept on the right, so the product stays exactly in the middle). On phones the labels are not counted.
+            const web = !((window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768);
+            const pad = 40, labelRoom = web ? 110 : 0;
+            const z = Math.min((W - 2 * (pad + labelRoom)) / wPx, (H - 2 * pad) / hPx);
             zoom = Math.max(0.05, Math.min(2, z));
-            offsetX = W / 2 + labelRoom / 2;
+            offsetX = W / 2;
             offsetY = H / 2;
         }
 
