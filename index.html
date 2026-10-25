@@ -12,7 +12,7 @@
         :root {
             --bg-color: #e8e8e8;
             --canvas-bg: #e8e8e8;
-            --panel-bg: rgba(188, 188, 188, 0.82); 
+            --panel-bg: rgba(214, 214, 214, 0.94); 
             --text-color: #000000; 
             --icon-color: #000000;
             --kbd-text-color: #6D6E71;
@@ -48,7 +48,7 @@
         [data-theme="dark"] {
             --bg-color: #111111;
             --canvas-bg: #111111;
-            --panel-bg: rgba(34, 34, 34, 0.8);
+            --panel-bg: rgba(23, 23, 23, 0.92);
             --text-color: #E8E8E8;
             --icon-color: #E8E8E8;
             --ui-accent: rgba(255, 255, 255, 0.1);
@@ -74,9 +74,7 @@
 
         button, input, select, textarea { font-family: inherit; }
 
-        /* Square icon buttons are drawn without an outline: only the soft fill shows */
-        .control-btn, .nc-close, .swap-btn, .tl-action-btn, #v3-fxbtn, #v3-play { border-color: transparent !important; }
-        .control-btn.glass-panel { border-color: transparent !important; }
+        /* Square icon buttons carry the same thin outline as the Navigation / Drawing button */
 
         html, body {
             margin: 0; padding: 0;
