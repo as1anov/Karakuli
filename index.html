@@ -6,9 +6,7 @@
     <title>Karakuli: Digital Editor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         :root {
@@ -27,7 +25,7 @@
             --draw-cursor-color: #404040; 
             --active-key-color: #000000;
             --border-radius: 12px;
-            --main-font: 'Sora', sans-serif;
+            --main-font: 'Sora', 'Helvetica Neue', Arial, sans-serif;
             --header-height: 43px;
             --dot-color: 0, 0, 0;
             --dot-opacity: 0.25; 
@@ -73,6 +71,12 @@
             box-sizing: border-box;
             touch-action: none; 
         }
+
+        button, input, select, textarea { font-family: inherit; }
+
+        /* Square icon buttons are drawn without an outline: only the soft fill shows */
+        .control-btn, .nc-close, .swap-btn, .tl-action-btn, #v3-fxbtn, #v3-play { border-color: transparent !important; }
+        .control-btn.glass-panel { border-color: transparent !important; }
 
         html, body {
             margin: 0; padding: 0;
@@ -2502,12 +2506,12 @@ service cloud.firestore {
             setTimeout(refit, 400);
         }
 
-        // Shows the whole sheet at once (full size of the template, with room for the left-hand labels).
+        // Shows the whole sheet at once, exactly in the middle of the screen (only the product counts: the side labels and lines do not move it).
         function fitCanvasToView() {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const W = (typeof width === 'number' && width > 0) ? width : window.innerWidth;
             const H = (typeof height === 'number' && height > 0) ? height : window.innerHeight;
-            const pad = 40, labelRoom = templateKind() === 'product' ? 90 : 0;
+            const pad = 40, labelRoom = 0;
             const z = Math.min((W - 2 * pad - labelRoom) / wPx, (H - 2 * pad) / hPx);
             zoom = Math.max(0.05, Math.min(2, z));
             offsetX = W / 2 + labelRoom / 2;
@@ -4096,6 +4100,11 @@ service cloud.firestore {
             const G = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
             return { cx: (b.lo + b.hi) / 2, y0: (-hPx / 2 + G.anchor * MM) / STEP };
         }
+        // Only the hook itself repeats: what lies on the arm, from the anchor line down. The pattern of the plate above stays as drawn.
+        function hookArmContent(b) {
+            const y0 = armZone(b).y0 - 0.6, k = hookContent(b);
+            return { segs: k.segs.filter(sg => sg.p1.y >= y0 && sg.p2.y >= y0), sp: k.sp.filter(id => +id.split(',')[1] >= y0) };
+        }
         function armSteps(b) {
             const z = armZone(b), inZ = q => Math.abs(q.x - z.cx) <= 0.6 && q.y >= z.y0 - 0.6;
             return segments.filter(sg => inZ(sg.p1) && inZ(sg.p2)).length;
@@ -4104,7 +4113,7 @@ service cloud.firestore {
         function hookSource() {
             const bands = hookBands(); if (!bands || bands.length < 2) return -1;
             const filled = [];
-            bands.forEach((b, i) => { const k = hookContent(b); if (k.segs.length + k.sp.length) filled.push(i); });
+            bands.forEach((b, i) => { const k = hookArmContent(b); if (k.segs.length + k.sp.length) filled.push(i); });
             return filled.length === 1 && armSteps(bands[filled[0]]) >= HOOK_MIN_STEPS ? filled[0] : -1;
         }
         // the cursor is in the arm zone of that hook (the plus only appears while you draw there, from either end)
@@ -4155,7 +4164,7 @@ service cloud.firestore {
             let el = hookAuto.el;
             if (!el) {
                 el = hookAuto.el = document.createElement('button');
-                el.id = 'hook-auto'; el.type = 'button'; el.title = 'Draw this pattern on all the other hooks (H)'; el.setAttribute('aria-label', 'Draw this pattern on all the other hooks');
+                el.id = 'hook-auto'; el.type = 'button'; el.title = 'Draw this hook on all the other hooks (H)'; el.setAttribute('aria-label', 'Draw this hook on all the other hooks');
                 el.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
                 el.addEventListener('pointerdown', e => e.stopPropagation());
                 el.addEventListener('click', e => { e.stopPropagation(); autoDrawHooks(); });
@@ -4177,7 +4186,7 @@ service cloud.firestore {
         function autoDrawHooks() {
             if (!hookAutoAllowed()) return;
             const src = hookSource(); if (src < 0) return;
-            const bands = hookBands(), sb = bands[src], k = hookContent(sb);
+            const bands = hookBands(), sb = bands[src], k = hookArmContent(sb);
             const order = bands.map((b, i) => i).filter(i => i !== src).sort((a, b) => Math.abs(a - src) - Math.abs(b - src) || a - b);
             saveState();   // one undo takes all the copies away
             hookAuto.busy = true; hookAuto.el && hookAuto.el.classList.remove('show');
@@ -4192,7 +4201,7 @@ service cloud.firestore {
             let ji = 0, done = 0;
             const step = () => {
                 const job = jobs[ji];
-                if (!job) { hookAuto.busy = false; hookAuto.sig = null; showActionHint(`Pattern repeated on ${order.length} hooks`); redraw(); return; }
+                if (!job) { hookAuto.busy = false; hookAuto.sig = null; showActionHint(`Hook repeated on ${order.length} hooks`); redraw(); return; }
                 const per = Math.max(1, Math.ceil(job.items.length / perHook)), end = Math.min(job.items.length, done + per);
                 for (; done < end; done++) {
                     const it = job.items[done];
@@ -4283,15 +4292,15 @@ service cloud.firestore {
             };
         }
 
-        // Drawing font: Unbounded from Google Fonts. An SVG used as an image cannot load web fonts, so the font
+        // Drawing font: Sora from Google Fonts. An SVG used as an image cannot load web fonts, so the font
         // files are fetched once and embedded (base64) into the exported SVG / PNG; offline it falls back to monospace.
-        const DRAWING_FONT = "'Unbounded', Arial, Helvetica, sans-serif";
+        const DRAWING_FONT = "'Sora', Arial, Helvetica, sans-serif";
         let drawingFontCss = '';
         async function getDrawingFontCss() {
             if (drawingFontCss) return drawingFontCss;
             try {
                 const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
-                let css = await (await fetch('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&display=swap', { signal: ctl.signal })).text();
+                let css = await (await fetch('https://fonts.googleapis.com/css2?family=Sora:wght@400;600&display=swap', { signal: ctl.signal })).text();
                 const urls = [...new Set([...css.matchAll(/url\((https:[^)]+)\)/g)].map(m => m[1]))];
                 for (const u of urls) {
                     const blob = await (await fetch(u, { signal: ctl.signal })).blob();
@@ -4300,7 +4309,7 @@ service cloud.firestore {
                 }
                 clearTimeout(t);
                 drawingFontCss = css;
-            } catch (err) { console.warn('Unbounded could not be loaded, using a fallback font', err); }
+            } catch (err) { console.warn('Sora could not be loaded, using a fallback font', err); }
             return drawingFontCss;
         }
 
@@ -4897,7 +4906,7 @@ async function exportGLB() {
         const box = new T.Box3().setFromObject(model), c = box.getCenter(new T.Vector3()), k = 0.001;
         const m0 = MATS[S.mat], em = R.material.clone();
         em.roughnessMap = null; em.bumpMap = null; em.name = `${m0.name} ${S.t} mm`; em.roughness = m0.brushed ? Math.min(1, m0.rough + 0.1) : m0.rough;
-        model.traverse(o => { if (o.isMesh) { mats.push([o, o.material]); o.material = em; } });
+        model.traverse(o => { if (o.isMesh) { mats.push([o, o.material]); o.material = em; if (o.userData.blend) { o.userData.wasVisible = o.visible; o.visible = false; } } });
         const root = new T.Group(); root.name = 'Karakuli';
         root.scale.setScalar(k); root.position.set(-c.x * k, -box.min.y * k, -c.z * k);
         R.scene.remove(model); root.add(model);
@@ -4909,7 +4918,7 @@ async function exportGLB() {
     } catch (err) {
         console.error(err); note('The GLB file could not be made: ' + (err && err.message || err));
     } finally {
-        mats.forEach(([o, m]) => { o.material = m; });
+        mats.forEach(([o, m]) => { o.material = m; if (o.userData.blend) o.visible = true; });
         S.fold = fold0; if (R.model) updatePose(); syncUI();
         btn.innerHTML = label; btn.disabled = false;
     }
@@ -6059,7 +6068,7 @@ async function buildModel() {
             const ta = pickRun(top, x0, x1) || [x0, x1], tb = pickRun(bot, x0, x1) || [x0, x1];
             return makeStrip(ta[0] / ppm, ta[1] / ppm, tb[0] / ppm, tb[1] / ppm);   // left / right end at the upper piece, then at the lower one
         });
-        list.forEach(s => model.add(s.mesh));
+        list.forEach(s => { model.add(s.mesh); model.add(s.mesh2); });
         R.strips.push(list);
     });
     // Wall mount, exactly as drawn: a barrel 26 x 11.6 mm is screwed to the wall, the product sits on its end (hole over the barrel),
@@ -6091,19 +6100,40 @@ async function buildModel() {
 }
 
 const ARC_SEG = 14;
+// A bend is drawn in two layers over the same surface. The lower layer is lit with the normal of the upper flat piece, the upper layer with the
+// normal of the lower flat piece and fades in from 0 to 1 across the bend. So the colour on a bend is exactly the colour of the piece above
+// blended into the colour of the piece below (reflections included, from any camera angle): no brighter or darker band in between.
 function makeStrip(xa0, xa1, xb0, xb1) {
-    const geo = new T.BufferGeometry();
     const nv = ARC_SEG * 24;
+    const geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.BufferAttribute(new Float32Array(nv * 3), 3));
     geo.setAttribute('normal', new T.BufferAttribute(new Float32Array(nv * 3), 3));
     geo.setAttribute('uv', new T.BufferAttribute(new Float32Array(nv * 2), 2));
     const mesh = new T.Mesh(geo, R.material);
     mesh.castShadow = mesh.receiveShadow = true; mesh.frustumCulled = false;
-    return { mesh, xa0, xa1, xb0, xb1 };
+    const geo2 = new T.BufferGeometry();
+    geo2.setAttribute('position', geo.attributes.position);
+    geo2.setAttribute('uv', geo.attributes.uv);
+    geo2.setAttribute('normal', new T.BufferAttribute(new Float32Array(nv * 3), 3));
+    geo2.setAttribute('color', new T.BufferAttribute(new Float32Array(nv * 4), 4));
+    if (!R.stripMat) { R.stripMat = R.material.clone(); syncStripMat(); }
+    const mesh2 = new T.Mesh(geo2, R.stripMat);
+    mesh2.castShadow = false; mesh2.receiveShadow = true; mesh2.frustumCulled = false; mesh2.renderOrder = 1; mesh2.userData.blend = true;
+    return { mesh, mesh2, xa0, xa1, xb0, xb1 };
+}
+
+function syncStripMat() {
+    const sm = R.stripMat; if (!sm) return;
+    sm.copy(R.material);
+    sm.transparent = true; sm.vertexColors = true; sm.depthWrite = false;
+    sm.polygonOffset = true; sm.polygonOffsetFactor = -1; sm.polygonOffsetUnits = -1;
+    sm.needsUpdate = true;
 }
 
 function updateStrip(strip, arc, t) {
-    const pos = strip.mesh.geometry.attributes.position.array, nor = strip.mesh.geometry.attributes.normal.array, uv = strip.mesh.geometry.attributes.uv.array;
+    const g1 = strip.mesh.geometry, g2 = strip.mesh2.geometry;
+    const pos = g1.attributes.position.array, nor = g1.attributes.normal.array, uv = g1.attributes.uv.array;
+    const nor2 = g2.attributes.normal.array, col = g2.attributes.color.array;
     const pts = [];
     for (let k = 0; k <= ARC_SEG; k++) {
         const u = k / ARC_SEG, phi = arc.phi * u;
@@ -6116,10 +6146,13 @@ function updateStrip(strip, arc, t) {
         }
         pts.push({ Py, Pz, Ny: Tz, Nz: -Ty, s: arc.len * u });
     }
+    const nA = pts[0], nB = pts[ARC_SEG];
     let v = 0;
-    const put = (x, Y, Z, nx, ny, nz, s) => {
+    const put = (x, Y, Z, n1, n2, a, s) => {
         pos[3 * v] = x; pos[3 * v + 1] = Y; pos[3 * v + 2] = Z;
-        nor[3 * v] = nx; nor[3 * v + 1] = ny; nor[3 * v + 2] = nz;
+        nor[3 * v] = n1[0]; nor[3 * v + 1] = n1[1]; nor[3 * v + 2] = n1[2];
+        nor2[3 * v] = n2[0]; nor2[3 * v + 1] = n2[1]; nor2[3 * v + 2] = n2[2];
+        col[4 * v] = col[4 * v + 1] = col[4 * v + 2] = 1; col[4 * v + 3] = a;
         uv[2 * v] = x; uv[2 * v + 1] = s; v++;
     };
     const ht = t / 2;
@@ -6129,20 +6162,22 @@ function updateStrip(strip, arc, t) {
         const xl = p => strip.xa0 + (strip.xb0 - strip.xa0) * (p.s / arc.len), xr = p => strip.xa1 + (strip.xb1 - strip.xa1) * (p.s / arc.len);   // edges follow the neighbouring pieces
         [1, -1].forEach(sd => {     // the two faces of the sheet
             const a0 = A(a, sd), b0 = A(b, sd);
+            const n1 = [0, sd * nA.Ny, sd * nA.Nz], n2 = [0, sd * nB.Ny, sd * nB.Nz];
             // counter-clockwise seen from outside: the +side face needs the reverse vertex order of the -side face
             const A0 = [xl(a), a0, a], A1 = [xr(a), a0, a], B0 = [xl(b), b0, b], B1 = [xr(b), b0, b];
-            const tri = (u, w, z) => [u, w, z].forEach(([x, q, r]) => put(x, q[0], q[1], 0, sd * r.Ny, sd * r.Nz, r.s));
+            const tri = (u, w, z) => [u, w, z].forEach(([x, q, r]) => { const f = r.s / arc.len; put(x, q[0], q[1], n1, n2, f * f * (3 - 2 * f), r.s); });
             if (sd > 0) { tri(A0, B1, A1); tri(A0, B0, B1); } else { tri(A0, A1, B1); tri(A0, B1, B0); }
         });
-        [[xl, -1], [xr, 1]].forEach(([xf, nx]) => {    // the two cut ends (they follow the edge, so the normal leans slightly)
+        [[xl, -1], [xr, 1]].forEach(([xf, nx]) => {    // the two cut ends: only in the lower layer (the upper one is invisible there)
             const a1 = A(a, 1), a2 = A(a, -1), b1 = A(b, 1), b2 = A(b, -1), xa = xf(a), xb = xf(b);
-            const q = (P, s_, x) => put(x, P[0], P[1], nx, 0, 0, s_);
+            const nn = [nx, 0, 0];
+            const q = (P, s_, x) => put(x, P[0], P[1], nn, nn, 0, s_);
             if (nx < 0) { q(a1, a.s, xa); q(a2, a.s, xa); q(b2, b.s, xb); q(a1, a.s, xa); q(b2, b.s, xb); q(b1, b.s, xb); }
             else { q(a1, a.s, xa); q(b2, b.s, xb); q(a2, a.s, xa); q(a1, a.s, xa); q(b1, b.s, xb); q(b2, b.s, xb); }
         });
     }
-    const g = strip.mesh.geometry;
-    g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.uv.needsUpdate = true;
+    g1.attributes.position.needsUpdate = g1.attributes.normal.needsUpdate = g1.attributes.uv.needsUpdate = true;
+    g2.attributes.normal.needsUpdate = g2.attributes.color.needsUpdate = true;
 }
 
 function updatePose() {
@@ -6169,6 +6204,7 @@ function applyMaterial() {
     mat.roughnessMap = m.brushed ? R.brush : null;
     mat.bumpMap = m.brushed ? R.brush : null; mat.bumpScale = 0.5;
     mat.needsUpdate = true;
+    syncStripMat();
     if (R.mask) R.weightKg = R.mask.count / (R.mask.ppm * R.mask.ppm) * S.t * m.density / 1e6;
     updateInfo();
 }
@@ -6209,6 +6245,19 @@ function fitCamera() {
 const CAM_DIRS = { persp: [0.42, 0.22, 1], front: [0, 0, 1], side: [1, 0, 0], top: [0, 1, 0.0001] };
 function goCamera(name) {
     if (!R || !R.fit) return;
+    let newC = null;
+    // Frame the product as it is shown now (flat or folded): the fit made when the model was built is for the flat sheet, whose centre and
+    // depth differ from the folded product, so side and top views came out off-centre.
+    if (R.model) {
+        const box = new T.Box3().setFromObject(R.model);
+        const sz3 = box.getSize(new T.Vector3()), c3 = box.getCenter(new T.Vector3());
+        if ([sz3.x, sz3.y, sz3.z, c3.x, c3.y, c3.z].every(isFinite) && sz3.x > 0) {
+            const f0 = R.fit; newC = [c3.x, c3.y, c3.z];
+            const asp = R.camera.aspect || f0.asp;
+            R.fit = { ...f0, c: [c3.x, c3.y, c3.z], sx: sz3.x, sy: sz3.y, sz: sz3.z, asp,
+                      dist: Math.max((sz3.x / 0.6 / 2) / (f0.tanV * asp), (sz3.y / 0.55 / 2) / f0.tanV) + sz3.z };
+        }
+    }
     const f = R.fit, d = CAM_DIRS[name]; if (!d) return;
     const l = Math.hypot(...d), dir = d.map(v => v / l);
     let dist;
@@ -6217,8 +6266,10 @@ function goCamera(name) {
         const w = name === 'side' ? f.sz : f.sx, h = name === 'side' ? f.sy : f.sz;
         dist = Math.max((w / 0.6 / 2) / (f.tanV * f.asp), (h / 0.55 / 2) / f.tanV) + (name === 'side' ? f.sx : f.sy) / 2;
     }
-    const p = R.camera.position, c = f.c, o = [p.x - c[0], p.y - c[1], p.z - c[2]], od = Math.hypot(...o) || 1;
-    R.cam = { from: o.map(v => v / od), fd: od, to: dir, td: dist, t: 0 };
+    const p = R.camera.position, tg = R.controls.target, c = [tg.x, tg.y, tg.z], o = [p.x - c[0], p.y - c[1], p.z - c[2]], od = Math.hypot(...o) || 1;
+    const from = o.map(v => v / od), ang = Math.acos(Math.max(-1, Math.min(1, from[0] * dir[0] + from[1] * dir[1] + from[2] * dir[2])));
+    // a longer turn takes longer; the centre of view, the direction and the distance all glide together
+    R.cam = { from, fd: od, to: dir, td: dist, t: 0, c0: c, c1: newC || f.c, ang, dur: Math.max(0.9, Math.min(2, 0.85 + ang * 0.55)) };
     fxStop(); S.cam = name; syncUI();
 }
 // ---- camera effects: moves of the camera around the product (one button in the bar opens the list and the settings) ----
@@ -6265,10 +6316,16 @@ function stepFx(dt) {
 }
 function stepCamera(dt) {
     const a = R.cam; if (!a) return;
-    a.t = Math.min(1, a.t + dt / 0.7);
-    const k = ease(a.t), c = R.fit.c;
-    let v = a.from.map((x, i) => x + (a.to[i] - x) * k); const l = Math.hypot(...v) || 1; v = v.map(x => x / l);
-    const d = a.fd + (a.td - a.fd) * k;
+    a.t = Math.min(1, a.t + dt / (a.dur || 0.7));
+    const t = a.t, k = t * t * t * (t * (t * 6 - 15) + 10);       // smootherstep: no jerk at the start or the end
+    // direction: slerp along the great circle (constant turning speed), distance: even in proportion, centre: straight line
+    let v;
+    const sa = Math.sin(a.ang || 0);
+    if (sa < 1e-4) v = a.to;
+    else { const w0 = Math.sin((1 - k) * a.ang) / sa, w1 = Math.sin(k * a.ang) / sa; v = a.from.map((x, i) => x * w0 + a.to[i] * w1); }
+    const d = Math.exp(Math.log(a.fd) + (Math.log(a.td) - Math.log(a.fd)) * k);
+    const c = a.c0.map((x, i) => x + (a.c1[i] - x) * k);
+    R.controls.target.set(c[0], c[1], c[2]);
     R.camera.position.set(c[0] + v[0] * d, c[1] + v[1] * d, c[2] + v[2] * d);
     R.dirty = true;
     if (a.t >= 1) R.cam = null;
@@ -6307,6 +6364,9 @@ function ensureCss() {
     #v3d-view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     #v3-price:empty { display: none; }
     #v3d-panel, #v3d-panel * { touch-action: pan-y; }
+    #v3-fx, #v3-fx * { touch-action: pan-y; }
+    #v3-fx { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    #v3-fx input[type=range] { touch-action: pan-y; }
     #v3d-panel { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .v3-tog { width: 100%; margin: 0 0 8px; padding: 0; border: 0; background: none; font-family: var(--main-font); cursor: pointer; align-items: center; gap: 8px; text-align: left; }
     .v3-tog > em { margin-left: auto; display: inline-flex; align-items: center; max-width: 60%; overflow: hidden; white-space: nowrap; }
@@ -6341,6 +6401,11 @@ function ensureCss() {
     .v3-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
     #v3d-title { position: absolute; left: 20px; top: 20px; right: 130px; pointer-events: none; }
     #v3d-title b { display: block; font-size: 15px; font-weight: 700; text-shadow: 0 1px 8px var(--bg-color); }
+    #v3-infot { pointer-events: auto; display: inline-flex; align-items: center; gap: 0; margin: 3px 0 0; padding: 2px 4px 2px 0; border: 0; background: none; color: var(--disabled-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; text-shadow: 0 1px 8px var(--bg-color); }
+    #v3-infot .v3-chev { width: 6px; height: 6px; margin: 0 7px 3px 2px; border: solid currentColor; border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); transition: transform 0.15s; }
+    #v3d-title.fold #v3-infot .v3-chev { transform: rotate(-45deg); margin: 0 8px 0 1px; }
+    #v3d-title.fold #v3-info { display: none; }
+    #v3-info em { display: block; font-style: normal; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
     #v3d-title span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 3px; font-size: 12px; color: var(--disabled-color); text-shadow: 0 1px 8px var(--bg-color); }
     #v3d-close { position: absolute; right: 20px; top: 20px; }
     #v3d-shop { position: absolute; right: 76px; top: 20px; display: none; }
@@ -6448,7 +6513,7 @@ function buildUI() {
     el.id = 'v3d';
     el.innerHTML = `
         <div id="v3d-view"><div id="v3-focus"></div></div>
-        <div id="v3d-title"><b id="v3-name"></b><span id="v3-info"></span></div>
+        <div id="v3d-title"><b id="v3-name"></b><button id="v3-infot" type="button" aria-expanded="true"><i class="v3-chev"></i>Details</button><span id="v3-info"></span></div>
         <div id="v3d-close" class="control-btn glass-panel" onclick="close3D()" title="Close (Esc)"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
         <div id="v3d-shop" class="control-btn glass-panel" title="Prices &amp; options"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
         <div id="v3d-panel" class="v3-glass">
@@ -6482,6 +6547,11 @@ function buildUI() {
     $('v3-ts').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b || +b.dataset.t === S.t) return; S.t = +b.dataset.t; syncUI(); await rebuild(); syncUI(); };
     $('v3d-panel').addEventListener('click', e => { const t = e.target.closest('.v3-tog'); if (t) t.parentElement.classList.toggle('closed'); });
     $('v3d-shop').onclick = openShopEditor;
+    try { if (localStorage.getItem('kk-v3-info') === '0') $('v3d-title').classList.add('fold'); } catch (e) {}
+    $('v3-infot').onclick = () => {
+        const f = $('v3d-title').classList.toggle('fold'); $('v3-infot').setAttribute('aria-expanded', String(!f));
+        try { localStorage.setItem('kk-v3-info', f ? '0' : '1'); } catch (e) {}
+    };
     $('v3-sheet').onclick = () => { const m = $('v3d-panel').classList.toggle('min'); if (!m && window.innerWidth <= 700) $('v3-fx').classList.remove('show'); $('v3d-panel').classList.remove('fxopen'); };
     if (window.innerWidth <= 700) document.querySelectorAll('#v3d-panel .v3-sec[data-sec]').forEach(sc => { if (sc.dataset.sec !== 'mat') sc.classList.add('closed'); });
     $('v3-glb').onclick = exportGLB; $('v3-png').onclick = exportPNG;
@@ -6605,8 +6675,14 @@ function syncUI() {
 function updateInfo() {
     const { key, P, w, h } = modelInfo();
     document.getElementById('v3-name').textContent = P.name;
-    const wt = R && R.weightKg ? ` · ≈ ${R.weightKg.toFixed(R.weightKg < 10 ? 2 : 1)} kg` : '';
-    document.getElementById('v3-info').textContent = `${+w.toFixed(1)} × ${+h.toFixed(1)} mm flat · ${S.t} mm ${MATS[S.mat].name.toLowerCase()}${wt}`;
+    // one fact per line, so nothing is cut off on a narrow screen
+    const lines = [`${+w.toFixed(1)} × ${+h.toFixed(1)} mm flat`, `${S.t} mm ${MATS[S.mat].name.toLowerCase()}`];
+    if (R && R.weightKg) lines.push(`≈ ${R.weightKg.toFixed(R.weightKg < 10 ? 2 : 1)} kg`);
+    try { const nh = productGeom(key, w, h).holes.length; lines.push(`${nh} ${nh === 1 ? 'mounting hole' : 'mounting holes'}`); } catch (e) {}
+    if (P.hooks) { const n = hooksFromWidth(w); lines.push(`${n} ${n === 1 ? 'hook' : 'hooks'}`); }
+    if (R && R.nBends) lines.push(`${R.nBends} ${R.nBends === 1 ? 'bend' : 'bends'}`);
+    if (R && R.mask && R.mask.cutMm) lines.push(`${(R.mask.cutMm / 1000).toFixed(1)} m of cut`);
+    document.getElementById('v3-info').innerHTML = lines.map(t => `<em>${t}</em>`).join('');
     const pr = priceOf(), box = document.getElementById('v3-price'), sec = document.getElementById('v3-price-sec');
     if (!box) return;
     if (!pr) { sec.style.display = 'none'; box.innerHTML = ''; return; }
@@ -6721,20 +6797,26 @@ varying vec2 vUv;
 float distAt(vec2 uv) { return -perspectiveDepthToViewZ(unpackRGBAToDepth(texture2D(tDepth, uv)), cNear, cFar); }
 float cocOf(float d) { return maxR * smoothstep(0.0, 1.0, (abs(d - fd) - zone) / ramp); }
 void main() {
-    vec3 sum = texture2D(tColor, vUv).rgb; float ws = 1.0;
-    float c0 = cocOf(distAt(vUv));
-    if (c0 > 0.6) {
+    vec3 base = texture2D(tColor, vUv).rgb;
+    vec3 sum = base; float ws = 1.0;
+    // the depth map is drawn at double size: the four sub-pixels of this pixel give the edge pixels an in-between blur instead of a stair-step
+    vec2 q = texel * 0.25;
+    float dc = distAt(vUv);
+    float c0 = 0.25 * (cocOf(distAt(vUv + vec2(-q.x, -q.y))) + cocOf(distAt(vUv + vec2(q.x, -q.y))) + cocOf(distAt(vUv + vec2(-q.x, q.y))) + cocOf(distAt(vUv + vec2(q.x, q.y))));
+    if (c0 > 0.05) {
         float ang0 = 6.2831853 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
         for (int i = 0; i < TAPS; i++) {
             float fi = float(i);
             float rad = sqrt((fi + 0.5) / float(TAPS)) * c0;
             float a = fi * 2.39996323 + ang0;
             vec2 uv = vUv + vec2(cos(a), sin(a)) * rad * texel;
-            float w = clamp(cocOf(distAt(uv)) - rad + 1.0, 0.0, 1.0);
+            float ds = distAt(uv);
+            float w = smoothstep(0.0, 1.0, (cocOf(ds) - rad) * 0.5 + 0.5);
+            if (ds > dc) w *= smoothstep(0.0, 2.0, c0);     // a sharper pixel does not take colour from what lies behind it
             sum += texture2D(tColor, uv).rgb * w; ws += w;
         }
     }
-    gl_FragColor = vec4(sum / ws, 1.0);
+    gl_FragColor = vec4(mix(base, sum / ws, smoothstep(0.05, 1.2, c0)), 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
 }`;
@@ -6746,8 +6828,9 @@ function dofFree() {
 function dofBuild(w, h) {
     const r = R.renderer, ex = r.extensions;
     const hdr = ex.has('EXT_color_buffer_float') || ex.has('EXT_color_buffer_half_float');
-    const col = new T.WebGLRenderTarget(w, h, { type: hdr ? T.HalfFloatType : T.UnsignedByteType, samples: (R.lite || w * h > 2.6e6) ? 0 : 4 });
-    const dep = new T.WebGLRenderTarget(w, h, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+    const col = new T.WebGLRenderTarget(w, h, { type: hdr ? T.HalfFloatType : T.UnsignedByteType, samples: R.lite ? (w * h > 2.6e6 ? 0 : 2) : (w * h > 9e6 ? 2 : 4) });
+    const ds2 = w * h > 3e6 ? 1 : 2;
+    const dep = new T.WebGLRenderTarget(w * ds2, h * ds2, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
     const depthMat = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking, side: T.DoubleSide });
     const mat = new T.ShaderMaterial({
         defines: { TAPS: R.lite ? 20 : 32 },
@@ -6758,6 +6841,7 @@ function dofBuild(w, h) {
     });
     const quad = new T.Mesh(new T.PlaneGeometry(2, 2), mat); quad.frustumCulled = false;
     const scene = new T.Scene(); scene.add(quad);
+    dep.texture.generateMipmaps = false;
     return { w, h, col, dep, depthMat, mat, quad, scene, cam: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
 }
 function dofFocusPoint() { return S.dof.p ? new T.Vector3(...S.dof.p) : new T.Vector3(...R.fit.c); }
@@ -6887,6 +6971,9 @@ window.prefetch3D = () => { loadLibs().catch(() => {}); };   // warm the downloa
 async function open3D() {
     if (templateKind() !== 'product') return;
     if (document.body.classList.contains('v3d-open')) return;
+    // The 3D model is made from the finished pattern: a time-lapse stopped halfway shows only part of it, so leave the time-lapse first
+    // (this puts the whole drawing back).
+    try { if (typeof isTimelapseUIOpen !== 'undefined' && isTimelapseUIOpen && typeof toggleTimelapseUI === 'function') toggleTimelapseUI(); } catch (err) { console.warn(err); }
     buildUI();
     document.body.classList.add('v3d-open');
     ui.el.classList.add('show');
@@ -6930,7 +7017,7 @@ function close3D() {
         cancelAnimationFrame(R.raf);
         disposeModel();
         Object.values(R.envs).forEach(t => t.dispose());
-        R.material.dispose(); R.brush.dispose(); R.pmrem.dispose(); R.controls.dispose();
+        R.material.dispose(); if (R.stripMat) R.stripMat.dispose(); R.brush.dispose(); R.pmrem.dispose(); R.controls.dispose();
         R.renderer.dispose(); R.renderer.forceContextLoss && R.renderer.forceContextLoss();
         R.renderer.domElement.remove();
         R = null;
