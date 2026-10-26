@@ -6536,7 +6536,7 @@ function ensureCss() {
     #v3-rail { display: flex; position: absolute; right: 0; top: 0; bottom: 0; width: var(--rw); box-sizing: border-box; flex-direction: column; align-items: center; gap: 8px; padding: 80px 0 80px; border-radius: 0; border-width: 0 0 0 1px; z-index: 3; touch-action: none; }
     #v3-rail.hide { display: none; }
     #v3-rail.v3-glass { background: var(--bg-color); backdrop-filter: none; -webkit-backdrop-filter: none; }
-    #v3-rail button { position: relative; width: 42px; height: 42px; flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 12px; background: transparent; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); cursor: pointer; transition: color 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent; }
+    #v3-rail button { position: relative; box-sizing: border-box; width: 42px; height: 42px; flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border-color); border-radius: 12px; background: transparent; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); cursor: pointer; transition: color 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent; }
     #v3-rail button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
     #v3-rail button:hover { color: var(--text-color); }
     #v3-railcol { display: block; width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text-color) 45%, transparent); }
@@ -6559,6 +6559,35 @@ function ensureCss() {
         opacity: 0; clip-path: inset(0 0 100% 0 round 16px); transition: clip-path 0.3s ease, opacity 0.15s ease; }
     #v3d-panel.open .v3-tog { opacity: 1; transform: none; }
     #v3d-panel.open .v3-sec .v3-body { opacity: 1; clip-path: inset(0 0 0 0 round 16px); transition: clip-path 0.34s cubic-bezier(.2,.7,.2,1) 0.2s, opacity 0.15s ease 0.2s; }
+    /* expressive opening: label springs out from the sidebar, the container drops from it, its contents pop in one after another */
+    @keyframes v3railin { from { transform: translateX(100%); } to { transform: none; } }
+    #v3d.show #v3-rail, #v3d.show #v3d-close, #v3d.show #v3d-shop { animation: v3railin 0.5s cubic-bezier(0.19, 1, 0.22, 1) both; }
+    @keyframes v3label { from { opacity: 0; transform: translateX(56px) scale(0.85); } to { opacity: 1; transform: none; } }
+    @keyframes v3drop { 0% { opacity: 0; clip-path: inset(0 0 100% 0 round 16px); transform: translateY(-14px) scale(0.94); }
+                        35% { opacity: 1; }
+                        100% { opacity: 1; clip-path: inset(0 0 0 0 round 16px); transform: none; } }
+    @keyframes v3pop { from { opacity: 0; transform: translateY(-10px) scale(0.5); } to { opacity: 1; transform: none; } }
+    #v3d-panel.open .v3-tog { animation: v3label 0.55s cubic-bezier(0.34, 1.7, 0.5, 1) backwards; }
+    #v3d-panel.open .v3-sec .v3-body { transform-origin: 100% 0; animation: v3drop 0.6s cubic-bezier(0.22, 1.25, 0.36, 1) 0.2s backwards; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow, .v3-note, .v3-clear, .v3-pick) { animation: v3pop 0.5s cubic-bezier(0.34, 1.7, 0.5, 1) backwards; animation-delay: 0.4s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(1) { animation-delay: 0.425s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(2) { animation-delay: 0.470s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(3) { animation-delay: 0.515s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(4) { animation-delay: 0.560s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(5) { animation-delay: 0.605s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(6) { animation-delay: 0.650s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(7) { animation-delay: 0.695s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(8) { animation-delay: 0.740s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(9) { animation-delay: 0.785s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(10) { animation-delay: 0.830s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(11) { animation-delay: 0.875s; }
+    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(12) { animation-delay: 0.920s; }
+    /* everything inside the containers sits against the right edge, next to the sidebar */
+    #v3d-panel .v3-body { text-align: right; }
+    #v3d-panel .v3-chips, #v3d-panel .v3-sw, #v3d-panel [data-sec="dl"] .v3-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+    #v3d-panel .v3-cat { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    #v3d-panel .v3-cat .v3-card, #v3d-panel [data-sec="dl"] .v3-chips > button { width: calc((100% - 18px) / 4); flex: none; }
+    #v3d-panel .v3-orow, #v3d-panel .v3-prow { justify-content: flex-end; gap: 12px; }
     #v3d-bar, #v3-fx { left: calc((100% - var(--rw)) / 2); }
     #v3d-bar { width: min(520px, calc(100% - var(--rw) - 40px)); }
     #v3-fx { width: min(520px, calc(100% - var(--rw) - 40px)); }
