@@ -26,7 +26,8 @@
             --active-key-color: #000000;
             --border-radius: 12px;
             --main-font: 'Sora', 'Helvetica Neue', Arial, sans-serif;
-            --header-height: 43px;
+            --tb: 40px;
+            --header-height: var(--tb);
             --dot-color: 0, 0, 0;
             --dot-opacity: 0.25; 
             --icon-stroke: 2; 
@@ -143,6 +144,33 @@
             background: var(--active-btn-bg);
             border-color: var(--text-color);
         }
+
+
+        /* --- MAIN TOOLBAR (top centre): drawing tools | 3D --- */
+        #main-toolbar { display: flex; align-items: center; gap: 0; padding: 0; height: var(--tb); box-sizing: border-box; border-radius: var(--border-radius); pointer-events: auto; overflow: hidden; }
+        #main-toolbar .mode-header, #main-toolbar .control-btn { background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; height: calc(var(--tb) - 2px); border-radius: calc(var(--border-radius) - 1px); color: var(--text-color); }
+        #main-toolbar .control-btn { width: calc(var(--tb) - 2px); }
+        #main-toolbar .mode-header { width: calc(var(--tb) - 2px); background: var(--active-btn-bg); }
+        #main-toolbar .control-btn.active, #v3d-btn.on { background: var(--active-btn-bg); }
+        #main-toolbar .control-btn:hover:not(.active) svg { opacity: .65; }
+        #mode-ico { display: block; }
+        #mode-ico svg { display: block; }
+        .tb-sep { width: 1px; height: 22px; margin: 0 5px; background: var(--border-color); flex: none; }
+        #main-toolbar .mode-header { transition: background .2s, color .2s; }
+        body.v3d-open #main-toolbar .mode-header { background: none; color: var(--disabled-color); }
+        body.v3d-open #v3d-btn { background: var(--active-btn-bg); }
+        body.v3d-open #main-toolbar .tb-act { opacity: .35; pointer-events: none; }
+        body.v3d-open .top-nav-container { z-index: 3600; }
+        body.v3d-open #left-nav-group { visibility: hidden; }
+        body.v3d-open #action-indicator { display: none; }
+        body.game-active #main-toolbar .tb-act:not(#eraser-btn), body.game-active #tb-sep, body.game-active #v3d-btn { display: none !important; }
+        #mode-text { display: none !important; }
+        body.game-active #main-toolbar .mode-header { width: 90px; }
+        body.game-active #mode-ico { display: none; }
+        @media (max-width: 600px) { :root { --tb: 38px; } .tb-sep { margin: 0 3px; } }
+        @media (max-width: 380px) { :root { --tb: 34px; } .theme-svg { width: 18px; height: 18px; } }
+        @media (min-width: 601px) { #v3d-title { right: calc(50% + 190px) !important; } }
+        @media (max-width: 600px) { body.v3d-open #v3d-title { top: 66px !important; } }
 
         /* --- DASHBOARD / SIDEBAR --- */
         #dashboard-overlay {
@@ -775,23 +803,32 @@
             </div>
 
             <div class="top-nav-wrapper">
-                <div class="mode-header glass-panel" id="mode-header" onclick="event.stopPropagation(); toggleMode()" title="Drawing / Navigation (Enter)">
-                    <span id="mode-text">Navigation</span>
-                    <div id="game-hearts"></div>
+                <div id="main-toolbar" class="glass-panel">
+                    <div class="mode-header" id="mode-header" onclick="event.stopPropagation(); tbMode()" title="Drawing / Navigation (Enter)">
+                        <span id="mode-ico"></span><span id="mode-text" style="display:none">Navigation</span>
+                        <div id="game-hearts"></div>
+                    </div>
+                    <div class="control-btn tb-act" id="tb-new" onclick="event.stopPropagation(); openNewCanvasModal(true)" title="New canvas">
+                        <svg viewBox="0 0 24 24" class="theme-svg"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11.5v6M9 14.5h6"/></svg>
+                    </div>
+                    <div class="control-btn tb-act" id="tb-undo" onclick="event.stopPropagation(); undo()" title="Undo (/)">
+                        <svg viewBox="0 0 24 24" class="theme-svg"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+                    </div>
+                    <div class="control-btn tb-act" id="tb-redo" onclick="event.stopPropagation(); redo()" title="Redo (*)">
+                        <svg viewBox="0 0 24 24" class="theme-svg"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+                    </div>
+                    <div class="control-btn tb-act" id="eraser-btn" onclick="event.stopPropagation(); toggleEraser()" title="Eraser (F)">
+                        <svg viewBox="0 0 24 24" class="theme-svg">
+                            <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+                            <path d="m22 21H7" /><path d="m5 11 9 9" />
+                        </svg>
+                    </div>
+                    <div class="tb-sep" id="tb-sep" style="display: none"></div>
+                    <div class="control-btn" id="v3d-btn" style="display: none" onpointerenter="window.prefetch3D && prefetch3D()" ontouchstart="window.prefetch3D && prefetch3D()" onclick="event.stopPropagation(); document.body.classList.contains('v3d-open') ? close3D() : open3D()" title="3D view: folded product">
+                        <svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><path d="m3.5 7.5 8.5 4.5 8.5-4.5M12 12v9"/></svg>
+                    </div>
                 </div>
                 <div id="action-indicator" class="indicator-text">Action</div>
-            </div>
-
-            <div class="right-controls-group" id="right-nav-group" style="display: flex; gap: 8px; pointer-events: none;">
-                <div class="control-btn glass-panel" id="v3d-btn" style="display: none" onpointerenter="window.prefetch3D && prefetch3D()" ontouchstart="window.prefetch3D && prefetch3D()" onclick="event.stopPropagation(); open3D()" title="3D view: folded product">
-                    <svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><path d="m3.5 7.5 8.5 4.5 8.5-4.5M12 12v9"/></svg>
-                </div>
-                <div class="control-btn glass-panel" id="eraser-btn" onclick="event.stopPropagation(); toggleEraser()" title="Eraser (F)">
-                    <svg viewBox="0 0 24 24" class="theme-svg">
-                        <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
-                        <path d="m22 21H7" /><path d="m5 11 9 9" />
-                    </svg>
-                </div>
             </div>
         </div>
         
@@ -3128,9 +3165,15 @@ service cloud.firestore {
             const indicator = document.getElementById('action-indicator');
             const eraserBtn = document.getElementById('eraser-btn');
             modeHeader.innerText = isDrawingMode ? "Drawing" : "Navigation";
+            const ico = document.getElementById('mode-ico');
+            if (ico) ico.innerHTML = isDrawingMode
+                ? '<svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>'
+                : '<svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>';
             if (isEraserActive) { eraserBtn.classList.add('active'); let percent = Math.round((eraserRadius / DEFAULT_ERASER_RADIUS) * 100); showActionHint(`Eraser: ${percent}%`, true); }
             else { eraserBtn.classList.remove('active'); if (!actionTimeout) indicator.classList.remove('visible'); }
         }
+
+        function tbMode() { if (document.body.classList.contains('v3d-open')) { window.close3D && window.close3D(); return; } toggleMode(); }
 
         function toggleMode() { 
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
@@ -3581,7 +3624,7 @@ service cloud.firestore {
             keys.left = false; keys.right = false;
             handleKbdTrigger('close');
             document.body.classList.remove('game-active');
-            document.getElementById('mode-text').style.display = 'inline';
+            document.getElementById('mode-text').style.display = 'none';
             document.getElementById('game-hearts').style.display = 'none';
             document.getElementById('eraser-btn').style.display = 'flex';
             
@@ -3613,6 +3656,7 @@ service cloud.firestore {
                     isPointerDrawing = true;
                     handleGameInput('click');
                     handleStart(e.clientX, e.clientY);
+                    if (isEraserActive && !isTimelapseUIOpen && !isGameMode && !isResizingCanvas && !isOverUI(e.clientX, e.clientY)) eraserBegin((pX - offsetX) / zoom, (pY - offsetY) / zoom);
                 } else if (activePointers.size === 2) {
                     isPointerDrawing = false;
                     let pts = Array.from(activePointers.values());
@@ -3661,6 +3705,7 @@ service cloud.firestore {
                 if (isTimelapseUIOpen && endTimelapseScreenScrub(e)) return;
                 if (e.pointerId === mainPointerId) {
                     handleEnd(e.clientX, e.clientY);
+                    eraserEnd();
                     isPointerDrawing = false; mainPointerId = null;
                 }
                 activePointers.delete(e.pointerId);
@@ -4225,21 +4270,69 @@ service cloud.firestore {
             invalidateGeometryCache();
         }
 
+        // ERASER. A stroke is one undo step; the work is done once per frame, not once per pointer event; the path between two
+        // pointer positions is swept so a fast move leaves no gaps; and a line is erased when the circle touches it anywhere
+        // (not only its end points).
+        const eraseJob = { pts: [], last: null, saved: false, raf: 0, changed: false };
+        function eraserBegin(worldX, worldY) {
+            eraseJob.last = null; eraseJob.saved = false; eraseJob.changed = false; eraseJob.pts.length = 0;
+            performEraserActionAt(worldX, worldY);
+        }
         function performEraserActionAt(worldX, worldY) {
             if (isViewOnly) return;
             if (isTimelapseUIOpen || isDashboardOpen || isGameMode) return;
-            const rWorld = eraserRadius / zoom; const rSq = rWorld * rWorld; let changed = false;
-            for (let id in specialElements) {
-                let [i, j] = id.split(',').map(Number); let dx = i * STEP - worldX; let dy = j * STEP - worldY;
-                if (dx * dx + dy * dy <= rSq) { if (!changed) saveState(); delete specialElements[id]; changed = true; }
+            eraseJob.pts.push([worldX, worldY]);
+            if (!eraseJob.raf) eraseJob.raf = requestAnimationFrame(eraserFlush);
+        }
+        function eraserFlush() {
+            eraseJob.raf = 0;
+            const pts = eraseJob.pts; eraseJob.pts = [];
+            if (!pts.length) return;
+            const r = eraserRadius / zoom, rSq = r * r;
+            // sample points along the swept path, at most r/2 apart (and at most 60 in all)
+            const samples = [];
+            let prev = eraseJob.last;
+            for (const q of pts) {
+                if (prev) {
+                    const d = Math.hypot(q[0] - prev[0], q[1] - prev[1]), n = Math.min(60, Math.ceil(d / Math.max(0.5, r * 0.5)));
+                    for (let k = 1; k < n; k++) samples.push([prev[0] + (q[0] - prev[0]) * k / n, prev[1] + (q[1] - prev[1]) * k / n]);
+                }
+                samples.push(q); prev = q;
             }
-            let initialLength = segments.length;
-            let newSegments = segments.filter(s => {
-                let dx1 = s.p1.x * STEP - worldX; let dy1 = s.p1.y * STEP - worldY; let dx2 = s.p2.x * STEP - worldX; let dy2 = s.p2.y * STEP - worldY;
-                return !(dx1 * dx1 + dy1 * dy1 <= rSq || dx2 * dx2 + dy2 * dy2 <= rSq);
-            });
-            if (newSegments.length !== initialLength) { if (!changed) saveState(); segments = newSegments; invalidateGeometryCache(); changed = true; }
-            if (changed) { redraw(); captureState(); }
+            eraseJob.last = prev;
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+            for (const q of samples) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+            x0 -= r; y0 -= r; x1 += r; y1 += r;
+            const hitPoint = (px, py) => { for (const q of samples) { const dx = px - q[0], dy = py - q[1]; if (dx * dx + dy * dy <= rSq) return true; } return false; };
+            const hitSeg = (ax, ay, bx, by) => {
+                const vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy;
+                for (const q of samples) {
+                    let t = L ? ((q[0] - ax) * vx + (q[1] - ay) * vy) / L : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+                    const dx = ax + vx * t - q[0], dy = ay + vy * t - q[1];
+                    if (dx * dx + dy * dy <= rSq) return true;
+                }
+                return false;
+            };
+            let changed = false;
+            const save = () => { if (!eraseJob.saved) { saveState(); eraseJob.saved = true; } };
+            for (const id in specialElements) {
+                const c = id.indexOf(','), px = +id.slice(0, c) * STEP, py = +id.slice(c + 1) * STEP;
+                if (px < x0 || px > x1 || py < y0 || py > y1) continue;
+                if (hitPoint(px, py)) { save(); delete specialElements[id]; changed = true; }
+            }
+            const keep = [];
+            for (const sg of segments) {
+                const ax = sg.p1.x * STEP, ay = sg.p1.y * STEP, bx = sg.p2.x * STEP, by = sg.p2.y * STEP;
+                if ((ax < x0 && bx < x0) || (ax > x1 && bx > x1) || (ay < y0 && by < y0) || (ay > y1 && by > y1) || !hitSeg(ax, ay, bx, by)) keep.push(sg);
+            }
+            if (keep.length !== segments.length) { save(); segments = keep; changed = true; }
+            if (changed) { eraseJob.changed = true; invalidateGeometryCache(); }
+            redraw();      // also moves the circle
+        }
+        function eraserEnd() {      // the finger / mouse is up: finish the stroke and record it once for the time-lapse
+            if (eraseJob.raf) { cancelAnimationFrame(eraseJob.raf); eraserFlush(); }
+            if (eraseJob.changed) { eraseJob.changed = false; captureState(); }
+            eraseJob.last = null; eraseJob.saved = false;
         }
 
         // Manufacturing drawing for product exports: red dashed bend / pattern-end lines with labels and
@@ -6579,8 +6672,8 @@ function ensureCss() {
     #v3-rail.v3-glass { background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; pointer-events: none; }
     #v3-rail.v3-glass button { pointer-events: auto; background: var(--panel-bg); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
     #v3-rail.v3-glass button.on { background: var(--panel-bg); border-color: color-mix(in srgb, var(--text-color) 55%, transparent); }
-    #v3d-close.glass-panel, #v3d-shop.glass-panel { width: 42px; height: 42px; }
-    #v3-rail button { position: relative; box-sizing: border-box; width: 42px; height: 42px; flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border-color); border-radius: 12px; background: transparent; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); cursor: pointer; transition: color 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent; }
+    #v3d-close.glass-panel, #v3d-shop.glass-panel { width: var(--tb); height: var(--tb); }
+    #v3-rail button { position: relative; box-sizing: border-box; width: var(--tb); height: var(--tb); flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border-color); border-radius: 12px; background: transparent; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); cursor: pointer; transition: color 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent; }
     #v3-rail button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
     #v3-rail button:hover { color: var(--text-color); }
     #v3-railth { display: flex; flex-direction: column; align-items: center; gap: 3px; line-height: 1; }
@@ -6589,8 +6682,8 @@ function ensureCss() {
     #v3-railcol { display: block; width: 23px; height: 23px; border-radius: 50%; box-shadow: none; }
     #v3-rail button.on { color: var(--text-color); background: var(--active-btn-bg); }
     #v3-rail button[data-go="price"] { display: none; } #v3-rail.hasprice button[data-go="price"] { display: flex; }
-    #v3d-close, #v3d-shop { z-index: 4; right: calc((var(--rw) - 42px) / 2); }
-    #v3d-close { top: 20px; } #v3d-shop { top: auto; bottom: 30px; }
+    #v3d-close, #v3d-shop { z-index: 4; right: calc((var(--rw) - var(--tb)) / 2); }
+    #v3d-close { top: max(20px, env(safe-area-inset-top)); } #v3d-shop { top: auto; bottom: 30px; }
     /* a section opens in two moves: its name slides out beside the sidebar, then the container with the information slides down from it */
     #v3d-panel.v3-glass { top: 76px; right: calc(var(--rw) + 12px); bottom: auto; left: auto; width: min(280px, calc(100% - var(--rw) - 24px)); max-height: calc(100% - 100px); padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0;
         overflow-y: auto; overflow-x: hidden; visibility: hidden; pointer-events: none; z-index: 2; transition: visibility 0s linear 0.5s; }
@@ -6598,7 +6691,7 @@ function ensureCss() {
     #v3d-panel .v3-sec { display: none; border-top: 0; padding: 0; }
     #v3d-panel[data-act="mat"] .v3-sec[data-sec="mat"], #v3d-panel[data-act="col"] .v3-sec[data-sec="col"], #v3d-panel[data-act="thick"] .v3-sec[data-sec="thick"],
     #v3d-panel[data-act="obj"] .v3-sec[data-sec="obj"], #v3d-panel[data-act="price"] .v3-sec[data-sec="price"], #v3d-panel[data-act="dl"] .v3-sec[data-sec="dl"] { display: block; }
-    #v3d-panel .v3-tog { pointer-events: none; display: flex; align-items: center; width: fit-content; height: var(--rb, 42px); margin: 0 4px 0 auto; padding: 0; border: 0; background: none;
+    #v3d-panel .v3-tog { pointer-events: none; display: flex; align-items: center; width: fit-content; height: var(--rb, var(--tb)); margin: 0 4px 0 auto; padding: 0; border: 0; background: none;
         opacity: 0; transform: translateX(26px); transition: opacity 0.18s ease, transform 0.22s ease; }
     #v3d-panel .v3-tog .v3-chev, #v3d-panel .v3-tog > em { display: none; }
     #v3d-panel .v3-sec .v3-body { display: block !important; padding: 14px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
@@ -6661,11 +6754,10 @@ function ensureCss() {
         #v3d-bar { bottom: 12px; width: calc(100% - var(--rw) - 24px); }
         #v3-fx { bottom: 84px; width: calc(100% - var(--rw) - 24px); max-height: calc(100% - 170px); }
         #v3d-title { left: 12px; top: 12px; right: calc(var(--rw) + 12px); }
-        #v3d-close { top: 12px; } #v3d-shop { bottom: 23px; }
+        #v3d-close { top: max(20px, env(safe-area-inset-top)); } #v3d-shop { bottom: 23px; }
         #v3-rail { padding: 64px 0 68px; gap: 3px; }
-        #v3d-close.glass-panel, #v3d-shop.glass-panel { width: 40px; height: 40px; }
-        #v3d-close, #v3d-shop { right: calc((var(--rw) - 40px) / 2); }
-        #v3-rail button { width: 40px; height: 40px; } #v3d { --rb: 40px; }
+        #v3d-close, #v3d-shop { right: calc((var(--rw) - var(--tb)) / 2); }
+        #v3d { --rb: var(--tb); }
     }
     }`;
     document.head.appendChild(css);
@@ -7245,6 +7337,7 @@ setInterval(() => {
     const show = typeof templateKind === 'function' && templateKind() === 'product';
     const want = show ? '' : 'none';
     if (b.style.display !== want) b.style.display = want;
+    const sp = document.getElementById('tb-sep'); if (sp && sp.style.display !== want) sp.style.display = want;
 }, 400);
 })();
 </script>
