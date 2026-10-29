@@ -2510,10 +2510,10 @@ service cloud.firestore {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const W = (typeof width === 'number' && width > 0) ? width : window.innerWidth;
             const H = (typeof height === 'number' && height > 0) ? height : window.innerHeight;
-            // On the web the side labels must stay visible: keep room for them on the left, but still centre on the product alone
-            // (the same room is kept on the right, so the product stays exactly in the middle). On phones the labels are not counted.
-            const web = !((window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768);
-            const pad = 40, labelRoom = web ? 110 : 0;
+            // The side labels (pattern end, bend line) must stay visible on every device: keep room for them on the left and the same on
+            // the right, so the product itself stays exactly in the middle. Phones get a narrower strip because the screen is narrow.
+            const narrow = W < 600;
+            const pad = narrow ? 14 : 40, labelRoom = narrow ? Math.round(W * 0.17) : 110;
             const z = Math.min((W - 2 * (pad + labelRoom)) / wPx, (H - 2 * pad) / hPx);
             zoom = Math.max(0.05, Math.min(2, z));
             offsetX = W / 2;
@@ -4769,8 +4769,13 @@ const GLTF_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/export
 const ORBIT_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js/+esm';
 
 const MATS = {
-    steel:     { name: 'Stainless steel',     color: '#c9ccd0', metal: 1,   rough: 0.55, brushed: true, density: 7.9 },
-    powder:    { name: 'Powder coat',         color: '#161616', metal: 0.1, rough: 0.62, density: 7.9 }
+    steel:     { name: 'Stainless steel', short: 'Steel',     color: '#c9ccd0', metal: 1,   rough: 0.55, brushed: true, density: 7.9 },
+    powder:    { name: 'Powder coat', short: 'Powder',         color: '#161616', metal: 0.1, rough: 0.62, density: 7.9 }
+};
+const MAT_DOT = { steel: 'linear-gradient(135deg, #cfd1d4, #9b9ea3)', powder: '#161616' };
+const MAT_ICONS = {
+    steel: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 16l5-7M12 17l6-8"/>',
+    powder: '<path d="M9 9h6v12H9zM10 5h4v4h-4zM17.5 6h.01M20 4.5h.01M20 8h.01"/>'
 };
 const SWATCHES = ['#161616', '#f1f1f1', '#d36e70', '#6b1c23', '#424632', '#f29200', '#008f39', '#20214f'];   // black, white, RAL 3022, 3004, 6003, 1037, 6037, 5002
 const ENVS = { soft: 'Soft light' };                     // one even light for every product
@@ -5544,18 +5549,54 @@ function shapesForRows(mask, r0, r1) {
     });
 }
 
-function makeBrushTexture() {
-    const c = document.createElement('canvas'); c.width = c.height = 512;
+// Brushed stainless steel: a seamless grain (every stroke wraps round the edges, so tiles join without a visible line),
+// drawn at 2048 px (1024 on phones) and repeated evenly in both directions: one tile is 240 mm, so the grain is never stretched.
+function makeBrushTexture(lite) {
+    const N = lite ? 1024 : 2048, k = N / 512;
+    const c = document.createElement('canvas'); c.width = c.height = N;
     const x = c.getContext('2d');
-    x.fillStyle = '#9a9a9a'; x.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 2600; i++) {
-        const v = 90 + Math.random() * 130, y = Math.random() * 512, len = 40 + Math.random() * 300, x0 = Math.random() * 512;
-        x.strokeStyle = `rgba(${v},${v},${v},${0.18 + Math.random() * 0.3})`; x.lineWidth = 0.6 + Math.random() * 0.9;
-        x.beginPath(); x.moveTo(x0, y); x.lineTo(x0 + len, y + (Math.random() - 0.5) * 1.2); x.stroke();
-    }
+    x.fillStyle = '#8c8c8c'; x.fillRect(0, 0, N, N);
     const tex = new T.CanvasTexture(c);
     tex.wrapS = tex.wrapT = T.RepeatWrapping;
-    tex.repeat.set(1 / 220, 1 / 220);     // UVs are in millimetres
+    tex.repeat.set(1 / 240, 1 / 240);     // UVs are in millimetres, same scale both ways: no stretching
+    tex.anisotropy = 8;
+    let seed = 20240607; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };   // fixed seed: same steel every time
+    const stroke = (x0, y0, len, dy, w, col) => {
+        x.strokeStyle = col; x.lineWidth = w;
+        for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) {
+            const a = x0 + ox, b = y0 + oy;
+            if (a + len < 0 || a > N || b + Math.abs(dy) < -2 || b - Math.abs(dy) > N + 2) continue;
+            x.beginPath(); x.moveTo(a, b); x.lineTo(a + len, b + dy); x.stroke();
+        }
+    };
+    // soft wide streaks first, then medium grain, then hairlines, then a fine speckle. The work is cut into small batches (a few
+    // hundred strokes each) that run one after another, so the page never freezes and no single loop runs long.
+    const layers = [[180, 3.5, 6, 70, 0.05, 0.06, 0.6], [3000, 1.0, 1.9, 40, 0.16, 0.34, 0.9], [4800, 0.5, 1.0, 20, 0.10, 0.28, 1.2]];
+    const jobs = [];
+    for (const [count, w0, w1, lenMin, a0, a1, dr] of layers) {
+        const n = Math.round(count * k * k / 4);
+        for (let from = 0; from < n; from += 400) jobs.push(() => {
+            for (let i = from; i < Math.min(n, from + 400); i++) {
+                const v = Math.round(60 + rnd() * 170), len = (lenMin + rnd() * (lenMin * 7)) * k;
+                stroke(rnd() * N, rnd() * N, len, (rnd() - 0.5) * dr * k, (w0 + rnd() * (w1 - w0)) * k, `rgba(${v},${v},${v},${(a0 + rnd() * (a1 - a0)).toFixed(3)})`);
+            }
+        });
+    }
+    jobs.push(() => {   // speckle: a small noise tile repeated over the whole picture (tile-safe by construction)
+        const t = document.createElement('canvas'); t.width = t.height = 64; const tx = t.getContext('2d'), im = tx.createImageData(64, 64);
+        for (let i = 0; i < im.data.length; i += 4) { const v = 128 + (rnd() - 0.5) * 24; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 40; }
+        tx.putImageData(im, 0, 0); x.fillStyle = x.createPattern(t, 'repeat'); x.fillRect(0, 0, N, N);
+    });
+    let step = 0;
+    const run = () => {
+        if (tex.__dead || step >= jobs.length) { if (!tex.__dead) tex.needsUpdate = true; if (typeof R !== 'undefined' && R) R.dirty = true; return; }
+        const t0 = performance.now();
+        while (step < jobs.length && performance.now() - t0 < 12) jobs[step++]();
+        tex.needsUpdate = true; if (typeof R !== 'undefined' && R) R.dirty = true;
+        setTimeout(run, 0);
+    };
+    setTimeout(run, 0);
+    const dispose = tex.dispose.bind(tex); tex.dispose = () => { tex.__dead = true; dispose(); };
     return tex;
 }
 
@@ -6222,7 +6263,7 @@ function applyMaterial() {
     mat.color.set(S.color || m.color);
     mat.metalness = m.metal; mat.roughness = m.rough;
     mat.roughnessMap = m.brushed ? R.brush : null;
-    mat.bumpMap = m.brushed ? R.brush : null; mat.bumpScale = 0.5;
+    mat.bumpMap = m.brushed ? R.brush : null; mat.bumpScale = 0.35;
     mat.needsUpdate = true;
     syncStripMat();
     if (R.mask) R.weightKg = R.mask.count / (R.mask.ppm * R.mask.ppm) * S.t * m.density / 1e6;
@@ -6420,7 +6461,7 @@ function ensureCss() {
     .v3-mh { font-size: 11px; color: var(--disabled-color); }
     .v3-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
     #v3d-title { position: absolute; left: 20px; top: 20px; right: 130px; pointer-events: none; }
-    #v3d-title b { display: block; font-size: 15px; font-weight: 700; text-shadow: 0 1px 8px var(--bg-color); }
+    #v3d-title b { display: block; font-size: 16px; font-weight: 700; }
     #v3-trow { display: flex; align-items: center; gap: 2px; min-width: 0; }
     #v3-trow b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #v3-infot { pointer-events: auto; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin: 0; padding: 0; border: 0; background: none; color: var(--disabled-color); cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -6428,8 +6469,9 @@ function ensureCss() {
     #v3-infot .v3-chev { width: 6px; height: 6px; margin: 0 0 3px 0; border: solid currentColor; border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); transition: transform 0.15s; }
     #v3d-title.fold #v3-infot .v3-chev { transform: rotate(-45deg); margin: 0 3px 0 0; }
     #v3d-title.fold #v3-info { display: none; }
+    #v3-info em::before { content: '- '; }
     #v3-info em { display: block; font-style: normal; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-    #v3d-title span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 3px; font-size: 12px; color: var(--disabled-color); text-shadow: 0 1px 8px var(--bg-color); }
+    #v3d-title span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 3px; font-size: 13px; color: var(--disabled-color); }
     #v3d-close { position: absolute; right: 20px; top: 20px; }
     #v3d-shop { position: absolute; right: 76px; top: 20px; display: none; }
     #v3d-shop.owner { display: flex; }
@@ -6453,11 +6495,10 @@ function ensureCss() {
     .v3-chip:hover { background: var(--active-btn-bg); }
     .v3-chip.on { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
     .v3-sw { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
-    .v3-dot { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border-color); cursor: pointer; padding: 0; position: relative; }
-    .v3-dot.on { outline: 2px solid var(--text-color); outline-offset: 2px; }
+    .v3-dot { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-color); cursor: pointer; padding: 0; position: relative; }
     .v3-dot.orig { background: transparent; overflow: hidden; }
     .v3-dot.orig::after { content: ''; position: absolute; left: -2px; right: -2px; top: 50%; height: 2px; margin-top: -1px; background: var(--text-color); opacity: 0.75; transform: rotate(-45deg); }
-    .v3-pick { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border: 1px solid var(--border-color); padding: 0; cursor: pointer; border-radius: 50%; overflow: hidden;
+    .v3-pick { -webkit-appearance: none; appearance: none; box-sizing: border-box; width: 28px; height: 28px; border: 1px solid var(--border-color); padding: 0; cursor: pointer; border-radius: 50%; overflow: hidden;
         background: conic-gradient(from 0deg, #ff3b30, #ff9500, #ffd60a, #34c759, #00c7be, #0a84ff, #5e5ce6, #bf5af2, #ff2d92, #ff3b30); }
     .v3-pick::-webkit-color-swatch-wrapper { padding: 0; opacity: 0; }
     .v3-pick::-webkit-color-swatch { border: 0; opacity: 0; }
@@ -6532,19 +6573,24 @@ function ensureCss() {
     #v3-retry { margin-top: 14px; }
     /* a slim sidebar of icons on the right; each icon slides its own settings panel out to the left (phones included) */
     #v3d { --rw: 60px; }
-    #v3d-view { right: var(--rw); }
-    #v3-rail { display: flex; position: absolute; right: 0; top: 0; bottom: 0; width: var(--rw); box-sizing: border-box; flex-direction: column; align-items: center; gap: 8px; padding: 80px 0 80px; border-radius: 0; border-width: 0 0 0 1px; z-index: 3; touch-action: none; }
+    #v3d-view { right: 0; }
+    #v3-rail { display: flex; position: absolute; right: 0; top: 0; bottom: 0; width: var(--rw); box-sizing: border-box; flex-direction: column; align-items: center; gap: 4px; padding: 76px 0 80px; border-radius: 0; border-width: 0 0 0 1px; z-index: 3; touch-action: none; }
     #v3-rail.hide { display: none; }
-    #v3-rail.v3-glass { background: var(--bg-color); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    #v3-rail.v3-glass { background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; pointer-events: none; }
+    #v3-rail.v3-glass button { pointer-events: auto; background: var(--panel-bg); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+    #v3-rail.v3-glass button.on { background: var(--panel-bg); border-color: color-mix(in srgb, var(--text-color) 55%, transparent); }
+    #v3d-close.glass-panel, #v3d-shop.glass-panel { width: 42px; height: 42px; }
     #v3-rail button { position: relative; box-sizing: border-box; width: 42px; height: 42px; flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border-color); border-radius: 12px; background: transparent; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); cursor: pointer; transition: color 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent; }
     #v3-rail button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
     #v3-rail button:hover { color: var(--text-color); }
-    #v3-railcol { display: block; width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text-color) 45%, transparent); }
-    #v3-rail button:hover #v3-railcol, #v3-rail button.on #v3-railcol { box-shadow: 0 0 0 1.5px var(--text-color); }
+    #v3-railth { display: flex; flex-direction: column; align-items: center; gap: 3px; line-height: 1; }
+    #v3-railth b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    #v3-railth i { display: block; width: 20px; border-radius: 1px; background: currentColor; }
+    #v3-railcol { display: block; width: 23px; height: 23px; border-radius: 50%; box-shadow: none; }
     #v3-rail button.on { color: var(--text-color); background: var(--active-btn-bg); }
     #v3-rail button[data-go="price"] { display: none; } #v3-rail.hasprice button[data-go="price"] { display: flex; }
-    #v3d-close, #v3d-shop { z-index: 4; right: calc((var(--rw) - 43px) / 2 - 0.5px); }
-    #v3d-close { top: 20px; } #v3d-shop { top: auto; bottom: 29.5px; }
+    #v3d-close, #v3d-shop { z-index: 4; right: calc((var(--rw) - 42px) / 2); }
+    #v3d-close { top: 20px; } #v3d-shop { top: auto; bottom: 30px; }
     /* a section opens in two moves: its name slides out beside the sidebar, then the container with the information slides down from it */
     #v3d-panel.v3-glass { top: 76px; right: calc(var(--rw) + 12px); bottom: auto; left: auto; width: min(280px, calc(100% - var(--rw) - 24px)); max-height: calc(100% - 100px); padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 0;
         overflow-y: auto; overflow-x: hidden; visibility: hidden; pointer-events: none; z-index: 2; transition: visibility 0s linear 0.5s; }
@@ -6567,39 +6613,58 @@ function ensureCss() {
                         35% { opacity: 1; }
                         100% { opacity: 1; clip-path: inset(0 0 0 0 round 16px); transform: none; } }
     @keyframes v3pop { from { opacity: 0; transform: translateY(-10px) scale(0.5); } to { opacity: 1; transform: none; } }
-    #v3d-panel.open .v3-tog { animation: v3label 0.55s cubic-bezier(0.34, 1.7, 0.5, 1) backwards; }
-    #v3d-panel.open .v3-sec .v3-body { transform-origin: 100% 0; animation: v3drop 0.6s cubic-bezier(0.22, 1.25, 0.36, 1) 0.2s backwards; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow, .v3-note, .v3-clear, .v3-pick) { animation: v3pop 0.5s cubic-bezier(0.34, 1.7, 0.5, 1) backwards; animation-delay: 0.4s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(1) { animation-delay: 0.425s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(2) { animation-delay: 0.470s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(3) { animation-delay: 0.515s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(4) { animation-delay: 0.560s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(5) { animation-delay: 0.605s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(6) { animation-delay: 0.650s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(7) { animation-delay: 0.695s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(8) { animation-delay: 0.740s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(9) { animation-delay: 0.785s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(10) { animation-delay: 0.830s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(11) { animation-delay: 0.875s; }
-    #v3d-panel.open .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(12) { animation-delay: 0.920s; }
+    #v3d-panel.open.anim .v3-tog { animation: v3label 0.55s cubic-bezier(0.34, 1.7, 0.5, 1) backwards; }
+    #v3d-panel.open.anim .v3-sec .v3-body { transform-origin: 100% 0; animation: v3drop 0.6s cubic-bezier(0.22, 1.25, 0.36, 1) 0.2s backwards; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow, .v3-note, .v3-clear, .v3-pick) { animation: v3pop 0.5s cubic-bezier(0.34, 1.7, 0.5, 1) backwards; animation-delay: 0.4s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(1) { animation-delay: 0.425s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(2) { animation-delay: 0.470s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(3) { animation-delay: 0.515s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(4) { animation-delay: 0.560s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(5) { animation-delay: 0.605s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(6) { animation-delay: 0.650s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(7) { animation-delay: 0.695s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(8) { animation-delay: 0.740s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(9) { animation-delay: 0.785s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(10) { animation-delay: 0.830s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(11) { animation-delay: 0.875s; }
+    #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(12) { animation-delay: 0.920s; }
+    .v3-mc { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border: 0; border-radius: 12px; background: transparent; font-size: 11px; font-weight: 600; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); transition: color 0.15s; }
+    .v3-mc svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .v3-mc:hover, .v3-mc.on, .v3-mc.on:hover { background: transparent; color: var(--text-color); border-color: transparent; }
+    .v3-mdot { display: block; width: 28px; height: 28px; border-radius: 50%; box-shadow: 0 0 0 1px var(--border-color); }
+    /* the submenus list their items downward; every icon and label sits against the right edge */
+    /* every container hugs its content (no empty strips at the sides) and sits against the sidebar */
+    #v3d-panel.v3-glass { width: fit-content; max-width: min(300px, calc(100% - var(--rw) - 24px)); }
+    #v3d-panel .v3-sec .v3-body { width: fit-content; margin-left: auto; padding: 14px; }
+    #v3d-panel #v3-mats, #v3d-panel .v3-cat, #v3d-panel [data-sec="dl"] .v3-chips { display: grid; grid-template-columns: repeat(2, minmax(max-content, 1fr)); gap: 10px 16px; justify-content: end; justify-items: stretch; }
+    #v3d-panel #v3-ts { display: grid; grid-template-columns: max-content; gap: 12px; justify-content: end; }
+    #v3d-panel #v3-cols { display: grid; grid-template-rows: repeat(5, 28px); grid-auto-flow: column; grid-auto-columns: 28px; gap: 10px; justify-content: end; }
+    /* an odd last item goes to the right column, next to the sidebar */
+    #v3d-panel .v3-cat > :last-child:nth-child(odd), #v3d-panel [data-sec="dl"] .v3-chips > :last-child:nth-child(odd), #v3d-panel #v3-mats > :last-child:nth-child(odd) { grid-column: 2; }
+    #v3d-panel .v3-cat .v3-card, #v3d-panel [data-sec="dl"] .v3-chips > button, #v3d-panel #v3-mats .v3-chip { width: auto; min-width: 0; padding: 0; line-height: 1.2; }
+    /* thickness: the name above a bar as thick as the sheet (2 px per mm) */
+    #v3d-panel .v3-tk { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; line-height: 1.2; border: 0; border-radius: 0; background: transparent; font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); transition: color 0.15s; }
+    #v3d-panel .v3-tk i { display: block; width: 100%; min-width: 46px; border-radius: 1px; background: currentColor; }
+    #v3d-panel .v3-tk:hover, #v3d-panel .v3-tk.on, #v3d-panel .v3-tk.on:hover { background: transparent; color: var(--text-color); border-color: transparent; }
+    #v3d-panel .v3-mc, #v3d-panel .v3-card { align-items: center; text-align: center; }
     /* everything inside the containers sits against the right edge, next to the sidebar */
     #v3d-panel .v3-body { text-align: right; }
-    #v3d-panel .v3-chips, #v3d-panel .v3-sw, #v3d-panel [data-sec="dl"] .v3-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; }
-    #v3d-panel .v3-cat { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-    #v3d-panel .v3-cat .v3-card, #v3d-panel [data-sec="dl"] .v3-chips > button { width: calc((100% - 18px) / 4); flex: none; }
+    #v3d-panel .v3-chips, #v3d-panel .v3-sw { display: flex; flex-wrap: wrap; justify-content: flex-end; }
     #v3d-panel .v3-orow, #v3d-panel .v3-prow { justify-content: flex-end; gap: 12px; }
     #v3d-bar, #v3-fx { left: calc((100% - var(--rw)) / 2); }
     #v3d-bar { width: min(520px, calc(100% - var(--rw) - 40px)); }
     #v3-fx { width: min(520px, calc(100% - var(--rw) - 40px)); }
     #v3d-title { right: calc(var(--rw) + 28px); }
-    #v3d-load { right: var(--rw); }
+    #v3d-load { right: 0; }
     @media (max-width: 700px) {
         #v3d { --rw: 52px; }
         #v3d-bar { bottom: 12px; width: calc(100% - var(--rw) - 24px); }
         #v3-fx { bottom: 84px; width: calc(100% - var(--rw) - 24px); max-height: calc(100% - 170px); }
         #v3d-title { left: 12px; top: 12px; right: calc(var(--rw) + 12px); }
-        #v3d-close { top: 12px; } #v3d-shop { bottom: 21.5px; }
-        #v3-rail { padding: 68px 0 68px; gap: 6px; }
+        #v3d-close { top: 12px; } #v3d-shop { bottom: 23px; }
+        #v3-rail { padding: 64px 0 68px; gap: 3px; }
+        #v3d-close.glass-panel, #v3d-shop.glass-panel { width: 40px; height: 40px; }
+        #v3d-close, #v3d-shop { right: calc((var(--rw) - 40px) / 2); }
         #v3-rail button { width: 40px; height: 40px; } #v3d { --rb: 40px; }
     }
     }`;
@@ -6616,7 +6681,7 @@ function buildUI() {
         <div id="v3d-title"><div id="v3-trow"><b id="v3-name"></b><button id="v3-infot" type="button" aria-expanded="true" aria-label="Product details"><i class="v3-chev"></i></button></div><span id="v3-info"></span></div>
         <div id="v3d-close" class="control-btn glass-panel" onclick="close3D()" title="Back (Esc)"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div>
         <div id="v3d-shop" class="control-btn glass-panel" title="Prices &amp; options"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
-        <div id="v3-rail" class="v3-glass"><button type="button" data-go="mat" title="Material" aria-label="Material"><svg viewBox="0 0 24 24"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg></button><button type="button" data-go="col" title="Colour" aria-label="Colour"><i id="v3-railcol"></i></button><button type="button" data-go="thick" title="Thickness" aria-label="Thickness"><svg viewBox="0 0 24 24"><path d="M4 9.5h16v5H4zM12 3v3.5M12 17.5V21M9.5 5L12 3l2.5 2M9.5 19L12 21l2.5-2"/></svg></button><button type="button" data-go="obj" title="Objects" aria-label="Objects"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></button><button type="button" data-go="price" title="Price" aria-label="Price"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01"/></svg></button><button type="button" data-go="dl" title="Download" aria-label="Download"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg></button></div>
+        <div id="v3-rail" class="v3-glass"><button type="button" data-go="mat" title="Material" aria-label="Material"><svg viewBox="0 0 24 24"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg></button><button type="button" data-go="col" title="Colour" aria-label="Colour"><i id="v3-railcol"></i></button><button type="button" data-go="thick" title="Thickness" aria-label="Thickness"><span id="v3-railth"><b>2</b><i></i></span></button><button type="button" data-go="obj" title="Objects" aria-label="Objects"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></button><button type="button" data-go="price" title="Price" aria-label="Price"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01"/></svg></button><button type="button" data-go="dl" title="Download" aria-label="Download"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg></button></div>
         <div id="v3d-panel" class="v3-glass">
             <button id="v3-sheet" class="v3-handle" aria-label="Show or hide the settings"><i></i></button>
             <div class="v3-sec" data-sec="mat"><button class="v3-lab v3-tog"><span>Material</span><em id="v3-sum-mat"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-mats"></div></div></div>
@@ -6642,7 +6707,9 @@ function buildUI() {
     const $ = id => document.getElementById(id);
     $('v3-mats').onclick = async e => {
         const b = e.target.closest('[data-m]'); if (!b) return;
-        const t0 = S.t; S.mat = b.dataset.m; ensureSel(); applyMaterial(); syncUI();
+        const t0 = S.t; S.mat = b.dataset.m;
+        if (MATS[S.mat].brushed) S.color = null;   // steel is steel: a colour picked for the powder coat is dropped, no mixing
+        ensureSel(); applyMaterial(); syncUI();
         if (S.t !== t0) { await rebuild(); syncUI(); }
     };
     $('v3-ts').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b || +b.dataset.t === S.t) return; S.t = +b.dataset.t; syncUI(); await rebuild(); syncUI(); };
@@ -6654,6 +6721,8 @@ function buildUI() {
         const pn = $('v3d-panel');
         if (act && pn.classList.contains('open') && pn.dataset.act !== act) { pn.classList.remove('open'); void pn.offsetWidth; }   // switching: play the two moves again
         if (act) pn.dataset.act = act; pn.classList.toggle('open', !!act);
+        clearTimeout(pn.__animT);
+        if (act) { pn.classList.add('anim'); pn.__animT = setTimeout(() => pn.classList.remove('anim'), 1400); } else pn.classList.remove('anim');
         if (act) {   // the panel opens level with its own icon
             const root = $('v3d').getBoundingClientRect(), bt = document.querySelector(`#v3-rail [data-go="${act}"]`).getBoundingClientRect();
             pn.style.top = '0px'; const ph = pn.offsetHeight;
@@ -6776,13 +6845,22 @@ function syncUI() {
     document.querySelectorAll('#v3-cams [data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === S.cam));
     objUI();
     $('v3-cols').innerHTML = swatchesHTML();
-    $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c || null; applyMaterial(); syncUI(); };
-    $('v3-custom').oninput = e => { S.color = e.target.value; applyMaterial(); document.querySelectorAll('#v3-cols .v3-dot').forEach(d => d.classList.remove('on')); };
+    // a colour belongs to the powder coat: picking one while steel is chosen switches to the powder coat (one of the two, never a mix)
+    const pickColour = async c => {
+        const t0 = S.t;
+        if (c && MATS[S.mat].brushed) { if (!allowedMats().includes('powder')) return false; S.mat = 'powder'; }
+        S.color = c || null; ensureSel(); applyMaterial(); syncUI();
+        if (S.t !== t0) { await rebuild(); syncUI(); }
+        return true;
+    };
+    $('v3-cols').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; pickColour(b.dataset.c || null); };
+    $('v3-custom').oninput = async e => { const v = e.target.value; if (MATS[S.mat].brushed) { await pickColour(v); return; } S.color = v; applyMaterial(); document.querySelectorAll('#v3-cols .v3-dot').forEach(d => d.classList.remove('on')); };
     ensureSel();
-    $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip${k === S.mat ? ' on' : ''}" data-m="${k}">${MATS[k].name}</button>`).join('');
-    $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip${t === S.t ? ' on' : ''}" data-t="${t}">${t} mm</button>`).join('');
+    $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip v3-mc${k === S.mat ? ' on' : ''}" data-m="${k}"><i class="v3-mdot" style="background:${MAT_DOT[k] || MATS[k].color}"></i><span>${MATS[k].short || MATS[k].name}</span></button>`).join('');
+    $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip v3-tk${t === S.t ? ' on' : ''}" data-t="${t}"><span>${t} mm</span><i style="height:${Math.max(2, Math.round(t * 2))}px"></i></button>`).join('');
     $('v3-sum-mat').textContent = MATS[S.mat].name; $('v3-sum-thick').textContent = S.t + ' mm';
     $('v3-sum-col').innerHTML = `<span class="v3-dot-s" style="background:${S.color || MATS[S.mat].color}"></span>`;
+    { const th = $('v3-railth'); if (th) { th.firstChild.textContent = S.t; th.lastChild.style.height = Math.max(2, Math.round(S.t * 2)) + 'px'; } }
     $('v3-railcol').style.background = S.color || MATS[S.mat].color;
     const owner = window.karakuliShop && window.karakuliShop.isOwner();
     $('v3-dxf').style.display = owner ? '' : 'none'; $('v3d-shop').classList.toggle('owner', !!owner);
@@ -6895,13 +6973,14 @@ function initRuntime() {
     controls.addEventListener('end', () => { if (R) R.dragging = false; });
     // Turning or zooming by hand does not stop an effect: it waits while the model is moved and carries on from the new position.
     controls.addEventListener('start', () => { if (R) { R.cam = null; if (R.fxRun) R.fxHold = true; R.dragging = true; if (S.cam) { S.cam = null; syncUI(); } } });
-    const light = new T.DirectionalLight(0xffffff, 0.9);
+    const light = new T.DirectionalLight(0xffffff, 1.1);
     light.castShadow = true; light.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 8;
     scene.add(light);
-    scene.add(new T.HemisphereLight(0xffffff, 0xaeb3ba, 0.55));
+    scene.add(new T.HemisphereLight(0xffffff, 0xaeb3ba, 0.3));
     const wall = new T.Mesh(new T.PlaneGeometry(40000, 30000), new T.MeshStandardMaterial({ color: WALLS[S.env], roughness: 0.95, metalness: 0 }));
     wall.receiveShadow = true; scene.add(wall);
-    R = { renderer, scene, camera, controls, light, wall, pmrem: new T.PMREMGenerator(renderer), envs: {}, material: new T.MeshStandardMaterial({ side: T.DoubleSide }), brush: makeBrushTexture(), model: null, pieces: [], strips: [], mask: null, raf: 0, last: 0, dirty: true, lite, slow: 0, fr: 0 };
+    R = { renderer, scene, camera, controls, light, wall, pmrem: new T.PMREMGenerator(renderer), envs: {}, material: new T.MeshStandardMaterial({ side: T.DoubleSide }), brush: makeBrushTexture(lite), model: null, pieces: [], strips: [], mask: null, raf: 0, last: 0, dirty: true, lite, slow: 0, fr: 0 };
+    try { const mx = renderer.capabilities.getMaxAnisotropy && renderer.capabilities.getMaxAnisotropy(); if (mx) R.brush.anisotropy = Math.min(16, mx); } catch (e) {}
     resize();
 }
 
@@ -7103,6 +7182,7 @@ async function open3D() {
     // (this puts the whole drawing back).
     try { if (typeof isTimelapseUIOpen !== 'undefined' && isTimelapseUIOpen && typeof toggleTimelapseUI === 'function') toggleTimelapseUI(); } catch (err) { console.warn(err); }
     buildUI();
+    if (window.__railSet) window.__railSet(null);   // never start with a menu left open from the last visit
     document.body.classList.add('v3d-open');
     ui.el.classList.add('show');
     S.fold = 0; S.playing = false;
@@ -7138,6 +7218,7 @@ async function open3D() {
 function close3D() {
     if (!document.body.classList.contains('v3d-open')) return;
     document.body.classList.remove('v3d-open');
+    if (window.__railSet) window.__railSet(null);
     if (ui) ui.el.classList.remove('show');
     if (window.cvSync) cvSync();
     S.playing = false;
