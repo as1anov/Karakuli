@@ -28,7 +28,7 @@
             --main-font: 'Sora', 'Helvetica Neue', Arial, sans-serif;
             --tb: 40px;
             --tbar-bg: #e8e8e8;   /* every toolbar / floating panel */
-            --btn-bg: #d7d7d8;    /* every button on them */
+            --btn-bg: #d1d3d4;    /* every button on them */
             --header-height: var(--tb);
             --dot-color: 0, 0, 0;
             --dot-opacity: 0.25; 
@@ -178,6 +178,22 @@
         @media (max-width: 380px) { :root { --tb: 32px; } .theme-svg { width: 18px; height: 18px; } }
         @media (min-width: 601px) { #v3d-title { right: calc(50% + 190px) !important; } }
         @media (max-width: 600px) { body.v3d-open #v3d-title { top: 66px !important; } }
+
+        /* --- BOLT HOLES WINDOW --- */
+        #holes-pop { position: fixed; inset: 0; z-index: 2800; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; touch-action: none; }
+        .hp-card { width: min(300px, 100%); background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 20px; box-shadow: 0 24px 60px rgba(0,0,0,0.35); overflow: hidden; }
+        .hp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 20px 14px; }
+        .hp-head b { display: block; font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
+        .hp-head small { display: block; margin-top: 4px; font-size: 12px; color: var(--disabled-color); }
+        .hp-body { padding: 0 20px 16px; }
+        .hp-board { position: relative; height: 92px; border-radius: 14px; border: 1px solid var(--border-color); background: var(--btn-bg); }
+        .hp-dot { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; padding: 0; border-radius: 50%; border: 1.5px solid var(--text-color); background: transparent; opacity: .4; cursor: pointer; transition: opacity .15s, transform .12s, background .15s; pointer-events: auto; }
+        .hp-dot::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; }   /* a larger touch area than the dot itself */
+        .hp-dot.on { background: var(--text-color); opacity: 1; }
+        .hp-dot:active { transform: scale(.85); }
+        .hp-foot { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px 16px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--disabled-color); }
+        .hp-foot b { color: var(--text-color); font-size: 13px; }
+        .hp-foot.warn, .hp-foot.warn b { color: #d33; }
 
         /* --- DASHBOARD / SIDEBAR --- */
         #dashboard-overlay {
@@ -815,7 +831,7 @@
                         <span id="mode-ico"></span><span id="mode-text" style="display:none">Navigation</span>
                         <div id="game-hearts"></div>
                     </div>
-                    <div class="control-btn tb-act" id="tb-new" onclick="event.stopPropagation(); openNewCanvasModal(true)" title="New canvas">
+                    <div class="control-btn tb-act" id="tb-new" onclick="event.stopPropagation(); toolbarCanvas()" title="Canvas size / new canvas">
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11.5v6M9 14.5h6"/></svg>
                     </div>
                     <div class="control-btn tb-act" id="tb-undo" onclick="event.stopPropagation(); undo()" title="Undo (/)">
@@ -1136,6 +1152,7 @@
         let projectCreationPromise = null;
         let currentProjectTitle = 'Karakuli #0000';
         let createProjectOnReset = false;
+        let holeOff = new Set();      // bolt-hole slots switched off by the person: 'row,col' (col 0 / 1 / 2 = left / middle / right)
         let activeProductKey = null;   // product shown on the canvas (shelf / hanger / magazine)
         let selectedPresetKey = null;  // product selected inside the New Canvas window
         let projectShare = { edit: null, view: null };   // share tokens of the project on the canvas
@@ -1148,7 +1165,7 @@
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
                 paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
-                productKey: activeProductKey,
+                productKey: activeProductKey, holeOff: [...holeOff],
                 shareEditToken: projectShare.edit, shareViewToken: projectShare.view,
                 tlCurrentFrame, tlCaptureStride, tlCaptureCounter, ...tlPart
             }));
@@ -1515,6 +1532,7 @@
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
+            holeOff = new Set(Array.isArray(project.holeOff) ? project.holeOff : []);
             if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
             const tlLoaded = project.tlHistory || (project.tlJson ? unpackTimelapse(project.tlJson) : null);
             if (tlLoaded && tlLoaded.length) {
@@ -1937,14 +1955,20 @@ service cloud.firestore {
             if (P.holes.bottomUp != null) rows.push(anchor - P.holes.bottomUp);
             // narrow products (4 hooks or fewer) get 4 holes instead of 6
             const xs = wMm <= 460 ? [P.holes.inset, wMm - P.holes.inset] : [P.holes.inset, wMm / 2, wMm - P.holes.inset];
-            const holes = [];
-            rows.forEach(y => xs.forEach(x => holes.push([x, y])));
+            const holes = [], slots = [];
+            const off = key === activeProductKey ? holeOff : null;
+            rows.forEach((y, r) => xs.forEach((x, c) => {
+                const col = xs.length === 2 ? (c ? 2 : 0) : c;       // two-column products keep the left / right slots
+                const on = !(off && off.has(r + ',' + col));
+                slots.push({ r, c: col, x, y, on });
+                if (on) holes.push([x, y]);
+            }));
             let arms = [];
             if (P.hooks) {
                 const n = hooksFromWidth(wMm), c = P.hooks;
                 for (let i = 0; i < n; i++) arms.push([i * c.pitch, i * c.pitch + c.armW]);
             }
-            return { anchor, folds: P.folds.map(o => anchor + o), marks: P.marks.map(m => ({ y: anchor + m.off, label: m.label })), patternEnd: P.patternEnd == null ? null : anchor + P.patternEnd, holes, arms };
+            return { anchor, folds: P.folds.map(o => anchor + o), marks: P.marks.map(m => ({ y: anchor + m.off, label: m.label })), patternEnd: P.patternEnd == null ? null : anchor + P.patternEnd, holes, slots, arms };
         }
         // Bolt holes of the template currently on the canvas, in mm from the sheet's top-left corner.
         function currentHolesMm() {
@@ -2454,6 +2478,9 @@ service cloud.firestore {
             initModalFocus();
         }
 
+        // Toolbar button: with a sheet on screen (a product, a shape, a sized canvas) it opens the size window of that very sheet;
+        // on the blank canvas it opens the New Canvas window. (A brand-new canvas is also in the menu.)
+        function toolbarCanvas() { if (isPaperVisible) openNewCanvasModalFromCorner(); else openNewCanvasModal(true); }
         function openNewCanvasModal(fromStart = false) {
             isResizingOnly = false;
             createProjectOnReset = true;
@@ -2518,7 +2545,7 @@ service cloud.firestore {
                 if (!(await keepCurrentDrawing())) return;
                 if (shareSession) leaveSharedSession();
                 const create = createProjectOnReset;
-                isPaperVisible = false; activeProductKey = null;
+                isPaperVisible = false; activeProductKey = null; holeOff.clear();
                 closeNewCanvasModal();
                 if (create) { activeProjectId = null; projectShare = { edit: null, view: null }; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
                 try { performReset({ preserveUndo: false }); } catch (err) { console.error(err); }
@@ -2534,6 +2561,7 @@ service cloud.firestore {
             paperWidthMm = PRODUCTS[selectedPresetKey] ? w : +w.toFixed(2);
             paperHeightMm = +h.toFixed(2);
             isPaperVisible = true;
+            if (!isResizingOnly || activeProductKey !== selectedPresetKey) holeOff.clear();
             activeProductKey = selectedPresetKey;
             closeNewCanvasModal();
             if (!isResizingOnly) {
@@ -3282,6 +3310,54 @@ service cloud.firestore {
             isPanning = true; 
         }
 
+        // ---- Bolt holes: a tap on a hole reticle opens a small window with the hole positions; dark = hole, light = none (at least 2) ----
+        function holeAtScreen(x, y) {
+            const MM = LINE_WEIGHT / 12, R = Math.max(HOLE_RING_MM * MM, 6 / zoom) * zoom;
+            const reach = Math.max(R * 2, 22);
+            return getBoltHolesPx().some(h => Math.hypot(offsetX + h.x * zoom - x, offsetY + h.y * zoom - y) <= reach);
+        }
+        function closeHolesPopup() { const el = document.getElementById('holes-pop'); if (el) el.remove(); }
+        function openHolesPopup() {
+            if (templateKind() !== 'product') return;
+            closeHolesPopup();
+            const wrap = document.createElement('div');
+            wrap.id = 'holes-pop';
+                        wrap.innerHTML = '<div class="hp-card" role="dialog" aria-label="Mounting holes"><div class="hp-head"><b>Mounting holes</b><button class="nc-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div class="hp-body"><div class="hp-board" id="hp-board"></div></div><div class="hp-foot" id="hp-foot"><span id="hp-info"></span><span>Minimum 2</span></div></div>';
+            document.body.appendChild(wrap);
+            const board = wrap.querySelector('#hp-board'), info = wrap.querySelector('#hp-info');
+            const render = (warn) => {
+                const G = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
+                const rows = Math.max(...G.slots.map(q => q.r)) + 1, cols = G.slots.some(q => q.c === 1);
+                board.innerHTML = '';
+                G.slots.forEach(q => {
+                    const b = document.createElement('button');
+                    b.className = 'hp-dot' + (q.on ? ' on' : '');
+                    b.style.left = (q.c === 0 ? 12 : q.c === 1 ? 50 : 88) + '%';
+                    b.style.top = (rows === 1 ? 50 : q.r === 0 ? 30 : 70) + '%';
+                    b.setAttribute('aria-pressed', q.on ? 'true' : 'false');
+                    b.title = q.on ? 'Hole' : 'No hole';
+                    b.onclick = e => {
+                        e.stopPropagation();
+                        const on = G.slots.filter(z => z.on).length;
+                        const key = q.r + ',' + q.c;
+                        if (q.on) { if (on <= 2) { render(true); return; } holeOff.add(key); } else holeOff.delete(key);
+                        invalidateGeometryCache(); redraw(); saveCurrentProject();
+                        render(false);
+                    };
+                    board.appendChild(b);
+                });
+                const n = G.slots.filter(z => z.on).length;
+                info.innerHTML = warn ? 'At least 2 holes are needed' : `<b>${n}</b> of ${G.slots.length} holes`;
+                wrap.querySelector('#hp-foot').classList.toggle('warn', !!warn);
+            };
+            render(false);
+            const close = () => { closeHolesPopup(); window.removeEventListener('keydown', onKey, true); };
+            const onKey = e => { if (e.key === 'Tab') return; e.stopImmediatePropagation(); if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } };
+            window.addEventListener('keydown', onKey, true);
+            wrap.addEventListener('pointerdown', e => { if (e.target === wrap) close(); });
+            wrap.querySelector('.nc-close').onclick = close;
+        }
+
         function handleEnd(x, y) {
             if (isResizingCanvas) {
                 if (performance.now() - (window.lastClickTime || 0) < 200) {
@@ -3301,6 +3377,7 @@ service cloud.firestore {
 
             if (isPanning && performance.now() - (window.lastClickTime || 0) < 200) {
                 if (!isOverUI(x, y) && !isTimelapseUIOpen && !isGameMode) {
+                    if (templateKind() === 'product' && !isViewOnly && !isEraserActive && holeAtScreen(x, y)) { isPanning = false; openHolesPopup(); return; }
                     let worldX = (x - offsetX) / zoom; let worldY = (y - offsetY) / zoom;
                     curI = Math.round(worldX / STEP); curJ = Math.round(worldY / STEP); lastDirection = null; redraw();
                     captureState();
