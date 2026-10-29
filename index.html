@@ -147,15 +147,19 @@
 
 
         /* --- MAIN TOOLBAR (top centre): drawing tools | 3D --- */
-        #main-toolbar { display: flex; align-items: center; gap: 0; padding: 0; height: var(--tb); box-sizing: border-box; border-radius: var(--border-radius); pointer-events: auto; overflow: hidden; }
-        #main-toolbar .mode-header, #main-toolbar .control-btn { background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; height: calc(var(--tb) - 2px); border-radius: calc(var(--border-radius) - 1px); color: var(--text-color); }
-        #main-toolbar .control-btn { width: calc(var(--tb) - 2px); }
-        #main-toolbar .mode-header { width: calc(var(--tb) - 2px); background: var(--active-btn-bg); }
+        #main-toolbar { --tbg: 5px; display: flex; align-items: center; gap: var(--tbg); padding: var(--tbg); box-sizing: border-box; border-radius: 16px; pointer-events: auto; margin-top: calc(var(--tbg) * -1 - 1px); }
+        #main-toolbar .mode-header, #main-toolbar .control-btn { background: none; border: 1px solid var(--border-color); backdrop-filter: none; -webkit-backdrop-filter: none; height: var(--tb); border-radius: 11px; color: var(--text-color); box-sizing: border-box; }
+        #main-toolbar .control-btn { width: var(--tb); }
+        #main-toolbar .mode-header { width: var(--tb); background: var(--active-btn-bg); }
         #main-toolbar .control-btn.active, #v3d-btn.on { background: var(--active-btn-bg); }
         #main-toolbar .control-btn:hover:not(.active) svg { opacity: .65; }
+        :root:not([data-theme="dark"]) #main-toolbar { background: #e8e8e8; }
+        :root:not([data-theme="dark"]) #main-toolbar .mode-header, :root:not([data-theme="dark"]) #main-toolbar .control-btn { background: #d7d7d8; }
+        :root:not([data-theme="dark"]) #main-toolbar .mode-header, :root:not([data-theme="dark"]) #main-toolbar .control-btn.active, :root:not([data-theme="dark"]) body.v3d-open #v3d-btn { background: var(--active-btn-bg); }
+        :root:not([data-theme="dark"]) body.v3d-open #main-toolbar .mode-header { background: #d7d7d8; }
         #mode-ico { display: block; }
         #mode-ico svg { display: block; }
-        .tb-sep { width: 1px; height: 22px; margin: 0 5px; background: var(--border-color); flex: none; }
+        .tb-sep { width: 1px; height: 22px; margin: 0; background: var(--border-color); flex: none; }
         #main-toolbar .mode-header { transition: background .2s, color .2s; }
         body.v3d-open #main-toolbar .mode-header { background: none; color: var(--disabled-color); }
         body.v3d-open #v3d-btn { background: var(--active-btn-bg); }
@@ -165,10 +169,10 @@
         body.v3d-open #action-indicator { display: none; }
         body.game-active #main-toolbar .tb-act:not(#eraser-btn), body.game-active #tb-sep, body.game-active #v3d-btn { display: none !important; }
         #mode-text { display: none !important; }
-        body.game-active #main-toolbar .mode-header { width: 90px; }
+        body.game-active #main-toolbar .mode-header { width: 96px; }
         body.game-active #mode-ico { display: none; }
-        @media (max-width: 600px) { :root { --tb: 38px; } .tb-sep { margin: 0 3px; } }
-        @media (max-width: 380px) { :root { --tb: 34px; } .theme-svg { width: 18px; height: 18px; } }
+        @media (max-width: 600px) { :root { --tb: 36px; } #main-toolbar { --tbg: 4px; border-radius: 15px; } }
+        @media (max-width: 380px) { :root { --tb: 32px; } .theme-svg { width: 18px; height: 18px; } }
         @media (min-width: 601px) { #v3d-title { right: calc(50% + 190px) !important; } }
         @media (max-width: 600px) { body.v3d-open #v3d-title { top: 66px !important; } }
 
@@ -4759,6 +4763,28 @@ service cloud.firestore {
             if (a && a.id !== 'kbd-sink' && ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName) && a.contains && document.getElementById('new-canvas-modal').classList.contains('show')) return;
             setTimeout(ensureKeyboardFocus, 0);
         }, { capture: true, passive: true }));
+        // Apple Pencil / stylus: on some iPads a pen tap on a plain element (a <div> button) never turns into a click
+        // (Scribble, touch-action:none, the focus juggling above). So a pen tap that goes down and up on the same button is
+        // turned into a click here, and the browser's own click, if it also arrives, is swallowed so nothing fires twice.
+        (() => {
+            const SEL = 'button, .control-btn, .tl-action-btn, .dash-btn, .modal-btn, [onclick]';
+            const SKIP = 'input, textarea, select, canvas, .v-key, .project-swipe, a[href]';
+            const pick = t => { const el = t && t.closest && t.closest(SEL); return el && !el.closest(SKIP) && !el.disabled && !el.classList.contains('disabled') ? el : null; };
+            let down = null, synthAt = 0, synthEl = null;
+            window.addEventListener('pointerdown', e => { down = (e.pointerType === 'pen') ? { el: pick(e.target), x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId } : null; }, true);
+            window.addEventListener('pointerup', e => {
+                const d = down; down = null;
+                if (!d || !d.el || e.pointerId !== d.id) return;
+                const el = pick(document.elementFromPoint(e.clientX, e.clientY));
+                if (el !== d.el || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 14 || performance.now() - d.t > 700) return;
+                synthAt = performance.now(); synthEl = el;
+                el.click();
+            }, true);
+            window.addEventListener('click', e => {
+                if (e.isTrusted && synthEl && performance.now() - synthAt < 350 && synthEl.contains(e.target)) { synthEl = null; e.stopImmediatePropagation(); e.preventDefault(); }
+            }, true);
+            window.addEventListener('pointercancel', () => { down = null; }, true);
+        })();
         window.addEventListener('load', ensureKeyboardFocus);
         window.addEventListener('focus', ensureKeyboardFocus);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) ensureKeyboardFocus(); });
@@ -4777,10 +4803,12 @@ service cloud.firestore {
         // First thing a visitor sees: the New Canvas window, with the blank canvas offered first.
         (function openStartWindow() {
             if (/[?&](edit|view)=/.test(location.search)) return;
-            let tries = 0;
+            let tries = 0, done = false;
+            const open = () => { if (done) return; done = true; clearInterval(timer); if (!document.body.classList.contains('customer-view')) openNewCanvasModal(true); };
+            // normally as soon as the canvas exists; if the drawing library is slow or fails, still open after ~3 s so the start window never goes missing
             const timer = setInterval(() => {
-                if (typeof width === 'number' && width > 0 && typeof showCanvasModal === 'function') { clearInterval(timer); openNewCanvasModal(true); }
-                else if (++tries > 100) clearInterval(timer);
+                if (typeof showCanvasModal !== 'function') { if (++tries > 100) clearInterval(timer); return; }
+                if ((typeof width === 'number' && width > 0) || ++tries > 30) open();
             }, 100);
         })();
 
