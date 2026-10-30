@@ -29,7 +29,7 @@
             --tb: 40px;
             --tbar-bg: #e9e8e8;   /* every toolbar / floating panel */
             --btn-on: #a7a9ac;    /* a selected button */
-            --btn-bg: #d1d3d4;    /* every button on them */
+            --btn-bg: #dedfe0;    /* every button on them */
             --header-height: var(--tb);
             --dot-color: 0, 0, 0;
             --dot-opacity: 0.25; 
@@ -152,14 +152,17 @@
         }
 
 
+        :root { --tpad: 10px; --tgap: 11px; }   /* the padding of every toolbar = the Flat / Folded bar's, so they are all the same height */
         /* --- MAIN TOOLBAR (top centre): drawing tools | 3D --- */
-        #main-toolbar { --tbg: 5px; display: flex; align-items: center; gap: var(--tbg); padding: 5px; box-sizing: border-box; border-radius: 17px; pointer-events: auto; }
+        #main-toolbar { --tbg: var(--tgap); display: flex; align-items: center; gap: var(--tbg); padding: var(--tpad); box-sizing: border-box; border-radius: 16px; pointer-events: auto; }
         /* the menu button sits in the same kind of frame, so it is the same height and on the same line as the toolbar (and as the 3D toolbar) */
         #left-nav-group { box-sizing: border-box; padding: 5px !important; gap: 0 !important; background: var(--tbar-bg); border: 1px solid var(--border-color); border-radius: 17px; backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
         #left-nav-group #menu-btn { border: 1px solid var(--border-color); }
-        #main-toolbar .mode-header, #main-toolbar .control-btn { background: none; border: 1px solid var(--border-color); backdrop-filter: none; -webkit-backdrop-filter: none; height: var(--tb); border-radius: 11px; color: var(--text-color); box-sizing: border-box; }
+        #main-toolbar .mode-header, #main-toolbar .control-btn { background: none; border: 1px solid var(--border-color); backdrop-filter: none; -webkit-backdrop-filter: none; height: var(--tb); border-radius: 12px; color: var(--text-color); box-sizing: border-box; }
         #main-toolbar .control-btn { width: var(--tb); }
-        #main-toolbar .mode-header { width: var(--tb); background: var(--btn-on); }
+        #main-toolbar .mode-header { width: var(--tb); background: var(--mode-bg, var(--btn-on)); color: #fff; }
+        /* the mode button wears the cursor's colour: red in Navigation, the dark pointer in Drawing */
+        body { --mode-bg: #FF6666; } body.mode-draw { --mode-bg: #404040; } body[data-theme="dark"].mode-draw { --mode-bg: #58595B; }
         #main-toolbar .control-btn.active, #v3d-btn.on { background: var(--btn-on); }
         #main-toolbar .control-btn:hover:not(.active) svg { opacity: .65; }
         #main-toolbar { background: var(--tbar-bg); }
@@ -167,7 +170,7 @@
         #main-toolbar .control-btn.active { background: var(--btn-on); }
         #mode-ico { display: block; }
         #mode-ico svg { display: block; }
-        .tb-sep { width: 1px; height: 22px; margin: 0 1px; background: var(--border-color); flex: none; }
+        .tb-sep { width: 1px; height: 22px; margin: 0; background: var(--border-color); flex: none; }
         #main-toolbar .mode-header { transition: background .2s, color .2s; }
         body.v3d-open #main-toolbar .mode-header { background: var(--btn-bg); color: var(--disabled-color); }
         body.v3d-open #main-toolbar #v3d-btn { background: var(--active-btn-bg); }
@@ -175,6 +178,32 @@
         body.v3d-open .top-nav-container { display: none; }
         body.v3d-open #left-nav-group { visibility: hidden; }
         body.v3d-open #action-indicator { display: none; }
+
+        /* the drawing toolbar enters like the 3D one: the bar rises, its buttons pop up one after another */
+        @keyframes tbin { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
+        @keyframes tbitem { from { opacity: 0; transform: translateY(8px) scale(0.55); } to { opacity: 1; transform: none; } }
+        #main-toolbar.tb-intro { animation: tbin 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+        #main-toolbar.tb-intro > * { animation: tbitem 0.46s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; animation-delay: calc(var(--d, 0) * 34ms + 120ms); }
+        #main-toolbar > :nth-child(1) { --d: 0; } #main-toolbar > :nth-child(2) { --d: 1; } #main-toolbar > :nth-child(3) { --d: 2; } #main-toolbar > :nth-child(4) { --d: 3; }
+        #main-toolbar > :nth-child(5) { --d: 4; } #main-toolbar > :nth-child(6) { --d: 5; } #main-toolbar > :nth-child(7) { --d: 6; } #main-toolbar > :nth-child(8) { --d: 7; }
+        body:not(.tb-bottom) #main-toolbar.tb-intro { animation-name: none; }
+        @media (prefers-reduced-motion: reduce) { #main-toolbar.tb-intro, #main-toolbar.tb-intro > * { animation: none !important; } }
+
+        /* product name + facts while drawing; tap the name or the arrow to hide / show them (shared with the 3D view) */
+        #prod-info { position: fixed; left: 20px; top: max(20px, env(safe-area-inset-top)); z-index: 480; max-width: calc(50% - 280px); pointer-events: none; display: none; color: var(--text-color); }
+        #prod-info.show { display: block; }
+        #prod-info .pi-row { display: flex; align-items: center; gap: 2px; min-height: 28px; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        #prod-info b { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #prod-info .pi-chev { width: 6px; height: 6px; margin: -3px 0 0 11px; flex: none; border: solid var(--disabled-color); border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); transition: transform .15s; }
+        #prod-info.fold .pi-chev { transform: rotate(-45deg); margin: 0 3px 0 11px; }
+        #prod-info.fold .pi-facts { display: none; }
+        #prod-info .pi-facts em { display: block; font-style: normal; font-size: 13px; color: var(--disabled-color); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #prod-info .pi-facts em::before { content: '- '; }
+        body.v3d-open #prod-info, body.timelapse-active #prod-info, body.game-active #prod-info, body.customer-view #prod-info, body.dashboard-open #prod-info { display: none !important; }
+        /* the same place as the name in the 3D view: level with the top bar on a wide screen, below it on a narrow one */
+        @media (min-width: 1040px) { #prod-info .pi-row { min-height: 62px; } #prod-info .pi-facts { margin-top: -12px; } }
+        @media (max-width: 1039px) { #prod-info { top: calc(max(20px, env(safe-area-inset-top)) + var(--tb) + 30px); right: 12px; left: 20px; max-width: none; } #prod-info .pi-facts em:first-child { margin-top: 4px; } }
+        @media (max-width: 600px) { #prod-info { left: 12px; } }
         /* --- toolbar at the bottom (under the hand); it moves up while the virtual keyboard or the time-lapse bar is open --- */
         body.tb-bottom .top-nav-container { top: auto; bottom: max(20px, env(safe-area-inset-bottom)); }
         body.tb-bottom .top-nav-wrapper { top: auto; bottom: 0; flex-direction: column-reverse; }
@@ -192,7 +221,7 @@
         #mode-text { display: none !important; }
         body.game-active #main-toolbar .mode-header { width: 96px; }
         body.game-active #mode-ico { display: none; }
-        @media (max-width: 600px) { :root { --tb: 36px; } #main-toolbar { --tbg: 4px; padding: 4px; border-radius: 15px; } #left-nav-group { padding: 4px !important; border-radius: 15px; } #v3-rail, #v3-rail.hide { border-radius: 15px; } }
+        @media (max-width: 600px) { :root { --tb: 36px; --tpad: 8px; --tgap: 9px; } #left-nav-group { padding: 4px !important; border-radius: 15px; } }
         @media (max-width: 380px) { :root { --tb: 32px; } .theme-svg { width: 18px; height: 18px; } }
 
         /* --- BOLT HOLES WINDOW --- */
@@ -877,6 +906,7 @@
             </div>
         </div>
         
+        <div id="prod-info"><div class="pi-row" id="pi-row"><b id="pi-name"></b><i class="pi-chev"></i></div><div class="pi-facts" id="pi-facts"></div></div>
         <div id="edge-tab" onclick="event.stopPropagation(); toggleDashboard()" title="Menu"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
         <div id="canvas-container"></div>
 
@@ -3289,6 +3319,7 @@ service cloud.firestore {
             const indicator = document.getElementById('action-indicator');
             const eraserBtn = document.getElementById('eraser-btn');
             modeHeader.innerText = isDrawingMode ? "Drawing" : "Navigation";
+            document.body.classList.toggle('mode-draw', !!isDrawingMode);
             const ico = document.getElementById('mode-ico');
             if (ico) ico.innerHTML = isDrawingMode
                 ? '<svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>'
@@ -6801,11 +6832,11 @@ function ensureCss() {
     .v3-range:active { filter: brightness(1.15); }
     [data-theme="dark"] .v3-range:active { filter: brightness(0.9); }
     #v3d-bar { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 10px 14px; width: min(520px, calc(100% - 40px)); }
-    #v3-play { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: grid; place-items: center; cursor: pointer; }
+    #v3-play { width: var(--tb); height: var(--tb); flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: grid; place-items: center; cursor: pointer; }
     #v3-play svg { width: 18px; height: 18px; fill: currentColor; }
     #v3-fold { flex: 1; min-width: 0; height: 22px; border-radius: 11px; } #v3-fold::-webkit-slider-runnable-track, #v3-fold::-webkit-slider-thumb { height: 22px; }
     .v3-sep { width: 1px; align-self: stretch; margin: 2px 0; background: var(--border-color); flex-shrink: 0; }
-    #v3-fxbtn { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); display: grid; place-items: center; cursor: pointer; }
+    #v3-fxbtn { width: var(--tb); height: var(--tb); flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); display: grid; place-items: center; cursor: pointer; }
     #v3-fxbtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
     #v3-fxbtn:hover { background: var(--active-btn-bg); }
     #v3-fxbtn.on { background: var(--text-color); color: var(--bg-color); }
@@ -6955,12 +6986,12 @@ function ensureCss() {
     /* ---- 3D toolbar: one horizontal bar at the top centre (Back first); every section opens below it as a horizontal strip ---- */
     #v3d, #v3d { --rw: 0px; --rtop: max(20px, env(safe-area-inset-top)); }
     body.customer-view #v3d { --rtop: 70px; }
-    #v3-rail, #v3-rail.hide { display: flex; position: absolute; top: var(--rtop); left: 0; right: 0; bottom: auto; width: fit-content; margin: 0 auto; flex-direction: row; align-items: center; gap: 5px; padding: 5px; border-width: 1px; border-radius: 17px; z-index: 6; }
+    #v3-rail, #v3-rail.hide { display: flex; position: absolute; top: var(--rtop); left: 0; right: 0; bottom: auto; width: fit-content; margin: 0 auto; flex-direction: row; align-items: center; gap: 5px; padding: var(--tpad); border-width: 1px; border-radius: 16px; z-index: 6; }
     #v3-rail.v3-glass { background: var(--tbar-bg); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); pointer-events: auto; }
     #v3-rail.v3-glass button { backdrop-filter: none; -webkit-backdrop-filter: none; }
     #v3-rail #v3d-close, #v3-rail #v3d-shop { position: relative; right: auto; top: auto; bottom: auto; flex: none; width: var(--tb); height: var(--tb); box-sizing: border-box; background: var(--btn-bg); backdrop-filter: none; -webkit-backdrop-filter: none; z-index: auto; }
-    #v3-rail #v3d-close { margin-right: 7px; }
-    #v3-rail #v3d-close::after { content: ""; position: absolute; right: -6px; top: 8px; bottom: 8px; width: 1px; background: var(--border-color); }
+    #v3-rail #v3d-close { margin-right: calc(var(--tpad) * 2 - 3px); }
+    #v3-rail #v3d-close::after { content: ""; position: absolute; right: calc(-1 * var(--tpad) - 1px); top: 8px; bottom: 8px; width: 1px; background: var(--border-color); }
     #v3d.show #v3-rail { animation: v3tbin 0.5s cubic-bezier(0.19, 1, 0.22, 1) both; }
     #v3d.show #v3d-close, #v3d.show #v3d-shop { animation: none; }
     @keyframes v3tbin { from { transform: translateY(-18px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -6982,15 +7013,15 @@ function ensureCss() {
         #v3d-bar { width: calc(100% - 24px); }
         #v3-fx { width: calc(100% - 24px); }
         #v3d-title { left: 12px; right: 12px; top: calc(var(--rtop) + var(--tb) + 18px); }
-        #v3-rail, #v3-rail.hide { gap: 4px; padding: 4px; }
-        #v3-rail #v3d-close { margin-right: 6px; } #v3-rail #v3d-close::after { right: -5px; }
+        #v3-rail, #v3-rail.hide { gap: 4px; }
+        #v3-rail #v3d-close { margin-right: calc(var(--tpad) * 2 - 2px); }
         #v3d-panel.v3-glass { top: calc(var(--rtop) + var(--tb) + 20px); }
         #v3d.menuopen #v3d-title { visibility: hidden; }
     }
     /* ---- the strips: same height, spacing, outlines and colours as the toolbar; no section names ---- */
     #v3d-panel .v3-tog { display: none !important; }
     #v3d-panel.v3-glass { top: calc(var(--rtop) + var(--tb) + 20px); overflow: visible; max-height: none; }
-    #v3d-panel .v3-sec .v3-body { display: flex !important; flex-direction: row; align-items: center; gap: 4px; box-sizing: border-box; height: calc(var(--tb) + 12px); padding: 5px; border-radius: 17px; max-width: calc(100vw - 24px); overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; text-align: left; }
+    #v3d-panel .v3-sec .v3-body { display: flex !important; flex-direction: row; align-items: center; gap: 4px; box-sizing: border-box; height: calc(var(--tb) + var(--tpad) * 2 + 2px); padding: var(--tpad); border-radius: 16px; max-width: calc(100vw - 24px); overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; text-align: left; }
     #v3d-panel .v3-sec .v3-body::-webkit-scrollbar { display: none; }
     #v3d-panel .v3-body, #v3d-panel .v3-body * { touch-action: pan-x pan-y; }
     #v3d-panel .v3-body > * { flex: none; }
@@ -7008,8 +7039,8 @@ function ensureCss() {
     #v3d-panel .v3-note { display: inline-flex; align-items: center; padding: 0 8px; font-size: 12px; white-space: nowrap; }
     /* ---- grid: square rounded buttons (40 px, 4 px apart); a name goes beside its button, at most two buttons wide; the strip opens under its own button and grows to the right ---- */
     #v3d-panel.v3-glass { left: 12px; right: auto; margin: 0; width: fit-content; max-width: calc(100% - 24px); }
-    #v3d-panel .v3-sec .v3-body { gap: 12px; clip-path: inset(0 100% 0 0 round 17px); transform-origin: 0 0; }
-    #v3d-panel.open .v3-sec .v3-body { clip-path: inset(0 0 0 0 round 17px); transition: clip-path 0.38s cubic-bezier(.2,.8,.2,1), opacity 0.15s ease; }
+    #v3d-panel .v3-sec .v3-body { gap: 12px; clip-path: inset(0 100% 0 0 round 16px); transform-origin: 0 0; }
+    #v3d-panel.open .v3-sec .v3-body { clip-path: inset(0 0 0 0 round 16px); transition: clip-path 0.38s cubic-bezier(.2,.8,.2,1), opacity 0.15s ease; }
     #v3d-panel.open.anim .v3-sec .v3-body { transform-origin: 0 0; animation: none; }
     #v3d-panel #v3-mats, #v3d-panel .v3-cat, #v3d-panel #v3-ts, #v3d-panel [data-sec="dl"] .v3-chips, #v3d-panel #v3-objlist, #v3d-panel #v3-price { gap: 12px; }
     #v3d-panel #v3-cols { gap: 4px; }
@@ -7057,8 +7088,8 @@ function ensureCss() {
     #v3d.intro #v3-rail > * { animation: v3item 0.46s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; animation-delay: calc(var(--d, 0) * 34ms + 120ms); }
     #v3-rail > :nth-child(1) { --d: 0; } #v3-rail > :nth-child(2) { --d: 1; } #v3-rail > :nth-child(3) { --d: 2; } #v3-rail > :nth-child(4) { --d: 3; } #v3-rail > :nth-child(5) { --d: 4; }
     #v3-rail > :nth-child(6) { --d: 5; } #v3-rail > :nth-child(7) { --d: 6; } #v3-rail > :nth-child(8) { --d: 7; } #v3-rail > :nth-child(9) { --d: 8; }
-    #v3d-panel .v3-sec .v3-body { clip-path: inset(0 100% 0 0 round 17px); opacity: 0; transition: clip-path 0.2s ease, opacity 0.12s ease; }
-    #v3d-panel.open .v3-sec .v3-body { clip-path: inset(0 0 0 0 round 17px); opacity: 1; transition: clip-path 0.36s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.1s ease; }
+    #v3d-panel .v3-sec .v3-body { clip-path: inset(0 100% 0 0 round 16px); opacity: 0; transition: clip-path 0.2s ease, opacity 0.12s ease; }
+    #v3d-panel.open .v3-sec .v3-body { clip-path: inset(0 0 0 0 round 16px); opacity: 1; transition: clip-path 0.36s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.1s ease; }
     #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-card, .v3-dot, .v3-pick, .v3-orow, .v3-prow, .v3-note, .v3-clear) { animation: v3item 0.44s cubic-bezier(0.34, 1.56, 0.64, 1) backwards !important; animation-delay: calc(var(--d, 0) * 30ms + 130ms) !important; }
     #v3d-panel .v3-sec .v3-body > :is(div):empty { display: none !important; }
     @media (prefers-reduced-motion: reduce) { #v3d.intro #v3-rail, #v3d.intro #v3-rail > *, #v3d-panel.open.anim .v3-body * { animation: none !important; } #v3d-panel .v3-sec .v3-body { transition: none; } }
@@ -7066,13 +7097,17 @@ function ensureCss() {
     #v3d-panel #v3-mats > .v3-chip { width: auto; } #v3d-panel #v3-mats > .v3-chip > span { display: none; }
     /* ---- the 3D toolbar sits at the bottom (under the hand); Flat / Folded and the camera go to the top ---- */
     #v3-rail, #v3-rail.hide { top: auto; bottom: max(20px, env(safe-area-inset-bottom)); }
-    #v3d-bar { top: var(--rtop); bottom: auto; }
-    #v3-fx { top: calc(var(--rtop) + 66px); bottom: auto; max-height: calc(100% - var(--rtop) - 66px - 110px); }
-    #v3d-title, #v3d-title { top: calc(var(--rtop) + 70px); }
+    #v3d-bar { top: var(--rtop); bottom: auto; box-sizing: border-box; height: calc(var(--tb) + var(--tpad) * 2 + 2px); padding-top: var(--tpad); padding-bottom: var(--tpad); border-radius: 16px; }
+    #v3-fx { top: calc(var(--rtop) + var(--tb) + var(--tpad) * 2 + 10px); bottom: auto; max-height: calc(100% - var(--rtop) - var(--tb) - 140px); }
+    #v3d-title, #v3d-title { top: calc(var(--rtop) + var(--tb) + 30px); }
     #v3-name { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
     @media (min-width: 1040px) { #v3-trow { min-height: 62px; } #v3d-title, #v3d-title { top: var(--rtop); left: 20px; right: auto; max-width: calc(50% - 280px); } #v3d-title #v3-info { margin-top: -12px; } }
     @keyframes v3bar { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
     @keyframes v3item { from { opacity: 0; transform: translateY(8px) scale(0.55); } to { opacity: 1; transform: none; } }
+    /* ---- spacing as in the sketch: the gap between buttons = the distance from the toolbar's edge to its first button = the distance either side of the separator ---- */
+    #v3-rail, #v3-rail.hide { gap: var(--tgap); }
+    #v3-rail #v3d-close { margin-right: calc(var(--tpad) + 1px); }
+    #v3d-panel .v3-sec .v3-body, #v3d-panel #v3-mats, #v3d-panel .v3-cat, #v3d-panel #v3-ts, #v3d-panel #v3-cols, #v3d-panel [data-sec="dl"] .v3-chips, #v3d-panel #v3-objlist, #v3d-panel #v3-price { gap: var(--tgap); }
     }`;
     document.head.appendChild(css);
 }
@@ -7137,12 +7172,13 @@ function buildUI() {
             // the strip's first item sits right under its own button; a strip wider than the toolbar is centred under it;
             // one that would stick out past the toolbar's right edge is lined up with that edge
             const tl = rl.left - root.left, tr = rl.right - root.left;
-            let want = bt.left - root.left - 6;
+            const edge = parseFloat(getComputedStyle($('v3-rail')).paddingLeft) + 1;   // strip edge = the toolbar's padding + border, so its first icon sits under its button
+            let want = bt.left - root.left - edge;
             if (w > rl.width) {
                 want = tl + rl.width / 2 - w / 2;
                 const cols = [...$('v3-rail').querySelectorAll('button')].filter(b => b.getClientRects().length);   // the toolbar's own columns: a centred strip lands on them too
                 if (cols.length > 1) { const c0 = cols[0].getBoundingClientRect().left - root.left, pitch = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left;
-                    want = c0 + Math.round((want + 6 - c0) / pitch) * pitch - 6; }
+                    want = c0 + Math.round((want + edge - c0) / pitch) * pitch - edge; }
             } else if (want + w > tr) want = tr - w;
             pn.style.left = Math.round(Math.max(12, Math.min(want, root.width - Math.min(w, room) - 12))) + 'px';
         }
@@ -7690,6 +7726,31 @@ setInterval(() => {
     new MutationObserver(apply).observe(b, { attributes: true, attributeFilter: ['class'] });
     new MutationObserver(apply).observe(kbd, { attributes: true, attributeFilter: ['class'] });
     b.classList.add('tb-bottom'); apply();
+    // the entrance animation plays on load and every time the drawing view comes back from 3D
+    const tbEl = document.getElementById('main-toolbar'); let introT = 0;
+    function intro() { tbEl.classList.remove('tb-intro'); void tbEl.offsetWidth; tbEl.classList.add('tb-intro'); clearTimeout(introT); introT = setTimeout(() => tbEl.classList.remove('tb-intro'), 1400); }
+    let was3d = b.classList.contains('v3d-open');
+    new MutationObserver(() => { const now = b.classList.contains('v3d-open'); if (was3d && !now) intro(); was3d = now; }).observe(b, { attributes: true, attributeFilter: ['class'] });
+    intro();
+    // product name + facts while drawing
+    const pi = document.getElementById('prod-info'), pRow = document.getElementById('pi-row');
+    try { if (localStorage.getItem('kk-v3-info') === '0') pi.classList.add('fold'); } catch (e) {}
+    pRow.addEventListener('click', e => { e.stopPropagation(); const f = pi.classList.toggle('fold'); try { localStorage.setItem('kk-v3-info', f ? '0' : '1'); } catch (er) {} });
+    let sig = '';
+    function refreshInfo() {
+        let html = '', name = '';
+        try {
+            if (templateKind() === 'product') {
+                const P = PRODUCTS[activeProductKey], w = paperWidthMm, h = paperHeightMm, L = [`${+w.toFixed(1)} × ${+h.toFixed(1)} mm flat`];
+                const nh = currentHolesMm().length; L.push(`${nh} ${nh === 1 ? 'mounting hole' : 'mounting holes'}`);
+                if (P.hooks) { const n = hooksFromWidth(w); L.push(`${n} ${n === 1 ? 'hook' : 'hooks'}`); }
+                name = P.name; html = L.map(t => `<em>${t}</em>`).join('');
+            }
+        } catch (e) {}
+        const k = name + '|' + html; if (k === sig) return; sig = k;
+        document.getElementById('pi-name').textContent = name; document.getElementById('pi-facts').innerHTML = html; pi.classList.toggle('show', !!name);
+    }
+    setInterval(refreshInfo, 400); refreshInfo();
     // swipe from the left screen edge towards the centre opens the menu
     let st = null;
     window.addEventListener('pointerdown', e => {
