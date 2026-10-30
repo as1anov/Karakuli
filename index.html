@@ -6,7 +6,7 @@
     <title>Karakuli: Digital Editor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300..800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         :root {
@@ -25,7 +25,7 @@
             --draw-cursor-color: #404040; 
             --active-key-color: #000000;
             --border-radius: 12px;
-            --main-font: 'Sora', 'Helvetica Neue', Arial, sans-serif;
+            --main-font: 'Google Sans', 'Google Sans Flex', 'Helvetica Neue', Arial, sans-serif;
             --tb: 40px;
             --tbar-bg: #e9e8e8;   /* every toolbar / floating panel */
             --btn-on: #a7a9ac;    /* a selected button */
@@ -178,6 +178,8 @@
         body.v3d-open .top-nav-container { display: none; }
         body.v3d-open #left-nav-group { visibility: hidden; }
         body.v3d-open #action-indicator { display: none; }
+        /* the text on every button is 13 px */
+        button:not(.v3-lab), .dash-btn, .modal-btn, .tpl-btn, .tpl-item, .project-act, .tl-action-btn, .v-key, .preset-card, .v3-chip, .v3-card, .v3-tk, .v3-mc, .v3-chip span, .v3-tk span, .v3-card span, .v3-card b { font-size: 13px !important; }
 
         /* the drawing toolbar enters like the 3D one: the bar rises, its buttons pop up one after another */
         @keyframes tbin { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
@@ -301,7 +303,7 @@
 
         .dash-section { margin-bottom: 24px; flex-shrink: 0; } 
         .dash-label { 
-            font-size: 11px; font-weight: 700; text-transform: uppercase; 
+            font-size: 12px; font-weight: 700; text-transform: uppercase; 
             letter-spacing: 0.8px; color: var(--disabled-color); 
             margin-bottom: 12px; display: block; 
         }
@@ -340,7 +342,7 @@
         .project-swipe.ready .project-del-bg span { opacity: 1; transform: none; }
         @keyframes trashPop { 0% { transform: scale(1); } 45% { transform: scale(1.5) rotate(-12deg); } 100% { transform: scale(1.18); } }
         .project-hint { margin-top: 4px; text-align: center; font-size: 11px; color: var(--disabled-color); }
-        .project-group { margin: 6px 2px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
+        .project-group { margin: 6px 2px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
         .project-group:first-child { margin-top: 0; }
         .project-item { border-radius: 12px; border: 1px solid var(--border-color); background: var(--panel-bg); overflow: hidden; transition: background 0.15s; }
         .project-item.current { border-color: color-mix(in srgb, var(--text-color) 35%, transparent); }
@@ -465,7 +467,10 @@
 
         #canvas-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100%; z-index: 1; overflow: hidden; touch-action: none; }
         .indicator-text { font-size: 12px; font-weight: 400; color: var(--text-color); opacity: 0; transition: opacity 0.3s ease, transform 0.2s ease; letter-spacing: 0.5px; pointer-events: none; transform: translateY(3px); text-align: center; }
-        .indicator-text.visible { opacity: 1; transform: translateY(5px); }
+        .indicator-text.visible { opacity: 1; }
+        /* the hint (Eraser: 25 %, Done, ...) sits at the top centre, level with the product name */
+        #action-indicator { position: fixed; left: 50%; top: calc(max(20px, env(safe-area-inset-top)) + 31px); transform: translate(-50%, -50%); z-index: 490; font-size: 14px; font-weight: 600; white-space: nowrap; }
+        @media (max-width: 1039px) { #action-indicator { top: calc(max(20px, env(safe-area-inset-top)) + var(--tb) + 44px); } }
 
         .theme-svg { width: 19.8px; height: 19.8px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 
@@ -508,7 +513,7 @@
         .nc-section { padding: 16px 0; border-top: 1px solid var(--border-color); }
         .nc-section:first-child { border-top: 0; padding-top: 6px; }
         .nc-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-        .nc-label { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
+        .nc-label { font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
         .nc-hint { font-size: 11px; color: var(--disabled-color); }
 
         .seg { display: flex; gap: 2px; padding: 2px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--panel-bg); }
@@ -557,7 +562,7 @@
         [data-theme="dark"] #new-canvas-modal { --tpl-bg: #2a2a2a; }
         .tpl-menu { display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20; max-height: min(460px, calc(100vh - 160px)); overflow-y: auto; overscroll-behavior: contain; padding: 4px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--tpl-bg); box-shadow: 0 12px 32px rgba(0,0,0,0.22); scrollbar-width: thin; }
         .tpl-select.open .tpl-menu { display: block; }
-        .tpl-group { padding: 8px 10px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
+        .tpl-group { padding: 8px 10px 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
         .tpl-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
         .tpl-item .tpl-name { flex: 1; }
         .tpl-item:hover, .tpl-item.kb { background: var(--active-btn-bg); }
@@ -902,10 +907,10 @@
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><path d="m3.5 7.5 8.5 4.5 8.5-4.5M12 12v9"/></svg>
                     </div>
                 </div>
-                <div id="action-indicator" class="indicator-text">Action</div>
             </div>
         </div>
         
+        <div id="action-indicator" class="indicator-text">Action</div>
         <div id="prod-info"><div class="pi-row" id="pi-row"><b id="pi-name"></b><i class="pi-chev"></i></div><div class="pi-facts" id="pi-facts"></div></div>
         <div id="edge-tab" onclick="event.stopPropagation(); toggleDashboard()" title="Menu"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></div>
         <div id="canvas-container"></div>
@@ -3808,7 +3813,7 @@ service cloud.firestore {
                 rect(0, 0, width, height);
                 fill(255);
                 textAlign(CENTER, CENTER);
-                textFont('Sora');
+                textFont('Google Sans Flex');
                 textStyle(BOLD);
                 textSize(48);
                 text("Game Over!", width/2, height/2 - 20);
@@ -6859,7 +6864,7 @@ function ensureCss() {
     .v3-fxs.closed .v3-chev { transform: rotate(-45deg); margin: 0 3px 0 0; }
     .v3-fxs.closed .v3-fxb { display: none; }
     .v3-fxs.closed .v3-fxh { margin-bottom: 0 !important; }
-    .v3-fxh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
+    .v3-fxh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
     .v3-fxg { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; margin-bottom: 12px; }
     .v3-fxg .v3-fxc { padding: 8px 0 6px; min-width: 0; white-space: nowrap; }
     @media (max-width: 700px) { .v3-fxg .v3-fxc { font-size: 9.5px; gap: 4px; } .v3-fxg .v3-fxc svg { width: 24px; height: 24px; } }
