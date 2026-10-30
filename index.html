@@ -205,7 +205,7 @@
         /* the same place as the name in the 3D view: level with the top bar on a wide screen, below it on a narrow one */
         @media (min-width: 1040px) { #prod-info .pi-row { min-height: 62px; } #prod-info .pi-facts { margin-top: -12px; } }
         @media (max-width: 1039px) { #prod-info { top: calc(max(20px, env(safe-area-inset-top)) + var(--tb) + 30px); right: 12px; left: 20px; max-width: none; } #prod-info .pi-facts em:first-child { margin-top: 4px; } }
-        @media (max-width: 600px) { #prod-info { left: 12px; } }
+        @media (max-width: 600px) { #prod-info { display: none !important; } }   /* phones: no room, the name would sit on Flat / Folded */
         /* --- toolbar at the bottom (under the hand); it moves up while the virtual keyboard or the time-lapse bar is open --- */
         body.tb-bottom .top-nav-container { top: auto; bottom: max(20px, env(safe-area-inset-bottom)); }
         body.tb-bottom .top-nav-wrapper { top: auto; bottom: 0; flex-direction: column-reverse; }
@@ -3984,12 +3984,14 @@ service cloud.firestore {
 
         function drawGrid(dotRGB, alpha) {
             // At very low zoom the grid becomes visual noise and can create thousands
-            // of draw calls. Hide it below the requested 38% threshold.
-            if (zoom < 0.38) return;
+            // of draw calls. It is shown down to 30 % zoom, with every second dot below 38 % to keep it light.
+            if (zoom < 0.295) return;   // 30 % itself still shows (rounding-safe)
+            const k = zoom < 0.38 ? 2 : 1;
             fill(`rgba(${dotRGB}, ${alpha})`); noStroke();
             let sI = floor((-offsetX/zoom)/STEP)-2, eI = ceil(((width-offsetX)/zoom)/STEP)+2;
             let sJ = floor((-offsetY/zoom)/STEP)-2, eJ = ceil(((height-offsetY)/zoom)/STEP)+2;
-            for(let i=sI; i<=eI; i++) for(let j=sJ; j<=eJ; j++) circle(i*STEP, j*STEP, 1.5/zoom);
+            sI -= ((sI % k) + k) % k; sJ -= ((sJ % k) + k) % k;
+            for(let i=sI; i<=eI; i+=k) for(let j=sJ; j<=eJ; j+=k) circle(i*STEP, j*STEP, 1.5/zoom);
         }
 
         // Bolt holes of the selected product, in world pixels (on grid points).
@@ -6124,6 +6126,9 @@ function glazeMat(i) {
     R.glz = R.glz || {};
     i = ((i % GLAZES.length) + GLAZES.length) % GLAZES.length;
     if (R.glz[i]) return R.glz[i];
+    { const o = { color: new T.Color(GLAZES[i].a), roughness: 0.3, metalness: 0 };   // one plain colour, no pattern
+      if (T.MeshPhysicalMaterial) { o.clearcoat = 0.7; o.clearcoatRoughness = 0.18; }
+      return (R.glz[i] = new (T.MeshPhysicalMaterial || T.MeshStandardMaterial)(o)); }
     const G = GLAZES[i], c = document.createElement('canvas'); c.width = 512; c.height = 512;
     const x = c.getContext('2d'); let r = 1357 + i * 7919; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
     const lin = (y0, y1, c0, c1) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, c0); g.addColorStop(1, c1); return g; };
@@ -6202,6 +6207,9 @@ function flowerHead(kind, cols, sc, rnd) {
 
 // one object, base centred on the origin: { g, w (x extent), d (z extent) }
 function makeObject(kind, seed, depthAvail, ctx) {
+    const o = makeObject0(kind, seed, depthAvail, ctx); o.g.userData.seed = seed; o.g.userData.kind = kind; return o;   // the seed tells which object is which when one is added
+}
+function makeObject0(kind, seed, depthAvail, ctx) {
     const g = new T.Group();
     const add = (geo, mat, x, y, z, shadow = true) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = shadow; g.add(m); return m; };
     const box = (w, h, d, mat, x, y, z) => add(new T.BoxGeometry(w, h, d), mat, x, y, z);
@@ -6222,6 +6230,7 @@ function makeObject(kind, seed, depthAvail, ctx) {
         rbox(th, h, 2.6, 1.2, cm, 0, h / 2, D / 2 - 1.3);                                   // spine (towards the viewer)
         const out = depthAvail >= 70;                                          // too shallow: stands with the cover towards the viewer
         if (!out) g.rotation.y = Math.PI / 2;
+        else if ((ctx.n || 0) % 2 === 1) g.rotation.y = Math.PI;               // every second book stands the other way round: its pages face the viewer
         return { g, w: out ? th : D, d: out ? D : th };
     }
     if (kind === 'magazine') {
@@ -6327,6 +6336,7 @@ function makeObject(kind, seed, depthAvail, ctx) {
 
 function placeObjects() {
     if (!R) return;
+    R.spawn = null;
     if (R.objs) { R.scene.remove(R.objs); R.objs.traverse(o => { if (o.geometry) o.geometry.dispose(); }); R.objs = null; }
     const key = modelInfo().key;
     if (S.objKey !== key) { S.objs = []; S.objKey = key; }
@@ -6387,11 +6397,43 @@ function placeObjects() {
     R.dirty = true;
 }
 
+// A new object appears out of nothing: it grows with a little overshoot, turns slightly into place and sways for a moment
+function spawnLast() {
+    if (!R || !R.objs || !S.objs.length) return;
+    const sd = S.objs[S.objs.length - 1].s, g = R.objs.children.find(c => c.userData && c.userData.seed === sd);
+    if (!g) return;
+    const w = new T.Group(); w.position.copy(g.position); g.position.set(0, 0, 0);
+    R.objs.remove(g); w.add(g); R.objs.add(w);
+    const drop = g.userData.kind === 'book' || g.userData.kind === 'magazine';   // books and magazines fall from above, the rest grow and turn
+    if (!drop) w.scale.setScalar(0.001);
+    R.spawn = { w, t: 0, drop, y0: w.position.y };
+    R.dirty = true;
+}
+function stepSpawn(dt) {
+    const sp = R.spawn; if (!sp) return;
+    sp.t += dt; const t = sp.t, D = 1.4;
+    if (sp.drop) {   // free fall, a small bounce on landing
+        const T = 0.5, H = 330;
+        if (t < T) { const q = t / T; sp.w.position.y = sp.y0 + H * (1 - q * q); sp.w.rotation.z = (1 - q) * 0.12; }
+        else { const b = t - T; sp.w.position.y = sp.y0 + 16 * Math.abs(Math.sin(b * 11)) * Math.exp(-b * 6); sp.w.rotation.z = Math.sin(b * 14) * 0.03 * Math.exp(-b * 5); }
+        R.dirty = true;
+        if (t >= D) { sp.w.position.y = sp.y0; sp.w.rotation.set(0, 0, 0); R.spawn = null; }
+        return;
+    }
+    const c1 = 1.9, c3 = c1 + 1, u = Math.min(1, t / 0.6);
+    const back = 1 + c3 * Math.pow(u - 1, 3) + c1 * Math.pow(u - 1, 2);              // ease-out-back: grows past its size and settles
+    const v = Math.min(1, t / 1.0), turn = Math.pow(1 - v, 3) * Math.PI * 2;      // one full turn about its own axis, slowing down
+    const sway = t > 0.25 ? Math.sin((t - 0.25) * 15) * 0.075 * Math.exp(-(t - 0.25) * 4.4) : 0;
+    sp.w.scale.setScalar(Math.max(0.001, back)); sp.w.rotation.y = -turn; sp.w.rotation.z = sway; sp.w.rotation.x = sway * 0.45;
+    R.dirty = true;
+    if (t >= D) { sp.w.scale.setScalar(1); sp.w.rotation.set(0, 0, 0); R.spawn = null; }
+}
 function objAdd(kind) {
     if (!R || !R.support) return;
     const n0 = S.objs.length;
     S.objs.push({ k: kind, s: objSeed++ });
     placeObjects();
+    spawnLast();
     if (S.objs.length === n0) note('There is no room for one more on this ' + modelInfo().P.name.toLowerCase() + '.');
     else if (S.fold < 0.995) { S.fold = 1; S.playing = false; R.prog = null; updatePose(); }   // things stand on the folded product
     syncUI();
@@ -7113,6 +7155,14 @@ function ensureCss() {
     #v3-rail, #v3-rail.hide { gap: var(--tgap); }
     #v3-rail #v3d-close { margin-right: calc(var(--tpad) + 1px); }
     #v3d-panel .v3-sec .v3-body, #v3d-panel #v3-mats, #v3d-panel .v3-cat, #v3d-panel #v3-ts, #v3d-panel #v3-cols, #v3d-panel [data-sec="dl"] .v3-chips, #v3d-panel #v3-objlist, #v3d-panel #v3-price { gap: var(--tgap); }
+    /* Objects: the chosen objects are listed in a second row under the icons, so a long list never runs off the screen */
+    #v3d-panel .v3-sec[data-sec="obj"] .v3-body { height: auto; flex-direction: column; align-items: flex-start; gap: var(--tgap); }
+    #v3d-panel .v3-sec[data-sec="obj"] .v3-body > .v3-cat { flex: none; }
+    #v3d-panel #v3-objlist { align-self: stretch; flex-direction: column; align-items: stretch; gap: 6px; }
+    #v3d-panel .v3-body .v3-orow { display: flex; justify-content: space-between; width: 100%; }
+    #v3d-panel .v3-body .v3-orow > span:first-child { flex: 1; max-width: none; }
+    #v3d-panel .v3-body .v3-clear { align-self: flex-start; }
+    @media (max-width: 600px) { #v3d-title { display: none !important; } }
     }`;
     document.head.appendChild(css);
 }
@@ -7195,6 +7245,11 @@ function buildUI() {
     document.querySelectorAll('#v3-rail button').forEach(b => b.onclick = () => railSet($('v3d-panel').classList.contains('open') && $('v3d-panel').dataset.act === b.dataset.go ? null : b.dataset.go));
     $('v3d-view').addEventListener('pointerdown', () => railSet(null));
     window.__railSet = railSet;
+    new ResizeObserver(() => {   // the panel grew (an object was added): keep it just above the toolbar
+        const pn = $('v3d-panel'); if (!pn.classList.contains('open')) return;
+        const root = $('v3d').getBoundingClientRect(), rl = $('v3-rail').getBoundingClientRect();
+        pn.style.top = Math.round(rl.top - root.top - pn.offsetHeight - 8) + 'px';
+    }).observe($('v3d-panel'));
     { const ps = $('v3-price-sec'); if (ps) { const sync = () => { $('v3-rail').classList.toggle('hasprice', ps.style.display !== 'none'); if (ps.style.display === 'none' && $('v3d-panel').dataset.act === 'price') railSet(null); };
       new MutationObserver(sync).observe(ps, { attributes: true, attributeFilter: ['style'] }); sync(); } }
     $('v3-name').onclick = () => $('v3-infot').onclick();   // the name toggles the details too
@@ -7611,6 +7666,7 @@ function loop(now) {
         if (!S.playing) syncUI();
     }
     if (R.cam) stepCamera(dt);
+    if (R.spawn) stepSpawn(dt);
     if (R.fxRun && !R.fxHold) stepFx(dt);
     const moved = R.controls.update();
     if (R.fxHold && !moved && !R.dragging) { R.fxHold = false; if (R.fxRun) R.fxRun = { t: 0, base: camPose() }; }   // rebase on the new position
