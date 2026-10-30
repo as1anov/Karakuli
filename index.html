@@ -207,7 +207,7 @@
         @media (max-width: 1039px) { #prod-info { top: calc(max(20px, env(safe-area-inset-top)) + var(--tb) + 30px); right: 12px; left: 20px; max-width: none; } #prod-info .pi-facts em:first-child { margin-top: 4px; } }
         @media (max-width: 600px) { #prod-info { display: none !important; } }   /* phones: no room, the name would sit on Flat / Folded */
         /* --- toolbar at the bottom (under the hand); it moves up while the virtual keyboard or the time-lapse bar is open --- */
-        body.tb-bottom .top-nav-container { top: auto; bottom: max(20px, env(safe-area-inset-bottom)); }
+        body.tb-bottom .top-nav-container { top: auto; bottom: max(var(--tbot), env(safe-area-inset-bottom)); }
         body.tb-bottom .top-nav-wrapper { top: auto; bottom: 0; flex-direction: column-reverse; }
         .top-nav-wrapper.tb-fly { animation: tbfly 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
         @keyframes tbfly { from { opacity: 0; translate: 0 var(--fly, 18px); } to { opacity: 1; translate: 0 0; } }
@@ -223,6 +223,8 @@
         #mode-text { display: none !important; }
         body.game-active #main-toolbar .mode-header { width: 96px; }
         body.game-active #mode-ico { display: none; }
+        :root { --tbot: 34px; }   /* how far the bottom toolbars stand above the screen edge: within reach of the hand */
+        @media (min-width: 601px) { :root { --tb: 48px; --tbot: 56px; } .theme-svg { width: 24px; height: 24px; } }   /* tablets and desktops: bigger buttons */
         @media (max-width: 600px) { :root { --tb: 36px; --tpad: 8px; --tgap: 9px; } #left-nav-group { padding: 4px !important; border-radius: 15px; } }
         @media (max-width: 380px) { :root { --tb: 32px; } .theme-svg { width: 18px; height: 18px; } }
 
@@ -7143,7 +7145,7 @@ function ensureCss() {
     /* Material: icons only, no names */
     #v3d-panel #v3-mats > .v3-chip { width: auto; } #v3d-panel #v3-mats > .v3-chip > span { display: none; }
     /* ---- the 3D toolbar sits at the bottom (under the hand); Flat / Folded and the camera go to the top ---- */
-    #v3-rail, #v3-rail.hide { top: auto; bottom: max(20px, env(safe-area-inset-bottom)); }
+    #v3-rail, #v3-rail.hide { top: auto; bottom: max(var(--tbot), env(safe-area-inset-bottom)); }
     #v3d-bar { top: var(--rtop); bottom: auto; box-sizing: border-box; height: calc(var(--tb) + var(--tpad) * 2 + 2px); padding-top: var(--tpad); padding-bottom: var(--tpad); border-radius: 16px; }
     #v3-fx { top: calc(var(--rtop) + var(--tb) + var(--tpad) * 2 + 10px); bottom: auto; max-height: calc(100% - var(--rtop) - var(--tb) - 140px); }
     #v3d-title, #v3d-title { top: calc(var(--rtop) + var(--tb) + 30px); }
@@ -7163,6 +7165,11 @@ function ensureCss() {
     #v3d-panel .v3-body .v3-orow > span:first-child { flex: 1; max-width: none; }
     #v3d-panel .v3-body .v3-clear { align-self: flex-start; }
     @media (max-width: 600px) { #v3d-title { display: none !important; } }
+    /* the close button (X) stands at the end of the 3D toolbar, where the hand is */
+    #v3-rail #v3d-close { order: 99; margin-right: 0; margin-left: calc(var(--tpad) + 1px); --d: 9; }
+    #v3-rail #v3d-close::after { right: auto; left: calc(-1 * var(--tpad) - 1px); }
+    /* the price and the shop buttons are hidden for now (the calculation is not placed yet); all the code stays */
+    #v3-rail button[data-go="price"], #v3-rail.hasprice button[data-go="price"], #v3-rail #v3d-shop, #v3-rail #v3d-shop.owner { display: none !important; }
     }`;
     document.head.appendChild(css);
 }
@@ -7175,7 +7182,7 @@ function buildUI() {
     el.innerHTML = `
         <div id="v3d-view"><div id="v3-focus"></div></div>
         <div id="v3d-title"><div id="v3-trow"><b id="v3-name"></b><button id="v3-infot" type="button" aria-expanded="true" aria-label="Product details"><i class="v3-chev"></i></button></div><span id="v3-info"></span></div>
-        <div id="v3-rail" class="v3-glass"><div id="v3d-close" class="control-btn glass-panel" onclick="close3D()" title="Back (Esc)"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></div><button type="button" data-go="mat" title="Material" aria-label="Material"><svg viewBox="0 0 24 24"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg></button><button type="button" data-go="col" title="Colour" aria-label="Colour"><i id="v3-railcol"></i></button><button type="button" data-go="thick" title="Thickness" aria-label="Thickness"><span id="v3-railth"><b>2</b><i></i></span></button><button type="button" data-go="obj" title="Objects" aria-label="Objects"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></button><button type="button" data-go="price" title="Price" aria-label="Price"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01"/></svg></button><button type="button" data-go="dl" title="Download" aria-label="Download"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg></button><div id="v3d-shop" class="control-btn glass-panel" title="Prices &amp; options"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div></div>
+        <div id="v3-rail" class="v3-glass"><div id="v3d-close" class="control-btn glass-panel" onclick="close3D()" title="Close (Esc)"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6 6 18M6 6l12 12"/></svg></div><button type="button" data-go="mat" title="Material" aria-label="Material"><svg viewBox="0 0 24 24"><path d="M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5"/></svg></button><button type="button" data-go="col" title="Colour" aria-label="Colour"><i id="v3-railcol"></i></button><button type="button" data-go="thick" title="Thickness" aria-label="Thickness"><span id="v3-railth"><b>2</b><i></i></span></button><button type="button" data-go="obj" title="Objects" aria-label="Objects"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg></button><button type="button" data-go="price" title="Price" aria-label="Price"><svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01"/></svg></button><button type="button" data-go="dl" title="Download" aria-label="Download"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"/></svg></button><div id="v3d-shop" class="control-btn glass-panel" title="Prices &amp; options"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M20.59 13.41l-7.18 7.18a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div></div>
         <div id="v3d-panel" class="v3-glass">
             <button id="v3-sheet" class="v3-handle" aria-label="Show or hide the settings"><i></i></button>
             <div class="v3-sec" data-sec="mat"><button class="v3-lab v3-tog"><span>Material</span><em id="v3-sum-mat"></em><i class="v3-chev"></i></button><div class="v3-body"><div class="v3-chips" id="v3-mats"></div></div></div>
@@ -7231,7 +7238,7 @@ function buildUI() {
             let want = bt.left - root.left - edge;
             if (w > rl.width) {
                 want = tl + rl.width / 2 - w / 2;
-                const cols = [...$('v3-rail').querySelectorAll('button')].filter(b => b.getClientRects().length);   // the toolbar's own columns: a centred strip lands on them too
+                const cols = [...$('v3-rail').querySelectorAll('button')].filter(b => b.getClientRects().length).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);   // the toolbar's own columns: a centred strip lands on them too
                 if (cols.length > 1) { const c0 = cols[0].getBoundingClientRect().left - root.left, pitch = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left;
                     want = c0 + Math.round((want + edge - c0) / pitch) * pitch - edge; }
             } else if (want + w > tr) want = tr - w;
