@@ -175,7 +175,7 @@
         body.v3d-open #main-toolbar .mode-header { background: var(--btn-bg); color: var(--disabled-color); }
         body.v3d-open #main-toolbar #v3d-btn { background: var(--active-btn-bg); }
         body.v3d-open #main-toolbar .tb-act { opacity: .35; pointer-events: none; }
-        body.v3d-open .top-nav-container { display: none; }
+        body.v3d-open .top-nav-container, body.timelapse-active .top-nav-container { display: none; }
         body.v3d-open #left-nav-group { visibility: hidden; }
         body.v3d-open #action-indicator { display: none; }
         /* the text on every button is 13 px */
@@ -187,7 +187,7 @@
         #main-toolbar.tb-intro { animation: tbin 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
         #main-toolbar.tb-intro > * { animation: tbitem 0.46s cubic-bezier(0.34, 1.56, 0.64, 1) backwards; animation-delay: calc(var(--d, 0) * 34ms + 120ms); }
         #main-toolbar > :nth-child(1) { --d: 0; } #main-toolbar > :nth-child(2) { --d: 1; } #main-toolbar > :nth-child(3) { --d: 2; } #main-toolbar > :nth-child(4) { --d: 3; }
-        #main-toolbar > :nth-child(5) { --d: 4; } #main-toolbar > :nth-child(6) { --d: 5; } #main-toolbar > :nth-child(7) { --d: 6; } #main-toolbar > :nth-child(8) { --d: 7; }
+        #main-toolbar > :nth-child(9) { --d: 8; } #main-toolbar > :nth-child(5) { --d: 4; } #main-toolbar > :nth-child(6) { --d: 5; } #main-toolbar > :nth-child(7) { --d: 6; } #main-toolbar > :nth-child(8) { --d: 7; }
         body:not(.tb-bottom) #main-toolbar.tb-intro { animation-name: none; }
         @media (prefers-reduced-motion: reduce) { #main-toolbar.tb-intro, #main-toolbar.tb-intro > * { animation: none !important; } }
 
@@ -214,10 +214,10 @@
         /* the menu: no hamburger, a small tab at the middle of the left edge, or a swipe from the edge towards the centre */
         #left-nav-group { display: none !important; }
         body.game-active #left-nav-group { display: flex !important; }
-        #edge-tab { position: fixed; left: 0; top: 50%; width: 18px; height: 60px; margin-top: -30px; z-index: 500; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--tbar-bg); border: 1px solid var(--border-color); border-left: 0; border-radius: 0 12px 12px 0; backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); color: var(--text-color); transition: width .2s, opacity .3s; }
+        #edge-tab { position: fixed; left: 0; top: 50%; width: 18px; height: 60px; margin-top: -30px; z-index: 3550; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--tbar-bg); border: 1px solid var(--border-color); border-left: 0; border-radius: 0 12px 12px 0; backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); color: var(--text-color); transition: width .2s, opacity .3s; }
         #edge-tab:hover { width: 24px; }
         #edge-tab svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: .7; }
-        body.dashboard-open #edge-tab, body.v3d-open #edge-tab, body.game-active #edge-tab, body.timelapse-active #edge-tab, body.customer-view #edge-tab { opacity: 0; pointer-events: none; }
+        body:has(#new-canvas-modal.show) #edge-tab, body.dashboard-open #edge-tab, body.game-active #edge-tab, body.timelapse-active #edge-tab, body.customer-view #edge-tab { opacity: 0; pointer-events: none; }
 
         body.game-active #main-toolbar .tb-act:not(#eraser-btn), body.game-active #tb-sep, body.game-active #v3d-btn { display: none !important; }
         #mode-text { display: none !important; }
@@ -230,6 +230,16 @@
 
         /* --- BOLT HOLES WINDOW --- */
         #holes-pop { position: fixed; inset: 0; z-index: 2800; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; touch-action: none; }
+        #plate-pop { position: fixed; inset: 0; z-index: 2800; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; touch-action: none; }
+        .pp-bolts { height: 32px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); font-weight: 600; cursor: pointer; }
+        .pp-bolts.on { background: var(--btn-on); }
+        .hp-board.pp-sheetbox { height: auto; display: flex; justify-content: center; align-items: center; padding: 14px; }
+        .pp-sheet { position: relative; background: #fff; border: 1.5px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+        .pp-sheet.round { border-radius: 50%; }
+        :root[data-theme="dark"] .pp-sheet, body[data-theme="dark"] .pp-sheet { background: #d2d2d2; }
+        .pp-opt { width: 96px; height: 96px; padding: 6px; border-radius: 16px; border: 1.5px solid var(--border-color); background: transparent; color: var(--text-color); cursor: pointer; }
+        .pp-opt svg { width: 100%; height: 100%; display: block; }
+        .pp-opt.on { border-color: var(--text-color); background: var(--btn-on); }
         .hp-card { width: min(300px, 100%); background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 20px; box-shadow: 0 24px 60px rgba(0,0,0,0.35); overflow: hidden; }
         .hp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 20px 14px; }
         .hp-head b { display: block; font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
@@ -247,14 +257,14 @@
         /* --- DASHBOARD / SIDEBAR --- */
         #dashboard-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.15); z-index: 2500; opacity: 0; pointer-events: none;
+            background: rgba(0,0,0,0.15); z-index: 3560; opacity: 0; pointer-events: none;
             transition: opacity 0.4s ease;
         }
         #dashboard-overlay.open { opacity: 1; pointer-events: auto; }
 
         #dashboard {
             position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width);
-            background: var(--bg-color); z-index: 2600; transform: translateX(-100%);
+            background: var(--bg-color); z-index: 3570; transform: translateX(-100%);
             transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
             display: flex; flex-direction: column; padding: max(40px, env(safe-area-inset-top)) 24px 24px 24px;
             box-shadow: 20px 0 50px rgba(0,0,0,0.1);
@@ -904,6 +914,9 @@
                     <div class="control-btn tb-act" id="kbd-btn" onclick="event.stopPropagation(); toggleKbdBtn()" title="Virtual keyboard">
                         <svg viewBox="0 0 24 24" class="theme-svg"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/></svg>
                     </div>
+                    <div class="control-btn tb-act" id="plate-btn" style="display: none" onclick="event.stopPropagation(); openPlatePopup()" title="Holes &amp; bolts for the 3D view">
+                        <svg viewBox="0 0 24 24" class="theme-svg"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg>
+                    </div>
                     <div class="tb-sep" id="tb-sep" style="display: none"></div>
                     <div class="control-btn" id="v3d-btn" style="display: none" onpointerenter="window.prefetch3D && prefetch3D()" ontouchstart="window.prefetch3D && prefetch3D()" onclick="event.stopPropagation(); document.body.classList.contains('v3d-open') ? close3D() : open3D()" title="3D view: folded product">
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><path d="m3.5 7.5 8.5 4.5 8.5-4.5M12 12v9"/></svg>
@@ -1269,7 +1282,7 @@
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
                 paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
-                productKey: activeProductKey, holeOff: [...holeOff],
+                productKey: activeProductKey, holeOff: [...holeOff], plateHoles: [...plateHoleOn], plateBolts,
                 shareEditToken: projectShare.edit, shareViewToken: projectShare.view,
                 tlCurrentFrame, tlCaptureStride, tlCaptureCounter, ...tlPart
             }));
@@ -1639,6 +1652,7 @@
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
             holeOff = new Set(Array.isArray(project.holeOff) ? project.holeOff : []);
+            plateHoleOn = new Set(Array.isArray(project.plateHoles) ? project.plateHoles : []); plateBolts = project.plateBolts !== false;
             if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
             const tlLoaded = project.tlHistory || (project.tlJson ? unpackTimelapse(project.tlJson) : null);
             if (tlLoaded && tlLoaded.length) {
@@ -2044,6 +2058,54 @@ service cloud.firestore {
         };
         // Plain shapes: width = height (side of the square / diameter of the circle).
         const SHAPES = { square: { name: 'Square', def: 500 }, circle: { name: 'Circle', def: 500 } };
+
+        // ---- 3D of a plain pattern (Paper, Shapes, the blank canvas): the lines are the metal; the person picks how many holes and bolts to see ----
+        const PLATE_P = { name: 'Pattern', tail: 0, folds: [], marks: [], holes: {}, profile: { gap: WALL_GAP_MM } };
+        const PLATE_PAD_MM = 6;                  // metal collar round every hole, so the hole has something to be in
+        let plateHoleOn = new Set(), plateTouched = false, plateBolts = true;   // nothing is placed until the person chooses in the Holes & bolts window
+        const PLATE_CORNERS = ['0,0', '0,2', '1,0', '1,2'];   // 'r,c' of the six places: 2 rows x 3 columns
+        function plateInfo() {
+            const MM = LINE_WEIGHT / 12;
+            if (isPaperVisible && paperWidthMm > 0 && paperHeightMm > 0) return { w: paperWidthMm, h: paperHeightMm, sx: 0, sy: 0, name: templateKind() === 'free' ? 'Pattern' : SHAPES[activeProductKey].name };
+            // blank canvas: the sheet is the drawing's own bounding box with a margin
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+            const add = (i, j) => { x0 = Math.min(x0, i * STEP); x1 = Math.max(x1, i * STEP); y0 = Math.min(y0, j * STEP); y1 = Math.max(y1, j * STEP); };
+            segments.forEach(sg => { add(sg.p1.x, sg.p1.y); add(sg.p2.x, sg.p2.y); });
+            for (const id in specialElements) { const [i, j] = id.split(',').map(Number); add(i, j); }
+            if (!isFinite(x0)) return { w: 0, h: 0, sx: 0, sy: 0, name: 'Pattern' };
+            const e = LINE_WEIGHT / 2 + BASE_STEP_VAL, M = 24;
+            return { w: (x1 - x0 + 2 * e) / MM + 2 * M, h: (y1 - y0 + 2 * e) / MM + 2 * M, sx: (x0 + x1) / 2, sy: (y0 + y1) / 2, name: 'Pattern' };
+        }
+        // the sheet's outline as a path (centred on the origin): a paper rectangle, a square or a circle
+        function sheetPath() {
+            const MM = LINE_WEIGHT / 12, w = paperWidthMm * MM, h = paperHeightMm * MM;
+            return new Path2D(templateKind() === 'free' ? `M${-w / 2} ${-h / 2}H${w / 2}V${h / 2}H${-w / 2}Z` : productOutlineD());
+        }
+        function plateShift() { return (typeof templateKind === 'function' && templateKind() !== 'product') ? plateInfo() : { sx: 0, sy: 0 }; }
+        // The places a hole can take on the sheet (ideal, before it is moved onto the pattern), in mm from the sheet's top-left corner.
+        // Rectangles: 'r,c' = row 0 / 1, column 0 / 1 / 2. Circle: 'c0'..'c7' = N, NE, E, SE, S, SW, W, NW.
+        function plateSlotMm(k, w, h) {
+            if (k[0] === 'c') {
+                const R = Math.min(w, h) / 2, rho = R - Math.min(17.8, R * 0.2), a = (-90 + 45 * Number(k.slice(1))) * Math.PI / 180;
+                return [w / 2 + rho * Math.cos(a), h / 2 + rho * Math.sin(a)];
+            }
+            const [r, c] = k.split(',').map(Number), ix = Math.min(17.8, w * 0.2), iy = Math.min(20, h * 0.2);
+            return [[ix, w / 2, w - ix][c], [iy, h - iy][r]];
+        }
+        let plateCache = { sig: '', out: [] };
+        // The holes stand where the person marked them on the sheet (the corners, the middle of a side ...), moved only onto the drawing grid.
+        // The grid is symmetrical about the middle of the sheet, so left / right and top / bottom holes mirror each other exactly.
+        function plateHolesMm() {
+            const { w, h, sx, sy } = plateInfo();
+            if (!(w > 0) || !plateHoleOn.size || !isPaperVisible) return [];   // the blank canvas has no holes
+            const MM = LINE_WEIGHT / 12, out = [];
+            [...plateHoleOn].sort().forEach(k => {
+                const [x, y] = plateSlotMm(k, w, h);
+                const px = Math.round(((x - w / 2) * MM + sx) / STEP) * STEP, py = Math.round(((y - h / 2) * MM + sy) / STEP) * STEP;
+                out.push([(px - sx) / MM + w / 2, (py - sy) / MM + h / 2]);
+            });
+            return out;
+        }
         const PAPER_MIN_MM = 20, PAPER_MAX_MM = 5000;
         const UNITS = { mm: { f: 1, dec: 1 }, cm: { f: 10, dec: 2 }, in: { f: 25.4, dec: 2 } };
         const PAPER_CHIPS = { A4: [210, 297], A3: [297, 420], A2: [420, 594], A1: [594, 841] };
@@ -2494,7 +2556,8 @@ service cloud.firestore {
 
         // Bolt holes on the canvas: centre dot + ring + four ticks (a reticle), constant 1 px lines on screen.
         function drawProductMarks(wPx, hPx) {
-            if (templateKind() !== 'product') return;
+            const plateSheet = templateKind() !== 'product';
+            if (plateSheet && !isPaperVisible) return;   // the blank canvas has no sheet to put bolts on
             const MM = LINE_WEIGHT / 12;
             const left = -wPx / 2, top = -hPx / 2;
             // Everything sits on the drawing grid, so the cursor lands exactly on it.
@@ -2504,7 +2567,7 @@ service cloud.firestore {
             const dotD = Math.max(R * 0.55, 3 / zoom);
             strokeWeight(1 / zoom); strokeCap(ROUND);
             const dotsOnly = isFarOutOnMobile();
-            currentHolesMm().forEach(([xMm, yMm]) => {
+            (plateSheet ? plateHolesMm() : currentHolesMm()).forEach(([xMm, yMm]) => {
                 const x = snap(left + xMm * MM), y = snap(top + yMm * MM);
                 if (dotsOnly) { noStroke(); fill(RED); circle(x, y, Math.max(dotD, 4 / zoom)); return; }
                 noFill(); stroke(RED);
@@ -2671,7 +2734,7 @@ service cloud.firestore {
                 if (!(await keepCurrentDrawing())) return;
                 if (shareSession) leaveSharedSession();
                 const create = createProjectOnReset;
-                isPaperVisible = false; activeProductKey = null; holeOff.clear();
+                isPaperVisible = false; activeProductKey = null; holeOff.clear(); plateHoleOn.clear(); plateBolts = true;
                 closeNewCanvasModal();
                 if (create) { activeProjectId = null; projectShare = { edit: null, view: null }; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
                 try { performReset({ preserveUndo: false }); } catch (err) { console.error(err); }
@@ -2687,7 +2750,7 @@ service cloud.firestore {
             paperWidthMm = PRODUCTS[selectedPresetKey] ? w : +w.toFixed(2);
             paperHeightMm = +h.toFixed(2);
             isPaperVisible = true;
-            if (!isResizingOnly || activeProductKey !== selectedPresetKey) holeOff.clear();
+            if (!isResizingOnly || activeProductKey !== selectedPresetKey) { holeOff.clear(); plateHoleOn.clear(); plateBolts = true; }
             activeProductKey = selectedPresetKey;
             closeNewCanvasModal();
             if (!isResizingOnly) {
@@ -3441,7 +3504,7 @@ service cloud.firestore {
         }
         function closeHolesPopup() { const el = document.getElementById('holes-pop'); if (el) el.remove(); }
         function openHolesPopup() {
-            if (templateKind() !== 'product') return;
+            if (templateKind() !== 'product') { if (isPaperVisible) openPlatePopup(); return; }
             closeHolesPopup();
             const wrap = document.createElement('div');
             wrap.id = 'holes-pop';
@@ -3475,6 +3538,47 @@ service cloud.firestore {
             };
             render(false);
             const close = () => { closeHolesPopup(); window.removeEventListener('keydown', onKey, true); };
+            const onKey = e => { if (e.key === 'Tab') return; e.stopImmediatePropagation(); if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } };
+            window.addEventListener('keydown', onKey, true);
+            wrap.addEventListener('pointerdown', e => { if (e.target === wrap) close(); });
+            wrap.querySelector('.nc-close').onclick = close;
+        }
+
+
+        // ---- holes & bolts for the 3D view of a plain pattern ----
+        function closePlatePopup() { const el = document.getElementById('plate-pop'); if (el) el.remove(); }
+        function openPlatePopup() {
+            if (templateKind() === 'product') return;
+            closePlatePopup();
+            const wrap = document.createElement('div');
+            wrap.id = 'plate-pop'; wrap.className = 'plate-pop';
+            wrap.innerHTML = '<div class="hp-card" role="dialog" aria-label="Holes and bolts"><div class="hp-head"><b>Holes &amp; bolts</b><button class="nc-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div class="hp-body"><div class="hp-board" id="pp-board"></div></div><div class="hp-foot"><span id="pp-info"></span><button class="pp-bolts" id="pp-bolts"></button></div></div>';
+            document.body.appendChild(wrap);
+            const board = wrap.querySelector('#pp-board'), info = wrap.querySelector('#pp-info'), bb = wrap.querySelector('#pp-bolts');
+            const circle = templateKind() === 'circle';
+            const render = () => {
+                board.innerHTML = ''; board.classList.add('pp-sheetbox');
+                // the sheet itself, drawn to scale: a paper / the drawing's frame, a square or a circle; the places for holes are marked on it
+                const pi = plateInfo(), W = pi.w > 0 ? pi.w : 4, H = pi.h > 0 ? pi.h : 3, k = Math.min(250 / W, 150 / H);
+                const sheet = document.createElement('div'); sheet.className = 'pp-sheet' + (circle ? ' round' : '');
+                sheet.style.width = Math.max(60, Math.round(W * k)) + 'px'; sheet.style.height = Math.max(60, Math.round(H * k)) + 'px';
+                board.appendChild(sheet);
+                const slots = circle ? [0, 1, 2, 3, 4, 5, 6, 7].map(i => 'c' + i) : ['0,0', '0,1', '0,2', '1,0', '1,1', '1,2'];
+                slots.forEach(key => {
+                    const [x, y] = pi.w > 0 ? plateSlotMm(key, W, H) : [[0.12, 0.5, 0.88][key[2] | 0] * W, [0.28, 0.72][key[0] | 0] * H];
+                    const on = plateHoleOn.has(key), b = document.createElement('button');
+                    b.className = 'hp-dot' + (on ? ' on' : ''); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.title = on ? 'Hole' : 'No hole';
+                    b.style.left = (x / W * 100) + '%'; b.style.top = (y / H * 100) + '%';
+                    b.onclick = e => { e.stopPropagation(); if (on) plateHoleOn.delete(key); else plateHoleOn.add(key); render(); try { scheduleProjectSave(); } catch (e) {} };
+                    sheet.appendChild(b);
+                });
+                const n = plateHolesMm().length;
+                info.innerHTML = `<b>${plateHoleOn.size}</b> of ${circle ? 8 : 6} holes`;
+                bb.textContent = plateBolts ? 'Bolts: on' : 'Bolts: off'; bb.classList.toggle('on', plateBolts); bb.disabled = !n; bb.style.opacity = n ? 1 : .45;
+            };
+            bb.onclick = () => { plateBolts = !plateBolts; render(); try { scheduleProjectSave(); } catch (e) {} };
+            render();
+            const close = () => { closePlatePopup(); window.removeEventListener('keydown', onKey, true); };
             const onKey = e => { if (e.key === 'Tab') return; e.stopImmediatePropagation(); if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } };
             window.addEventListener('keydown', onKey, true);
             wrap.addEventListener('pointerdown', e => { if (e.target === wrap) close(); });
@@ -3975,8 +4079,12 @@ service cloud.firestore {
             }
             const clipToProduct = isExporting && !isTimelapseExport && templateKind() !== 'free';
             if (clipToProduct) { push(); drawingContext.save(); drawingContext.clip(new Path2D(productOutlineD())); fillNoPatternZone(); }
+            // Paper, square and circle: whatever goes past the edge of the sheet is cut off (on the canvas and in every download)
+            const clipSheet = isPaperVisible && !clipToProduct && templateKind() !== 'product';
+            if (clipSheet) { push(); drawingContext.save(); drawingContext.clip(sheetPath()); }
             // On a sheet the pattern is always black (like the product), also in the dark theme.
             drawGeometry(isPaperVisible ? '#000000' : colors.geomColor);
+            if (clipSheet) { drawingContext.restore(); pop(); }
             if (clipToProduct) { drawingContext.restore(); pop(); }
             if (isPaperVisible && !isExporting && !isTimelapseUIOpen) drawBendLines();
             if (!isExporting || isTimelapseExport) drawCursor();
@@ -3985,10 +4093,9 @@ service cloud.firestore {
         }
 
         function drawGrid(dotRGB, alpha) {
-            // At very low zoom the grid becomes visual noise and can create thousands
-            // of draw calls. It is shown down to 30 % zoom, with every second dot below 38 % to keep it light.
-            if (zoom < 0.295) return;   // 30 % itself still shows (rounding-safe)
-            const k = zoom < 0.38 ? 2 : 1;
+            // At very low zoom the grid becomes visual noise and thousands of draw calls: every dot from 40 % up, none below.
+            if (zoom < 0.395) return;   // 40 % itself still shows (rounding-safe)
+            const k = 1;
             fill(`rgba(${dotRGB}, ${alpha})`); noStroke();
             let sI = floor((-offsetX/zoom)/STEP)-2, eI = ceil(((width-offsetX)/zoom)/STEP)+2;
             let sJ = floor((-offsetY/zoom)/STEP)-2, eJ = ceil(((height-offsetY)/zoom)/STEP)+2;
@@ -3999,7 +4106,11 @@ service cloud.firestore {
         // Bolt holes of the selected product, in world pixels (on grid points).
         // Any line drawn over one of them is cut open there, instantly.
         function getBoltHolesPx() {
-            if (templateKind() !== 'product') return [];
+            if (templateKind() !== 'product') {   // paper, square, circle: the holes chosen in the Holes & bolts window cut the pattern open just like a product's
+                if (!isPaperVisible) return [];
+                const MM = LINE_WEIGHT / 12, { w, h, sx, sy } = plateInfo();
+                return plateHolesMm().map(([x, y]) => ({ x: (x - w / 2) * MM + sx, y: (y - h / 2) * MM + sy, r: (HOLE_DIAMETER_MM * MM) / 2 }));
+            }
             const MM = LINE_WEIGHT / 12;
             const wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
             const snap = v => Math.round(v / STEP) * STEP;
@@ -5436,6 +5547,7 @@ const LINE_TOL = 0.2, ARC_TOL = 0.25;
 // Centres of the bolt holes exactly as they are drawn on the canvas (they sit on grid points), in mm from the sheet's top-left corner.
 // The raster cut, the snapping circles and the wall barrels all use these, so the barrel is always in the middle of its hole.
 function holesMm() {
+    if (templateKind() !== 'product') return plateHolesMm();
     const MM = LINE_WEIGHT / 12, { w, h } = modelInfo();
     return getBoltHolesPx().map(q => [q.x / MM + w / 2, q.y / MM + h / 2]);
 }
@@ -5638,8 +5750,8 @@ function refineGroups(groups, ppm, design) {
 // The exact circles and lines of the drawing (rings, bolt holes, stroke edges), in contour coordinates (image px + 1)
 function designPrimitives(w, h, W, H, ppm) {
     const mm = LINE_WEIGHT / 12, pw = w * mm, ph = h * mm, sx = W / pw, sy = H / ph, hw = LINE_WEIGHT / 2;
-    const U = (X, Y) => [(X + pw / 2) * sx + 1, (Y + ph / 2) * sy + 1];
-    const circles = [], lines = [];
+    const U = (X, Y) => [(X - sh.sx + pw / 2) * sx + 1, (Y - sh.sy + ph / 2) * sy + 1];
+    const sh = plateShift(), circles = [], lines = [];
     const line = (X1, Y1, X2, Y2) => { const a = U(X1, Y1), b = U(X2, Y2), l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l > 1e-6) lines.push({ px: a[0], py: a[1], dx: (b[0] - a[0]) / l, dy: (b[1] - a[1]) / l }); };
     const ringD = BASE_STEP_VAL * 2;
     for (const id in specialElements) {
@@ -5658,7 +5770,7 @@ function designPrimitives(w, h, W, H, ppm) {
         line(x1 + nx, y1 + ny, x1 - nx, y1 - ny); line(x2 + nx, y2 + ny, x2 - nx, y2 - ny);   // the butt ends
     }));
     // the outline of the product itself: straight edges, the solid zone's top edge, rounded corners, hook arms
-    {
+    if (templateKind() === 'product') {
         const P = PRODUCTS[activeProductKey], G = productGeom(activeProductKey, w, h), L = -pw / 2, R = pw / 2, T = -ph / 2, B = ph / 2;
         line(L, T, L, B); line(R, T, R, B); line(L, T, R, T); line(L, B, R, B);
         if (G.patternEnd != null) line(L, T + G.patternEnd * mm, R, T + G.patternEnd * mm);
@@ -5716,7 +5828,7 @@ function creaseNormals(geo, deg) {
 
 // Bend geometry of the sheet in the (Y up, Z towards the viewer) plane.
 function bendSpec(key, G, t) {
-    const marks = PRODUCTS[key].marks.filter(m => m.label === 'BEND LINE');
+    const marks = (PRODUCTS[key] || PLATE_P).marks.filter(m => m.label === 'BEND LINE');
     const angs = BEND_ANGLES[key] || [];
     return marks.map((m, i) => {
         const ang = (angs[i] || 90) * Math.PI / 180;
@@ -5783,16 +5895,17 @@ function runsOfRow(g, W, y) {
 function paintMaskCanvas(ctx, w, h, W, H) {
     const mm = LINE_WEIGHT / 12, pw = w * mm, ph = h * mm;
     ctx.save();
-    ctx.scale(W / pw, H / ph); ctx.translate(pw / 2, ph / 2);
+    const plate = templateKind() !== 'product', sh = plateShift();
+    ctx.scale(W / pw, H / ph); ctx.translate(pw / 2 - sh.sx, ph / 2 - sh.sy);
     ctx.fillStyle = '#000'; ctx.strokeStyle = '#000';
-    const G = productGeom(activeProductKey, w, h);
+    const G = plate ? { patternEnd: null } : productGeom(activeProductKey, w, h);
     if (G.patternEnd != null) {      // the solid zone below PATTERN END, following the outline
         ctx.save(); ctx.clip(new Path2D(productOutlineD()));
         ctx.fillRect(-pw / 2, -ph / 2 + G.patternEnd * mm, pw, ph);
         ctx.restore();
     }
     ctx.save();
-    ctx.beginPath(); ctx.rect(-pw / 2, -ph, pw, ph * 2); ctx.clip();      // the pattern is cut only on the left and right
+    ctx.beginPath(); if (plate) ctx.rect(-1e6, -1e6, 2e6, 2e6); else ctx.rect(-pw / 2, -ph, pw, ph * 2); ctx.clip(); if (plate && isPaperVisible) ctx.clip(sheetPath());      // a product's pattern is cut only on the left and right
     ctx.lineWidth = LINE_WEIGHT; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.miterLimit = 2;
     ctx.beginPath();
     getPathGroups().forEach(g => { ctx.moveTo(g[0].p1.x * STEP, g[0].p1.y * STEP); g.forEach(sg => ctx.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); });
@@ -5841,7 +5954,7 @@ async function rasterMask(w, h) {
     let count = 0;
     for (let i = 0, j = 3; i < g.length; i++, j += 4) { A[i] = d[j - 3] < 128 ? d[j] : 0; if (A[i] > 127) { g[i] = 1; count++; } }   // opaque and dark = metal (white discs = holes)
     // bolt holes are real holes in every part
-    const G = productGeom(activeProductKey, w, h), r = HOLE_DIAMETER_MM / 2 * ppm;
+    const G = templateKind() === 'product' ? productGeom(activeProductKey, w, h) : { anchor: h, folds: [], marks: [], patternEnd: null, holes: [], slots: [], arms: [] }, r = HOLE_DIAMETER_MM / 2 * ppm;
     holesMm().forEach(([hx, hy]) => {
         const cx = hx * ppm, cy = hy * ppm;
         for (let y = Math.max(0, Math.floor(cy - r - 1)); y <= Math.min(H - 1, Math.ceil(cy + r + 1)); y++)
@@ -5946,6 +6059,7 @@ function makeEnvScene() {
 
 // ---------------------------------------------------------------- scene
 function modelInfo() {
+    if (templateKind() !== 'product') { const pl = plateInfo(); return { key: 'plate', P: { ...PLATE_P, name: pl.name }, w: pl.w, h: pl.h }; }
     const key = activeProductKey, P = PRODUCTS[key];
     return { key, P, w: paperWidthMm, h: paperHeightMm };
 }
@@ -6514,7 +6628,7 @@ async function buildModel() {
     const cap = new T.LatheGeometry(capPts.map(q => new T.Vector2(q[0], q[1])), 40); cap.rotateX(Math.PI / 2); cap.translate(0, 0, zTop + 1);
     const face = new T.CircleGeometry(5.8 - rr - 0.05, 56); face.translate(0, 0, zTop + 1 + 4 + 0.02);   // the flat top of the cap with the sunburst
     const faceMat = new T.MeshStandardMaterial({ color: 0xffffff, map: sunburstTexture(), metalness: 1, roughness: 0.3 });
-    holesMm().forEach(([hx, hy]) => {
+    (key !== 'plate' || plateBolts ? holesMm() : []).forEach(([hx, hy]) => {   // a plain pattern shows bolts only when asked
         [[barrel, steel], [stud, steel], [washer, rubberMat], [cap, capMat], [face, faceMat]].forEach(([geo, mt]) => {
             const m = new T.Mesh(geo, mt); m.castShadow = mt !== rubberMat; m.receiveShadow = true;
             m.position.set(hx, -hy, 0); model.add(m);
@@ -7170,6 +7284,8 @@ function ensureCss() {
     #v3-rail #v3d-close::after { right: auto; left: calc(-1 * var(--tpad) - 1px); }
     /* the price and the shop buttons are hidden for now (the calculation is not placed yet); all the code stays */
     #v3-rail button[data-go="price"], #v3-rail.hasprice button[data-go="price"], #v3-rail #v3d-shop, #v3-rail #v3d-shop.owner { display: none !important; }
+    @media (max-width: 600px) { #v3d-panel .v3-tk .mm { display: none; } }   /* phones: digits only */
+    #v3d.plate #v3-rail button[data-go="obj"] { display: none !important; }
     }`;
     document.head.appendChild(css);
 }
@@ -7365,6 +7481,7 @@ function syncFx() {
 }
 
 function syncUI() {
+    try { document.getElementById('v3d').classList.toggle('plate', modelInfo().key === 'plate'); } catch (e) {}   // a plain pattern has no shelf to put objects on
     const $ = id => document.getElementById(id);
     syncFx();
     document.querySelectorAll('#v3-cams [data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === S.cam));
@@ -7382,7 +7499,7 @@ function syncUI() {
     $('v3-custom').oninput = async e => { const v = e.target.value; if (MATS[S.mat].brushed) { await pickColour(v); return; } S.color = v; applyMaterial(); document.querySelectorAll('#v3-cols .v3-dot').forEach(d => d.classList.remove('on')); };
     ensureSel();
     $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip v3-mc${k === S.mat ? ' on' : ''}" data-m="${k}"><i class="v3-mdot" style="background:${MAT_DOT[k] || MATS[k].color}"></i><span>${MATS[k].short || MATS[k].name}</span></button>`).join('');
-    $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip v3-tk${t === S.t ? ' on' : ''}" data-t="${t}"><span>${t}mm</span><i style="--bar:${Math.max(2, Math.round(t * 2))}px"></i></button>`).join('');
+    $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip v3-tk${t === S.t ? ' on' : ''}" data-t="${t}"><span>${t}<small class="mm">mm</small></span><i style="--bar:${Math.max(2, Math.round(t * 2))}px"></i></button>`).join('');
     $('v3-sum-mat').textContent = MATS[S.mat].name; $('v3-sum-thick').textContent = S.t + ' mm';
     $('v3-sum-col').innerHTML = `<span class="v3-dot-s" style="background:${S.color || MATS[S.mat].color}"></span>`;
     { const th = $('v3-railth'); if (th) { th.firstChild.textContent = S.t; th.lastChild.style.height = Math.max(2, Math.round(S.t * 2)) + 'px'; } }
@@ -7401,7 +7518,7 @@ function updateInfo() {
     // one fact per line, so nothing is cut off on a narrow screen
     const lines = [`${+w.toFixed(1)} × ${+h.toFixed(1)} mm flat`, `${S.t} mm ${MATS[S.mat].name.toLowerCase()}`];
     if (R && R.weightKg) lines.push(`≈ ${R.weightKg.toFixed(R.weightKg < 10 ? 2 : 1)} kg`);
-    try { const nh = productGeom(key, w, h).holes.length; lines.push(`${nh} ${nh === 1 ? 'mounting hole' : 'mounting holes'}`); } catch (e) {}
+    try { const nh = key === 'plate' ? holesMm().length : productGeom(key, w, h).holes.length; if (key === 'plate' && !nh) throw 0; lines.push(`${nh} ${nh === 1 ? 'mounting hole' : 'mounting holes'}`); } catch (e) {}
     if (P.hooks) { const n = hooksFromWidth(w); lines.push(`${n} ${n === 1 ? 'hook' : 'hooks'}`); }
     if (R && R.nBends) lines.push(`${R.nBends} ${R.nBends === 1 ? 'bend' : 'bends'}`);
     if (R && R.mask && R.mask.cutMm) lines.push(`${(R.mask.cutMm / 1000).toFixed(1)} m of cut`);
@@ -7702,7 +7819,6 @@ async function rebuild() {
 window.prefetch3D = () => { loadLibs().catch(() => {}); };   // warm the download while the person is about to open the view
 
 async function open3D() {
-    if (templateKind() !== 'product') return;
     if (document.body.classList.contains('v3d-open')) return;
     // The 3D model is made from the finished pattern: a time-lapse stopped halfway shows only part of it, so leave the time-lapse first
     // (this puts the whole drawing back).
@@ -7769,10 +7885,11 @@ window.__v3d = { get R() { return R; }, holesMm, designPrimitives, rasterMask, m
 setInterval(() => {
     const b = document.getElementById('v3d-btn');
     if (!b) return;
-    const show = typeof templateKind === 'function' && templateKind() === 'product';
-    const want = show ? '' : 'none';
+    const want = '';   // the 3D button is on every canvas now: products, Paper, Shapes and the blank canvas
     if (b.style.display !== want) b.style.display = want;
     const sp = document.getElementById('tb-sep'); if (sp && sp.style.display !== want) sp.style.display = want;
+    const pb = document.getElementById('plate-btn'), pw = typeof templateKind === 'function' && templateKind() !== 'product' && isPaperVisible ? '' : 'none';   // holes & bolts: only where the sheet has none of its own
+    if (pb && pb.style.display !== pw) pb.style.display = pw;
 }, 400);
 })();
 </script>
@@ -7822,7 +7939,7 @@ setInterval(() => {
     // swipe from the left screen edge towards the centre opens the menu
     let st = null;
     window.addEventListener('pointerdown', e => {
-        st = (e.clientX <= 20 && !isDashboardOpen && !isGameMode && !b.classList.contains('v3d-open') && !b.classList.contains('customer-view')) ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+        st = (e.clientX <= 20 && !isDashboardOpen && !isGameMode && !b.classList.contains('customer-view') && !document.getElementById('new-canvas-modal').classList.contains('show')) ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
     }, true);
     window.addEventListener('pointermove', e => {
         if (!st || e.pointerId !== st.id) return;
