@@ -711,20 +711,24 @@
         .ad-card input { width: 100%; box-sizing: border-box; height: 44px; margin-top: 12px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color); font-family: var(--main-font); font-size: 14px; }
         .ad-btns { display: flex; gap: 8px; margin-top: 18px; }
         .ad-btns .modal-btn { flex: 1; height: 42px; }
-        /* Customer view (a view-only link): Design / Time-lapse / 3D, no editing tools */
+        /* Customer view (a view-only link): Design / Time-lapse / 3D / Games, no editing tools */
         #cv-head { display: none; }
         body.customer-view #cv-head { display: block; }
         body.customer-view .top-nav-container, body.customer-view .handle-arrow, body.customer-view #mobile-keyboard,
         body.customer-view #dashboard, body.customer-view #dashboard-overlay, body.customer-view #share-badge,
-        body.customer-view #tl-export-btn, body.customer-view #tl-close-btn, body.customer-view #v3d-close { display: none !important; }
+        body.customer-view #tl-close-btn, body.customer-view #v3d-close { display: none !important; }
         #cv-bar { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 3600; display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); }
         .cv-tab { height: 34px; padding: 0 16px; border: 0; border-radius: 12px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
         .cv-tab:hover:not(:disabled) { background: var(--active-btn-bg); }
         .cv-tab.active { background: var(--text-color); color: var(--bg-color); }
         .cv-tab:disabled { opacity: 0.35; cursor: default; }
         #cv-title { position: fixed; left: 20px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; max-width: 24vw; font-size: 13px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
-        #cv-brand { position: fixed; right: 20px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--disabled-color); text-decoration: none; }
-        @media (max-width: 700px) { #cv-title, #cv-brand { display: none; } }
+        #cv-brand { position: fixed; left: 20px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; font-size: 14.4px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--disabled-color); text-decoration: none; }
+        @media (max-width: 700px) { #cv-brand { display: none; } .cv-tab { padding: 0 12px; } }   /* phones: the word would sit on the tabs */
+        @media (max-width: 400px) { .cv-tab { padding: 0 9px; } }
+        #cv-hearts { display: none; position: fixed; right: 16px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; gap: 4px; align-items: center; pointer-events: none; }
+        body.customer-view.game-active #cv-hearts { display: flex; }
+        #cv-hearts .pixel-heart { width: 22px; height: 22px; }
         #game-hearts { display: none; gap: 6px; align-items: center; justify-content: center; height: 100%; width: 100%; }
         .pixel-heart { width: 18px; height: 18px; }
     </style>
@@ -1721,14 +1725,13 @@
                 cvBuilt = true;
                 const el = document.createElement('div');
                 el.id = 'cv-head';
-                el.innerHTML = `<div id="cv-title"></div>
-                    <div id="cv-bar"><button class="cv-tab" data-t="design">Design</button><button class="cv-tab" data-t="tl">Time-lapse</button><button class="cv-tab" data-t="3d">3D</button></div>
+                el.innerHTML = `<div id="cv-hearts"></div>
+                    <div id="cv-bar"><button class="cv-tab" data-t="design">Design</button><button class="cv-tab" data-t="tl">Time-lapse</button><button class="cv-tab" data-t="3d">3D</button><button class="cv-tab" data-t="game">Games</button></div>
                     <a id="cv-brand" href="${location.pathname}" title="Open Karakuli">Karakuli</a>`;
                 document.body.appendChild(el);
                 el.querySelector('#cv-bar').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b && !b.disabled) cvGo(b.dataset.t); });
             }
             document.body.classList.add('customer-view');
-            document.getElementById('cv-title').textContent = currentProjectTitle || '';
             document.querySelector('.cv-tab[data-t="tl"]').disabled = tlHistory.length < 2;
             document.querySelector('.cv-tab[data-t="3d"]').style.display = templateKind() === 'product' ? '' : 'none';
             if (templateKind() === 'product' && window.prefetch3D) prefetch3D();
@@ -1738,14 +1741,17 @@
             document.body.classList.remove('customer-view');
             if (document.body.classList.contains('v3d-open')) window.close3D && window.close3D();
             if (isTimelapseUIOpen) toggleTimelapseUI();
+            if (isGameMode) exitGame();
         }
         function cvSync() {
-            const tab = document.body.classList.contains('v3d-open') ? '3d' : (isTimelapseUIOpen ? 'tl' : 'design');
+            const tab = isGameMode ? 'game' : document.body.classList.contains('v3d-open') ? '3d' : (isTimelapseUIOpen ? 'tl' : 'design');
             document.querySelectorAll('.cv-tab').forEach(b => b.classList.toggle('active', b.dataset.t === tab));
         }
         async function cvGo(tab) {
+            if (tab !== 'game' && isGameMode) exitGame();
             if (tab !== '3d' && document.body.classList.contains('v3d-open')) window.close3D();
             if (tab !== 'tl' && isTimelapseUIOpen) toggleTimelapseUI();
+            if (tab === 'game') { if (document.body.classList.contains('v3d-open')) window.close3D(); if (!isGameMode) startBreakMaze(); }
             if (tab === 'tl') { if (!isTimelapseUIOpen) toggleTimelapseUI(); startTlPlayback(); }
             if (tab === '3d') { if (isTimelapseUIOpen) toggleTimelapseUI(); await window.open3D(); }
             cvSync();
@@ -3694,6 +3700,7 @@ service cloud.firestore {
             let emptySVG = `<svg class="pixel-heart" viewBox="0 0 24 24" fill="none" stroke="var(--disabled-color)" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
             for(let i=0; i<3; i++) html += (i < lives) ? heartSVG : emptySVG;
             document.getElementById('game-hearts').innerHTML = html;
+            const ch = document.getElementById('cv-hearts'); if (ch) ch.innerHTML = html;
         }
 
         function buildGameBricks() {
