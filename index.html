@@ -233,7 +233,10 @@
         #plate-pop { position: fixed; inset: 0; z-index: 2800; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; touch-action: none; }
         .pp-bolts { height: 32px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); font-weight: 600; cursor: pointer; }
         .pp-bolts.on { background: var(--btn-on); }
-        .hp-board.pp-sheetbox { height: auto; display: flex; justify-content: center; align-items: center; padding: 14px; }
+        .hp-board.pp-sheetbox { height: auto; display: flex; justify-content: center; align-items: center; padding: 6px 0; border: 0; background: none; }
+        #plate-pop .hp-card { width: min(400px, 100%); padding-bottom: 14px; }
+        #plate-pop .hp-foot { justify-content: center; border-top: 0; padding-top: 4px; }
+        #plate-pop .hp-dot { width: 16px; height: 16px; margin: -8px 0 0 -8px; }
         .pp-sheet { position: relative; background: #fff; border: 1.5px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
         .pp-sheet.round { border-radius: 50%; }
         :root[data-theme="dark"] .pp-sheet, body[data-theme="dark"] .pp-sheet { background: #d2d2d2; }
@@ -2095,6 +2098,24 @@ service cloud.firestore {
         let plateCache = { sig: '', out: [] };
         // The holes stand where the person marked them on the sheet (the corners, the middle of a side ...), moved only onto the drawing grid.
         // The grid is symmetrical about the middle of the sheet, so left / right and top / bottom holes mirror each other exactly.
+        function plateSlotKeys() { return templateKind() === 'circle' ? [0, 1, 2, 3, 4, 5, 6, 7].map(i => 'c' + i) : ['0,0', '0,1', '0,2', '1,0', '1,1', '1,2']; }
+        function plateSlotSnappedMm(k) {   // where a slot really lands on the drawing grid, in mm from the sheet's corner
+            const { w, h, sx, sy } = plateInfo(), MM = LINE_WEIGHT / 12;
+            const [x, y] = plateSlotMm(k, w, h);
+            const px = Math.round(((x - w / 2) * MM + sx) / STEP) * STEP, py = Math.round(((y - h / 2) * MM + sy) / STEP) * STEP;
+            return [(px - sx) / MM + w / 2, (py - sy) / MM + h / 2];
+        }
+        function plateSlotAtScreen(x, y) {   // a tap near a place for a hole (chosen or not) -> its key
+            if (!isPaperVisible || templateKind() === 'product' || !plateHoleOn.size || !(plateInfo().w > 0)) return null;
+            const MM = LINE_WEIGHT / 12, { w, h } = plateInfo(), reach = Math.max(Math.max(HOLE_RING_MM * MM, 6 / zoom) * zoom * 2, 22);
+            let best = null, bd = 1e9;
+            plateSlotKeys().filter(k => plateHoleOn.has(k)).forEach(k => {
+                const [xm, ym] = plateSlotSnappedMm(k);
+                const d = Math.hypot(offsetX + (-w * MM / 2 + xm * MM) * zoom - x, offsetY + (-h * MM / 2 + ym * MM) * zoom - y);
+                if (d <= reach && d < bd) { bd = d; best = k; }
+            });
+            return best;
+        }
         function plateHolesMm() {
             const { w, h, sx, sy } = plateInfo();
             if (!(w > 0) || !plateHoleOn.size || !isPaperVisible) return [];   // the blank canvas has no holes
@@ -2510,7 +2531,7 @@ service cloud.firestore {
         //  circle                           : four arc-shaped ears sitting on the circle at the diagonals
         function drawCanvasEars(wPx, hPx) {
             const kind = templateKind();
-            if (kind === 'product') return;   // product templates have a fixed size: no ears, so nothing can be dragged by accident
+            if (kind) return;   // no ears on any template: the size is changed only in the New Canvas window
             const col = currentTheme === 'light' ? 160 : 80;
             const halfW = wPx / 2, halfH = hPx / 2, cLen = 20 / zoom;
             push();
@@ -2716,6 +2737,13 @@ service cloud.firestore {
             });
         }
         window.appDialog = appDialog;
+
+        // While a window sits in front of the blurred canvas, the canvas gets nothing: no clicks, drags, touches or wheel.
+        (function blockCanvasBehindWindows() {
+            const SEL = '#new-canvas-modal, #share-modal, #holes-pop, #plate-pop, #app-dialog';
+            ['pointerdown', 'pointermove', 'pointerup', 'mousedown', 'mousemove', 'mouseup', 'touchstart', 'touchmove', 'touchend', 'wheel'].forEach(ev =>
+                document.documentElement.addEventListener(ev, e => { if (e.target && e.target.closest && e.target.closest(SEL)) e.stopPropagation(); }, { passive: true }));
+        })();
 
         // A new canvas / template never inherits the previous drawing. The previous one is saved as its own project
         // first (signed-in users); without an account the person is asked before it is discarded.
@@ -3437,7 +3465,7 @@ service cloud.firestore {
 
         function checkCornerClick(worldX, worldY) {
             const kind = templateKind();
-            if (kind === 'product') return null;   // size of a product template changes only in the New Canvas window
+            if (kind) return null;   // the size of every template changes only in the New Canvas window
             const MM_TO_PX = LINE_WEIGHT / 12;
             const halfW = (paperWidthMm * MM_TO_PX) / 2;
             const halfH = (paperHeightMm * MM_TO_PX) / 2;
@@ -3552,14 +3580,14 @@ service cloud.firestore {
             closePlatePopup();
             const wrap = document.createElement('div');
             wrap.id = 'plate-pop'; wrap.className = 'plate-pop';
-            wrap.innerHTML = '<div class="hp-card" role="dialog" aria-label="Holes and bolts"><div class="hp-head"><b>Holes &amp; bolts</b><button class="nc-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div class="hp-body"><div class="hp-board" id="pp-board"></div></div><div class="hp-foot"><span id="pp-info"></span><button class="pp-bolts" id="pp-bolts"></button></div></div>';
+            wrap.innerHTML = '<div class="hp-card" role="dialog" aria-label="Holes and bolts"><div class="hp-head"><b>Holes &amp; bolts</b><button class="nc-close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div class="hp-body"><div class="hp-board" id="pp-board"></div></div></div>';
             document.body.appendChild(wrap);
-            const board = wrap.querySelector('#pp-board'), info = wrap.querySelector('#pp-info'), bb = wrap.querySelector('#pp-bolts');
+            const board = wrap.querySelector('#pp-board');
             const circle = templateKind() === 'circle';
             const render = () => {
                 board.innerHTML = ''; board.classList.add('pp-sheetbox');
                 // the sheet itself, drawn to scale: a paper / the drawing's frame, a square or a circle; the places for holes are marked on it
-                const pi = plateInfo(), W = pi.w > 0 ? pi.w : 4, H = pi.h > 0 ? pi.h : 3, k = Math.min(250 / W, 150 / H);
+                const pi = plateInfo(), W = pi.w > 0 ? pi.w : 4, H = pi.h > 0 ? pi.h : 3, k = Math.min(Math.min(350, window.innerWidth - 90) / W, Math.min(290, window.innerHeight - 200) / H);
                 const sheet = document.createElement('div'); sheet.className = 'pp-sheet' + (circle ? ' round' : '');
                 sheet.style.width = Math.max(60, Math.round(W * k)) + 'px'; sheet.style.height = Math.max(60, Math.round(H * k)) + 'px';
                 board.appendChild(sheet);
@@ -3573,10 +3601,7 @@ service cloud.firestore {
                     sheet.appendChild(b);
                 });
                 const n = plateHolesMm().length;
-                info.innerHTML = `<b>${plateHoleOn.size}</b> of ${circle ? 8 : 6} holes`;
-                bb.textContent = plateBolts ? 'Bolts: on' : 'Bolts: off'; bb.classList.toggle('on', plateBolts); bb.disabled = !n; bb.style.opacity = n ? 1 : .45;
             };
-            bb.onclick = () => { plateBolts = !plateBolts; render(); try { scheduleProjectSave(); } catch (e) {} };
             render();
             const close = () => { closePlatePopup(); window.removeEventListener('keydown', onKey, true); };
             const onKey = e => { if (e.key === 'Tab') return; e.stopImmediatePropagation(); if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } };
@@ -3605,6 +3630,10 @@ service cloud.firestore {
             if (isPanning && performance.now() - (window.lastClickTime || 0) < 200) {
                 if (!isOverUI(x, y) && !isTimelapseUIOpen && !isGameMode) {
                     if (templateKind() === 'product' && !isViewOnly && !isEraserActive && holeAtScreen(x, y)) { isPanning = false; openHolesPopup(); return; }
+                    if (templateKind() !== 'product' && !isViewOnly && !isEraserActive) {   // a plain sheet: a tap on a place for a hole adds / removes it
+                        const sk = plateSlotAtScreen(x, y);
+                        if (sk) { isPanning = false; openPlatePopup(); return; }
+                    }
                     let worldX = (x - offsetX) / zoom; let worldY = (y - offsetY) / zoom;
                     curI = Math.round(worldX / STEP); curJ = Math.round(worldY / STEP); lastDirection = null; redraw();
                     captureState();
@@ -7286,6 +7315,7 @@ function ensureCss() {
     #v3-rail button[data-go="price"], #v3-rail.hasprice button[data-go="price"], #v3-rail #v3d-shop, #v3-rail #v3d-shop.owner { display: none !important; }
     @media (max-width: 600px) { #v3d-panel .v3-tk .mm { display: none; } }   /* phones: digits only */
     #v3d.plate #v3-rail button[data-go="obj"] { display: none !important; }
+    #v3d.plate #v3d-bar #v3-play, #v3d.plate #v3d-bar #v3-fold, #v3d.plate #v3d-bar .v3-end { opacity: .35; pointer-events: none; }
     }`;
     document.head.appendChild(css);
 }
@@ -7400,8 +7430,8 @@ function buildUI() {
         $('v3d-panel').classList.toggle('fxopen', open);
         syncUI();
     };
-    $('v3-fold').oninput = e => { S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
-    $('v3-play').onclick = () => { if (S.fold >= 0.999) S.fold = 0; if (R) R.prog = null; S.playing = true; syncUI(); };
+    $('v3-fold').oninput = e => { if (modelInfo().key === 'plate') { e.target.value = 1; return; } S.playing = false; if (R) R.prog = null; S.fold = +e.target.value; syncUI(); updatePose(); };
+    $('v3-play').onclick = () => { if (modelInfo().key === 'plate') return; if (S.fold >= 0.999) S.fold = 0; if (R) R.prog = null; S.playing = true; syncUI(); };
     return ui;
 }
 
@@ -7481,7 +7511,7 @@ function syncFx() {
 }
 
 function syncUI() {
-    try { document.getElementById('v3d').classList.toggle('plate', modelInfo().key === 'plate'); } catch (e) {}   // a plain pattern has no shelf to put objects on
+    try { const pl = modelInfo().key === 'plate'; document.getElementById('v3d').classList.toggle('plate', pl); document.getElementById('v3-fold').disabled = pl; document.getElementById('v3-play').disabled = pl; } catch (e) {}   // a plain pattern has no shelf to put objects on
     const $ = id => document.getElementById(id);
     syncFx();
     document.querySelectorAll('#v3-cams [data-cam]').forEach(b => b.classList.toggle('on', b.dataset.cam === S.cam));
@@ -7849,7 +7879,9 @@ async function open3D() {
         showLoad('Lighting the room…', '', 92); await nextFrame();
         applyEnv(); applyMaterial(); fitCamera(); updatePose(); updateInfo();
         hideLoad();
-        S.playing = true; syncUI();
+        if (modelInfo().key === 'plate') { S.fold = 1; S.playing = false; updatePose(); }   // a plain sheet has no bends: nothing to fold
+        else S.playing = true;
+        syncUI();
         R.last = 0; R.raf = requestAnimationFrame(loop);
     } catch (err) {
         building = false;
