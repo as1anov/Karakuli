@@ -723,7 +723,7 @@
         .cv-tab.active { background: var(--text-color); color: var(--bg-color); }
         .cv-tab:disabled { opacity: 0.35; cursor: default; }
         #cv-title { position: fixed; left: 20px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; max-width: 24vw; font-size: 13px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
-        #cv-brand { position: fixed; left: 20px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; font-size: 14.4px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--disabled-color); text-decoration: none; }
+        #cv-brand { position: fixed; left: 20px; top: max(16px, env(safe-area-inset-top)); height: 42px; display: flex; align-items: center; z-index: 3600; font-size: 14.4px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--disabled-color); text-decoration: none; }
         @media (max-width: 700px) { #cv-brand { display: none; } .cv-tab { padding: 0 12px; } }   /* phones: the word would sit on the tabs */
         @media (max-width: 400px) { .cv-tab { padding: 0 9px; } }
         #cv-hearts { display: none; position: fixed; right: 16px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; gap: 4px; align-items: center; pointer-events: none; }
@@ -1770,8 +1770,8 @@
             applyProjectData(sharedDataOf(sh, mode));
             updateShareBadge(); updateCurrentProjectUI();
             if (isViewOnly) enterCustomerView();
-            showActionHint(isViewOnly ? 'View only' : 'Shared project — your changes are saved for everyone', true);
-            setTimeout(() => showActionHint(isViewOnly ? 'View only' : 'Shared project'), 3500);
+            try { updateModeUI(); } catch (e) {}   // the mode icon is drawn right away
+            if (isViewOnly) { showActionHint('View only', true); setTimeout(() => showActionHint('View only'), 3500); }
             // pick up changes made by others while nothing of ours is waiting to be saved
             clearInterval(sharedPollTimer);
             sharedPollTimer = setInterval(async () => {
@@ -5154,7 +5154,7 @@ service cloud.firestore {
         // Opened from a share link?
         // First thing a visitor sees: the New Canvas window, with the blank canvas offered first.
         (function openStartWindow() {
-            if (/[?&](edit|view)=/.test(location.search)) return;
+            if (/[?&](e|v|edit|view)=/.test(location.search)) return;
             let tries = 0, done = false;
             const open = () => { if (done) return; done = true; clearInterval(timer); if (!document.body.classList.contains('customer-view')) openNewCanvasModal(true); };
             // normally as soon as the canvas exists; if the drawing library is slow or fails, still open after ~3 s so the start window never goes missing
