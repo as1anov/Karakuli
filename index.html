@@ -718,7 +718,7 @@
         body.customer-view #dashboard, body.customer-view #dashboard-overlay, body.customer-view #share-badge,
         body.customer-view #tl-close-btn, body.customer-view #v3d-close { display: none !important; }
         #cv-bar { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 3600; display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); }
-        .cv-tab { height: 34px; padding: 0 16px; border: 0; border-radius: 12px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+        .cv-tab { white-space: nowrap; height: 34px; padding: 0 16px; border: 0; border-radius: 12px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
         .cv-tab:hover:not(:disabled) { background: var(--active-btn-bg); }
         .cv-tab.active { background: var(--text-color); color: var(--bg-color); }
         .cv-tab:disabled { opacity: 0.35; cursor: default; }
@@ -726,8 +726,12 @@
         #cv-brand { position: fixed; left: 20px; top: max(16px, env(safe-area-inset-top)); height: 42px; display: flex; align-items: center; z-index: 3600; font-size: 14.4px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--disabled-color); text-decoration: none; }
         @media (max-width: 700px) { #cv-brand { display: none; } .cv-tab { padding: 0 12px; } }   /* phones: the word would sit on the tabs */
         @media (max-width: 400px) { .cv-tab { padding: 0 9px; } }
-        #cv-hearts { display: none; position: fixed; right: 16px; top: max(24px, calc(env(safe-area-inset-top) + 8px)); z-index: 3600; gap: 4px; align-items: center; pointer-events: none; }
+        #cv-hearts { display: none; position: fixed; left: 50%; transform: translateX(-50%); top: max(16px, env(safe-area-inset-top)); height: 42px; z-index: 3600; gap: 6px; align-items: center; pointer-events: none; }
+        #cv-gx { display: none; position: fixed; left: 16px; top: max(16px, env(safe-area-inset-top)); width: 42px; height: 42px; z-index: 3600; align-items: center; justify-content: center; padding: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); color: var(--text-color); cursor: pointer; }
+        #cv-gx svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
         body.customer-view.game-active #cv-hearts { display: flex; }
+        body.customer-view.game-active #cv-gx { display: flex; }
+        body.customer-view.game-active #cv-bar, body.customer-view.game-active #cv-brand { display: none; }
         #cv-hearts .pixel-heart { width: 22px; height: 22px; }
         #game-hearts { display: none; gap: 6px; align-items: center; justify-content: center; height: 100%; width: 100%; }
         .pixel-heart { width: 18px; height: 18px; }
@@ -1726,10 +1730,11 @@
                 cvBuilt = true;
                 const el = document.createElement('div');
                 el.id = 'cv-head';
-                el.innerHTML = `<div id="cv-hearts"></div>
+                el.innerHTML = `<div id="cv-hearts"></div><button id="cv-gx" aria-label="Close the game"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
                     <div id="cv-bar"><button class="cv-tab" data-t="design">Design</button><button class="cv-tab" data-t="tl">Time-lapse</button><button class="cv-tab" data-t="3d">3D</button><button class="cv-tab" data-t="game">Games</button></div>
                     <a id="cv-brand" href="${location.pathname}" title="Open Karakuli">Karakuli</a>`;
                 document.body.appendChild(el);
+                el.querySelector('#cv-gx').addEventListener('click', () => cvGo('design'));
                 el.querySelector('#cv-bar').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b && !b.disabled) cvGo(b.dataset.t); });
             }
             document.body.classList.add('customer-view');
@@ -1748,12 +1753,29 @@
             const tab = isGameMode ? 'game' : document.body.classList.contains('v3d-open') ? '3d' : (isTimelapseUIOpen ? 'tl' : 'design');
             document.querySelectorAll('.cv-tab').forEach(b => b.classList.toggle('active', b.dataset.t === tab));
         }
+        // The whole drawing in view (after a game the camera is zoomed in on the maze)
+        function cvFitDrawing() {
+            try {
+                if (isPaperVisible) { fitCanvasToView(); redraw(); return; }
+                const fr = tlHistory.length ? tlHistory[tlHistory.length - 1] : { segments, specialElements };
+                let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+                (fr.segments || []).forEach(sg => { x0 = Math.min(x0, sg.p1.x, sg.p2.x); x1 = Math.max(x1, sg.p1.x, sg.p2.x); y0 = Math.min(y0, sg.p1.y, sg.p2.y); y1 = Math.max(y1, sg.p1.y, sg.p2.y); });
+                Object.keys(fr.specialElements || {}).forEach(id => { const [i, j] = id.split(',').map(Number); x0 = Math.min(x0, i); x1 = Math.max(x1, i); y0 = Math.min(y0, j); y1 = Math.max(y1, j); });
+                if (x0 === Infinity) return;
+                const pad = 3, wPx = (x1 - x0 + 2 * pad) * STEP, hPx = (y1 - y0 + 2 * pad) * STEP;
+                const top = 70, bottom = 130, availH = Math.max(100, height - top - bottom);
+                zoom = Math.max(0.05, Math.min(2, Math.min(width / wPx, availH / hPx)));
+                offsetX = width / 2 - ((x0 + x1) / 2) * STEP * zoom;
+                offsetY = top + availH / 2 - ((y0 + y1) / 2) * STEP * zoom;
+                redraw();
+            } catch (e) { console.warn(e); }
+        }
         async function cvGo(tab) {
             if (tab !== 'game' && isGameMode) exitGame();
             if (tab !== '3d' && document.body.classList.contains('v3d-open')) window.close3D();
             if (tab !== 'tl' && isTimelapseUIOpen) toggleTimelapseUI();
             if (tab === 'game') { if (document.body.classList.contains('v3d-open')) window.close3D(); if (!isGameMode) startBreakMaze(); }
-            if (tab === 'tl') { if (!isTimelapseUIOpen) toggleTimelapseUI(); startTlPlayback(); }
+            if (tab === 'tl') { if (!isTimelapseUIOpen) toggleTimelapseUI(); cvFitDrawing(); startTlPlayback(); }
             if (tab === '3d') { if (isTimelapseUIOpen) toggleTimelapseUI(); await window.open3D(); }
             cvSync();
         }
@@ -3056,6 +3078,7 @@ service cloud.firestore {
             tlScreenHold.direction = direction;
             tlScreenHold.startX = e.clientX;
             tlScreenHold.startY = e.clientY;
+            tlScreenHold.ev = e;
             tlScreenHold.timer = setTimeout(() => {
                 tlScreenHold.repeating = true;
                 stepTimelapse(direction);
@@ -3993,6 +4016,13 @@ service cloud.firestore {
             
             canvasElem.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
+                if (isTimelapseUIOpen && tlScreenHold.pointerId != null && tlScreenHold.pointerId !== e.pointerId && tlScreenHold.ev) {   // a second finger: pinch-zoom instead of a scrub
+                    const f = tlScreenHold.ev; clearTimelapseScreenHold();
+                    activePointers.clear(); activePointers.set(f.pointerId, f); activePointers.set(e.pointerId, e);
+                    mainPointerId = f.pointerId; isPointerDrawing = false; isPanning = false; lastPinchDist = getDist(f, e);
+                    canvasElem.setPointerCapture?.(e.pointerId);
+                    return;
+                }
                 if (isTimelapseUIOpen && beginTimelapseScreenScrub(e)) {
                     canvasElem.setPointerCapture?.(e.pointerId);
                     return;
