@@ -1671,6 +1671,7 @@
             if (project.currentTheme) setTheme(project.currentTheme);
             history = []; redoStack = []; invalidateGeometryCache();
             if (fit && isPaperVisible) { try { fitCanvasToView(); } catch (e) {} }
+            try { updateModeUI(); } catch (e) {}   // the mode button always shows its icon
             redraw();
         }
 
@@ -3986,6 +3987,7 @@ service cloud.firestore {
 
         // --- CORE P5 ---
         function setup() { 
+            try { updateModeUI(); } catch (e) {}
             let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); offsetX = width/2; offsetY = height/2; 
             const canvasElem = document.getElementById('defaultCanvas0');
             
