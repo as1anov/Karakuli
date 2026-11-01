@@ -1158,7 +1158,7 @@
         //   kind 'edit' : anyone holding the link can read and change it (no account needed)
         //   kind 'view' : a read-only version published by the owner
         // Firestore rules for /shared are listed in the note shown by the Share window.
-        const randomToken = () => { const a = new Uint8Array(20); crypto.getRandomValues(a); return Array.from(a, b => (b % 36).toString(36)).join(''); };
+        const randomToken = () => { const a = new Uint8Array(10); crypto.getRandomValues(a); return Array.from(a, b => (b % 36).toString(36)).join(''); };   // 10 characters: about 5·10^15 combinations
         window.karakuliShare = {
             async publish(kind, data, title, tl, shop) {
                 if (!signedInUser) throw new Error('Sign in with Google to share');
@@ -1880,7 +1880,7 @@ service cloud.firestore {
             try {
                 const { title, tokens } = await prepareShare(id);
                 const base = location.origin + location.pathname;
-                const editUrl = `${base}?edit=${tokens.edit}`, viewUrl = `${base}?view=${tokens.view}`;
+                const editUrl = `${base}?e=${tokens.edit}`, viewUrl = `${base}?v=${tokens.view}`;
                 body.innerHTML = `
                     <div class="share-block">
                         <div class="share-title">${PROJECT_ICONS.pencil}Can edit</div>
@@ -5159,9 +5159,9 @@ service cloud.firestore {
 
         (function initSharedLink() {
             const q = new URLSearchParams(location.search);
-            const mode = q.has('edit') ? 'edit' : (q.has('view') ? 'view' : null);
-            if (!mode) return;
-            const token = q.get(mode);
+            const key = ['e', 'edit', 'v', 'view'].find(k => q.has(k));   // e / v are the short forms; edit / view are older links
+            if (!key) return;
+            const mode = key[0] === 'e' ? 'edit' : 'view', token = q.get(key);
             let tries = 0;
             const timer = setInterval(() => {
                 if (window.karakuliShare && typeof redraw === 'function' && typeof width === 'number' && width > 0) { clearInterval(timer); openSharedProject(token, mode); }
