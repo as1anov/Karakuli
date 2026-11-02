@@ -2857,6 +2857,11 @@ service cloud.firestore {
         window.appDialog = appDialog;
 
         // While a window sits in front of the blurred canvas, the canvas gets nothing: no clicks, drags, touches or wheel.
+        // The side menu scrolls its own lists: the wheel over it must never zoom the canvas
+        (function menuWheel() {
+            const d = document.getElementById('dashboard');
+            if (d) ['wheel', 'touchmove'].forEach(ev => d.addEventListener(ev, e => e.stopPropagation(), { passive: true }));
+        })();
         (function blockCanvasBehindWindows() {
             const SEL = '#new-canvas-modal, #share-modal, #holes-pop, #plate-pop, #app-dialog';
             ['pointerdown', 'pointermove', 'pointerup', 'mousedown', 'mousemove', 'mouseup', 'touchstart', 'touchmove', 'touchend', 'wheel'].forEach(ev =>
@@ -5209,6 +5214,7 @@ service cloud.firestore {
         }
         
         function mouseWheel(e) {
+            if (e && e.target && e.target.closest && e.target.closest('#dashboard, #share-modal, #new-canvas-modal, #holes-pop, #plate-pop, #app-dialog')) return true;   // let the window scroll itself
             if (e.ctrlKey) { 
                 if (isEraserActive && !isTimelapseUIOpen && !isGameMode) { 
                     if (e.delta > 0) eraserRadius = Math.max(2, eraserRadius - 2); else eraserRadius = Math.min(300, eraserRadius + 2); 
