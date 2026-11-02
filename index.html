@@ -266,10 +266,10 @@
         #dashboard-overlay.open { opacity: 1; pointer-events: auto; }
 
         #dashboard {
-            position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width);
+            position: fixed; top: 0; left: 0; height: 100vh; height: 100dvh; width: var(--sidebar-width);
             background: var(--bg-color); z-index: 3570; transform: translateX(-100%);
             transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
-            display: flex; flex-direction: column; padding: max(40px, env(safe-area-inset-top)) 24px 24px 24px;
+            display: flex; flex-direction: column; padding: max(40px, env(safe-area-inset-top)) 24px max(24px, calc(env(safe-area-inset-bottom) + 12px)) 24px;
             box-shadow: 20px 0 50px rgba(0,0,0,0.1);
         }
         #dashboard.open { transform: translateX(0); }
@@ -357,7 +357,7 @@
         .project-chk { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; flex-shrink: 0; margin: 0 0 0 2px; border: 1.5px solid var(--disabled-color); border-radius: 6px; background: transparent; cursor: pointer; display: grid; place-items: center; }
         .project-chk:checked { background: var(--text-color); border-color: var(--text-color); }
         .project-chk:checked::after { content: ""; width: 5px; height: 10px; margin-top: -2px; border: solid var(--bg-color); border-width: 0 2px 2px 0; transform: rotate(45deg); }
-        #pl-selbar { flex-shrink: 0; margin-top: 8px; }
+        #pl-selbar { flex-shrink: 0; margin-top: 8px; margin-bottom: 8px; }
         #pl-selbar:empty { display: none; }
         .pl-sel { display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 10px; border-radius: 12px; border: 1px solid var(--border-color); background: linear-gradient(var(--panel-bg), var(--panel-bg)), var(--bg-color); font-size: 12px; font-weight: 700; }
         .pl-sel > span { flex: 1 0 auto; white-space: nowrap; }
