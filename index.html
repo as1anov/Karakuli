@@ -382,6 +382,8 @@
         .project-name { display: block; font-size: 12px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .project-meta { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 11px; color: var(--disabled-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .project-meta svg { width: 11px; height: 11px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .project-stats { margin-top: 1px; }
+        .project-stats.empty { color: #d9534f; }
         .project-empty { padding: 12px; color: var(--disabled-color); font-size: 12px; text-align: center; }
         .project-more { width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-color); cursor: pointer; transition: background 0.15s; }
         .project-more:hover, .project-item.open .project-more { background: var(--active-btn-bg); }
@@ -1022,7 +1024,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteField, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, deleteField, query, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB2R9HE9a_s6NKWxhVN3uJ5M01_6HkS8Gw",
@@ -1168,6 +1170,24 @@
                     }
                 } catch (error) { console.warn('Cloud project load unavailable; using local project.', error); }
                 return readLocalProjects().find(project => project.id === id) || null;
+            },
+            // Many at once: one request (batches of 400) instead of one round trip per project
+            async removeMany(ids) {
+                ids = (ids || []).filter(Boolean);
+                if (!signedInUser || !ids.length) return;
+                const gone = new Set(ids);
+                writeLocalProjects(readLocalProjects().filter(project => !gone.has(project.id)));
+                try {
+                    for (let i = 0; i < ids.length; i += 400) {
+                        const batch = writeBatch(db);
+                        ids.slice(i, i + 400).forEach(id => batch.delete(doc(db, 'users', signedInUser.uid, 'projects', id)));
+                        await batch.commit();
+                    }
+                } catch (error) {
+                    console.warn('Batch delete failed; deleting one by one in parallel.', error);
+                    const res = await Promise.allSettled(ids.map(id => deleteDoc(doc(db, 'users', signedInUser.uid, 'projects', id))));
+                    if (res.some(x => x.status === 'rejected')) syncFail(res.find(x => x.status === 'rejected').reason, 'delete');
+                }
             },
             async remove(id) {
                 if (!signedInUser || !id) return;
@@ -1489,6 +1509,13 @@
             return name + size;
         }
 
+        // how much is drawn: the number of lines and a rough size, so empty test projects are easy to tell apart
+        function projectStats(p) {
+            const n = Array.isArray(p.segments) ? p.segments.length : 0, sp = p.specialElements ? Object.keys(p.specialElements).length : 0;
+            if (!n && !sp) return 'Empty';
+            const kb = (n * 15 + sp * 20 + 400) / 1024;
+            return `${n} ${n === 1 ? 'line' : 'lines'} · ${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
+        }
         function projectTileIcon(p) {
             if (PRODUCTS[p.productKey]) return PROJECT_ICONS.product;
             if (p.productKey === 'circle') return PROJECT_ICONS.circleT;
@@ -1515,7 +1542,7 @@
                         <div class="project-main">
                             ${key ? `<input type="checkbox" class="project-chk" data-id="${key}"${plSel.has(key) ? ' checked' : ''} aria-label="Select project">` : ''}
                             <div class="project-tile">${projectTileIcon(p)}</div>
-                            <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>${name}${meta}</div>
+                            <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>${name}${meta}<span class="project-meta project-stats${p.segments && !p.segments.length && !Object.keys(p.specialElements || {}).length ? ' empty' : ''}">${escapeProjectText(projectStats(p))}</span></div>
                             <button class="project-more" aria-label="Project actions" title="Actions" onclick="toggleProjectActions(this)">${PROJECT_ICONS.dots}</button>
                         </div>
                         <div class="project-actions">
@@ -1529,7 +1556,7 @@
         }
 
         function plLive() {
-            return { id: activeProjectId, title: currentProjectTitle, productKey: activeProductKey, isPaperVisible, paperWidthMm, paperHeightMm, shareEditToken: projectShare.edit, shareViewToken: projectShare.view };
+            return { id: activeProjectId, title: currentProjectTitle, productKey: activeProductKey, segments, specialElements, isPaperVisible, paperWidthMm, paperHeightMm, shareEditToken: projectShare.edit, shareViewToken: projectShare.view };
         }
         function plVisible() {
             const others = plCache.filter(p => p.id !== activeProjectId)
@@ -1640,11 +1667,20 @@
         async function plDeleteSel() {
             const ids = [...plSel]; if (!ids.length) return;
             if (!(await appDialog({ title: 'Delete projects', text: `Delete ${ids.length} ${ids.length === 1 ? 'project' : 'projects'} permanently?`, ok: 'Delete' }))) return;
-            const hadCur = ids.includes(activeProjectId);
-            for (const id of ids) { try { await removeProjectCore(id); } catch (err) { console.warn('Could not delete', id, err); } }
-            plSel.clear();
+            const hadCur = ids.includes(activeProjectId), tokens = [];
+            ids.forEach(id => {
+                if (id === activeProjectId) tokens.push(projectShare.edit, projectShare.view);
+                else { const p = plCache.find(x => x.id === id); if (p) tokens.push(p.shareEditToken, p.shareViewToken); }
+            });
+            // the rows vanish at once; the cloud catches up in the background (one batched request)
+            const gone = new Set(ids);
+            plCache = plCache.filter(p => !gone.has(p.id));
+            if (hadCur) { activeProjectId = null; projectShare = { edit: null, view: null }; currentProjectTitle = 'Karakuli #0000'; }
+            plSel.clear(); plRender();
             if (hadCur) performReset({ preserveUndo: false });
             updateCurrentProjectUI();
+            try { await window.karakuliProjects.removeMany(ids); } catch (err) { console.warn('Could not delete', err); }
+            tokens.filter(Boolean).forEach(t => { try { window.karakuliShare?.remove(t); } catch (e) {} });
             await renderProjectsList();
         }
         async function plShareSel() {
