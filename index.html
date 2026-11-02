@@ -2787,6 +2787,8 @@ service cloud.firestore {
         }
 
         async function applyNewCanvasSize() {
+            // another template chosen in the size window is a new canvas: it starts empty, the old drawing stays in its project
+            if (isResizingOnly && !modalFree && (selectedPresetKey || null) !== (activeProductKey || null)) { isResizingOnly = false; createProjectOnReset = true; }
             if (modalFree && !isResizingOnly) {   // blank canvas: no sheet at all
                 if (!(await keepCurrentDrawing())) return;
                 if (shareSession) leaveSharedSession();
