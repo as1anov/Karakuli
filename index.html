@@ -910,6 +910,9 @@
                     <div class="control-btn tb-act" id="tb-new" onclick="event.stopPropagation(); toolbarCanvas()" title="Canvas size / new canvas">
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11.5v6M9 14.5h6"/></svg>
                     </div>
+                    <div class="control-btn tb-act" id="tb-proj" style="display: none" onclick="event.stopPropagation(); toolbarProjects()" title="My projects">
+                        <svg viewBox="0 0 24 24" class="theme-svg"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                    </div>
                     <div class="control-btn tb-act" id="tb-undo" onclick="event.stopPropagation(); undo()" title="Undo (/)">
                         <svg viewBox="0 0 24 24" class="theme-svg"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
                     </div>
@@ -2719,6 +2722,15 @@ service cloud.firestore {
 
         // Toolbar button: with a sheet on screen (a product, a shape, a sized canvas) it opens the size window of that very sheet;
         // on the blank canvas it opens the New Canvas window. (A brand-new canvas is also in the menu.)
+        // My projects: only for a signed-in person, right after New canvas
+        function toolbarProjects() {
+            if (!window.karakuliProjects?.isSignedIn()) return;
+            if (!isDashboardOpen) toggleDashboard();
+            if (!document.getElementById('projects-list').classList.contains('open')) toggleProjectsList();
+        }
+        function syncProjectsBtn() { const b = document.getElementById('tb-proj'); if (b) b.style.display = window.karakuliProjects?.isSignedIn() ? '' : 'none'; }
+        window.addEventListener('karakuli-auth-change', syncProjectsBtn);
+        setInterval(syncProjectsBtn, 1000);
         function toolbarCanvas() { if (isPaperVisible) openNewCanvasModalFromCorner(); else openNewCanvasModal(true); }
         function openNewCanvasModal(fromStart = false) {
             isResizingOnly = false;
