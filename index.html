@@ -349,7 +349,8 @@
         .project-swipe .project-item { position: relative; touch-action: pan-y; background: linear-gradient(var(--panel-bg), var(--panel-bg)), var(--bg-color); will-change: transform; }
         .project-swipe .project-item.current { background: linear-gradient(var(--active-btn-bg), var(--active-btn-bg)), var(--bg-color); }
         .pl-items, .pl-items * { touch-action: pan-y; }
-        .project-del-bg { position: absolute; inset: 0; display: flex; justify-content: flex-end; border-radius: 12px; background: #ef4444; }
+        .project-del-bg { position: absolute; inset: 0; display: flex; justify-content: flex-end; border-radius: 12px; background: #ef4444; visibility: hidden; }   /* hidden at rest: no red at the rounded corners */
+        .project-swipe.opened .project-del-bg, .project-swipe.swiping .project-del-bg { visibility: visible; }
         .project-del-btn { width: 50%; height: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; background: #ef4444; color: #fff; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
         .project-del-btn:active { background: #dc2626; }
         .project-del-btn svg { width: 18px; height: 18px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
@@ -1583,7 +1584,7 @@
                 if (!sw.on) {
                     if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }   // it is a scroll
                     if (Math.abs(dx) < 10) return;
-                    sw.on = true;
+                    sw.on = true; sw.wrap.classList.add('swiping');
                     try { box.setPointerCapture(e.pointerId); } catch (_) {}
                 }
                 const lim = sw.w * OPEN;
@@ -1599,6 +1600,7 @@
                 const lim = s0.w * OPEN, open = e.type !== 'pointercancel' && s0.cur < -lim * 0.5;
                 s0.wrap.classList.toggle('opened', open);
                 setX(s0.wrap, open ? -lim : 0, true);
+                setTimeout(() => s0.wrap.classList.remove('swiping'), 320);
             };
             box.addEventListener('pointerup', finish);
             box.addEventListener('pointercancel', finish);
