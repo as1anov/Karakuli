@@ -3655,7 +3655,7 @@ service cloud.firestore {
         function isOverUI(x, y) {
             if (document.getElementById('new-canvas-modal').classList.contains('show')) return true;
             if (isTimelapseUIOpen && y > window.innerHeight - 120) return true;
-            if (isDashboardOpen && x < 300) return true;
+            if (isDashboardOpen && x < 300 && !document.body.classList.contains('projects-open')) return true;
             const kbd = document.getElementById('mobile-keyboard');
             if (kbd.classList.contains('open')) { 
                 const rect = kbd.getBoundingClientRect(); 
@@ -3792,6 +3792,7 @@ service cloud.firestore {
 
             if (isPanning && performance.now() - (window.lastClickTime || 0) < 200) {
                 if (!isOverUI(x, y) && !isTimelapseUIOpen && !isGameMode) {
+                    if (isDashboardOpen && document.body.classList.contains('projects-open')) { isPanning = false; toggleDashboard(); return; }   // one tap on the canvas closes the menu; dragging does not
                     if (templateKind() === 'product' && !isViewOnly && !isEraserActive && holeAtScreen(x, y)) { isPanning = false; openHolesPopup(); return; }
                     if (templateKind() !== 'product' && !isViewOnly && !isEraserActive) {   // a plain sheet: a tap on a place for a hole adds / removes it
                         const sk = plateSlotAtScreen(x, y);
