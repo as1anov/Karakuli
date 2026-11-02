@@ -514,6 +514,7 @@
             opacity: 0; transition: opacity 0.25s ease;
         }
         #new-canvas-modal.show, #share-modal.show { display: flex; opacity: 1; }
+        #share-modal { z-index: 6100; }   /* above the side menu (3570) and the 3D view (3500) */
         .modal-content {
             width: 100%; max-width: 380px; max-height: min(92vh, 780px);
             display: flex; flex-direction: column; overflow: hidden;
