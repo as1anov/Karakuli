@@ -349,12 +349,22 @@
         .project-swipe .project-item { position: relative; touch-action: pan-y; background: linear-gradient(var(--panel-bg), var(--panel-bg)), var(--bg-color); will-change: transform; }
         .project-swipe .project-item.current { background: linear-gradient(var(--active-btn-bg), var(--active-btn-bg)), var(--bg-color); }
         .pl-items, .pl-items * { touch-action: pan-y; }
-        .project-del-bg { position: absolute; inset: 0; display: flex; align-items: center; gap: 8px; padding-left: 16px; border-radius: 12px; background: #ef4444; color: #fff; font-size: 12px; font-weight: 700; opacity: calc(0.35 + var(--sw) * 0.65); }
-        .project-del-bg svg { width: 18px; height: 18px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; transform: scale(calc(0.7 + var(--sw) * 0.3)); transition: transform 0.18s; }
-        .project-del-bg span { opacity: 0; transform: translateX(-6px); transition: opacity 0.15s, transform 0.15s; white-space: nowrap; }
-        .project-swipe.ready .project-del-bg { background: #dc2626; }
-        .project-swipe.ready .project-del-bg svg { animation: trashPop 0.28s ease; transform: scale(1.18); }
-        .project-swipe.ready .project-del-bg span { opacity: 1; transform: none; }
+        .project-del-bg { position: absolute; inset: 0; display: flex; justify-content: flex-end; border-radius: 12px; background: #ef4444; }
+        .project-del-btn { width: 50%; height: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; background: #ef4444; color: #fff; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .project-del-btn:active { background: #dc2626; }
+        .project-del-btn svg { width: 18px; height: 18px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+        .project-chk { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; flex-shrink: 0; margin: 0 0 0 2px; border: 1.5px solid var(--disabled-color); border-radius: 6px; background: transparent; cursor: pointer; display: grid; place-items: center; }
+        .project-chk:checked { background: var(--text-color); border-color: var(--text-color); }
+        .project-chk:checked::after { content: ""; width: 5px; height: 10px; margin-top: -2px; border: solid var(--bg-color); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+        #pl-selbar { flex-shrink: 0; margin-top: 8px; }
+        #pl-selbar:empty { display: none; }
+        .pl-sel { display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 10px; border-radius: 12px; border: 1px solid var(--border-color); background: linear-gradient(var(--panel-bg), var(--panel-bg)), var(--bg-color); font-size: 12px; font-weight: 700; }
+        .pl-sel > span { flex: 1 0 auto; white-space: nowrap; }
+        .pl-sel button { height: 30px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .pl-sel button.del { color: #ef4444; border-color: #ef4444; }
+        #main-content { transition: filter 0.4s ease, transform 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
+        body.projects-open #main-content { filter: none; transform: translateX(var(--sidebar-width)); }   /* My Projects: the menu pushes the canvas to the right, no blur */
+        body.projects-open #dashboard-overlay { background: transparent; }
         @keyframes trashPop { 0% { transform: scale(1); } 45% { transform: scale(1.5) rotate(-12deg); } 100% { transform: scale(1.18); } }
         .project-hint { margin-top: 4px; text-align: center; font-size: 11px; color: var(--disabled-color); }
         .project-group { margin: 6px 2px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
@@ -824,6 +834,7 @@
                 </div>
             </div>
         </div>
+        <div id="pl-selbar"></div>
     </div>
 
     <input id="kbd-sink" type="text" autofocus readonly inputmode="none" autocomplete="off" aria-hidden="true" tabindex="-1">
@@ -1487,6 +1498,7 @@
 
         // ---- My Projects panel: search, filter, sort, selection (delete / share several), rename, duplicate ----
         let plCache = [];
+        const plSel = new Set();   // projects ticked for a group action
 
         function projectCardHTML(p, isCurrent) {
             const shared = (p.shareEditToken || p.shareViewToken) ? `<span title="Shared by link">${PROJECT_ICONS.people}</span>` : '';
@@ -1497,9 +1509,10 @@
             const name = `<span class="project-name">${escapeProjectText(p.title || 'Untitled project')}</span>`;
             return `
                 <div class="project-swipe"${key ? ` data-id="${key}"` : ''}${isCurrent ? ' data-current="1"' : ''}>
-                    <div class="project-del-bg">${PROJECT_ICONS.trash}<span>Release to delete</span></div>
+                    <div class="project-del-bg"><button class="project-del-btn" type="button">${PROJECT_ICONS.trash}<span>Delete</span></button></div>
                     <div class="project-item${isCurrent ? ' current' : ''}">
                         <div class="project-main">
+                            ${key ? `<input type="checkbox" class="project-chk" data-id="${key}"${plSel.has(key) ? ' checked' : ''} aria-label="Select project">` : ''}
                             <div class="project-tile">${projectTileIcon(p)}</div>
                             <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>${name}${meta}</div>
                             <button class="project-more" aria-label="Project actions" title="Actions" onclick="toggleProjectActions(this)">${PROJECT_ICONS.dots}</button>
@@ -1527,83 +1540,133 @@
             const list = document.getElementById('projects-list'), box = document.getElementById('pl-items');
             if (!list || !box) return;
             if (!window.karakuliProjects?.isSignedIn()) {
-                list.classList.add('guest');
+                list.classList.add('guest'); { const sb = document.getElementById('pl-selbar'); if (sb) sb.innerHTML = ''; }
                 box.innerHTML = '<div class="pl-guest"><span>Sign in with Google to save your projects, open them on any device and share them by link.</span><div class="dash-btn google-btn" onclick="document.getElementById(\'google-login-btn\').click()" style="margin:0">Login with Google</div></div>';
                 return;
             }
             list.classList.remove('guest');
             const v = plVisible();
+            const known = new Set([...(v.cur && activeProjectId ? [activeProjectId] : []), ...v.others.map(p => p.id)]);
+            [...plSel].forEach(id => { if (!known.has(id)) plSel.delete(id); });
+            const selbar = document.getElementById('pl-selbar');
+            if (selbar) selbar.innerHTML = plSel.size ? `<div class="pl-sel"><span>${plSel.size} selected</span><button type="button" onclick="plShareSel()">Share</button><button type="button" class="del" onclick="plDeleteSel()">Delete</button><button type="button" onclick="plClearSel()" aria-label="Clear selection">✕</button></div>` : '';
             let html = '';
             const se = window.karakuliSync && window.karakuliSync.error;
             if (se) html += `<div class="project-empty sync-warn" onclick="showSyncHelp()">Your projects are not reaching the cloud (${escapeProjectText(String(se.code))}), so other devices cannot see them. <u>How to fix</u></div>`;
             if (v.cur) html += '<div class="project-group">Current</div>' + projectCardHTML(v.cur, true);
             if (v.others.length) html += `<div class="project-group">Saved · ${v.others.length}</div>` + v.others.map(p => projectCardHTML(p, false)).join('');
             if (!v.others.length) html += '<div class="project-empty">No other saved projects yet.</div>';
-            else html += '<div class="project-hint">Swipe a project to the right to delete it</div>';
+            else html += '<div class="project-hint">Swipe a project to the left to delete it</div>';
             const keep = box.scrollTop;
             box.innerHTML = html; box.scrollTop = keep;
         }
 
-        // ---- Swipe right to delete ----
+        // ---- Swipe left (to half the row) to show Delete ----
         (function initProjectSwipe() {
             const box = document.getElementById('pl-items');
             if (!box) return;
             let sw = null, suppressClick = false;
-            const THRESHOLD = 0.42;
+            const OPEN = 0.5;
+            const setX = (wrap, x, anim) => { const it = wrap.querySelector('.project-item'); it.style.transition = anim ? 'transform 0.3s cubic-bezier(.2,1,.3,1)' : 'none'; it.style.transform = x ? `translateX(${x}px)` : ''; };
+            const closeAll = except => box.querySelectorAll('.project-swipe.opened').forEach(w => { if (w !== except) { w.classList.remove('opened'); setX(w, 0, true); } });
             box.addEventListener('pointerdown', e => {
-                if (e.button > 0 || e.target.closest('button')) return;
+                if (e.button > 0 || e.target.closest('button, .project-chk')) return;
                 const wrap = e.target.closest('.project-swipe[data-id]');
+                closeAll(wrap);
                 if (!wrap) return;
-                sw = { wrap, item: wrap.querySelector('.project-item'), x: e.clientX, y: e.clientY, dx: 0, on: false, id: e.pointerId, w: wrap.offsetWidth };
+                const w = wrap.offsetWidth;
+                sw = { wrap, x: e.clientX, y: e.clientY, cur: 0, on: false, id: e.pointerId, w, base: wrap.classList.contains('opened') ? -w * OPEN : 0 };
             });
             box.addEventListener('pointermove', e => {
                 if (!sw || e.pointerId !== sw.id) return;
                 const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
                 if (!sw.on) {
                     if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }   // it is a scroll
-                    if (dx < 10) return;
-                    sw.on = true; sw.item.style.transition = 'none';
+                    if (Math.abs(dx) < 10) return;
+                    sw.on = true;
                     try { box.setPointerCapture(e.pointerId); } catch (_) {}
-                    sw.wrap.classList.add('swiping');
                 }
-                // follows the finger, with a little resistance past the threshold
-                const lim = sw.w * THRESHOLD;
-                sw.dx = dx <= lim ? Math.max(0, dx) : lim + (dx - lim) * 0.55;
-                sw.item.style.transform = `translateX(${sw.dx}px)`;
-                const p = Math.min(1, sw.dx / lim);
-                sw.wrap.style.setProperty('--sw', p.toFixed(3));
-                sw.wrap.classList.toggle('ready', sw.dx >= lim);
+                const lim = sw.w * OPEN;
+                let x = Math.min(0, sw.base + dx);
+                if (x < -lim) x = -lim - (-lim - x) * 0.35;   // a little resistance past the half
+                sw.cur = x; setX(sw.wrap, x, false);
             });
-            const finish = async e => {
+            const finish = e => {
                 if (!sw || e.pointerId !== sw.id) return;
                 const s0 = sw; sw = null;
                 if (!s0.on) return;
                 suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
-                const { wrap, item } = s0, id = wrap.dataset.id, isCur = wrap.dataset.current === '1';
-                wrap.classList.remove('swiping');
-                const back = () => { item.style.transition = 'transform 0.35s cubic-bezier(.2,1.1,.3,1)'; item.style.transform = ''; wrap.style.setProperty('--sw', 0); wrap.classList.remove('ready'); };
-                if (e.type === 'pointercancel' || s0.dx < s0.w * THRESHOLD) { back(); return; }
-                if (isCur && !(await appDialog({ title: 'Delete project', text: 'Delete the current project and clear the canvas?', ok: 'Delete' }))) { back(); return; }
-                // fly out to the right, then the row folds away
+                const lim = s0.w * OPEN, open = e.type !== 'pointercancel' && s0.cur < -lim * 0.5;
+                s0.wrap.classList.toggle('opened', open);
+                setX(s0.wrap, open ? -lim : 0, true);
+            };
+            box.addEventListener('pointerup', finish);
+            box.addEventListener('pointercancel', finish);
+            box.addEventListener('click', async e => {
+                if (suppressClick) { e.stopPropagation(); e.preventDefault(); return; }
+                const btn = e.target.closest('.project-del-btn');
+                if (!btn) return;
+                const wrap = btn.closest('.project-swipe'), item = wrap.querySelector('.project-item');
+                const id = wrap.dataset.id, isCur = wrap.dataset.current === '1', w = wrap.offsetWidth;
+                const back = () => { wrap.classList.remove('opened'); setX(wrap, 0, true); };
+                if (!(await appDialog({ title: 'Delete project', text: isCur ? 'Delete the current project and clear the canvas?' : 'Delete this project permanently?', ok: 'Delete' }))) { back(); return; }
+                // flies out to the left, then the row folds away
                 item.style.transition = 'transform 0.24s cubic-bezier(.5,0,.9,.5)';
-                item.style.transform = `translateX(${s0.w + 20}px)`;
-                wrap.classList.add('removing');
+                item.style.transform = `translateX(${-w - 20}px)`;
                 await new Promise(r => setTimeout(r, 220));
                 wrap.style.height = wrap.offsetHeight + 'px'; wrap.offsetHeight;
                 wrap.style.transition = 'height 0.22s ease, margin 0.22s ease, opacity 0.22s ease';
                 wrap.style.height = '0px'; wrap.style.marginTop = wrap.style.marginBottom = '-3px'; wrap.style.opacity = '0';
                 await new Promise(r => setTimeout(r, 230));
                 try {
+                    plSel.delete(id);
                     await removeProjectCore(id);
                     if (isCur) performReset({ preserveUndo: false });
                 } catch (err) { console.warn('Could not delete', id, err); }
                 updateCurrentProjectUI();
                 await renderProjectsList();
-            };
-            box.addEventListener('pointerup', finish);
-            box.addEventListener('pointercancel', finish);
-            box.addEventListener('click', e => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+            }, true);
+            box.addEventListener('change', e => {
+                const c = e.target.closest('.project-chk'); if (!c) return;
+                if (c.checked) plSel.add(c.dataset.id); else plSel.delete(c.dataset.id);
+                plRender();
+            });
         })();
+
+        // ---- Group actions on the ticked projects ----
+        function plClearSel() { plSel.clear(); plRender(); }
+        async function plDeleteSel() {
+            const ids = [...plSel]; if (!ids.length) return;
+            if (!(await appDialog({ title: 'Delete projects', text: `Delete ${ids.length} ${ids.length === 1 ? 'project' : 'projects'} permanently?`, ok: 'Delete' }))) return;
+            const hadCur = ids.includes(activeProjectId);
+            for (const id of ids) { try { await removeProjectCore(id); } catch (err) { console.warn('Could not delete', id, err); } }
+            plSel.clear();
+            if (hadCur) performReset({ preserveUndo: false });
+            updateCurrentProjectUI();
+            await renderProjectsList();
+        }
+        async function plShareSel() {
+            const ids = [...plSel]; if (!ids.length) return;
+            if (!window.karakuliProjects?.isSignedIn() || !window.karakuliShare) { showActionHint('Sign in with Google to share'); return; }
+            if (shareSession) { showActionHint('Open your own project to share it'); return; }
+            const modal = document.getElementById('share-modal'), body = document.getElementById('share-body');
+            document.getElementById('share-title').textContent = `Share ${ids.length} ${ids.length === 1 ? 'project' : 'projects'}`;
+            body.innerHTML = '<div class="share-desc" style="padding:8px 0 18px">Preparing the links…</div>';
+            modal.style.display = 'flex'; setTimeout(() => modal.classList.add('show'), 10);
+            try {
+                const base = location.origin + location.pathname; let html = '';
+                for (let n = 0; n < ids.length; n++) {
+                    const { title, tokens } = await prepareShare(ids[n]);
+                    html += `<div class="share-block"><div class="share-title">${escapeProjectText(title || 'Untitled project')}</div>
+                        <div class="share-desc">Can edit</div>
+                        <div class="share-row"><input id="gs-e-${n}" readonly value="${base}?e=${tokens.edit}"><button class="share-copy" onclick="copyShareLink('gs-e-${n}', this)">Copy</button></div>
+                        <div class="share-desc" style="margin-top:8px">View only</div>
+                        <div class="share-row"><input id="gs-v-${n}" readonly value="${base}?v=${tokens.view}"><button class="share-copy" onclick="copyShareLink('gs-v-${n}', this)">Copy</button></div></div>`;
+                }
+                body.innerHTML = html;
+                renderProjectsList();
+            } catch (err) { console.error('Share error:', err); body.innerHTML = shareErrorHTML(err); }
+        }
 
         async function renameProject(id) {
             const isCur = !id || id === activeProjectId;
@@ -1649,8 +1712,19 @@
         function setProjectsMode(open) {
             const list = document.getElementById('projects-list');
             list.classList.toggle('open', open);
+            setTimeout(syncProjectsPush, 0);
             document.getElementById('dash-home').classList.toggle('projects-mode', open);
             document.getElementById('projects-btn').classList.toggle('active', open);
+        }
+        // With My Projects open (wide screens) the menu pushes the canvas to the right instead of covering it, and the view moves with it
+        function syncProjectsPush() {
+            const want = isDashboardOpen && document.getElementById('projects-list').classList.contains('open') && window.innerWidth > 700;
+            const has = document.body.classList.contains('projects-open');
+            if (want === has) return;
+            const sw = document.getElementById('dashboard').offsetWidth;
+            document.body.classList.toggle('projects-open', want);
+            offsetX += want ? -sw / 2 : sw / 2;
+            try { redraw(); } catch (e) {}
         }
         async function toggleProjectsList() {
             const open = !document.getElementById('projects-list').classList.contains('open');
@@ -1714,7 +1788,8 @@
             }
             applyProjectData(data, { fit: false });
             showActionHint('Project opened');
-            setProjectsMode(false);
+            if (window.innerWidth > 700) renderProjectsList();   // the list stays, next to the opened drawing
+            else { setProjectsMode(false); if (isDashboardOpen) toggleDashboard(); }
             updateCurrentProjectUI();
         }
 
@@ -2903,6 +2978,7 @@ service cloud.firestore {
                 document.body.classList.remove('dashboard-open');
                 clearMenuNavigationFocus();
             }
+            syncProjectsPush();
         }
 
         function updateUIState() {
