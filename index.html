@@ -365,7 +365,7 @@
         .pl-sel button.del { color: #ef4444; border-color: #ef4444; }
         #main-content { transition: filter 0.4s ease, transform 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
         body.projects-open #main-content { filter: none; transform: translateX(var(--sidebar-width)); }   /* My Projects: the menu pushes the canvas to the right, no blur */
-        body.projects-open #dashboard-overlay { background: transparent; }
+        body.projects-open #dashboard-overlay { background: transparent; pointer-events: none; }   /* the canvas stays usable beside the open menu */
         @keyframes trashPop { 0% { transform: scale(1); } 45% { transform: scale(1.5) rotate(-12deg); } 100% { transform: scale(1.18); } }
         .project-hint { margin-top: 4px; text-align: center; font-size: 11px; color: var(--disabled-color); }
         .project-group { margin: 6px 2px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
@@ -4147,7 +4147,11 @@ service cloud.firestore {
             let c = createCanvas(windowWidth, windowHeight); c.parent('canvas-container'); offsetX = width/2; offsetY = height/2; 
             const canvasElem = document.getElementById('defaultCanvas0');
             
-            canvasElem.addEventListener('pointerdown', (e) => {
+            // With the menu pushing the canvas to the right, a pointer's x on the screen is the canvas x plus the menu's width
+            const pushDx = () => document.body.classList.contains('projects-open') ? document.getElementById('dashboard').offsetWidth : 0;
+            const adj = ev => { const d = pushDx(); if (!d) return ev; return new Proxy(ev, { get(t, k) { if (k === 'clientX' || k === 'pageX' || k === 'x') return t[k] - d; const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } }); };
+            canvasElem.addEventListener('pointerdown', (e0) => {
+                const e = adj(e0);
                 e.preventDefault();
                 if (isTimelapseUIOpen && tlScreenHold.pointerId != null && tlScreenHold.pointerId !== e.pointerId && tlScreenHold.ev) {   // a second finger: pinch-zoom instead of a scrub
                     const f = tlScreenHold.ev; clearTimelapseScreenHold();
@@ -4177,7 +4181,8 @@ service cloud.firestore {
                 }
             });
 
-            canvasElem.addEventListener('pointermove', (e) => {
+            canvasElem.addEventListener('pointermove', (e0) => {
+                const e = adj(e0);
                 e.preventDefault();
                 if (isTimelapseUIOpen && moveTimelapseScreenScrub(e)) return;
                 if (activePointers.has(e.pointerId)) {
@@ -4212,7 +4217,8 @@ service cloud.firestore {
                 }
             });
 
-            const endPointer = (e) => {
+            const endPointer = (e0) => {
+                const e = adj(e0);
                 e.preventDefault();
                 if (isTimelapseUIOpen && endTimelapseScreenScrub(e)) return;
                 if (e.pointerId === mainPointerId) {
