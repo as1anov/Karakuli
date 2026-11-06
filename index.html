@@ -865,7 +865,7 @@
         <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="nc-title">
             <div class="nc-header">
                 <div>
-                    <h2 id="nc-title">Canvas</h2>
+                    <h2 id="nc-title">New Canvas</h2>
                     <p class="nc-sub" id="nc-sub">Start from a product or set a custom size.</p>
                 </div>
                 <button class="nc-close" onclick="closeNewCanvasModal()" aria-label="Close">
@@ -2839,7 +2839,7 @@ service cloud.firestore {
         }
 
         function showCanvasModal() {
-            document.getElementById('nc-title').textContent = isResizingOnly ? 'Canvas Size' : 'Canvas';
+            document.getElementById('nc-title').textContent = isResizingOnly ? 'Canvas Size' : 'New Canvas';
             document.getElementById('nc-sub').textContent = isResizingOnly
                 ? 'Change the size of the current canvas.'
                 : 'Start from a blank canvas, a product or a custom size.';
