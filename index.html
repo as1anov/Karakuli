@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1325,9 +1327,10 @@
         let sharedPollTimer = null, sharedSeenMs = 0, sharedDirty = false;
 
         function projectSnapshot(withTl = false) {
+            const tlLive = isTimelapseUIOpen && tlHistory.length ? tlHistory[tlHistory.length - 1] : null;   // while the time-lapse is open the canvas shows an old frame
             const tlPart = withTl ? { tlJson: (() => { const pk = packTimelapse(tlHistory); const j = pk ? JSON.stringify(pk) : null; return j && j.length < 750000 ? j : null; })() } : {};
             return JSON.parse(JSON.stringify({
-                title: currentProjectTitle, segments, specialElements, curI, curJ, lastDirection,
+                title: currentProjectTitle, segments: tlLive ? tlLive.segments : segments, specialElements: tlLive ? tlLive.specialElements : specialElements, curI, curJ, lastDirection,
                 paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
                 productKey: activeProductKey, holeOff: [...holeOff], plateHoles: [...plateHoleOn], plateBolts,
                 shareEditToken: projectShare.edit, shareViewToken: projectShare.view,
@@ -1426,6 +1429,7 @@
 
         async function saveSharedSession() {
             if (!shareSession || shareSession.mode !== 'edit') return;
+            if (isTimelapseUIOpen) return;   // the canvas shows an old frame of the recording, not the drawing
             try { await window.karakuliShare.update(shareSession.token, shareSnapshot(), currentProjectTitle); sharedSeenMs = Date.now(); sharedDirty = false; }
             catch (err) { console.error('Shared save error:', err); showActionHint('Could not save changes to the shared project'); }
         }
@@ -1441,6 +1445,7 @@
         async function saveCurrentProjectNow(opts = {}) {
             if (shareSession) { await saveSharedSession(); return; }
             if (!window.karakuliProjects?.isSignedIn()) return;
+            if (isTimelapseUIOpen) return;   // the canvas shows an old frame of the recording: saving now would overwrite the drawing with it
             if (!activeProjectId) {
                 if (!projectCreationPromise) {
                     projectCreationPromise = (async () => {
@@ -1772,6 +1777,7 @@
         }
 
         // Puts a project (own or shared) on the canvas.
+        let projectRecovered = false;
         function applyProjectData(project, { fit = true } = {}) {
             segments = project.segments || []; specialElements = project.specialElements || {};
             curI = project.curI || 0; curJ = project.curJ || 0; lastDirection = project.lastDirection || null;
@@ -1788,6 +1794,14 @@
                 tlCaptureStride = project.tlCaptureStride || 1;
                 tlCaptureCounter = project.tlCaptureCounter || 0;
             } else { tlHistory = []; tlCurrentFrame = 0; tlCaptureStride = 1; tlCaptureCounter = 0; }
+            // A drawing that was saved while the time-lapse showed an early frame is a few percent of the real one; the recording still has it all.
+            projectRecovered = false;
+            const lastFrame = tlHistory.length ? tlHistory[tlHistory.length - 1] : null;
+            if (lastFrame && Array.isArray(lastFrame.segments) && lastFrame.segments.length > segments.length * 1.5 + 10) {
+                segments = JSON.parse(JSON.stringify(lastFrame.segments)); specialElements = JSON.parse(JSON.stringify(lastFrame.specialElements || {}));
+                if (lastFrame.cursor) { curI = lastFrame.cursor.i; curJ = lastFrame.cursor.j; }
+                projectRecovered = true;
+            }
             if (project.currentTheme) setTheme(project.currentTheme);
             history = []; redoStack = []; invalidateGeometryCache();
             if (fit && isPaperVisible) { try { fitCanvasToView(); } catch (e) {} }
@@ -1826,6 +1840,8 @@
                 } catch (err) { console.warn('Shared copy not loaded', err); }
             }
             applyProjectData(data, { fit: false });
+            if (projectRecovered && !isViewOnly) { setTimeout(() => { showActionHint('Drawing restored from the time-lapse'); scheduleProjectSave(); }, 1200); }
+            cvFitDrawing(true);   // the whole drawing in view (a big pattern used to open as a small corner of itself)
             showActionHint('Project opened');
             if (window.innerWidth > 700) renderProjectsList();   // the list stays, next to the opened drawing
             else { setProjectsMode(false); if (isDashboardOpen) toggleDashboard(); }
@@ -1871,10 +1887,10 @@
             document.querySelectorAll('.cv-tab').forEach(b => b.classList.toggle('active', b.dataset.t === tab));
         }
         // The whole drawing in view (after a game the camera is zoomed in on the maze)
-        function cvFitDrawing() {
+        function cvFitDrawing(live = false) {
             try {
                 if (isPaperVisible) { fitCanvasToView(); redraw(); return; }
-                const fr = tlHistory.length ? tlHistory[tlHistory.length - 1] : { segments, specialElements };
+                const fr = tlHistory.length && !live ? tlHistory[tlHistory.length - 1] : { segments, specialElements };
                 let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
                 (fr.segments || []).forEach(sg => { x0 = Math.min(x0, sg.p1.x, sg.p2.x); x1 = Math.max(x1, sg.p1.x, sg.p2.x); y0 = Math.min(y0, sg.p1.y, sg.p2.y); y1 = Math.max(y1, sg.p1.y, sg.p2.y); });
                 Object.keys(fr.specialElements || {}).forEach(id => { const [i, j] = id.split(',').map(Number); x0 = Math.min(x0, i); x1 = Math.max(x1, i); y0 = Math.min(y0, j); y1 = Math.max(y1, j); });
