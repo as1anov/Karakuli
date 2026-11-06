@@ -3349,6 +3349,11 @@ service cloud.firestore {
                     end++;
                 }
                 if (end > start) batches.push({ start, end });
+                else {
+                    // a frame that only adds lines which do not form one stroke (a big drawing is recorded in larger steps): still grow them one by one
+                    const a = tlHistory[start], b = tlHistory[start + 1], after = getFrameSegmentKeys(b), before = getFrameSegmentKeys(a);
+                    if (getFrameSpecialSignature(a) === getFrameSpecialSignature(b) && !a.segments.some(sg => !after.has(segmentKey(sg))) && b.segments.some(sg => !before.has(segmentKey(sg)))) { batches.push({ start, end: start + 1 }); end = start + 1; }
+                }
                 start = end > start ? end : start + 1;
             }
             return batches;
@@ -4377,7 +4382,7 @@ service cloud.firestore {
             return `${segment.p1.x},${segment.p1.y}:${segment.p2.x},${segment.p2.y}`;
         }
 
-        function orderTimelapseSegments(segments, cursor) {
+        function orderTimelapseSegments(segments, cursor, loose = false) {
             const availableAtPoint = new Map();
             const pointKey = point => `${point.x},${point.y}`;
             segments.forEach((segment, index) => {
@@ -4393,14 +4398,27 @@ service cloud.firestore {
             while (ordered.length < segments.length) {
                 const nextIndex = (availableAtPoint.get(pointKey(point)) || []).find(index => !used[index]);
                 // Never make an artificial bridge between disconnected lines.
-                if (nextIndex === undefined) return null;
-                used[nextIndex] = true;
-                const segment = segments[nextIndex];
+                let jump = false, pick = nextIndex;
+                if (pick === undefined) {
+                    if (!loose) return null;
+                    // loose mode (a frame that adds several separate lines): lift the pen and continue at the nearest unused segment
+                    let best = Infinity;
+                    segments.forEach((sg, k) => {
+                        if (used[k]) return;
+                        const d = Math.min(Math.hypot(sg.p1.x - point.x, sg.p1.y - point.y), Math.hypot(sg.p2.x - point.x, sg.p2.y - point.y));
+                        if (d < best) { best = d; pick = k; }
+                    });
+                    jump = true;
+                }
+                used[pick] = true;
+                const segment = segments[pick];
                 const startsAtCursor = segment.p1.x === point.x && segment.p1.y === point.y;
                 const endsAtCursor = segment.p2.x === point.x && segment.p2.y === point.y;
-                const p1 = endsAtCursor && !startsAtCursor ? segment.p2 : segment.p1;
-                const p2 = endsAtCursor && !startsAtCursor ? segment.p1 : segment.p2;
-                ordered.push({ p1, p2 });
+                let flip = endsAtCursor && !startsAtCursor;
+                if (jump) flip = Math.hypot(segment.p2.x - point.x, segment.p2.y - point.y) < Math.hypot(segment.p1.x - point.x, segment.p1.y - point.y);
+                const p1 = flip ? segment.p2 : segment.p1;
+                const p2 = flip ? segment.p1 : segment.p2;
+                ordered.push(jump ? { p1, p2, jump: true } : { p1, p2 });
                 point = p2;
             }
             return ordered;
@@ -4416,7 +4434,7 @@ service cloud.firestore {
             const fromSegments = getFrameSegmentKeys(fromFrame);
             const addedSegments = toFrame.segments.filter(segment => !fromSegments.has(segmentKey(segment)));
             if (!addedSegments.length) return cacheTimelapseGrowthPath(null);
-            const orderedSegments = orderTimelapseSegments(addedSegments, fromFrame.cursor);
+            const orderedSegments = orderTimelapseSegments(addedSegments, fromFrame.cursor, true);
             if (!orderedSegments) return cacheTimelapseGrowthPath(null);
             const start = orderedSegments[0]?.p1;
             const predecessor = [...fromFrame.segments].reverse().find(segment =>
@@ -4462,7 +4480,7 @@ service cloud.firestore {
                 if (localProgress <= 0) return;
                 const x1 = segment.p1.x * STEP, y1 = segment.p1.y * STEP;
                 const x2 = segment.p2.x * STEP, y2 = segment.p2.y * STEP;
-                if (!hasPath) { ctx.moveTo(x1, y1); hasPath = true; }
+                if (!hasPath || segment.jump) { ctx.moveTo(x1, y1); hasPath = true; }
                 const tipX = lerp(x1, x2, localProgress), tipY = lerp(y1, y2, localProgress);
                 ctx.lineTo(tipX, tipY);
                 tip = { x: tipX, y: tipY, dx: x2 - x1, dy: y2 - y1 };
