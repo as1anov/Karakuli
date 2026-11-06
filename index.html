@@ -3403,7 +3403,66 @@ service cloud.firestore {
 
         function togglePlayTimelapse() { if (isPlayingTl) stopTlPlayback(); else startTlPlayback(); }
 
+        // Before the first play everything the playback needs is prepared (line order of every step, outlines of every frame), with a
+        // "Loading" notice: nothing is computed while the lines are growing, so a big drawing plays as smoothly as a small one.
+        let tlPrep = { h: null, n: -1 }, tlStarting = false;
+        async function tlPrepare() {
+            if (tlPrep.h === tlHistory && tlPrep.n === tlHistory.length) return;
+            const h = tlHistory, n = h.length;
+            let box = null, shown = false, t0 = performance.now(), last = t0;
+            const say = pct => {
+                if (!shown && performance.now() - t0 > 300) {
+                    box = document.createElement('div'); box.id = 'tl-loading';
+                    box.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5000;padding:14px 22px;border-radius:14px;background:var(--bg-color);color:var(--text-color);border:1px solid var(--border-color);font:600 14px var(--main-font);box-shadow:0 8px 30px rgba(0,0,0,.2);pointer-events:none';
+                    document.body.appendChild(box); shown = true;
+                }
+                if (box) box.textContent = 'Loading… ' + pct + '%';
+            };
+            const slice = async (pct) => { if (performance.now() - last > 12) { say(pct); await new Promise(r => setTimeout(r, 0)); last = performance.now(); } };
+            try {
+                for (let i = 0; i < n; i++) { getFrameSegmentKeys(h[i]); getFrameSpecialSignature(h[i]); await slice(Math.round(10 * i / n)); }
+                await new Promise(r => setTimeout(r, 0));
+                const batches = getTimelapseBatches();
+                const inBatch = new Set();
+                for (let b = 0; b < batches.length; b++) {
+                    const { start, end } = batches[b];
+                    if (tlHistory !== h) return;
+                    tlGrowthFor(start, end);
+                    getNodePoints(h[end].specialElements);
+                    // the outlines of the frame a step starts from, kept for the whole playback
+                    if (!tlGroupsMemo.has(h[start].segments)) {
+                        const sv = { segments, specialElements, geometryCache, shared: tlSharedActive };
+                        try { tlSharedActive = true; segments = h[start].segments; geometryCache = { source: null, groups: [] }; getPathGroups(); }
+                        finally { segments = sv.segments; specialElements = sv.specialElements; geometryCache = sv.geometryCache; tlSharedActive = sv.shared; }
+                    }
+                    await slice(10 + Math.round(90 * b / Math.max(1, batches.length)));
+                }
+                // frames shown as a whole (the end of a step, single frames) need their outlines too
+                const interior = new Set();
+                batches.forEach(({ start, end }) => { for (let i = start + 1; i < end; i++) interior.add(i); });
+                for (let i = 0; i < n; i++) {
+                    if (interior.has(i) || tlGroupsMemo.has(h[i].segments)) continue;
+                    if (tlHistory !== h) return;
+                    const sv = { segments, specialElements, geometryCache, shared: tlSharedActive };
+                    try { tlSharedActive = true; segments = h[i].segments; geometryCache = { source: null, groups: [] }; getPathGroups(); }
+                    finally { segments = sv.segments; specialElements = sv.specialElements; geometryCache = sv.geometryCache; tlSharedActive = sv.shared; }
+                    await slice(Math.round(100 * i / n));
+                }
+                tlPrep = { h, n };
+            } finally { if (box) box.remove(); }
+        }
+
         function startTlPlayback() {
+            if (tlHistory.length < 2 || tlStarting) return;
+            if (tlPrep.h === tlHistory && tlPrep.n === tlHistory.length) return startTlPlaybackNow();
+            tlStarting = true;
+            tlPrepare().catch(err => console.warn('Time-lapse preparation failed', err)).then(() => {
+                tlStarting = false;
+                if (isTimelapseUIOpen && !isPlayingTl) startTlPlaybackNow();
+            });
+        }
+
+        function startTlPlaybackNow() {
             if (tlHistory.length < 2) return;
             isPlayingTl = true;
             document.getElementById('tl-play-icon').style.display = 'none';
@@ -4424,33 +4483,39 @@ service cloud.firestore {
             return ordered;
         }
 
+        let tlGrowthMap = { h: null, n: -1, map: new Map() };
         function getTimelapseGrowthPath() {
             if (!tlTransition || !tlHistory[tlTransition.from] || !tlHistory[tlTransition.to]) return;
-            if (tlGrowthCache.from === tlTransition.from && tlGrowthCache.to === tlTransition.to && tlGrowthCache.historyLength === tlHistory.length) {
-                return tlGrowthCache.path;
-            }
-            const fromFrame = tlHistory[tlTransition.from];
-            const toFrame = tlHistory[tlTransition.to];
+            return tlGrowthFor(tlTransition.from, tlTransition.to);
+        }
+        // the order in which the lines of one step grow (cached: the loading pass fills the cache for the whole recording)
+        function tlGrowthFor(from, to) {
+            if (tlGrowthMap.h !== tlHistory || tlGrowthMap.n !== tlHistory.length) tlGrowthMap = { h: tlHistory, n: tlHistory.length, map: new Map() };
+            const key = from + ':' + to;
+            if (tlGrowthMap.map.has(key)) return tlGrowthMap.map.get(key);
+            const path = tlComputeGrowth(from, to);
+            tlGrowthMap.map.set(key, path);
+            return path;
+        }
+        function tlComputeGrowth(from, to) {
+            const fromFrame = tlHistory[from];
+            const toFrame = tlHistory[to];
             const fromSegments = getFrameSegmentKeys(fromFrame);
             const addedSegments = toFrame.segments.filter(segment => !fromSegments.has(segmentKey(segment)));
-            if (!addedSegments.length) return cacheTimelapseGrowthPath(null);
+            if (!addedSegments.length) return null;
             const orderedSegments = orderTimelapseSegments(addedSegments, fromFrame.cursor, true);
-            if (!orderedSegments) return cacheTimelapseGrowthPath(null);
+            if (!orderedSegments) return null;
             const start = orderedSegments[0]?.p1;
             const predecessor = [...fromFrame.segments].reverse().find(segment =>
                 (segment.p1.x === start.x && segment.p1.y === start.y) ||
                 (segment.p2.x === start.x && segment.p2.y === start.y)
             );
-            if (!predecessor) return cacheTimelapseGrowthPath({ fromFrame, toFrame, segments: orderedSegments });
+            if (!predecessor) return { fromFrame, toFrame, segments: orderedSegments };
             const predecessorStartsAtJoint = predecessor.p2.x === start.x && predecessor.p2.y === start.y;
             const orientedPredecessor = predecessorStartsAtJoint
                 ? predecessor
                 : { p1: predecessor.p2, p2: predecessor.p1 };
-            return cacheTimelapseGrowthPath({
-                fromFrame, toFrame,
-                segments: [orientedPredecessor, ...orderedSegments],
-                growthOffset: 1
-            });
+            return { fromFrame, toFrame, segments: [orientedPredecessor, ...orderedSegments], growthOffset: 1 };
         }
 
         function cacheTimelapseGrowthPath(path) {
