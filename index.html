@@ -3133,7 +3133,7 @@ service cloud.firestore {
             scheduleProjectSave();
         }
 
-        function cycleTlSpeed() { const o = [1, 2, 4, 8, 16, 32], i = o.indexOf(tlSpeed); setTlSpeed(o[(i + 1) % o.length]); }
+        function cycleTlSpeed() { if (tlSpeed === 1) setTlSpeed(2); else if (tlSpeed === 2) setTlSpeed(4); else if (tlSpeed === 4) setTlSpeed(8); else setTlSpeed(1); }
         function setTlSpeed(s) { tlSpeed = s; document.getElementById('tl-cycle-speed').innerText = `${s}x`; if (isPlayingTl) { stopTlPlayback(); startTlPlayback(); } }
         // Playback time of every recorded frame. A frame lasts FRAME_DURATION per drawn grid step it adds, so a big drawing (recorded with fewer,
         // larger frames) is drawn at the same pace as a small one instead of racing through.
@@ -3472,6 +3472,10 @@ service cloud.firestore {
                 const steps = new Array(Math.max(0, n - 1)), bbox = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
                 const grow = (x, y) => { if (x < bbox.x0) bbox.x0 = x; if (x > bbox.x1) bbox.x1 = x; if (y < bbox.y0) bbox.y0 = y; if (y > bbox.y1) bbox.y1 = y; };
                 h[0].segments.forEach(sg => { grow(sg.p1.x, sg.p1.y); grow(sg.p2.x, sg.p2.y); });
+                // line ends that already exist: a new stroke that starts or ends on one is joined to it, so the corner is mitered like in the finished drawing
+                const touch = new Map(), tk = (x, y) => x + ',' + y;
+                const touchAdd = sg => { for (const p of [sg.p1, sg.p2]) { const k = tk(p.x, p.y); if (!touch.has(k)) touch.set(k, sg); } };
+                h[0].segments.forEach(touchAdd);
                 for (let i = 0; i < n - 1; i++) {
                     const A = h[i].segments, B = h[i + 1].segments;
                     let pure = false, added = null;
@@ -3480,7 +3484,14 @@ service cloud.firestore {
                     else if (!A.length) { pure = true; added = B.slice(); }
                     else { const before = getFrameSegmentKeys(h[i]); const after = getFrameSegmentKeys(h[i + 1]); added = B.filter(sg => !before.has(segmentKey(sg))); pure = after.size - added.length === before.size; }
                     steps[i] = { pure, segs: added.length ? orderTimelapseSegments(added, h[i].cursor, true) || added.map(sg => ({ p1: sg.p1, p2: sg.p2, jump: true })) : [] };
-                    steps[i].segs.forEach(sg => { grow(sg.p1.x, sg.p1.y); grow(sg.p2.x, sg.p2.y); });
+                    const ss = steps[i].segs;
+                    ss.forEach((sg, k) => {
+                        if (k === 0 || sg.jump) { const e = touch.get(tk(sg.p1.x, sg.p1.y)); if (e) sg.pre = e.p2.x === sg.p1.x && e.p2.y === sg.p1.y ? { p1: e.p1, p2: e.p2 } : { p1: e.p2, p2: e.p1 }; }
+                        const nx = ss[k + 1];
+                        if (!nx || nx.jump || nx.p1.x !== sg.p2.x || nx.p1.y !== sg.p2.y) { const e = touch.get(tk(sg.p2.x, sg.p2.y)); if (e && e !== sg) sg.post = e.p1.x === sg.p2.x && e.p1.y === sg.p2.y ? { p1: e.p1, p2: e.p2 } : { p1: e.p2, p2: e.p1 }; }
+                    });
+                    if (!steps[i].pure) { touch.clear(); B.forEach(touchAdd); } else added.forEach(touchAdd);
+                    ss.forEach(sg => { grow(sg.p1.x, sg.p1.y); grow(sg.p2.x, sg.p2.y); });
                     if (i % 4 === 0) await slice(Math.round(10 * i / n));
                 }
                 for (let i = 0; i < n; i++) { getFrameSpecialSignature(h[i]); if (i % 8 === 0) await slice(10); }
@@ -4541,7 +4552,8 @@ service cloud.firestore {
             if (tlLayerUsable()) {
                 const list = [];
                 for (let i = from; i < to; i++) tlPrep.steps[i].segs.forEach(sg => list.push(sg));
-                return list.length ? { fromFrame, toFrame, segments: list } : null;
+                if (!list.length) return null;
+                return list[0].pre && !list[0].jump ? { fromFrame, toFrame, segments: [list[0].pre, ...list], growthOffset: 1 } : { fromFrame, toFrame, segments: list };
             }
             const fromSegments = getFrameSegmentKeys(fromFrame);
             const addedSegments = toFrame.segments.filter(segment => !fromSegments.has(segmentKey(segment)));
@@ -4574,10 +4586,13 @@ service cloud.firestore {
         function tlLayerStroke(c2, list) {
             let open = false, lx = NaN, ly = NaN;
             c2.beginPath();
-            list.forEach(sg => {
+            list.forEach((sg, idx) => {
                 const x1 = sg.p1.x * STEP, y1 = sg.p1.y * STEP, x2 = sg.p2.x * STEP, y2 = sg.p2.y * STEP;
-                if (!open || sg.jump || x1 !== lx || y1 !== ly) c2.moveTo(x1, y1);
+                if (!open || sg.jump || x1 !== lx || y1 !== ly) {
+                    if (sg.pre) { c2.moveTo(sg.pre.p1.x * STEP, sg.pre.p1.y * STEP); c2.lineTo(x1, y1); } else c2.moveTo(x1, y1);
+                }
                 c2.lineTo(x2, y2); open = true; lx = x2; ly = y2;
+                if (sg.post) c2.lineTo(sg.post.p2.x * STEP, sg.post.p2.y * STEP);
             });
             c2.stroke();
         }
@@ -4590,7 +4605,7 @@ service cloud.firestore {
             const bb = tlPrep.bbox, m = weight;
             if (!L) {
                 const w0 = (bb.x1 - bb.x0) * STEP + 2 * m + 4, h0 = (bb.y1 - bb.y0) * STEP + 2 * m + 4;
-                const sMax = Math.min(8192 / w0, 8192 / h0, Math.sqrt(1.2e7 / (w0 * h0)));
+                const sMax = Math.min(4096 / w0, 4096 / h0, Math.sqrt(4e6 / (w0 * h0)));
                 const s = Math.max(0.02, Math.min(sMax, want));
                 const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(w0 * s)); cv.height = Math.max(1, Math.ceil(h0 * s));
                 L = tlLayer = { cv, c2: cv.getContext('2d'), s, sMax, key: col + '|' + weight, h: tlHistory, frame: -1, x0: bb.x0 * STEP - m - 2, y0: bb.y0 * STEP - m - 2, w: w0, hgt: h0, zoomSeen: zoom, zoomAt: now };
