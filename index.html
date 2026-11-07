@@ -1842,7 +1842,8 @@
             } else { tlHistory = []; tlCurrentFrame = 0; tlCaptureStride = 1; tlCaptureCounter = 0; }
             // A drawing that was saved while the time-lapse showed an early frame is a few percent of the real one; the recording still has it all.
             projectRecovered = false;
-            const lastFrame = tlHistory.length ? tlHistory[tlHistory.length - 1] : null;
+            let lastFrame = null;   // the fullest frame of the recording (the latest one among equals)
+            tlHistory.forEach(f => { if (f && Array.isArray(f.segments) && (!lastFrame || f.segments.length >= lastFrame.segments.length)) lastFrame = f; });
             if (lastFrame && Array.isArray(lastFrame.segments) && lastFrame.segments.length > segments.length * 1.5 + 10) {
                 segments = JSON.parse(JSON.stringify(lastFrame.segments)); specialElements = JSON.parse(JSON.stringify(lastFrame.specialElements || {}));
                 if (lastFrame.cursor) { curI = lastFrame.cursor.i; curJ = lastFrame.cursor.j; }
