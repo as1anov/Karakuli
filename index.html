@@ -4484,17 +4484,6 @@ service cloud.firestore {
         }
 
         function orderTimelapseSegments(segments, cursor, loose = false) {
-            if (loose) {
-                // Lines were stored in the order they were drawn, so that IS the growth order: one pass, however many lines a step adds.
-                const out = []; let px = NaN, py = NaN;
-                for (const sg of segments) {
-                    const flip = !(sg.p1.x === px && sg.p1.y === py) && sg.p2.x === px && sg.p2.y === py;
-                    const p1 = flip ? sg.p2 : sg.p1, p2 = flip ? sg.p1 : sg.p2;
-                    out.push(p1.x === px && p1.y === py ? { p1, p2 } : (out.length === 0 && cursor && p1.x === cursor.i && p1.y === cursor.j ? { p1, p2 } : { p1, p2, jump: true }));
-                    px = p2.x; py = p2.y;
-                }
-                return out;
-            }
             const availableAtPoint = new Map();
             const pointKey = point => `${point.x},${point.y}`;
             segments.forEach((segment, index) => {
@@ -4506,6 +4495,7 @@ service cloud.firestore {
             });
             const used = new Array(segments.length).fill(false);
             const ordered = [];
+            let nextFree = 0;
             let point = { x: cursor.i, y: cursor.j };
             while (ordered.length < segments.length) {
                 const nextIndex = (availableAtPoint.get(pointKey(point)) || []).find(index => !used[index]);
@@ -4514,13 +4504,8 @@ service cloud.firestore {
                 if (pick === undefined) {
                     if (!loose) return null;
                     // loose mode (a frame that adds several separate lines): lift the pen and continue at the nearest unused segment
-                    let best = Infinity;
-                    segments.forEach((sg, k) => {
-                        if (used[k]) return;
-                        const d = Math.min(Math.hypot(sg.p1.x - point.x, sg.p1.y - point.y), Math.hypot(sg.p2.x - point.x, sg.p2.y - point.y));
-                        if (d < best) { best = d; pick = k; }
-                    });
-                    jump = true;
+                    while (nextFree < segments.length && used[nextFree]) nextFree++;   // the next line in drawing order (cheap, however many lines a step adds)
+                    pick = nextFree; jump = true;
                 }
                 used[pick] = true;
                 const segment = segments[pick];
