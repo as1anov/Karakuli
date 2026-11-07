@@ -1583,7 +1583,7 @@
             const known = new Set([...(v.cur && activeProjectId ? [activeProjectId] : []), ...v.others.map(p => p.id)]);
             [...plSel].forEach(id => { if (!known.has(id)) plSel.delete(id); });
             const selbar = document.getElementById('pl-selbar');
-            if (selbar) selbar.innerHTML = plSel.size ? `<div class="pl-sel"><span>${plSel.size} selected</span><button type="button" onclick="plShareSel()">Share</button><button type="button" onclick="plExportSel()">Export</button><button type="button" class="del" onclick="plDeleteSel()">Delete</button><button type="button" onclick="plClearSel()" aria-label="Clear selection">✕</button></div>` : '';
+            if (selbar) selbar.innerHTML = plSel.size ? `<div class="pl-sel"><span>${plSel.size} selected</span><button type="button" onclick="plShareSel()">Share</button><button type="button" class="del" onclick="plDeleteSel()">Delete</button><button type="button" onclick="plClearSel()" aria-label="Clear selection">✕</button></div>` : '';
             let html = '';
             const se = window.karakuliSync && window.karakuliSync.error;
             if (se) html += `<div class="project-empty sync-warn" onclick="showSyncHelp()">Your projects are not reaching the cloud (${escapeProjectText(String(se.code))}), so other devices cannot see them. <u>How to fix</u></div>`;
@@ -1591,7 +1591,6 @@
             if (v.others.length) html += `<div class="project-group">Saved · ${v.others.length}</div>` + v.others.map(p => projectCardHTML(p, false)).join('');
             if (!v.others.length) html += '<div class="project-empty">No other saved projects yet.</div>';
             else html += '<div class="project-hint">Swipe a project to the left to delete it</div>';
-            html += '<div class="project-hint" style="margin-top:10px"><button type="button" onclick="plImportPick()" style="font:inherit;color:var(--text-color);background:none;border:1px solid var(--border-color);border-radius:10px;padding:7px 12px;cursor:pointer">Import project file</button></div>';
             const keep = box.scrollTop;
             box.innerHTML = html; box.scrollTop = keep;
         }
@@ -1671,51 +1670,6 @@
 
         // ---- Group actions on the ticked projects ----
         function plClearSel() { plSel.clear(); plRender(); }
-        // ---- Export / import of whole projects: one text file (JSON inside), easy to send from a phone ----
-        function saveTextFile(name, text) {
-            const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-            const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 4000);
-        }
-        async function plExportSel() {
-            const ids = [...plSel]; if (!ids.length) return;
-            try {
-                const list = [];
-                for (const id of ids) {
-                    let data;
-                    if (id === activeProjectId) { if (!isTimelapseUIOpen) await saveCurrentProject({ tl: true }).catch(() => {}); data = projectSnapshot(true); }
-                    else data = await window.karakuliProjects.load(id);
-                    if (data) list.push(data);
-                }
-                if (!list.length) { showActionHint('Nothing to export'); return; }
-                const name = (list.length === 1 ? (list[0].title || 'Karakuli project') : `Karakuli-${list.length}-projects`).replace(/[^\w.-]+/g, '-') + '.txt';
-                saveTextFile(name, JSON.stringify({ karakuli: 1, projects: list }));
-                showActionHint(`Exported ${list.length} ${list.length === 1 ? 'project' : 'projects'}`);
-            } catch (err) { console.error(err); showActionHint('Could not export'); }
-        }
-        function plImportPick() {
-            let inp = document.getElementById('pl-import');
-            if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.id = 'pl-import'; inp.style.display = 'none'; inp.onchange = () => plImportFile(inp.files && inp.files[0]).finally(() => { inp.value = ''; }); document.body.appendChild(inp); }
-            inp.click();
-        }
-        async function plImportFile(file) {
-            if (!file) return;
-            try {
-                const obj = JSON.parse(await file.text());
-                const list = obj && Array.isArray(obj.projects) ? obj.projects : (obj && obj.segments ? [obj] : []);
-                if (!list.length) { showActionHint('This file is not a Karakuli project'); return; }
-                if (window.karakuliProjects?.isSignedIn()) {
-                    let last = null;
-                    for (const d of list) { d.shareEditToken = null; d.shareViewToken = null; last = await window.karakuliProjects.create(d); }
-                    await renderProjectsList();
-                    showActionHint(`Imported ${list.length} ${list.length === 1 ? 'project' : 'projects'}`);
-                    if (list.length === 1 && last) await openProject(last);
-                } else {
-                    applyProjectData(list[0], { fit: false }); cvFitDrawing(true);
-                    showActionHint('Project opened (sign in to keep it)');
-                }
-            } catch (err) { console.error(err); showActionHint('Could not read this file'); }
-        }
         async function plDeleteSel() {
             const ids = [...plSel]; if (!ids.length) return;
             if (!(await appDialog({ title: 'Delete projects', text: `Delete ${ids.length} ${ids.length === 1 ? 'project' : 'projects'} permanently?`, ok: 'Delete' }))) return;
