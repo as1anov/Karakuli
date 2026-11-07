@@ -3169,7 +3169,7 @@ service cloud.firestore {
             scheduleProjectSave();
         }
 
-        function cycleTlSpeed() { if (tlSpeed === 1) setTlSpeed(2); else if (tlSpeed === 2) setTlSpeed(4); else if (tlSpeed === 4) setTlSpeed(8); else setTlSpeed(1); }
+        function cycleTlSpeed() { const o = [1, 2, 4, 8, 16, 32], i = o.indexOf(tlSpeed); setTlSpeed(o[(i + 1) % o.length]); }
         function setTlSpeed(s) { tlSpeed = s; document.getElementById('tl-cycle-speed').innerText = `${s}x`; if (isPlayingTl) { stopTlPlayback(); startTlPlayback(); } }
         // Playback time of every recorded frame. A frame lasts FRAME_DURATION per drawn grid step it adds, so a big drawing (recorded with fewer,
         // larger frames) is drawn at the same pace as a small one instead of racing through.
@@ -3398,7 +3398,28 @@ service cloud.firestore {
             return ordered;
         }
 
+        // Steps that only add lines (known after the loading pass) are merged into strokes without looking at the drawing again.
+        function buildBatchesFromSteps() {
+            const steps = tlPrep.steps, h = tlHistory, n = h.length, batches = [];
+            const sameSp = i => getFrameSpecialSignature(h[i]) === getFrameSpecialSignature(h[i + 1]);
+            for (let start = 0; start < n - 1;) {
+                let end = start, endPt = null;
+                while (end < n - 1) {
+                    const st = steps[end];
+                    if (!st.pure || !st.segs.length || !sameSp(end) || st.segs.some(sg => sg.jump)) break;
+                    const p1 = st.segs[0].p1, c = h[end].cursor;
+                    if (p1.x !== c.i || p1.y !== c.j || (endPt && (p1.x !== endPt.x || p1.y !== endPt.y))) break;
+                    endPt = st.segs[st.segs.length - 1].p2; end++;
+                }
+                if (end === start && steps[start].pure && steps[start].segs.length && sameSp(start)) end = start + 1;   // several separate lines in one step: grow them one by one
+                if (end > start) batches.push({ start, end });
+                start = end > start ? end : start + 1;
+            }
+            return batches;
+        }
+
         function buildTimelapseBatches() {
+            if (tlLayerUsable()) return buildBatchesFromSteps();
             const batches = [];
             for (let start = 0; start < tlHistory.length - 1;) {
                 let end = start;
@@ -3483,35 +3504,25 @@ service cloud.firestore {
             };
             const slice = async (pct) => { if (performance.now() - last > 12) { say(pct); await new Promise(r => setTimeout(r, 0)); last = performance.now(); } };
             try {
-                for (let i = 0; i < n; i++) { getFrameSegmentKeys(h[i]); getFrameSpecialSignature(h[i]); await slice(Math.round(10 * i / n)); }
+                // every step of the recording: does it only add lines (then the layer can just draw them) and in which order do they grow
+                const steps = new Array(Math.max(0, n - 1)), bbox = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+                const grow = (x, y) => { if (x < bbox.x0) bbox.x0 = x; if (x > bbox.x1) bbox.x1 = x; if (y < bbox.y0) bbox.y0 = y; if (y > bbox.y1) bbox.y1 = y; };
+                h[0].segments.forEach(sg => { grow(sg.p1.x, sg.p1.y); grow(sg.p2.x, sg.p2.y); });
+                for (let i = 0; i < n - 1; i++) {
+                    const A = h[i].segments, B = h[i + 1].segments;
+                    let pure = false, added = null;
+                    // the usual case: the next frame is the previous one with new lines appended (checked at three places)
+                    if (B.length >= A.length && A.length && [0, A.length >> 1, A.length - 1].every(k => segmentKey(A[k]) === segmentKey(B[k]))) { pure = true; added = B.slice(A.length); }
+                    else if (!A.length) { pure = true; added = B.slice(); }
+                    else { const before = getFrameSegmentKeys(h[i]); const after = getFrameSegmentKeys(h[i + 1]); added = B.filter(sg => !before.has(segmentKey(sg))); pure = after.size - added.length === before.size; }
+                    steps[i] = { pure, segs: added.length ? orderTimelapseSegments(added, h[i].cursor, true) || added.map(sg => ({ p1: sg.p1, p2: sg.p2, jump: true })) : [] };
+                    steps[i].segs.forEach(sg => { grow(sg.p1.x, sg.p1.y); grow(sg.p2.x, sg.p2.y); });
+                    if (i % 4 === 0) await slice(Math.round(10 * i / n));
+                }
+                for (let i = 0; i < n; i++) { getFrameSpecialSignature(h[i]); if (i % 8 === 0) await slice(10); }
                 await new Promise(r => setTimeout(r, 0));
-                const batches = getTimelapseBatches();
-                const inBatch = new Set();
-                for (let b = 0; b < batches.length; b++) {
-                    const { start, end } = batches[b];
-                    if (tlHistory !== h) return;
-                    tlGrowthFor(start, end);
-                    getNodePoints(h[end].specialElements);
-                    // the outlines of the frame a step starts from, kept for the whole playback
-                    if (!tlGroupsMemo.has(h[start].segments)) {
-                        const sv = { segments, specialElements, geometryCache, shared: tlSharedActive };
-                        try { tlSharedActive = true; segments = h[start].segments; geometryCache = { source: null, groups: [] }; getPathGroups(); }
-                        finally { segments = sv.segments; specialElements = sv.specialElements; geometryCache = sv.geometryCache; tlSharedActive = sv.shared; }
-                    }
-                    await slice(10 + Math.round(90 * b / Math.max(1, batches.length)));
-                }
-                // frames shown as a whole (the end of a step, single frames) need their outlines too
-                const interior = new Set();
-                batches.forEach(({ start, end }) => { for (let i = start + 1; i < end; i++) interior.add(i); });
-                for (let i = 0; i < n; i++) {
-                    if (interior.has(i) || tlGroupsMemo.has(h[i].segments)) continue;
-                    if (tlHistory !== h) return;
-                    const sv = { segments, specialElements, geometryCache, shared: tlSharedActive };
-                    try { tlSharedActive = true; segments = h[i].segments; geometryCache = { source: null, groups: [] }; getPathGroups(); }
-                    finally { segments = sv.segments; specialElements = sv.specialElements; geometryCache = sv.geometryCache; tlSharedActive = sv.shared; }
-                    await slice(Math.round(100 * i / n));
-                }
-                tlPrep = { h, n };
+                tlPrep = { h, n, steps, bbox }; tlLayer = null; tlBatchCache = { historyLength: -1, batches: [] }; tlGrowthMap = { h: null, n: -1, map: new Map() };
+                getTimelapseBatches();
             } finally { if (box) box.remove(); }
         }
 
@@ -4475,12 +4486,16 @@ service cloud.firestore {
             ctx.clip(); stroke(col); strokeWeight(visualLineWeight); strokeCap(SQUARE); strokeJoin(MITER); ctx.miterLimit = 2; noFill();
             // Stroke all subpaths in one native Canvas pass. This removes the
             // anti-aliased seams caused by drawing touching groups separately.
+            if ((isTimelapseUIOpen || isTimelapseExport) && tlLayerUsable()) {
+                tlLayerBlit(tlLayerEnsure(tlTransition ? tlTransition.from : tlCurrentFrame, typeof col === 'string' ? col : String(col), visualLineWeight));
+            } else {
             ctx.beginPath();
             getPathGroups(skipCache, segments).forEach(group => {
                 ctx.moveTo(group[0].p1.x * STEP, group[0].p1.y * STEP);
                 group.forEach(segment => ctx.lineTo(segment.p2.x * STEP, segment.p2.y * STEP));
             });
             ctx.stroke();
+            }
             ctx.restore(); pop();
 
             // all node rings and diamonds in two native passes (was one p5 call per element)
@@ -4563,6 +4578,11 @@ service cloud.firestore {
         function tlComputeGrowth(from, to) {
             const fromFrame = tlHistory[from];
             const toFrame = tlHistory[to];
+            if (tlLayerUsable()) {
+                const list = [];
+                for (let i = from; i < to; i++) tlPrep.steps[i].segs.forEach(sg => list.push(sg));
+                return list.length ? { fromFrame, toFrame, segments: list } : null;
+            }
             const fromSegments = getFrameSegmentKeys(fromFrame);
             const addedSegments = toFrame.segments.filter(segment => !fromSegments.has(segmentKey(segment)));
             if (!addedSegments.length) return null;
@@ -4584,6 +4604,58 @@ service cloud.firestore {
         function cacheTimelapseGrowthPath(path) {
             tlGrowthCache = { from: tlTransition.from, to: tlTransition.to, historyLength: tlHistory.length, path };
             return path;
+        }
+
+        // ---- Time-lapse picture layer ----
+        // The lines already drawn live in one off-screen picture that is only ADDED to while the time-lapse plays (a step draws just its
+        // new lines), so a frame costs the same for a huge drawing as for a small one. A new picture is made only on a jump (seek, erase).
+        let tlLayer = null;
+        function tlLayerUsable() { return tlPrep.h === tlHistory && tlPrep.n === tlHistory.length && tlPrep.steps && tlHistory.length > 1; }
+        function tlLayerStroke(c2, list) {
+            let open = false, lx = NaN, ly = NaN;
+            c2.beginPath();
+            list.forEach(sg => {
+                const x1 = sg.p1.x * STEP, y1 = sg.p1.y * STEP, x2 = sg.p2.x * STEP, y2 = sg.p2.y * STEP;
+                if (!open || sg.jump || x1 !== lx || y1 !== ly) c2.moveTo(x1, y1);
+                c2.lineTo(x2, y2); open = true; lx = x2; ly = y2;
+            });
+            c2.stroke();
+        }
+        function tlLayerEnsure(frame, col, weight) {
+            const dpr = pixelDensity(), want = zoom * dpr, now = performance.now();
+            let L = tlLayer;
+            if (L && (L.key !== col + '|' + weight || L.h !== tlHistory)) L = null;
+            if (L && L.zoomSeen !== zoom) { L.zoomSeen = zoom; L.zoomAt = now; }
+            if (L && want > L.s * 1.3 && L.s < L.sMax * 0.999 && now - L.zoomAt > 250) L = null;   // zoomed in and settled: sharper picture
+            const bb = tlPrep.bbox, m = weight;
+            if (!L) {
+                const w0 = (bb.x1 - bb.x0) * STEP + 2 * m + 4, h0 = (bb.y1 - bb.y0) * STEP + 2 * m + 4;
+                const sMax = Math.min(8192 / w0, 8192 / h0, Math.sqrt(1.2e7 / (w0 * h0)));
+                const s = Math.max(0.02, Math.min(sMax, want));
+                const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(w0 * s)); cv.height = Math.max(1, Math.ceil(h0 * s));
+                L = tlLayer = { cv, c2: cv.getContext('2d'), s, sMax, key: col + '|' + weight, h: tlHistory, frame: -1, x0: bb.x0 * STEP - m - 2, y0: bb.y0 * STEP - m - 2, w: w0, hgt: h0, zoomSeen: zoom, zoomAt: now };
+            }
+            const c2 = L.c2;
+            c2.setTransform(L.s, 0, 0, L.s, -L.x0 * L.s, -L.y0 * L.s);
+            c2.strokeStyle = col; c2.lineWidth = weight; c2.lineCap = 'butt';   // p5's SQUARE cap is the canvas 'butt' cap c2.lineJoin = 'miter'; c2.miterLimit = 2;
+            if (L.frame === frame) return L;
+            const steps = tlPrep.steps;
+            let ok = L.frame >= 0 && frame > L.frame;
+            for (let i = L.frame; ok && i < frame; i++) if (!steps[i] || !steps[i].pure) ok = false;
+            if (ok) { for (let i = L.frame; i < frame; i++) if (steps[i].segs.length) tlLayerStroke(c2, steps[i].segs); }
+            else {
+                c2.save(); c2.setTransform(1, 0, 0, 1, 0, 0); c2.clearRect(0, 0, L.cv.width, L.cv.height); c2.restore();
+                const groups = getPathGroups(true, tlHistory[frame].segments);
+                c2.beginPath();
+                groups.forEach(g => { c2.moveTo(g[0].p1.x * STEP, g[0].p1.y * STEP); g.forEach(sg => c2.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); });
+                c2.stroke();
+            }
+            L.frame = frame;
+            return L;
+        }
+        function tlLayerBlit(L) {
+            const ctx = drawingContext; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(L.cv, L.x0, L.y0, L.w, L.hgt);
         }
 
         function drawTimelapseGrowth(col, lineWeight, innerHoleR, growthPath) {
