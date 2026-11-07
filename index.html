@@ -3057,10 +3057,20 @@ service cloud.firestore {
             }
         }
 
+        // A project saved without a (usable) recording still replays: its lines are stored in the order they were drawn.
+        function tlSynthesize() {
+            if (tlHistory.length >= 2 || segments.length < 2) return;
+            const n = segments.length, K = Math.min(150, n), frames = [];
+            for (let k = 0; k <= K; k++) {
+                const m = Math.round(n * k / K), last = m ? segments[m - 1] : null;
+                frames.push({ segments: segments.slice(0, m), specialElements: k === K ? JSON.parse(JSON.stringify(specialElements)) : {}, cursor: last ? { i: last.p2.x, j: last.p2.y } : { i: curI, j: curJ } });
+            }
+            tlHistory = frames; tlCurrentFrame = 0; tlCaptureStride = 1; tlCaptureCounter = 0; tlTimeCache = null;
+        }
         function toggleTimelapseUI() {
             if(isGameMode) return;
             clearTimelapseScreenHold();
-            if (!isTimelapseUIOpen) { captureState(true); tlTheme = currentTheme; }
+            if (!isTimelapseUIOpen) { captureState(true); tlTheme = currentTheme; tlSynthesize(); }
             isTimelapseUIOpen = !isTimelapseUIOpen;
             const toolbar = document.getElementById('timelapse-toolbar');
             if (isTimelapseUIOpen) {
@@ -4474,6 +4484,17 @@ service cloud.firestore {
         }
 
         function orderTimelapseSegments(segments, cursor, loose = false) {
+            if (loose) {
+                // Lines were stored in the order they were drawn, so that IS the growth order: one pass, however many lines a step adds.
+                const out = []; let px = NaN, py = NaN;
+                for (const sg of segments) {
+                    const flip = !(sg.p1.x === px && sg.p1.y === py) && sg.p2.x === px && sg.p2.y === py;
+                    const p1 = flip ? sg.p2 : sg.p1, p2 = flip ? sg.p1 : sg.p2;
+                    out.push(p1.x === px && p1.y === py ? { p1, p2 } : (out.length === 0 && cursor && p1.x === cursor.i && p1.y === cursor.j ? { p1, p2 } : { p1, p2, jump: true }));
+                    px = p2.x; py = p2.y;
+                }
+                return out;
+            }
             const availableAtPoint = new Map();
             const pointKey = point => `${point.x},${point.y}`;
             segments.forEach((segment, index) => {
