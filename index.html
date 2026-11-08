@@ -1447,6 +1447,7 @@
             if (!window.karakuliProjects?.isSignedIn()) return;
             if (isTimelapseUIOpen) return;   // the canvas shows an old frame of the recording: saving now would overwrite the drawing with it
             if (!activeProjectId) {
+                if (!drawingHasContent()) return;   // an empty sheet is not saved: a project appears only once something is drawn
                 if (!projectCreationPromise) {
                     projectCreationPromise = (async () => {
                         currentProjectTitle = await nextProjectTitle();
@@ -1466,6 +1467,7 @@
             if (pl && pl.getClientRects().length) await renderProjectsList();   // the list is refreshed only while it is open
         }
 
+        const drawingHasContent = () => segments.length > 0 || Object.keys(specialElements || {}).length > 0;
         let projectSaveFirstAt = 0;
         function scheduleProjectSave(tl = false) {
             if (isViewOnly) return;
@@ -1473,7 +1475,7 @@
             if (!window.karakuliProjects?.isSignedIn()) return;
             // The first edit creates the file immediately; later edits wait for a pause of 1.5 s (but never longer than 10 s in a row), so
             // continuous drawing is not interrupted by saving.
-            if (!activeProjectId) { saveCurrentProject().catch(error => console.error('Project save error:', error)); return; }
+            if (!activeProjectId) { if (drawingHasContent()) saveCurrentProject().catch(error => console.error('Project save error:', error)); return; }
             const now = Date.now();
             if (!projectSaveFirstAt) projectSaveFirstAt = now;
             clearTimeout(projectSaveTimer);
