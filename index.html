@@ -6596,8 +6596,8 @@ function disposeModel() {
 // ---------------------------------------------------------------- objects catalog (stage 10)
 // Procedural things that stand on the folded product. They are placed on its horizontal surface and shown once the sheet is folded.
 const OBJ_KINDS = {
-    book:     { name: 'Book',     icon: '<rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M10 3v18"/>' },
-    magazine: { name: 'Magazine', hook: 'both', icon: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/>' },
+    book:     { name: 'Book',     turn: 'Turn the book: pages forward / back',     icon: '<rect x="6" y="3" width="12" height="18" rx="1.5"/><path d="M10 3v18"/>' },
+    magazine: { name: 'Magazine', hook: 'both', turn: 'Turn the magazine: lean on the wall / on the product', icon: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/>' },
     vase:     { name: 'Vase',     icon: '<path d="M9 3h6M10 3c0 4-5 6-5 11a7 7 0 0 0 14 0c0-5-5-7-5-11"/>' },
     pencils:  { name: 'Pencils',  icon: '<path d="M7 11h10l-1 9H8z"/><path d="M9 11 8 4M12 11V3M15 11l1-7"/>' },
     towel:    { name: 'Towel',    hook: true, icon: '<path d="M4 6h16"/><path d="M6 6v14h12V6"/><path d="M6 15h12"/>' },
@@ -6962,12 +6962,12 @@ function makeObject0(kind, seed, depthAvail, ctx) {
         rbox(2.4, h, D, 1, cm, -th / 2 + 1.2, h / 2, 0); rbox(2.4, h, D, 1, cm, th / 2 - 1.2, h / 2, 0);   // boards
         rbox(th, h, 2.6, 1.2, cm, 0, h / 2, D / 2 - 1.3);                                   // spine (towards the viewer)
         const out = depthAvail >= 70;                                          // too shallow: stands with the cover towards the viewer
-        if (!out) g.rotation.y = Math.PI / 2;
-        else if ((ctx.n || 0) % 2 === 1) g.rotation.y = Math.PI;               // every second book stands the other way round: its pages face the viewer
+        if (!out) g.rotation.y = ctx.flip ? -Math.PI / 2 : Math.PI / 2;
+        else if (((ctx.n || 0) % 2 === 1) !== !!ctx.flip) g.rotation.y = Math.PI;   // every second book stands the other way round (its pages face the viewer); the turn button swaps it
         return { g, w: out ? th : D, d: out ? D : th };
     }
     if (kind === 'magazine') {
-        const sup = ctx.sup, pocket = ctx.key === 'magazine', th = 4, onWall = pocket && (ctx.n || 0) % 2 === 1;   // in the holder they lean on the plate and on the wall in turn
+        const sup = ctx.sup, pocket = ctx.key === 'magazine', th = 4, onWall = pocket && (((ctx.n || 0) % 2 === 1) !== !!ctx.flip);   // in the holder they lean on the plate and on the wall in turn; the turn button swaps it
         const k = Math.min(ctx.key === 'hanger' ? (ctx.pitch ? ctx.pitch + 44 : 140) / 215 : 1, (-sup.y - 10) / 275, (ctx.hmax || 275) / 275), W = 215 * k, H = 275 * k;
         const zP = pocket ? (onWall ? 0.2 : R.gap - 0.2) : R.gap + R.t + 0.2;       // plane the top edge rests on: the wall, or the patterned plate
         const off = Math.max(5, Math.min(0.1 * H, pocket ? (onWall ? sup.z1 - 1 - th - zP : zP - th - sup.z0 - 1) : sup.z1 - zP - 14));
@@ -6975,7 +6975,8 @@ function makeObject0(kind, seed, depthAvail, ctx) {
         const m = new T.Mesh(new T.BoxGeometry(W, H, th), [edge, edge, edge, edge, cov, back]);   // +z face = cover
         m.position.set(0, H / 2, th / 2); m.castShadow = m.receiveShadow = true;
         g.add(m);
-        g.rotation.x = (pocket && !onWall ? 1 : -1) * Math.asin(off / H);          // the top edge rests on the plate (tilt forward) or on the wall (tilt back)
+        g.rotation.x = (pocket && !onWall ? 1 : -1) * Math.asin(off / H);
+        if (!pocket && ctx.flip) g.rotation.y = Math.PI;                             // on hooks it is turned round: the back faces the viewer          // the top edge rests on the plate (tilt forward) or on the wall (tilt back)
         return { g, w: W, d: th, at: { y: sup.y + 0.2, z: pocket ? (onWall ? zP + off : zP - th - off) : zP + off } };
     }
     if (kind === 'vase') {   // every new vase differs in shape, size, glaze and flowers
@@ -7079,7 +7080,7 @@ function placeObjects() {
             const c = cands.find(q => taken.every(([a, b]) => q.x + q.w / 2 + 6 <= a || q.x - q.w / 2 - 6 >= b));
             if (!c) return;
             taken.push([c.x - c.w / 2, c.x + c.w / 2]); kept.push(it);
-            const o = makeObject(it.k, it.s, sup.depth, { sup, key, pitch: c.two ? pitch : 0, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
+            const o = makeObject(it.k, it.s, sup.depth, { sup, key, flip: !!it.f, pitch: c.two ? pitch : 0, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
             if (o.at) o.g.position.set(c.x, o.at.y, o.at.z);
             else if (it.k === 'towel' || it.k === 'umbrella') o.g.position.set(c.x, 0, 0);              // built in absolute y / z: it hangs exactly on the lip
             else o.g.position.set(c.x, sup.y + 2, (sup.z0 + sup.z1) / 2);
@@ -7098,7 +7099,7 @@ function placeObjects() {
             forbid = above.map(b => [b[0] - 10, b[0] + 10]);                  // full-size magazines stand in the gaps between the barrels
         }
         for (const it of S.objs) {
-            const o = makeObject(it.k, it.s, sup.depth, { sup, key, hmax, zc: (sup.z0 + sup.z1) / 2, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
+            const o = makeObject(it.k, it.s, sup.depth, { sup, key, flip: !!it.f, hmax, zc: (sup.z0 + sup.z1) / 2, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
             const gb = prev ? (prev === 'book' && it.k === 'book' ? 1 : GAP) : 0;     // books stand shoulder to shoulder
             if (total + gb + o.w > sup.w - 40) break;          // no more room on this product
             total += gb + o.w; o.gb = gb; built.push(o); prev = it.k;
@@ -7176,6 +7177,7 @@ function objAct(i, act) {
     if (act === 'del') S.objs.splice(i, 1);
     else if (act === 'left' && i > 0) [S.objs[i - 1], S.objs[i]] = [S.objs[i], S.objs[i - 1]];
     else if (act === 'right' && i < S.objs.length - 1) [S.objs[i + 1], S.objs[i]] = [S.objs[i], S.objs[i + 1]];
+    else if (act === 'flip' && S.objs[i]) S.objs[i].f = !S.objs[i].f;
     else if (act === 'clear') S.objs = [];
     placeObjects(); syncUI();
 }
@@ -7184,7 +7186,7 @@ function objUI() {
     const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine';
     cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
-    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button><button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
+    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button>${OBJ_KINDS[it.k].turn ? `<button data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
         + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
     document.getElementById('v3-objnote').style.display = 'none';   // only icons and names in Objects
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
@@ -7846,6 +7848,7 @@ function ensureCss() {
     #v3d-panel .v3-body .v3-orow > span:first-child { max-width: calc(var(--tb) * 2 + 4px); line-height: 1.15; white-space: normal; }
     #v3d-panel .v3-body .v3-orow > span:last-child { display: inline-flex; gap: 4px; }
     #v3d-panel .v3-body .v3-orow button { box-sizing: border-box; width: var(--tb); height: var(--tb); margin: 0; border-radius: var(--border-radius); border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); font-size: 16px; }
+    #v3d-panel .v3-body .v3-orow button svg { width: 18px; height: 18px; display: block; margin: auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     #v3d-panel .v3-body .v3-prow { font-size: 12px; font-weight: 600; color: var(--text-color); }
     /* ---- as drawn in the mock: 5 px grid; a named item = icon + a label box two buttons wide (three grid units in all); objects and downloads are icons only; thickness has its name inside ---- */
     #v3d-panel .v3-sec .v3-body { gap: 5px; }
@@ -7954,6 +7957,11 @@ function buildUI() {
     $('v3d-shop').onclick = openShopEditor;
     try { if (localStorage.getItem('kk-v3-info') === '0') $('v3d-title').classList.add('fold'); } catch (e) {}
     // sidebar rail (wide screens): one icon opens its own panel, the same icon (or a tap on the 3D view) closes it
+    const centrePanel = () => {
+        const pn = $('v3d-panel'), root = $('v3d').getBoundingClientRect(), rl = $('v3-rail').getBoundingClientRect(), w = pn.offsetWidth;
+        const want = rl.left - root.left + rl.width / 2 - w / 2;
+        pn.style.left = Math.round(Math.max(12, Math.min(want, root.width - w - 12))) + 'px';
+    };
     const railSet = act => {
         const pn = $('v3d-panel');
         if (act && pn.classList.contains('open') && pn.dataset.act !== act) { pn.classList.remove('open'); void pn.offsetWidth; }   // switching: play the two moves again
@@ -7964,21 +7972,7 @@ function buildUI() {
             const root = $('v3d').getBoundingClientRect(), bt = document.querySelector(`#v3-rail [data-go="${act}"]`).getBoundingClientRect();
             const rl = $('v3-rail').getBoundingClientRect();
             pn.style.top = Math.round(rl.top - root.top - pn.offsetHeight - 8) + 'px'; pn.style.bottom = 'auto';   // the toolbar is at the bottom: strips open upwards
-            pn.style.left = Math.round(bt.left - root.left) + 'px';       // directly under its own button, growing to the right
-            const room = root.width - 24, w = pn.offsetWidth;
-            // up to 4 items: under the button; more (colours, objects): lined up under the middle of the main toolbar
-            // the strip's first item sits right under its own button; a strip wider than the toolbar is centred under it;
-            // one that would stick out past the toolbar's right edge is lined up with that edge
-            const tl = rl.left - root.left, tr = rl.right - root.left;
-            const edge = parseFloat(getComputedStyle($('v3-rail')).paddingLeft) + 1;   // strip edge = the toolbar's padding + border, so its first icon sits under its button
-            let want = bt.left - root.left - edge;
-            if (w > rl.width) {
-                want = tl + rl.width / 2 - w / 2;
-                const cols = [...$('v3-rail').querySelectorAll('button')].filter(b => b.getClientRects().length).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);   // the toolbar's own columns: a centred strip lands on them too
-                if (cols.length > 1) { const c0 = cols[0].getBoundingClientRect().left - root.left, pitch = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left;
-                    want = c0 + Math.round((want + edge - c0) / pitch) * pitch - edge; }
-            } else if (want + w > tr) want = tr - w;
-            pn.style.left = Math.round(Math.max(12, Math.min(want, root.width - Math.min(w, room) - 12))) + 'px';
+            centrePanel();   // every strip stands exactly over the middle of the main toolbar
         }
         document.querySelectorAll('#v3-rail button').forEach(b => b.classList.toggle('on', b.dataset.go === act));
         $('v3d').classList.toggle('menuopen', !!act);
@@ -7992,6 +7986,7 @@ function buildUI() {
         const pn = $('v3d-panel'); if (!pn.classList.contains('open')) return;
         const root = $('v3d').getBoundingClientRect(), rl = $('v3-rail').getBoundingClientRect();
         pn.style.top = Math.round(rl.top - root.top - pn.offsetHeight - 8) + 'px';
+        centrePanel();
     }).observe($('v3d-panel'));
     { const ps = $('v3-price-sec'); if (ps) { const sync = () => { $('v3-rail').classList.toggle('hasprice', ps.style.display !== 'none'); if (ps.style.display === 'none' && $('v3d-panel').dataset.act === 'price') railSet(null); };
       new MutationObserver(sync).observe(ps, { attributes: true, attributeFilter: ['style'] }); sync(); } }
