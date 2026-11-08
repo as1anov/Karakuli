@@ -3070,6 +3070,7 @@ service cloud.firestore {
         function toggleTimelapseUI() {
             if(isGameMode) return;
             clearTimelapseScreenHold();
+            tlResume = null; tlPos = null;
             if (!isTimelapseUIOpen) { captureState(true); tlTheme = currentTheme; tlSynthesize(); }
             isTimelapseUIOpen = !isTimelapseUIOpen;
             const toolbar = document.getElementById('timelapse-toolbar');
@@ -3134,7 +3135,7 @@ service cloud.firestore {
         }
 
         function cycleTlSpeed() { if (tlSpeed === 1) setTlSpeed(2); else if (tlSpeed === 2) setTlSpeed(4); else if (tlSpeed === 4) setTlSpeed(8); else setTlSpeed(1); }
-        function setTlSpeed(s) { tlSpeed = s; document.getElementById('tl-cycle-speed').innerText = `${s}x`; if (isPlayingTl) { stopTlPlayback(); startTlPlayback(); } }
+        function setTlSpeed(s) { tlSpeed = s; document.getElementById('tl-cycle-speed').innerText = `${s}x`; if (isPlayingTl) { const pos = tlPos; stopTlPlayback(); tlResume = pos; startTlPlayback(); } }   // a new speed continues from the same place
         // Playback time of every recorded frame. A frame lasts FRAME_DURATION per drawn grid step it adds, so a big drawing (recorded with fewer,
         // larger frames) is drawn at the same pace as a small one instead of racing through.
         let tlTimeCache = null;
@@ -3160,7 +3161,7 @@ service cloud.firestore {
             const fill = document.getElementById('tl-fill');
             const totalFrames = Math.max(0, tlHistory.length - 1);
             const tlTotal = totalFrames > 0 ? tlTimeline()[totalFrames] : 0;
-            const posNow = isPlayingTl && tlPos != null ? tlPos : tlCurrentFrame;
+            const posNow = tlPos != null && (isPlayingTl || tlResume != null) ? tlPos : tlCurrentFrame;
             const percent = totalFrames > 0 ? (tlTimeOfPos(posNow) / tlTotal) * 100 : 0;
             fill.style.width = `${Math.min(100, percent)}%`;
             const timeDisplay = document.getElementById('tl-current-time');
@@ -3173,14 +3174,26 @@ service cloud.firestore {
             if (tlHistory.length < 2) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const percentage = (e.clientX - rect.left) / rect.width;
-            tlCurrentFrame = Math.floor(tlPosAtTime(Math.max(0, Math.min(1, percentage)) * tlTimeline()[tlHistory.length - 1]));
-            tlCurrentFrame = Math.max(0, Math.min(tlCurrentFrame, tlHistory.length - 1));
-            applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
+            const pos = Math.max(0, Math.min(tlHistory.length - 1, tlPosAtTime(Math.max(0, Math.min(1, percentage)) * tlTimeline()[tlHistory.length - 1])));
+            const wasPlaying = isPlayingTl;
+            stopTlPlayback();
+            if (wasPlaying) { tlCurrentFrame = Math.floor(pos); applyFrame(tlCurrentFrame); tlResume = pos; startTlPlayback(); }   // playback goes on from the tapped place
+            else tlShowPos(pos);
+            updateTlProgress(); redraw();
+        }
+        // A still picture at an exact position, also in the middle of a growing stroke (pause, seek): the part already drawn stays on the sheet.
+        let tlResume = null;
+        function tlShowPos(pos) {
+            tlResume = null; tlPos = null;
+            if (!tlLayerUsable()) { tlTransition = null; tlCurrentFrame = Math.floor(pos); applyFrame(tlCurrentFrame); return; }
+            tlPlaybackBatches = getTimelapseBatches();
+            renderTimelapsePosition(pos, { index: -1 }, false);
+            tlResume = pos;
         }
 
         function stepTimelapse(delta) {
             if (tlHistory.length === 0) return;
-            stopTlPlayback();
+            stopTlPlayback(); tlResume = null; tlPos = null;
             tlCurrentFrame = Math.max(0, Math.min(tlHistory.length - 1, tlCurrentFrame + delta));
             applyFrame(tlCurrentFrame); updateTlProgress(); redraw();
         }
@@ -3457,7 +3470,10 @@ service cloud.firestore {
         }
 
         let tlPos = null;   // exact (fractional) playback position, for the time display
-        function togglePlayTimelapse() { if (isPlayingTl) stopTlPlayback(); else startTlPlayback(); }
+        function togglePlayTimelapse() {
+            if (isPlayingTl) { const pos = tlPos; stopTlPlayback(); if (pos != null) { tlShowPos(pos); updateTlProgress(); redraw(); } }   // pause keeps what is already drawn
+            else startTlPlayback();
+        }
 
         // Before the first play everything the playback needs is prepared (line order of every step, outlines of every frame), with a
         // "Loading" notice: nothing is computed while the lines are growing, so a big drawing plays as smoothly as a small one.
@@ -3480,10 +3496,12 @@ service cloud.firestore {
                 const steps = new Array(Math.max(0, n - 1)), bbox = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
                 const grow = (x, y) => { if (x < bbox.x0) bbox.x0 = x; if (x > bbox.x1) bbox.x1 = x; if (y < bbox.y0) bbox.y0 = y; if (y > bbox.y1) bbox.y1 = y; };
                 h[0].segments.forEach(sg => { grow(sg.p1.x, sg.p1.y); grow(sg.p2.x, sg.p2.y); });
-                // line ends that already exist: a new stroke that starts or ends on one is joined to it, so the corner is mitered like in the finished drawing
-                const touch = new Map(), tk = (x, y) => x + ',' + y;
-                const touchAdd = sg => { for (const p of [sg.p1, sg.p2]) { const k = tk(p.x, p.y); if (!touch.has(k)) touch.set(k, sg); } };
-                h[0].segments.forEach(touchAdd);
+                // every grid point -> the lines that end there right now. A new line is joined (mitered) to EVERY line it meets, not just one,
+                // so each corner looks like it does in the finished drawing, also while the line is still growing.
+                const tk = (x, y) => x + ',' + y;
+                let adj = new Map();
+                const adjAdd = sg => { for (const p of [sg.p1, sg.p2]) { const k = tk(p.x, p.y); let l = adj.get(k); if (!l) adj.set(k, l = []); l.push(sg); } };
+                h[0].segments.forEach(adjAdd);
                 for (let i = 0; i < n - 1; i++) {
                     const A = h[i].segments, B = h[i + 1].segments;
                     let pure = false, added = null;
@@ -3493,12 +3511,17 @@ service cloud.firestore {
                     else { const before = getFrameSegmentKeys(h[i]); const after = getFrameSegmentKeys(h[i + 1]); added = B.filter(sg => !before.has(segmentKey(sg))); pure = after.size - added.length === before.size; }
                     steps[i] = { pure, segs: added.length ? orderTimelapseSegments(added, h[i].cursor, true) || added.map(sg => ({ p1: sg.p1, p2: sg.p2, jump: true })) : [] };
                     const ss = steps[i].segs;
+                    if (!pure) { adj = new Map(); const keep = getFrameSegmentKeys(h[i + 1]); h[i].segments.forEach(sg => { if (keep.has(segmentKey(sg))) adjAdd(sg); }); }   // the erased lines are gone before the new ones grow
                     ss.forEach((sg, k) => {
-                        if (k === 0 || sg.jump) { const e = touch.get(tk(sg.p1.x, sg.p1.y)); if (e) sg.pre = e.p2.x === sg.p1.x && e.p2.y === sg.p1.y ? { p1: e.p1, p2: e.p2 } : { p1: e.p2, p2: e.p1 }; }
-                        const nx = ss[k + 1];
-                        if (!nx || nx.jump || nx.p1.x !== sg.p2.x || nx.p1.y !== sg.p2.y) { const e = touch.get(tk(sg.p2.x, sg.p2.y)); if (e && e !== sg) sg.post = e.p1.x === sg.p2.x && e.p1.y === sg.p2.y ? { p1: e.p1, p2: e.p2 } : { p1: e.p2, p2: e.p1 }; }
+                        const prev = k > 0 && !sg.jump ? ss[k - 1] : null;
+                        const far = (e, x, y) => e.p1.x === x && e.p1.y === y ? e.p2 : e.p1;
+                        const j1 = [], j2 = [];
+                        for (const e of adj.get(tk(sg.p1.x, sg.p1.y)) || []) if (e !== prev) j1.push(far(e, sg.p1.x, sg.p1.y));
+                        for (const e of adj.get(tk(sg.p2.x, sg.p2.y)) || []) j2.push(far(e, sg.p2.x, sg.p2.y));
+                        if (j1.length) sg.j1 = j1.slice(0, 6);
+                        if (j2.length) sg.j2 = j2.slice(0, 6);
+                        adjAdd(sg);
                     });
-                    if (!steps[i].pure) { touch.clear(); B.forEach(touchAdd); } else added.forEach(touchAdd);
                     ss.forEach(sg => { grow(sg.p1.x, sg.p1.y); grow(sg.p2.x, sg.p2.y); });
                     if (i % 4 === 0) await slice(Math.round(10 * i / n));
                 }
@@ -3524,7 +3547,8 @@ service cloud.firestore {
             isPlayingTl = true;
             document.getElementById('tl-play-icon').style.display = 'none';
             document.getElementById('tl-pause-icon').style.display = 'block';
-            if (tlCurrentFrame >= tlHistory.length - 1) tlCurrentFrame = 0;
+            if (tlCurrentFrame >= tlHistory.length - 1) { tlCurrentFrame = 0; tlResume = null; }
+            const startPos = tlResume != null && Math.floor(tlResume) === tlCurrentFrame ? tlResume : tlCurrentFrame; tlResume = null;
             tlPlaybackStartFrame = tlCurrentFrame;
             tlPlaybackBatches = getTimelapseBatches();
             const appliedFrame = { index: -1 };
@@ -3533,7 +3557,7 @@ service cloud.firestore {
             tlPlaybackStart = performance.now();
             // The playback clock advances by the time of the frame that was just shown, but by at most 50 ms: when a device stalls for
             // a moment the animation continues from where it was instead of jumping over whole pieces of the drawing.
-            let mediaT = tlTimeOfPos(tlPlaybackStartFrame), lastNow = tlPlaybackStart;
+            let mediaT = tlTimeOfPos(startPos), lastNow = tlPlaybackStart;
             const tick = (now) => {
                 if (!isPlayingTl) return;
                 mediaT += Math.min(50, Math.max(0, now - lastNow)) * tlSpeed / 1000; lastNow = now;
@@ -3581,7 +3605,7 @@ service cloud.firestore {
             }
 
             showActionHint('Exporting MP4…', true);
-            stopTlPlayback();
+            stopTlPlayback(); tlResume = null;
             tlCurrentFrame = 0;
             tlTransition = null;
             isTimelapseExport = true;
@@ -4424,32 +4448,17 @@ service cloud.firestore {
             if (!isExporting) updateHookBadge();
         }
 
-        let gridTile = null;
         function drawGrid(dotRGB, alpha) {
             // At very low zoom the grid becomes visual noise and thousands of draw calls: every dot from 40 % up, none below.
             if (zoom < 0.395) return;   // 40 % itself still shows (rounding-safe)
-            const k = 1;
             fill(`rgba(${dotRGB}, ${alpha})`); noStroke();
-            let sI = floor((-offsetX/zoom)/STEP)-2, eI = ceil(((width-offsetX)/zoom)/STEP)+2;
-            let sJ = floor((-offsetY/zoom)/STEP)-2, eJ = ceil(((height-offsetY)/zoom)/STEP)+2;
-            sI -= ((sI % k) + k) % k; sJ -= ((sJ % k) + k) % k;
-            // A tile with one dot, repeated by the canvas itself: one fill instead of thousands of circle() calls (they made a drawing
-            // that is zoomed out far enough to fit the screen slow, exactly the big ones).
-            try {
-                const ctx = drawingContext, dpr = pixelDensity(), T = Math.max(4, Math.round(STEP * zoom * dpr)), key = `${T}|${dotRGB}|${alpha}`;
-                if (!gridTile || gridTile.key !== key) {
-                    const cv = document.createElement('canvas'); cv.width = cv.height = T; const c2 = cv.getContext('2d');
-                    c2.fillStyle = `rgba(${dotRGB}, ${alpha})`; c2.beginPath(); c2.arc(T / 2, T / 2, Math.max(0.75, 1.5 * dpr), 0, Math.PI * 2); c2.fill();
-                    gridTile = { key, pat: ctx.createPattern(cv, 'repeat'), T };
-                }
-                if (gridTile.pat && gridTile.pat.setTransform) {
-                    gridTile.pat.setTransform(new DOMMatrix().translate(-STEP / 2, -STEP / 2).scale(STEP / gridTile.T));
-                    ctx.save(); ctx.fillStyle = gridTile.pat;
-                    ctx.fillRect(sI * STEP - STEP, sJ * STEP - STEP, (eI - sI + 2) * STEP, (eJ - sJ + 2) * STEP);
-                    ctx.restore(); return;
-                }
-            } catch (e) { gridTile = null; }
-            for(let i=sI; i<=eI; i+=k) for(let j=sJ; j<=eJ; j+=k) circle(i*STEP, j*STEP, 1.5/zoom);
+            const sI = floor((-offsetX/zoom)/STEP)-2, eI = ceil(((width-offsetX)/zoom)/STEP)+2;
+            const sJ = floor((-offsetY/zoom)/STEP)-2, eJ = ceil(((height-offsetY)/zoom)/STEP)+2;
+            // every dot is the same round dot as always (radius 1.5 px on screen), but all of them go into ONE path and one fill
+            const ctx = drawingContext, r = 1.5 / zoom;
+            ctx.beginPath();
+            for (let i = sI; i <= eI; i++) for (let j = sJ; j <= eJ; j++) { ctx.moveTo(i * STEP + r, j * STEP); ctx.arc(i * STEP, j * STEP, r, 0, Math.PI * 2); }
+            ctx.fill();
         }
 
         // Bolt holes of the selected product, in world pixels (on grid points).
@@ -4482,16 +4491,23 @@ service cloud.firestore {
             push(); let ctx = drawingContext; ctx.save();
             const nodePts = getNodePoints(specialElements);
             const useLayer = (isTimelapseUIOpen || isTimelapseExport) && tlLayerUsable();
+            const newNodes = tlReachedNodes(growthPath);   // rings the growing line has just reached
+            const allNodes = newNodes.length ? nodePts.nodes.concat(newNodes) : nodePts.nodes;
             if (!useLayer) {
             ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
-            nodePts.nodes.forEach(([nx, ny]) => { ctx.moveTo(nx + innerHoleR, ny); ctx.arc(nx, ny, innerHoleR, 0, TWO_PI, true); });
+            allNodes.forEach(([nx, ny]) => { ctx.moveTo(nx + innerHoleR, ny); ctx.arc(nx, ny, innerHoleR, 0, TWO_PI, true); });
             if (!isGameMode) getBoltHolesPx().forEach(h => { ctx.moveTo(h.x + h.r, h.y); ctx.arc(h.x, h.y, h.r, 0, TWO_PI, true); });
             ctx.clip(); stroke(col); strokeWeight(visualLineWeight); strokeCap(SQUARE); strokeJoin(MITER); ctx.miterLimit = 2; noFill();
             }
             // Stroke all subpaths in one native Canvas pass. This removes the
             // anti-aliased seams caused by drawing touching groups separately.
             if (useLayer) {
-                tlLayerBlit(tlLayerEnsure(tlTransition ? tlTransition.from : tlCurrentFrame, typeof col === 'string' ? col : String(col), visualLineWeight, innerHoleR, !!(tlTransition && tlTransition.mid)));
+                const L = tlLayerEnsure(tlTransition ? tlTransition.from : tlCurrentFrame, typeof col === 'string' ? col : String(col), visualLineWeight, innerHoleR, !!(tlTransition && tlTransition.mid));
+                if (newNodes.length) {   // a ring that has just appeared also cuts its hole in the lines that were already there (only a few circles, so the clip is cheap)
+                    ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
+                    newNodes.forEach(([nx, ny]) => { ctx.moveTo(nx + innerHoleR, ny); ctx.arc(nx, ny, innerHoleR, 0, TWO_PI, true); });
+                    ctx.clip(); tlLayerBlit(L); ctx.restore();
+                } else tlLayerBlit(L);
             } else {
             ctx.beginPath();
             getPathGroups(skipCache, segments).forEach(group => {
@@ -4503,10 +4519,10 @@ service cloud.firestore {
             ctx.restore(); pop();
 
             // all node rings and diamonds in two native passes (was one p5 call per element)
-            if (nodePts.nodes.length) {
+            if (allNodes.length) {
                 push(); noFill(); stroke(col); strokeWeight(visualLineWeight);
                 ctx.beginPath();
-                nodePts.nodes.forEach(([nx, ny]) => { ctx.moveTo(nx + ringD / 2, ny); ctx.arc(nx, ny, ringD / 2, 0, TWO_PI); });
+                allNodes.forEach(([nx, ny]) => { ctx.moveTo(nx + ringD / 2, ny); ctx.arc(nx, ny, ringD / 2, 0, TWO_PI); });
                 ctx.stroke(); pop();
             }
             if (nodePts.diamonds.length) {
@@ -4516,7 +4532,7 @@ service cloud.firestore {
                 nodePts.diamonds.forEach(([dx0, dy0]) => { const cy = dy0 + off; ctx.moveTo(dx0, cy - dd); ctx.lineTo(dx0 + dd, cy); ctx.lineTo(dx0, cy + dd); ctx.lineTo(dx0 - dd, cy); ctx.closePath(); });
                 ctx.fill(); pop();
             }
-            drawTimelapseGrowth(col, visualLineWeight, innerHoleR, growthPath);
+            drawTimelapseGrowth(col, visualLineWeight, innerHoleR, growthPath, allNodes);
         }
 
         function segmentKey(segment) {
@@ -4582,7 +4598,7 @@ service cloud.firestore {
                 const list = [];
                 for (let i = from; i < to; i++) tlPrep.steps[i].segs.forEach(sg => list.push(sg));
                 if (!list.length) return null;
-                return list[0].pre && !list[0].jump && !(tlTransition && tlTransition.mid) ? { fromFrame, toFrame, segments: [list[0].pre, ...list], growthOffset: 1 } : { fromFrame, toFrame, segments: list };
+                return { fromFrame, toFrame, segments: list };
             }
             const fromSegments = getFrameSegmentKeys(fromFrame);
             const addedSegments = toFrame.segments.filter(segment => !fromSegments.has(segmentKey(segment)));
@@ -4612,16 +4628,26 @@ service cloud.firestore {
         // new lines), so a frame costs the same for a huge drawing as for a small one. A new picture is made only on a jump (seek, erase).
         let tlLayer = null;
         function tlLayerUsable() { return tlPrep.h === tlHistory && tlPrep.n === tlHistory.length && tlPrep.steps && tlHistory.length > 1; }
+        // A corner join: the other line's far end, the shared point, and a tiny stub along the new line. The stub is only there so the
+        // canvas mitres the two (the miter itself is the corner); a longer one would draw part of a line that has not grown yet.
+        function tlJoinPath(c2, far, vx, vy, ux, uy) {
+            c2.moveTo(far.x * STEP, far.y * STEP); c2.lineTo(vx, vy); c2.lineTo(vx + ux * 2, vy + uy * 2);
+        }
+        function tlSegUnit(sg) { const dx = (sg.p2.x - sg.p1.x) * STEP, dy = (sg.p2.y - sg.p1.y) * STEP, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; }
         function tlLayerStroke(c2, list) {
             let open = false, lx = NaN, ly = NaN;
             c2.beginPath();
-            list.forEach((sg, idx) => {
+            list.forEach(sg => {
                 const x1 = sg.p1.x * STEP, y1 = sg.p1.y * STEP, x2 = sg.p2.x * STEP, y2 = sg.p2.y * STEP;
-                if (!open || sg.jump || x1 !== lx || y1 !== ly) {
-                    if (sg.pre) { c2.moveTo(sg.pre.p1.x * STEP, sg.pre.p1.y * STEP); c2.lineTo(x1, y1); } else c2.moveTo(x1, y1);
-                }
+                if (!open || sg.jump || x1 !== lx || y1 !== ly) c2.moveTo(x1, y1);
                 c2.lineTo(x2, y2); open = true; lx = x2; ly = y2;
-                if (sg.post) c2.lineTo(sg.post.p2.x * STEP, sg.post.p2.y * STEP);
+            });
+            // corners with the lines that were already there
+            list.forEach(sg => {
+                if (!sg.j1 && !sg.j2) return;
+                const [ux, uy] = tlSegUnit(sg);
+                if (sg.j1) sg.j1.forEach(f => tlJoinPath(c2, f, sg.p1.x * STEP, sg.p1.y * STEP, ux, uy));
+                if (sg.j2) sg.j2.forEach(f => tlJoinPath(c2, f, sg.p2.x * STEP, sg.p2.y * STEP, -ux, -uy));
             });
             c2.stroke();
         }
@@ -4654,6 +4680,18 @@ service cloud.firestore {
                 const groups = getPathGroups(true, segsNow);
                 c2.beginPath();
                 groups.forEach(g => { c2.moveTo(g[0].p1.x * STEP, g[0].p1.y * STEP); g.forEach(sg => c2.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); });
+                // points where three or more lines meet: every pair of them is mitred, the same as when the lines grew one by one
+                const at = new Map();
+                segsNow.forEach(sg => { for (const p of [sg.p1, sg.p2]) { const k = p.x + ',' + p.y; let l = at.get(k); if (!l) at.set(k, l = []); l.push(sg); } });
+                at.forEach((l, k) => {
+                    if (l.length < 3 || l.length > 6) return;
+                    const c = k.indexOf(','), vx = +k.slice(0, c), vy = +k.slice(c + 1);
+                    const far = e => e.p1.x === vx && e.p1.y === vy ? e.p2 : e.p1;
+                    for (let a = 0; a < l.length; a++) for (let b = a + 1; b < l.length; b++) {
+                        const fa = far(l[a]), fb = far(l[b]);
+                        c2.moveTo(fa.x * STEP, fa.y * STEP); c2.lineTo(vx * STEP, vy * STEP); c2.lineTo(fb.x * STEP, fb.y * STEP);
+                    }
+                });
                 c2.stroke();
             }
             // the node rings and bolt holes are cut out of the picture itself, so it can be drawn without a clip (a clip makes a big picture very slow on iPad)
@@ -4671,17 +4709,43 @@ service cloud.firestore {
             ctx.drawImage(L.cv, L.x0, L.y0, L.w, L.hgt);
         }
 
-        function drawTimelapseGrowth(col, lineWeight, innerHoleR, growthPath) {
+        // Nodes that appear during one step (a ring + its hole): each one shows up exactly when the growing line reaches it,
+        // so the hole is never cut before its ring is drawn.
+        function tlPathPos(growthPath) {
+            const off = growthPath.growthOffset || 0, progress = Math.max(0, Math.min(1, tlTransition.progress));
+            return off + progress * (growthPath.segments.length - off);
+        }
+        function tlReachedNodes(growthPath) {
+            if (!growthPath || !tlTransition) return [];
+            if (!growthPath.newNodes) {
+                const fe = growthPath.fromFrame.specialElements || {}, te = growthPath.toFrame.specialElements || {}, list = [];
+                for (const id in te) {
+                    if (!te[id] || !te[id].isNode || (fe[id] && fe[id].isNode)) continue;
+                    const c = id.indexOf(','), x = +id.slice(0, c), y = +id.slice(c + 1);
+                    let reach = Infinity;
+                    growthPath.segments.forEach((sg, k) => {
+                        if (sg.p1.x === x && sg.p1.y === y) reach = Math.min(reach, k);
+                        if (sg.p2.x === x && sg.p2.y === y) reach = Math.min(reach, k + 1);
+                    });
+                    list.push({ px: x * STEP, py: y * STEP, reach });
+                }
+                growthPath.newNodes = list;
+            }
+            if (!growthPath.newNodes.length) return [];
+            const pos = tlPathPos(growthPath);
+            return growthPath.newNodes.filter(n => n.reach <= pos + 1e-9).map(n => [n.px, n.py]);
+        }
+
+        function drawTimelapseGrowth(col, lineWeight, innerHoleR, growthPath, holeNodes) {
             if (!growthPath) return;
             const { fromFrame, toFrame } = growthPath;
             const orderedSegments = growthPath.segments;
-            const progress = Math.max(0, Math.min(1, tlTransition.progress));
             const growthOffset = growthPath.growthOffset || 0;
-            const pathPosition = growthOffset + progress * (orderedSegments.length - growthOffset);
+            const pathPosition = tlPathPos(growthPath);
             let tip = { x: fromFrame.cursor.i * STEP, y: fromFrame.cursor.j * STEP, dx: 0, dy: 0 };
             const ctx = drawingContext;
             push(); ctx.save(); ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
-            getNodePoints(toFrame.specialElements).nodes.forEach(([nx, ny]) => { ctx.moveTo(nx + innerHoleR, ny); ctx.arc(nx, ny, innerHoleR, 0, TWO_PI, true); });
+            (holeNodes || getNodePoints(toFrame.specialElements).nodes).forEach(([nx, ny]) => { ctx.moveTo(nx + innerHoleR, ny); ctx.arc(nx, ny, innerHoleR, 0, TWO_PI, true); });
             getBoltHolesPx().forEach(h => { ctx.moveTo(h.x + h.r, h.y); ctx.arc(h.x, h.y, h.r, 0, TWO_PI, true); });
             ctx.clip(); stroke(col); strokeWeight(lineWeight); strokeCap(SQUARE); strokeJoin(MITER); ctx.miterLimit = 2; noFill();
             // Render the whole in-progress addition as one polyline. This preserves
@@ -4697,6 +4761,15 @@ service cloud.firestore {
                 const tipX = lerp(x1, x2, localProgress), tipY = lerp(y1, y2, localProgress);
                 ctx.lineTo(tipX, tipY);
                 tip = { x: tipX, y: tipY, dx: x2 - x1, dy: y2 - y1 };
+            });
+            // corners with the lines that are already on the sheet: at the start of a line as soon as it starts, at its end once it has arrived
+            orderedSegments.forEach((segment, index) => {
+                const localProgress = Math.max(0, Math.min(1, pathPosition - index));
+                if (localProgress <= 0 || (!segment.j1 && !segment.j2)) return;
+                const [ux, uy] = tlSegUnit(segment);
+                if (segment.j1) segment.j1.forEach(f => tlJoinPath(ctx, f, segment.p1.x * STEP, segment.p1.y * STEP, ux, uy));
+                if (segment.j2 && localProgress >= 1) segment.j2.forEach(f => tlJoinPath(ctx, f, segment.p2.x * STEP, segment.p2.y * STEP, -ux, -uy));
+                hasPath = true;
             });
             if (hasPath) ctx.stroke();
             ctx.restore(); pop();
@@ -4767,7 +4840,7 @@ service cloud.firestore {
                 let worldMX = (pX - offsetX) / zoom; let worldMY = (pY - offsetY) / zoom;
                 noFill(); stroke("#FF6666"); strokeWeight(2 / zoom); noFill(); ellipse(worldMX, worldMY, (eraserRadius * 2) / zoom); return;
             }
-            if (isTimelapseUIOpen && (isPlayingTl || isTimelapseExport)) { drawTimelapseLeadCursor(); return; }
+            if (isTimelapseUIOpen && (isPlayingTl || isTimelapseExport || (tlTransition && tlAnimatedTip))) { drawTimelapseLeadCursor(); return; }
             if (isTimelapseUIOpen && specialElements[`${curI},${curJ}`]?.isNode) return;
             if (isTimelapseUIOpen && !isPlayingTl && tlHistory.length > 0) {
                 let frame = tlHistory[tlCurrentFrame]; if (!frame) return;
