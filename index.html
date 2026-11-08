@@ -4495,6 +4495,7 @@ service cloud.firestore {
             const useLayer = (isTimelapseUIOpen || isTimelapseExport) && tlLayerUsable();
             const newNodes = tlReachedNodes(growthPath);   // rings the growing line has just reached
             const allNodes = newNodes.length ? nodePts.nodes.concat(newNodes) : nodePts.nodes;
+            const newDiamonds = tlReachedDiamonds(growthPath), allDiamonds = newDiamonds.length ? nodePts.diamonds.concat(newDiamonds) : nodePts.diamonds;
             if (!useLayer) {
             ctx.beginPath(); ctx.rect(-100000, -100000, 200000, 200000);
             allNodes.forEach(([nx, ny]) => { ctx.moveTo(nx + innerHoleR, ny); ctx.arc(nx, ny, innerHoleR, 0, TWO_PI, true); });
@@ -4527,11 +4528,11 @@ service cloud.firestore {
                 allNodes.forEach(([nx, ny]) => { ctx.moveTo(nx + ringD / 2, ny); ctx.arc(nx, ny, ringD / 2, 0, TWO_PI); });
                 ctx.stroke(); pop();
             }
-            if (nodePts.diamonds.length) {
+            if (allDiamonds.length) {
                 push(); fill(col); noStroke();
                 const dd = visualLineWeight / Math.SQRT2, off = visualLineWeight / 2;
                 ctx.beginPath();
-                nodePts.diamonds.forEach(([dx0, dy0]) => { const cy = dy0 + off; ctx.moveTo(dx0, cy - dd); ctx.lineTo(dx0 + dd, cy); ctx.lineTo(dx0, cy + dd); ctx.lineTo(dx0 - dd, cy); ctx.closePath(); });
+                allDiamonds.forEach(([dx0, dy0]) => { const cy = dy0 + off; ctx.moveTo(dx0, cy - dd); ctx.lineTo(dx0 + dd, cy); ctx.lineTo(dx0, cy + dd); ctx.lineTo(dx0 - dd, cy); ctx.closePath(); });
                 ctx.fill(); pop();
             }
             drawTimelapseGrowth(col, visualLineWeight, innerHoleR, growthPath, allNodes);
@@ -4722,20 +4723,27 @@ service cloud.firestore {
             if (!growthPath.newNodes) {
                 const fe = growthPath.fromFrame.specialElements || {}, te = growthPath.toFrame.specialElements || {}, list = [];
                 for (const id in te) {
-                    if (!te[id] || !te[id].isNode || (fe[id] && fe[id].isNode)) continue;
+                    if (!te[id]) continue;
                     const c = id.indexOf(','), x = +id.slice(0, c), y = +id.slice(c + 1);
                     let reach = Infinity;
                     growthPath.segments.forEach((sg, k) => {
                         if (sg.p1.x === x && sg.p1.y === y) reach = Math.min(reach, k);
                         if (sg.p2.x === x && sg.p2.y === y) reach = Math.min(reach, k + 1);
                     });
-                    list.push({ px: x * STEP, py: y * STEP, reach });
+                    if (reach === Infinity) reach = 0;   // none of the new lines touches it: it sits on a line that is already there, so it appears with the start of the step
+                    if (te[id].isNode && !(fe[id] && fe[id].isNode)) list.push({ px: x * STEP, py: y * STEP, reach, dia: false });
+                    if (te[id].isDiamond && !(fe[id] && fe[id].isDiamond)) list.push({ px: x * STEP, py: y * STEP, reach, dia: true });
                 }
                 growthPath.newNodes = list;
             }
             if (!growthPath.newNodes.length) return [];
             const pos = tlPathPos(growthPath);
-            return growthPath.newNodes.filter(n => n.reach <= pos + 1e-9).map(n => [n.px, n.py]);
+            return growthPath.newNodes.filter(n => !n.dia && n.reach <= pos + 1e-9).map(n => [n.px, n.py]);
+        }
+        function tlReachedDiamonds(growthPath) {   // the same for diamonds: tlReachedNodes has built the list
+            if (!growthPath || !tlTransition || !growthPath.newNodes || !growthPath.newNodes.length) return [];
+            const pos = tlPathPos(growthPath);
+            return growthPath.newNodes.filter(n => n.dia && n.reach <= pos + 1e-9).map(n => [n.px, n.py]);
         }
 
         function drawTimelapseGrowth(col, lineWeight, innerHoleR, growthPath, holeNodes) {
