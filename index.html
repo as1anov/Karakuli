@@ -6748,6 +6748,7 @@ function makeTowel(seed, ctx) {
     // Layers of the cloth lie millimetres apart, so the shadow map makes dark blotches where one layer shades the other: the towel casts a shadow
     // (on the wall) but does not receive one, which keeps its surface clean.
     const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; g.add(m);
+    g.userData.pivot = { y: sup.y + 20, z: z0c };   // like the umbrella, it is simply there and swings about the arm it hangs on
     return { g, w: towelSize().w, d: 60 };
 }
 
@@ -7128,7 +7129,7 @@ function spawnLast() {
     const sd = S.objs[S.objs.length - 1].s, g = R.objs.children.find(c => c.userData && c.userData.seed === sd);
     if (!g) return;
     const w = new T.Group(); w.position.copy(g.position); g.position.set(0, 0, 0);
-    const pv = g.userData.kind === 'umbrella' && g.userData.pivot;
+    const pv = (g.userData.kind === 'umbrella' || g.userData.kind === 'towel') && g.userData.pivot;
     if (pv) { w.position.y += pv.y; w.position.z += pv.z; g.position.set(0, -pv.y, -pv.z); }   // the umbrella turns about the lip it hangs on
     R.objs.remove(g); w.add(g); R.objs.add(w);
     if (pv) { R.spawn = { w, t: 0, sway: true, y0: w.position.y }; R.dirty = true; return; }   // no growing or turning: it is simply there and swings a little
