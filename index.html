@@ -6794,7 +6794,7 @@ function makeTowel(seed, ctx) {
 // of the arm, and its inner top rests on the foot of the hook, in the pocket between the wall plate and the lip. The legs of the crook hang on both sides of
 // the 12 mm arm. It is lowered until the very first point of contact (checked against 20-30 thousand points of the crook's surface), so it touches the metal
 // and nowhere goes into it.
-const UMB = { S: 7.0, YAW: 90 * Math.PI / 180, CX: 0.0079, YC: 132.27, ZT: -1.72 };   // mm per model unit, turn, middle of the crook (tip to shaft) and inner top, in model units
+const UMB = { K: 2.3, S: 7.0, YAW: 90 * Math.PI / 180, CX: 0.0079, YC: 132.27, ZT: -1.72 };   // mm per model unit, turn, middle of the crook (tip to shaft) and inner top, in model units
 function umbrellaData() {
     if (umbrellaData.c) return umbrellaData.c;
     const bin = atob(document.getElementById('umbrella-obj').textContent.trim()), u8 = new Uint8Array(bin.length);
@@ -6855,8 +6855,10 @@ function makeUmbrella(seed, ctx) {
     }
     if (lift > 90) { Cz = (sup.z0 + sup.z1) / 2; lift = minLift(Cz); if (lift > 90) lift = 0; }
     const pos = new Float32Array(d.nv * 3), nrm = new Float32Array(d.nv * 3);
+    // the model is only 41 cm long; a real stick umbrella is about 90 cm. The crook stays as it is (it has to fit the hook) and the cloth and the tip are lengthened.
+    const lng = y => y < 122.7 ? 122.7 - (122.7 - y) * UMB.K : y;
     for (let i = 0; i < d.nv; i++) {
-        const a = (d.pos[i * 3] - CX) * S, b = (d.pos[i * 3 + 1] - YC) * S + lift, c = (d.pos[i * 3 + 2] - ZT) * S;
+        const a = (d.pos[i * 3] - CX) * S, b = (lng(d.pos[i * 3 + 1]) - YC) * S + lift, c = (d.pos[i * 3 + 2] - ZT) * S;
         pos[i * 3] = wx(a, c); pos[i * 3 + 1] = Cy0 + b; pos[i * 3 + 2] = Cz + wz(a, c);
         const na = d.nrm[i * 3], nb = d.nrm[i * 3 + 1], nc = d.nrm[i * 3 + 2];
         nrm[i * 3] = wx(na, nc); nrm[i * 3 + 1] = nb; nrm[i * 3 + 2] = wz(na, nc);
@@ -7012,8 +7014,7 @@ function makeObject0(kind, seed, depthAvail, ctx) {
         const m = new T.Mesh(new T.BoxGeometry(W, H, th), [edge, edge, edge, edge, cov, back]);   // +z face = cover
         m.position.set(0, H / 2, th / 2); m.castShadow = m.receiveShadow = true;
         g.add(m);
-        g.rotation.x = (pocket && !onWall ? 1 : -1) * Math.asin(off / H);
-        if (!pocket && ctx.flip) g.rotation.y = Math.PI;                             // on hooks it is turned round: the back faces the viewer          // the top edge rests on the plate (tilt forward) or on the wall (tilt back)
+        g.rotation.x = (pocket && !onWall ? 1 : -1) * Math.asin(off / H);          // the top edge rests on the plate (tilt forward) or on the wall (tilt back)
         return { g, w: W, d: th, at: { y: sup.y + 0.2, z: pocket ? (onWall ? zP + off : zP - th - off) : zP + off } };
     }
     if (kind === 'vase') {   // every new vase differs in shape, size, glaze and flowers
@@ -7223,7 +7224,7 @@ function objUI() {
     const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine';
     cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
-    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button>${OBJ_KINDS[it.k].turn ? `<button data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
+    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
         + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
     document.getElementById('v3-objnote').style.display = 'none';   // only icons and names in Objects
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
