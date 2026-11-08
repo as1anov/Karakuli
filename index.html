@@ -4454,8 +4454,8 @@ service cloud.firestore {
             fill(`rgba(${dotRGB}, ${alpha})`); noStroke();
             const sI = floor((-offsetX/zoom)/STEP)-2, eI = ceil(((width-offsetX)/zoom)/STEP)+2;
             const sJ = floor((-offsetY/zoom)/STEP)-2, eJ = ceil(((height-offsetY)/zoom)/STEP)+2;
-            // every dot is the same round dot as always (radius 1.5 px on screen), but all of them go into ONE path and one fill
-            const ctx = drawingContext, r = 1.5 / zoom;
+            // every dot is the same round dot as always (1.5 px across on screen), but all of them go into ONE path and one fill
+            const ctx = drawingContext, r = 0.75 / zoom;   // p5 circle() takes the diameter: 1.5 px across, as before
             ctx.beginPath();
             for (let i = sI; i <= eI; i++) for (let j = sJ; j <= eJ; j++) { ctx.moveTo(i * STEP + r, j * STEP); ctx.arc(i * STEP, j * STEP, r, 0, Math.PI * 2); }
             ctx.fill();
