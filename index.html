@@ -3063,17 +3063,45 @@ service cloud.firestore {
         function tlSynthesize() {
             if (tlHistory.length >= 2 || segments.length < 2) return;
             const n = segments.length, K = Math.min(150, n), frames = [];
+            // rings and diamonds join the picture together with the first line that reaches their point (an element no line touches comes last)
+            const need = {};
+            Object.keys(specialElements).forEach(id => {
+                const c = id.indexOf(','), x = +id.slice(0, c), y = +id.slice(c + 1);
+                const q = segments.findIndex(sg => (sg.p1.x === x && sg.p1.y === y) || (sg.p2.x === x && sg.p2.y === y));
+                need[id] = q < 0 ? Infinity : q + 1;
+            });
             for (let k = 0; k <= K; k++) {
-                const m = Math.round(n * k / K), last = m ? segments[m - 1] : null;
-                frames.push({ segments: segments.slice(0, m), specialElements: k === K ? JSON.parse(JSON.stringify(specialElements)) : {}, cursor: last ? { i: last.p2.x, j: last.p2.y } : { i: curI, j: curJ } });
+                const m = Math.round(n * k / K), last = m ? segments[m - 1] : null, sp = {};
+                Object.keys(specialElements).forEach(id => { if (k === K || need[id] <= m) sp[id] = JSON.parse(JSON.stringify(specialElements[id])); });
+                frames.push({ segments: segments.slice(0, m), specialElements: sp, cursor: last ? { i: last.p2.x, j: last.p2.y } : { i: curI, j: curJ } });
             }
             tlHistory = frames; tlCurrentFrame = 0; tlCaptureStride = 1; tlCaptureCounter = 0; tlTimeCache = null;
+        }
+        // Recordings saved by an earlier version from a project without a recording hold every ring and diamond only in the LAST frame, so they all
+        // appeared at the very end. Such a recording is mended: an element is present from the first frame whose lines touch its point.
+        function tlFixLateSpecials() {
+            const h = tlHistory, n = h.length;
+            if (n < 3 || !h[n - 1] || !h[n - 1].specialElements) return;
+            const ids = Object.keys(h[n - 1].specialElements);
+            if (!ids.length) return;
+            for (let i = 0; i < n - 1; i++) if (h[i].specialElements && Object.keys(h[i].specialElements).length) return;   // a real recording has some earlier
+            const need = {};
+            ids.forEach(id => {
+                const c = id.indexOf(','), x = +id.slice(0, c), y = +id.slice(c + 1);
+                let f = h.findIndex(fr => fr.segments.some(sg => (sg.p1.x === x && sg.p1.y === y) || (sg.p2.x === x && sg.p2.y === y)));
+                need[id] = f < 0 ? n - 1 : f;
+            });
+            tlHistory = h.map((fr, i) => {
+                const sp = {}; ids.forEach(id => { if (i >= need[id]) sp[id] = JSON.parse(JSON.stringify(h[n - 1].specialElements[id])); });
+                return { segments: fr.segments, specialElements: sp, cursor: fr.cursor };
+            });
+            tlTimeCache = null;
         }
         function toggleTimelapseUI() {
             if(isGameMode) return;
             clearTimelapseScreenHold();
             tlResume = null; tlPos = null;
-            if (!isTimelapseUIOpen) { captureState(true); tlTheme = currentTheme; tlSynthesize(); }
+            if (!isTimelapseUIOpen) { captureState(true); tlTheme = currentTheme; tlSynthesize(); tlFixLateSpecials(); }
             isTimelapseUIOpen = !isTimelapseUIOpen;
             const toolbar = document.getElementById('timelapse-toolbar');
             if (isTimelapseUIOpen) {
