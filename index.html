@@ -6794,7 +6794,7 @@ function makeTowel(seed, ctx) {
 // of the arm, and its inner top rests on the foot of the hook, in the pocket between the wall plate and the lip. The legs of the crook hang on both sides of
 // the 12 mm arm. It is lowered until the very first point of contact (checked against 20-30 thousand points of the crook's surface), so it touches the metal
 // and nowhere goes into it.
-const UMB = { K: 2.3, S: 7.0, YAW: 90 * Math.PI / 180, CX: 0.0079, YC: 132.27, ZT: -1.72 };   // mm per model unit, turn, middle of the crook (tip to shaft) and inner top, in model units
+const UMB = { S: 12.0, YAW: 90 * Math.PI / 180, CX: 0.0079, YC: 132.27, ZT: -1.72 };   // mm per model unit, turn, middle of the crook (tip to shaft) and inner top, in model units
 function umbrellaData() {
     if (umbrellaData.c) return umbrellaData.c;
     const bin = atob(document.getElementById('umbrella-obj').textContent.trim()), u8 = new Uint8Array(bin.length);
@@ -6855,10 +6855,8 @@ function makeUmbrella(seed, ctx) {
     }
     if (lift > 90) { Cz = (sup.z0 + sup.z1) / 2; lift = minLift(Cz); if (lift > 90) lift = 0; }
     const pos = new Float32Array(d.nv * 3), nrm = new Float32Array(d.nv * 3);
-    // the model is only 41 cm long; a real stick umbrella is about 90 cm. The crook stays as it is (it has to fit the hook) and the cloth and the tip are lengthened.
-    const lng = y => y < 122.7 ? 122.7 - (122.7 - y) * UMB.K : y;
     for (let i = 0; i < d.nv; i++) {
-        const a = (d.pos[i * 3] - CX) * S, b = (lng(d.pos[i * 3 + 1]) - YC) * S + lift, c = (d.pos[i * 3 + 2] - ZT) * S;
+        const a = (d.pos[i * 3] - CX) * S, b = (d.pos[i * 3 + 1] - YC) * S + lift, c = (d.pos[i * 3 + 2] - ZT) * S;
         pos[i * 3] = wx(a, c); pos[i * 3 + 1] = Cy0 + b; pos[i * 3 + 2] = Cz + wz(a, c);
         const na = d.nrm[i * 3], nb = d.nrm[i * 3 + 1], nc = d.nrm[i * 3 + 2];
         nrm[i * 3] = wx(na, nc); nrm[i * 3 + 1] = nb; nrm[i * 3 + 2] = wz(na, nc);
