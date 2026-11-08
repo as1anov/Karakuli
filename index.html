@@ -6761,6 +6761,7 @@ function towelSize() {
     return { SC, w: (d.pmax[0] - d.pmin[0]) * SC };
 }
 const TOWEL_DROP = 10;   // mm: the towel hangs 1 cm lower
+const TOWEL_WALL = 10;   // mm: and 1 cm nearer to the wall
 function makeTowel(seed, ctx) {
     const g = new T.Group(), sup = ctx.sup, d = towelData(), { SC } = towelSize();
     const tex = terryTexture(); tex.repeat.set(14, 26);
@@ -6775,7 +6776,7 @@ function makeTowel(seed, ctx) {
         const yy = dy + (d.pos[i * 3 + 1] - d.pmax[1]) * SC, dzc = dzCh + (d.pos[i * 3 + 2] - TOWEL_CH_Z) * SC - z0c;
         pos[i * 3] = (d.pos[i * 3] - xc) * SC;
         pos[i * 3 + 1] = sup.y - TOWEL_DROP + yy * ca + dzc * sa;
-        pos[i * 3 + 2] = z0c + dzc * ca - yy * sa;
+        pos[i * 3 + 2] = z0c - TOWEL_WALL + dzc * ca - yy * sa;
     }
     const geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.BufferAttribute(pos, 3));
@@ -6785,7 +6786,7 @@ function makeTowel(seed, ctx) {
     // Layers of the cloth lie millimetres apart, so the shadow map makes dark blotches where one layer shades the other: the towel casts a shadow
     // (on the wall) but does not receive one, which keeps its surface clean.
     const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false; g.add(m);
-    g.userData.pivot = { y: sup.y + 20 - TOWEL_DROP, z: z0c };   // like the umbrella, it is simply there and swings about the arm it hangs on
+    g.userData.pivot = { y: sup.y + 20 - TOWEL_DROP, z: z0c - TOWEL_WALL };   // like the umbrella, it is simply there and swings about the arm it hangs on
     return { g, w: towelSize().w, d: 60 };
 }
 
