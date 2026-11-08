@@ -7008,7 +7008,7 @@ function makeObject0(kind, seed, depthAvail, ctx) {
     }
     if (kind === 'magazine') {
         const sup = ctx.sup, pocket = ctx.key === 'magazine', th = 4, onWall = pocket && (((ctx.n || 0) % 2 === 1) !== !!ctx.flip);   // in the holder they lean on the plate and on the wall in turn; the turn button swaps it
-        const k = Math.min(ctx.key === 'hanger' ? (ctx.pitch ? ctx.pitch + 44 : 140) / 215 : 1, (-sup.y - 10) / 275, (ctx.hmax || 275) / 275), W = 215 * k, H = 275 * k;
+        const k = Math.min(1, (-sup.y - 10) / 297, (ctx.hmax || 297) / 297), W = 210 * k, H = 297 * k;   // A4 everywhere; only shrinks when it would not fit under the product
         const zP = pocket ? (onWall ? 0.2 : R.gap - 0.2) : R.gap + R.t + 0.2;       // plane the top edge rests on: the wall, or the patterned plate
         const off = Math.max(5, Math.min(0.1 * H, pocket ? (onWall ? sup.z1 - 1 - th - zP : zP - th - sup.z0 - 1) : sup.z1 - zP - 14));
         const cov = magCover(ctx.n || 0), edge = objMaterial('#f1ece0', { roughness: 0.9 }), back = objMaterial('#e6e3dc', { roughness: 0.7 });
@@ -7113,8 +7113,8 @@ function placeObjects() {
         S.objs.forEach(it => {
             // candidate spots: one hook, or (magazine) the middle of two neighbouring hooks; nearest to the middle first
             const cands = [];
-            if (it.k === 'magazine' && n > 1) for (let i = 0; i + 1 < n; i++) cands.push({ x: (sup.hooks[i] + sup.hooks[i + 1]) / 2, w: pitch + 44, hi: i, two: true });
-            else for (let i = 0; i < n; i++) cands.push({ x: sup.hooks[i], w: it.k === 'towel' ? towelSize().w : it.k === 'magazine' ? 140 : 160, hi: i });
+            if (it.k === 'magazine' && n > 1) for (let i = 0; i + 1 < n; i++) cands.push({ x: (sup.hooks[i] + sup.hooks[i + 1]) / 2, w: 210, hi: i, two: true });
+            else for (let i = 0; i < n; i++) cands.push({ x: sup.hooks[i], w: it.k === 'towel' ? towelSize().w : it.k === 'magazine' ? 210 : 160, hi: i });
             cands.sort((a, b) => Math.abs(a.x) - Math.abs(b.x) || a.x - b.x);
             const c = cands.find(q => taken.every(([a, b]) => q.x + q.w / 2 + 6 <= a || q.x - q.w / 2 - 6 >= b));
             if (!c) return;
