@@ -4989,6 +4989,7 @@ service cloud.firestore {
             if (isViewOnly) { showActionHint('View only'); return; }
             if (isTimelapseUIOpen || !isDrawingMode || isEraserActive || isDashboardOpen || isGameMode) return;
             if (t === 'isDiamond' && (!lastDirection || lastDirection.di !== 0 || lastDirection.dj !== 1)) return;
+            captureState(true);   // the lines drawn so far become their own frame, so the circle / diamond follows them at once
             saveState(); let id = `${curI},${curJ}`; if(!specialElements[id]) specialElements[id] = {isNode:false, isDiamond:false};
             specialElements[id][t] = !specialElements[id][t];
             if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
