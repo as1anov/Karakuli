@@ -4993,7 +4993,7 @@ service cloud.firestore {
             specialElements[id][t] = !specialElements[id][t];
             if (t==='isDiamond' && specialElements[id].isDiamond && lastDirection) { curI += lastDirection.di*3; curJ += lastDirection.dj*3; }
             if(!specialElements[id].isNode && !specialElements[id].isDiamond) delete specialElements[id];
-            showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw(); captureState();
+            showActionHint(t === 'isNode' ? 'Node' : 'Diamond'); redraw(); captureState(true);
         }
 
 
