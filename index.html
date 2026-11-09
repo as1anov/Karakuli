@@ -800,6 +800,10 @@
 
             <div class="dash-section">
                 <span class="dash-label">Features</span>
+                <div class="dash-btn" onclick="runShelfGenerator()">
+                    <svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+                    Generate pattern
+                </div>
                 <div class="dash-btn" onclick="toggleTimelapseUI(); toggleDashboard()">
                     <svg viewBox="0 0 24 24">
                         <path d="M7.75 3.5a1.25 1.25 0 0 0-1.85 1.09v14.82a1.25 1.25 0 0 0 1.85 1.09l12.83-7.41a1.25 1.25 0 0 0 0-2.18L7.75 3.5z" stroke-linejoin="round" />
@@ -5134,6 +5138,184 @@ service cloud.firestore {
                 requestAnimationFrame(step);
             };
             requestAnimationFrame(step);
+        }
+
+        // ---- Pattern generator (Shelf) ----
+        // Builds a pattern from rules, on a coarse lattice (one lattice step = GEN_P grid steps): one connected set of strokes that grow
+        // from the solid zone, turns only by 0 / 45 / 90 degrees, a clear gap between lines that do not touch, rings and diamonds only
+        // where they have room. The same seed always gives the same pattern. The result is drawn into the editor step by step.
+        const GEN_P = 4;
+        function genRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+        const GEN_DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];   // 45-degree steps; index 2 = down
+        function genSegDist(ax, ay, bx, by, cx, cy, dx, dy) {   // the shortest distance between two segments
+            const orient = (px, py, qx, qy, rx, ry) => (qx - px) * (ry - py) - (qy - py) * (rx - px);
+            const o1 = orient(ax, ay, bx, by, cx, cy), o2 = orient(ax, ay, bx, by, dx, dy), o3 = orient(cx, cy, dx, dy, ax, ay), o4 = orient(cx, cy, dx, dy, bx, by);
+            if (((o1 > 0 && o2 < 0) || (o1 < 0 && o2 > 0)) && ((o3 > 0 && o4 < 0) || (o3 < 0 && o4 > 0))) return 0;
+            const pt = (px, py, x1, y1, x2, y2) => { const vx = x2 - x1, vy = y2 - y1, t = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / ((vx * vx + vy * vy) || 1))); return Math.hypot(px - x1 - vx * t, py - y1 - vy * t); };
+            return Math.min(pt(ax, ay, cx, cy, dx, dy), pt(bx, by, cx, cy, dx, dy), pt(cx, cy, ax, ay, bx, by), pt(dx, dy, ax, ay, bx, by));
+        }
+        function generateShelfPattern(seed) {
+            const rng = genRng(seed), P = GEN_P, MM = LINE_WEIGHT / 12;
+            const wPx = paperWidthMm * MM, hPx = paperHeightMm * MM, G = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
+            const jEnd = Math.ceil((-hPx / 2 + G.patternEnd * MM) / STEP);                    // the row where the solid zone begins
+            const A = Math.max(2, Math.floor((wPx / 2 - 60) / (P * STEP)));                   // lattice columns to each side of the middle
+            const R = Math.max(2, Math.floor((jEnd * STEP + hPx / 2 - 60) / (P * STEP)));     // lattice rows from the top margin to the solid zone
+            const jTop = jEnd - R * P;
+            const holes = getBoltHolesPx().map(h => ({ x: h.x / STEP, y: h.y / STEP, r: h.r / STEP }));
+            // the character of this pattern
+            const st = { straight: 1.5 + rng() * 4, diag: 0.3 + rng() * 2.2, side: 0.4 + rng() * 1.6, up: 0.6 + rng() * 2, dia: 0.1 + rng() * 0.5, ring: 0.1 + rng() * 0.3,
+                         target: 0.32 + rng() * 0.22, mirror: rng() < 0.85, long: 6 + Math.floor(rng() * 18) };
+            const lo = st.mirror ? -A : -A, hi = st.mirror ? 0 : A;
+            const px = n => n[0] * P, py = n => jTop + n[1] * P;
+            const key = (a, r) => a + ',' + r;
+            const edges = [], adj = new Map(), eset = new Set();
+            const mir = n => [-n[0], n[1]];
+            const eKey = (u, v) => (u[0] < v[0] || (u[0] === v[0] && u[1] < v[1])) ? key(...u) + '>' + key(...v) : key(...v) + '>' + key(...u);
+            const dirOf = (u, v) => GEN_DIRS.findIndex(d => d[0] === v[0] - u[0] && d[1] === v[1] - u[1]);
+            const ang = (d1, d2) => { const x = Math.abs(d1 - d2) % 8; return Math.min(x, 8 - x); };
+            const nearHole = (u, v) => holes.some(h => genSegDist(px(u), py(u), px(v), py(v), h.x, h.y, h.x, h.y) < h.r + 1.9 + 0.8);
+            const okEdges = (news) => {
+                const all = [];
+                for (let i = 0; i < news.length; i++) {
+                    const [u, v] = news[i];
+                    if (u[0] < -A || u[0] > A || v[0] < -A || v[0] > A || u[1] < 0 || u[1] > R || v[1] < 0 || v[1] > R) return false;
+                    if (st.mirror && (u[0] > 0 || v[0] > 0) && i === 0) return false;
+                    if (eset.has(eKey(u, v))) return false;
+                    if (nearHole(u, v)) return false;
+                    const dd = dirOf(u, v);
+                    // angles at both ends with the lines already there (and with the new ones)
+                    for (const [n, dir] of [[u, dd], [v, (dd + 4) & 7]]) {
+                        const used = (adj.get(key(...n)) || []).slice();
+                        news.forEach((o, k) => { if (k !== i) { if (o[0][0] === n[0] && o[0][1] === n[1]) used.push(dirOf(o[0], o[1])); if (o[1][0] === n[0] && o[1][1] === n[1]) used.push((dirOf(o[0], o[1]) + 4) & 7); } });
+                        if (used.some(x => ang(x, dir) < 2)) return false;
+                        if (used.length >= 3) return false;
+                    }
+                    all.push(news[i]);
+                }
+                const far = (e1, e2) => {   // two lines that do not touch each other keep a gap
+                    const sh = e1[0][0] === e2[0][0] && e1[0][1] === e2[0][1] || e1[0][0] === e2[1][0] && e1[0][1] === e2[1][1] || e1[1][0] === e2[0][0] && e1[1][1] === e2[0][1] || e1[1][0] === e2[1][0] && e1[1][1] === e2[1][1];
+                    if (sh) return true;
+                    return genSegDist(px(e1[0]), py(e1[0]), px(e1[1]), py(e1[1]), px(e2[0]), py(e2[0]), px(e2[1]), py(e2[1])) >= 3.2;
+                };
+                for (let i = 0; i < news.length; i++) {
+                    for (let j = i + 1; j < news.length; j++) if (!far(news[i], news[j]) && eKey(news[i][0], news[i][1]) !== eKey(news[j][0], news[j][1])) return false;
+                    for (const e of edges) if (!far(news[i], e)) return false;
+                }
+                return true;
+            };
+            const commit = (news) => news.forEach(([u, v]) => {
+                const k = eKey(u, v); if (eset.has(k)) return;
+                eset.add(k); edges.push([u, v]);
+                const d = dirOf(u, v);
+                (adj.get(key(...u)) || adj.set(key(...u), []).get(key(...u))).push(d);
+                (adj.get(key(...v)) || adj.set(key(...v), []).get(key(...v))).push((d + 4) & 7);
+            });
+            const withMirror = (u, v) => { const e = [[u, v]]; if (st.mirror) { const m = [mir(u), mir(v)]; if (eKey(m[0], m[1]) !== eKey(u, v)) e.push(m); } return e; };
+            const strokes = [], diaEdges = new Set();
+            let guard = 0;
+            const total = (2 * A + 1) * (R + 1) * (st.mirror ? 0.5 : 1);
+            const nodeCount = () => adj.size / (st.mirror ? 2 : 1);
+            while (guard++ < 500 && (strokes.length < 1 || nodeCount() / total < st.target)) {
+                let start;
+                const nodes = [...adj.keys()].map(k => k.split(',').map(Number)).filter(n => n[0] >= lo && n[0] <= hi && (adj.get(key(...n)) || []).length < 3);
+                if (!strokes.length || rng() < 0.45 || !nodes.length) start = [lo + Math.floor(rng() * (hi - lo + 1)), R];
+                else start = nodes[Math.floor(rng() * nodes.length)];
+                if (!strokes.length && st.mirror && rng() < 0.5) start = [0, R];
+                const stroke = { start, steps: [] };
+                let cur = start, heading = start[1] === R ? 6 : -1, len = 3 + Math.floor(rng() * st.long);
+                for (let s = 0; s < len; s++) {
+                    const opts = [];
+                    if (heading < 0) for (let d = 0; d < 8; d++) opts.push([d, 1 + rng() * (d % 2 ? st.diag : st.side)]);
+                    else for (const t of [0, 1, -1, 2, -2]) { const d = (heading + t + 8) & 7; opts.push([d, (t === 0 ? st.straight : Math.abs(t) === 1 ? st.diag : st.side) * (0.5 + rng()) * (GEN_DIRS[d][1] < 0 ? st.up : 1)]); }
+                    opts.sort((x, y) => y[1] - x[1]);
+                    let done = false;
+                    for (const [d] of opts) {
+                        const to = [cur[0] + GEN_DIRS[d][0], cur[1] + GEN_DIRS[d][1]];
+                        const news = withMirror(cur, to);
+                        if (!okEdges(news)) continue;
+                        const dia = d === 2 && heading === 2 && rng() < st.dia;
+                        commit(news);
+                        stroke.steps.push({ from: cur, to, dia });
+                        if (dia) { diaEdges.add(eKey(cur, to)); if (st.mirror) diaEdges.add(eKey(mir(cur), mir(to))); }
+                        cur = to; heading = d; done = true; break;
+                    }
+                    if (!done) break;
+                }
+                if (stroke.steps.length >= 3) strokes.push(stroke);
+                else if (stroke.steps.length) {   // a stub is not worth keeping: take it back
+                    stroke.steps.forEach(sp => { const dropE = (u, v) => { const k = eKey(u, v); const i = edges.findIndex(e => eKey(e[0], e[1]) === k); if (i < 0) return; edges.splice(i, 1); eset.delete(k); const d = dirOf(u, v); const a1 = adj.get(key(...u)), a2 = adj.get(key(...v)); a1.splice(a1.indexOf(d), 1); a2.splice(a2.indexOf((d + 4) & 7), 1); if (!a1.length) adj.delete(key(...u)); if (!a2.length) adj.delete(key(...v)); diaEdges.delete(k); }; dropE(sp.from, sp.to); if (st.mirror) dropE(mir(sp.from), mir(sp.to)); });
+                }
+            }
+            // a diamond leaves a small gap in its line: both sides of it must still be held by the solid zone, or a piece would fall out
+            for (let again = true; again;) {
+                again = false;
+                const par = new Map(), find = k => { while (par.get(k) !== k) { par.set(k, par.get(par.get(k))); k = par.get(k); } return k; };
+                adj.forEach((_, k) => par.set(k, k));
+                edges.forEach(e => { if (!diaEdges.has(eKey(e[0], e[1]))) par.set(find(key(...e[0])), find(key(...e[1]))); });
+                const grounded = new Set(); adj.forEach((_, k) => { if (+k.split(',')[1] === R) grounded.add(find(k)); });
+                for (const e of edges) {
+                    const k = eKey(e[0], e[1]);
+                    if (diaEdges.has(k) && (!grounded.has(find(key(...e[0]))) || !grounded.has(find(key(...e[1]))))) { diaEdges.delete(k); again = true; break; }
+                }
+            }
+            // rings: where nothing else is near
+            const rings = new Set(), ringList = [];
+            const cand = [...adj.keys()].map(k => k.split(',').map(Number)).filter(n => n[1] < R && n[1] >= 1);
+            for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
+            const ringR = (BASE_STEP_VAL + LINE_WEIGHT / 2) / STEP;   // the outer radius of a ring, in grid steps
+            for (const n of cand) {
+                if (rng() > st.ring) continue;
+                const x = px(n), y = py(n);
+                if (Math.abs(x) * STEP > wPx / 2 - 50 - ringR * STEP || y * STEP < -hPx / 2 + 70 + ringR * STEP) continue;
+                if ((adj.get(key(...n)) || []).length > 2) continue;
+                if (holes.some(h => Math.hypot(h.x - x, h.y - y) < h.r + ringR + 1)) continue;
+                if (edges.some(e => (diaEdges.has(eKey(e[0], e[1])) && ((e[0][0] === n[0] && e[0][1] === n[1]) || (e[1][0] === n[0] && e[1][1] === n[1]))))) continue;
+                if (edges.some(e => !((e[0][0] === n[0] && e[0][1] === n[1]) || (e[1][0] === n[0] && e[1][1] === n[1])) && genSegDist(x, y, x, y, px(e[0]), py(e[0]), px(e[1]), py(e[1])) < ringR + 1.1)) continue;
+                if (ringList.some(m => Math.hypot(px(m) - x, py(m) - y) < 2 * ringR + 1.2)) continue;
+                rings.add(key(...n)); ringList.push(n);
+                if (st.mirror && n[0] !== 0) { const m = mir(n); rings.add(key(...m)); ringList.push(m); }
+            }
+            // the order of drawing: every stroke, then its mirror image
+            const ops = [];
+            const placed = new Set();
+            const drawStroke = (stk, flip) => {
+                const M = n => flip ? mir(n) : n;
+                const at = n => { const i = px(M(n)), j = py(M(n)); return [i, j]; };
+                const visit = n => { const m = M(n), k = key(...m); if (rings.has(k) && !placed.has(k)) { placed.add(k); const [i, j] = at(n); ops.push({ t: 'node', i, j }); } };
+                const s0 = at(stk.start); ops.push({ t: 'move', i: s0[0], j: s0[1] }); visit(stk.start);
+                stk.steps.forEach(sp => {
+                    const a = at(sp.from), b = at(sp.to), dx = Math.sign(b[0] - a[0]), dj = Math.sign(b[1] - a[1]);
+                    if (diaEdges.has(eKey(M(sp.from), M(sp.to)))) { ops.push({ t: 'dia', i: a[0], j: a[1] }); for (let k = 3; k < P; k++) ops.push({ t: 'seg', x1: a[0] + dx * k, y1: a[1] + dj * k, x2: a[0] + dx * (k + 1), y2: a[1] + dj * (k + 1) }); }
+                    else for (let k = 0; k < P; k++) ops.push({ t: 'seg', x1: a[0] + dx * k, y1: a[1] + dj * k, x2: a[0] + dx * (k + 1), y2: a[1] + dj * (k + 1) });
+                    visit(sp.to);
+                });
+            };
+            strokes.forEach(stk => { drawStroke(stk, false); if (st.mirror) drawStroke(stk, true); });
+            return { ops, strokes: strokes.length, rings: ringList.length, mirror: st.mirror, edges: edges.length };
+        }
+        let genSeedLast = 0;
+        function runShelfGenerator() {
+            if (isViewOnly) { showActionHint('View only'); return; }
+            if (templateKind() !== 'product' || activeProductKey !== 'shelf') { showActionHint('The generator is for the Shelf: choose the Shelf template'); return; }
+            if (isTimelapseUIOpen) toggleTimelapseUI();
+            const seed = (Math.floor(Math.random() * 900000) + 100000);
+            genSeedLast = seed;
+            const gen = generateShelfPattern(seed);
+            saveState();
+            segments = []; specialElements = {}; lastDirection = null; invalidateGeometryCache();
+            captureState(true);
+            const flush = () => { captureState(true); };
+            let n = 0;
+            gen.ops.forEach(op => {
+                if (op.t === 'move') { curI = op.i; curJ = op.j; flush(); }
+                else if (op.t === 'seg') { segments.push(op.x1 < op.x2 || (op.x1 === op.x2 && op.y1 < op.y2) ? { p1: { x: op.x1, y: op.y1 }, p2: { x: op.x2, y: op.y2 } } : { p1: { x: op.x2, y: op.y2 }, p2: { x: op.x1, y: op.y1 } }); curI = op.x2; curJ = op.y2; invalidateGeometryCache(); if (++n % 2 === 0) flush(); }
+                else if (op.t === 'node') { specialElements[`${op.i},${op.j}`] = Object.assign(specialElements[`${op.i},${op.j}`] || {}, { isNode: true }); flush(); }
+                else if (op.t === 'dia') { specialElements[`${op.i},${op.j}`] = Object.assign(specialElements[`${op.i},${op.j}`] || {}, { isDiamond: true }); flush(); }
+            });
+            flush(); invalidateGeometryCache();
+            if (isDashboardOpen) toggleDashboard();
+            showActionHint(`Pattern #${seed}`); updateModeUI(); redraw();
+            return gen;
         }
 
         function addSeg(x1, y1, x2, y2) {
