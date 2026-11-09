@@ -800,7 +800,7 @@
 
             <div class="dash-section">
                 <span class="dash-label">Features</span>
-                <div class="dash-btn" onclick="runShelfGenerator()">
+                <div class="dash-btn" id="gen-btn" style="display: none" onclick="runShelfGenerator()">
                     <svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
                     Generate pattern
                 </div>
@@ -1231,6 +1231,8 @@
 
         onAuthStateChanged(auth, (user) => {
             signedInUser = user;
+            window.kkAdmin = !!user && (user.email || '').toLowerCase() === 'aslanov.az@gmail.com';   // the pattern generator is for the owner only, for now
+            const gb = document.getElementById('gen-btn'); if (gb) gb.style.display = window.kkAdmin ? '' : 'none';
             if (user) {
                 loginContainer.innerHTML = `
                     <div class="user-profile">
@@ -5295,6 +5297,7 @@ service cloud.firestore {
         }
         let genSeedLast = 0;
         function runShelfGenerator() {
+            if (!window.kkAdmin) return;
             if (isViewOnly) { showActionHint('View only'); return; }
             if (templateKind() !== 'product' || activeProductKey !== 'shelf') { showActionHint('The generator is for the Shelf: choose the Shelf template'); return; }
             if (isTimelapseUIOpen) toggleTimelapseUI();
