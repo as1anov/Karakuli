@@ -5166,7 +5166,7 @@ service cloud.firestore {
             const holes = getBoltHolesPx().map(h => ({ x: h.x / STEP, y: h.y / STEP, r: h.r / STEP }));
             // the character of this pattern
             const st = { straight: 1.5 + rng() * 4, diag: 0.3 + rng() * 2.2, side: 0.4 + rng() * 1.6, up: 0.6 + rng() * 2, dia: 0.1 + rng() * 0.5, ring: 0.1 + rng() * 0.3,
-                         target: 0.32 + rng() * 0.22, mirror: rng() < 0.85, long: 6 + Math.floor(rng() * 18) };
+                         target: 0.32 + rng() * 0.22, mirror: false,   // never symmetric: the author's patterns are not long: 6 + Math.floor(rng() * 18) };
             const lo = st.mirror ? -A : -A, hi = st.mirror ? 0 : A;
             const px = n => n[0] * P, py = n => jTop + n[1] * P;
             const key = (a, r) => a + ',' + r;
