@@ -5168,7 +5168,7 @@ service cloud.firestore {
             const R = Math.floor((jEnd - yT) / P), y0 = jEnd - R * P;
             const holes = getBoltHolesPx().map(h => ({ x: h.x / STEP, y: h.y / STEP, r: h.r / STEP }));
             const RING = (BASE_STEP_VAL + LINE_WEIGHT / 2) / STEP;                           // outer radius of a ring, in grid steps
-            const st = { diag: 0.10 + rng() * 0.12, newest: 0.55 + rng() * 0.3, loops: 0.03 + rng() * 0.06, voids: 0.04 + rng() * 0.04, hubs: 0.8 + rng() * 0.5, dia: 0.85 };
+            const st = { diag: 0.5 + rng() * 0.4, newest: 0.55 + rng() * 0.3, loops: 0, voids: 0.04 + rng() * 0.04, hubs: 0.8 + rng() * 0.5, dia: 0.85 };
             const key = n => n[0] + ',' + n[1];
             const pos = n => [x0 + n[0] * P, y0 + n[1] * P];
             const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]];
@@ -5184,7 +5184,7 @@ service cloud.firestore {
                     const sh = e[0][0] === u[0] && e[0][1] === u[1] || e[1][0] === u[0] && e[1][1] === u[1] || e[0][0] === v[0] && e[0][1] === v[1] || e[1][0] === v[0] && e[1][1] === v[1];
                     if (sh) continue;
                     const c = pos(e[0]), d = pos(e[1]);
-                    if (genSegDist(a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]) < ((u[0] !== v[0] && u[1] !== v[1]) || (e[0][0] !== e[1][0] && e[0][1] !== e[1][1]) ? 2.1 : 2.6)) return false;
+                    if (genSegDist(a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]) < 2.6) return false;   // no thin slits between lines
                 }
                 return true;
             };
@@ -5196,7 +5196,14 @@ service cloud.firestore {
                     if (eset.has(ek(o1, o2))) return false;
                 }
                 const dd = [Math.sign(v[0] - u[0]), Math.sign(v[1] - u[1])];   // two lines meet at 90 degrees or more (the suns are the only 45-degree meetings)
-                for (const n of [[u, dd], [v, [-dd[0], -dd[1]]]]) { const m = used.get(key(n[0])); if (m && !hubKeys0.has(key(n[0]))) for (const e of m.edges) { const o = key(e[0]) === key(n[0]) ? e[1] : e[0]; const od = [Math.sign(o[0] - n[0][0]), Math.sign(o[1] - n[0][1])]; if (od[0] * n[1][0] + od[1] * n[1][1] > 1) return false; } }
+                for (const n of [[u, dd], [v, [-dd[0], -dd[1]]]]) { const m = used.get(key(n[0])); if (m && !hubKeys0.has(key(n[0]))) for (const e of m.edges) { const o = key(e[0]) === key(n[0]) ? e[1] : e[0]; const od = [Math.sign(o[0] - n[0][0]), Math.sign(o[1] - n[0][1])]; if (od[0] * n[1][0] + od[1] * n[1][1] > 0) return false; } }
+                for (const h of hubs) {   // a ring is never touched by a line that is not its spoke
+                    const hp = pos(h), a = pos(u), b = pos(v);
+                    if (u === h || v === h || key(u) === key(h) || key(v) === key(h)) continue;
+                    const dd2 = [b[0] - a[0], b[1] - a[1]], cr = (a[0] - hp[0]) * dd2[1] - (a[1] - hp[1]) * dd2[0];
+                    const radial = cr === 0 && ((a[0] - hp[0]) * dd2[0] + (a[1] - hp[1]) * dd2[1]) >= 0;   // goes straight on from a spoke
+                    if (!radial && genSegDist(hp[0], hp[1], hp[0], hp[1], a[0], a[1], b[0], b[1]) < RING + 0.7) return false;
+                }
                 return clear(u, v);
             };
             const addNode = n => { if (!used.has(key(n))) used.set(key(n), { n, edges: [] }); return used.get(key(n)); };
