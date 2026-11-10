@@ -5169,7 +5169,7 @@ service cloud.firestore {
             const R = Math.floor((jEnd - yT) / P), y0 = jEnd - R * P;
             const holes = getBoltHolesPx().map(h => ({ x: h.x / STEP, y: h.y / STEP, r: h.r / STEP }));
             const RING = (BASE_STEP_VAL + LINE_WEIGHT / 2) / STEP;                           // outer radius of a ring, in grid steps
-            const st = { diag: 0.8 + rng() * 0.2, newest: 0.35 + rng() * 0.3, loops: 0, voids: 0.02 + rng() * 0.025, hubs: 1.1 + rng() * 0.6, dia: 0.85 };
+            const st = { diag: 0.8 + rng() * 0.2, newest: 0.35 + rng() * 0.3, loops: 0, voids: 0.04 + rng() * 0.04, hubs: 0.65 + rng() * 0.4, dia: 0.85 };
             const key = n => n[0] + ',' + n[1];
             const pos = n => [x0 + n[0] * P, y0 + n[1] * P];
             const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]];
@@ -5214,8 +5214,8 @@ service cloud.firestore {
             // suns: a ring with eight spokes
             const hubs = [], nHub = Math.max(2, Math.round((K + 1) * (R + 1) / 73 * st.hubs));
             for (let t = 0; t < nHub * 40 && hubs.length < nHub; t++) {
-                const h = [1 + Math.floor(rng() * (K - 1)), 1 + Math.floor(rng() * (R - 1))], hp = pos(h);
-                if (hubs.some(o => Math.hypot(o[0] - h[0], o[1] - h[1]) < 3.6)) continue;
+                const h = [2 + Math.floor(rng() * (K - 3)), 2 + Math.floor(rng() * (R - 3))], hp = pos(h);   // never at the edge of the product
+                if (hubs.some(o => Math.hypot(o[0] - h[0], o[1] - h[1]) < 4.5)) continue;   // rings stand well apart
                 if (holes.some(o => Math.hypot(o.x - hp[0], o.y - hp[1]) < o.r + RING + 2)) continue;
                 const nb = DIRS.map(d => [h[0] + d[0], h[1] + d[1]]);
                 if (nb.some(n => !inside(n) || blocked.has(key(n)) || used.has(key(n)) || nearHole(h, n))) continue;
@@ -5236,6 +5236,9 @@ service cloud.firestore {
                 for (const [d] of ds) {
                     const v = [u[0] + d[0], u[1] + d[1]];
                     if (d[0] !== 0 && d[1] !== 0 && rng() > st.diag) continue;   // a 45-degree line only now and then
+                    // the edge of the pattern: on the left and right the lines arrive horizontally, on the top and bottom vertically (in nine cases of ten)
+                    const sideN = n => n[0] === 0 || n[0] === K, topN = n => n[1] === 0 || n[1] === R;
+                    if (((sideN(u) || sideN(v)) && d[1] !== 0) || ((topN(u) || topN(v)) && d[0] !== 0)) { if (rng() < 0.9) continue; }
                     if (!okEdge(u, v)) continue;
                     addEdge(u, v); order.push([u, v]); front.push(v); moved = true; break;
                 }
@@ -5264,8 +5267,8 @@ service cloud.firestore {
                     used.forEach((m, k) => { if (loose.has(k)) used.delete(k); else m.edges = m.edges.filter(e => !loose.has(key(e[0]))); });
                     for (let i = hubs.length - 1; i >= 0; i--) if (loose.has(key(hubs[i]))) hubs.splice(i, 1); } }
             // dead ends: shorter, as in the originals, or a little longer; a diamond under a line that comes down
-            const len = new Map(), dia = new Map(), hubKeys = new Set(hubs.map(key));
-            used.forEach(m => {
+            const len = new Map(), dia = new Map(), hubKeys = new Set(hubs.map(key)), diaAt = [];
+            [...used.values()].sort(() => rng() - 0.5).forEach(m => {
                 if (m.edges.length !== 1 || m.n[1] === R) return;
                 const e = m.edges[0], u = (e[0][0] === m.n[0] && e[0][1] === m.n[1]) ? e[1] : e[0], d = [Math.sign(m.n[0] - u[0]), Math.sign(m.n[1] - u[1])];
                 if (hubKeys.has(key(u)) && false) return;
@@ -5280,8 +5283,9 @@ service cloud.firestore {
                     const cx = tip[0], cy = tip[1] + 0.97;
                     const bad = edges.some(o => !(key(o[0]) === key(m.n) || key(o[1]) === key(m.n)) && genSegDist(cx, cy, cx, cy, pos(o[0])[0], pos(o[0])[1], pos(o[1])[0], pos(o[1])[1]) < 2.65)
                         || holes.some(h => Math.hypot(h.x - cx, h.y - cy) < h.r + 3) || hubs.some(h => Math.hypot(pos(h)[0] - cx, pos(h)[1] - cy) < RING + 2.4)
-                        || cy + 1.4 > jEnd || cx < xL + 1 || cx > xR - 1;
-                    if (!bad) dia.set(ek(e[0], e[1]), tip);
+                        || cy + 1.4 > jEnd || cx < xL + 1 || cx > xR - 1
+                        || hubs.some(h => Math.hypot(pos(h)[0] - cx, pos(h)[1] - cy) < 9) || diaAt.some(q => Math.hypot(q[0] - cx, q[1] - cy) < 12);   // a diamond is never next to a ring or another diamond
+                    if (!bad) { dia.set(ek(e[0], e[1]), tip); diaAt.push([cx, cy]); }
                 }
             });
             // the order of drawing: suns first, then the maze as it grew
