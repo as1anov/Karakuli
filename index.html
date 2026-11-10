@@ -5169,7 +5169,7 @@ service cloud.firestore {
             const R = Math.floor((jEnd - yT) / P), y0 = jEnd - R * P;
             const holes = getBoltHolesPx().map(h => ({ x: h.x / STEP, y: h.y / STEP, r: h.r / STEP }));
             const RING = (BASE_STEP_VAL + LINE_WEIGHT / 2) / STEP;                           // outer radius of a ring, in grid steps
-            const st = { diag: 0.8 + rng() * 0.2, newest: 0.35 + rng() * 0.3, loops: 0, voids: 0.04 + rng() * 0.04, hubs: 0.65 + rng() * 0.4, dia: 0.85 };
+            const st = { diag: 0.8 + rng() * 0.2, newest: 0.15 + rng() * 0.25, loops: 0.08 + rng() * 0.1, voids: 0.02 + rng() * 0.03, hubs: 0.65 + rng() * 0.4, dia: 0.85 };
             const key = n => n[0] + ',' + n[1];
             const pos = n => [x0 + n[0] * P, y0 + n[1] * P];
             const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]];
@@ -5245,7 +5245,15 @@ service cloud.firestore {
                 if (!moved) front.splice(i, 1);
             }
             // a few loops
-            used.forEach(m => { for (const d of DIRS) { const v = [m.n[0] + d[0], m.n[1] + d[1]]; if (rng() < st.loops && used.has(key(v)) && used.get(key(v)).edges.length && m.edges.length && okEdge(m.n, v, true)) { addEdge(m.n, v); order.push([m.n, v]); } } });
+            // closed loops (as in the author's drawings): only along the lattice, and never in a square that has a diagonal inside (that would leave a tiny triangle)
+            [...used.values()].forEach(m => { for (const d of DIRS.slice(0, 4)) {
+                const v = [m.n[0] + d[0], m.n[1] + d[1]];
+                if (!(rng() < st.loops) || !used.has(key(v)) || !used.get(key(v)).edges.length || !m.edges.length) continue;
+                const perp = d[0] === 0 ? [1, 0] : [0, 1];
+                const diagIn = sg => [[m.n, [v[0] + sg * perp[0], v[1] + sg * perp[1]]], [v, [m.n[0] + sg * perp[0], m.n[1] + sg * perp[1]]]].some(([a, b]) => eset.has(ek(a, b)));
+                if (diagIn(1) || diagIn(-1)) continue;
+                if (okEdge(m.n, v, true)) { addEdge(m.n, v); order.push([m.n, v]); }
+            } });
             // every piece must be held by the solid zone: join the suns to the rest, or drop them
             const comp = () => { const par = new Map(), f = k => { while (par.get(k) !== k) { par.set(k, par.get(par.get(k))); k = par.get(k); } return k; };
                 used.forEach((_, k) => par.set(k, k)); edges.forEach(e => par.set(f(key(e[0])), f(key(e[1])))); ground.forEach(g => par.set(f(key(g)), f(key(ground[0])))); return f; };
