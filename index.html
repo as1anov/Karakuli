@@ -5168,7 +5168,7 @@ service cloud.firestore {
             const R = Math.floor((jEnd - yT) / P), y0 = jEnd - R * P;
             const holes = getBoltHolesPx().map(h => ({ x: h.x / STEP, y: h.y / STEP, r: h.r / STEP }));
             const RING = (BASE_STEP_VAL + LINE_WEIGHT / 2) / STEP;                           // outer radius of a ring, in grid steps
-            const st = { diag: 0.05 + rng() * 0.07, newest: 0.55 + rng() * 0.3, loops: 0.03 + rng() * 0.06, voids: 0.025 + rng() * 0.035, hubs: 0.8 + rng() * 0.5, dia: 0.5 + rng() * 0.4 };
+            const st = { diag: 0.10 + rng() * 0.12, newest: 0.55 + rng() * 0.3, loops: 0.03 + rng() * 0.06, voids: 0.04 + rng() * 0.04, hubs: 0.8 + rng() * 0.5, dia: 0.85 };
             const key = n => n[0] + ',' + n[1];
             const pos = n => [x0 + n[0] * P, y0 + n[1] * P];
             const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]];
@@ -5184,7 +5184,7 @@ service cloud.firestore {
                     const sh = e[0][0] === u[0] && e[0][1] === u[1] || e[1][0] === u[0] && e[1][1] === u[1] || e[0][0] === v[0] && e[0][1] === v[1] || e[1][0] === v[0] && e[1][1] === v[1];
                     if (sh) continue;
                     const c = pos(e[0]), d = pos(e[1]);
-                    if (genSegDist(a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]) < 2.5) return false;
+                    if (genSegDist(a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]) < ((u[0] !== v[0] && u[1] !== v[1]) || (e[0][0] !== e[1][0] && e[0][1] !== e[1][1]) ? 2.1 : 2.6)) return false;
                 }
                 return true;
             };
@@ -5196,7 +5196,7 @@ service cloud.firestore {
                     if (eset.has(ek(o1, o2))) return false;
                 }
                 const dd = [Math.sign(v[0] - u[0]), Math.sign(v[1] - u[1])];   // two lines meet at 90 degrees or more (the suns are the only 45-degree meetings)
-                for (const n of [[u, dd], [v, [-dd[0], -dd[1]]]]) { const m = used.get(key(n[0])); if (m && !hubKeys0.has(key(n[0]))) for (const e of m.edges) { const o = key(e[0]) === key(n[0]) ? e[1] : e[0]; const od = [Math.sign(o[0] - n[0][0]), Math.sign(o[1] - n[0][1])]; if (od[0] * n[1][0] + od[1] * n[1][1] > 0) return false; } }
+                for (const n of [[u, dd], [v, [-dd[0], -dd[1]]]]) { const m = used.get(key(n[0])); if (m && !hubKeys0.has(key(n[0]))) for (const e of m.edges) { const o = key(e[0]) === key(n[0]) ? e[1] : e[0]; const od = [Math.sign(o[0] - n[0][0]), Math.sign(o[1] - n[0][1])]; if (od[0] * n[1][0] + od[1] * n[1][1] > 1) return false; } }
                 return clear(u, v);
             };
             const addNode = n => { if (!used.has(key(n))) used.set(key(n), { n, edges: [] }); return used.get(key(n)); };
@@ -5227,6 +5227,7 @@ service cloud.firestore {
                 let moved = false;
                 for (const [d] of ds) {
                     const v = [u[0] + d[0], u[1] + d[1]];
+                    if (d[0] !== 0 && d[1] !== 0 && rng() > st.diag) continue;   // a 45-degree line only now and then
                     if (!okEdge(u, v)) continue;
                     addEdge(u, v); order.push([u, v]); front.push(v); moved = true; break;
                 }
@@ -5269,7 +5270,7 @@ service cloud.firestore {
                 len.set(ek(e[0], e[1]), L);
                 if (d[0] === 0 && d[1] === 1 && rng() < st.dia) {   // downward: a diamond hangs below the end
                     const cx = tip[0], cy = tip[1] + 0.97;
-                    const bad = edges.some(o => !(key(o[0]) === key(m.n) || key(o[1]) === key(m.n)) && genSegDist(cx, cy, cx, cy, pos(o[0])[0], pos(o[0])[1], pos(o[1])[0], pos(o[1])[1]) < 3.2)
+                    const bad = edges.some(o => !(key(o[0]) === key(m.n) || key(o[1]) === key(m.n)) && genSegDist(cx, cy, cx, cy, pos(o[0])[0], pos(o[0])[1], pos(o[1])[0], pos(o[1])[1]) < 2.65)
                         || holes.some(h => Math.hypot(h.x - cx, h.y - cy) < h.r + 3) || hubs.some(h => Math.hypot(pos(h)[0] - cx, pos(h)[1] - cy) < RING + 2.4)
                         || cy + 1.4 > jEnd || cx < xL + 1 || cx > xR - 1;
                     if (!bad) dia.set(ek(e[0], e[1]), tip);
