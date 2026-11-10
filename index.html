@@ -5169,7 +5169,7 @@ service cloud.firestore {
             const R = Math.floor((jEnd - yT) / P), y0 = jEnd - R * P;
             const holes = getBoltHolesPx().map(h => ({ x: h.x / STEP, y: h.y / STEP, r: h.r / STEP }));
             const RING = (BASE_STEP_VAL + LINE_WEIGHT / 2) / STEP;                           // outer radius of a ring, in grid steps
-            const st = { diag: 0.5 + rng() * 0.4, newest: 0.55 + rng() * 0.3, loops: 0, voids: 0.04 + rng() * 0.04, hubs: 0.8 + rng() * 0.5, dia: 0.85 };
+            const st = { diag: 0.5 + rng() * 0.4, newest: 0.1 + rng() * 0.2, loops: 0, voids: 0.01 + rng() * 0.015, hubs: 0.8 + rng() * 0.5, dia: 0.85 };
             const key = n => n[0] + ',' + n[1];
             const pos = n => [x0 + n[0] * P, y0 + n[1] * P];
             const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]];
