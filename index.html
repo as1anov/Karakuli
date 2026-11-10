@@ -5169,7 +5169,7 @@ service cloud.firestore {
             const R = Math.floor((jEnd - yT) / P), y0 = jEnd - R * P;
             const holes = getBoltHolesPx().map(h => ({ x: h.x / STEP, y: h.y / STEP, r: h.r / STEP }));
             const RING = (BASE_STEP_VAL + LINE_WEIGHT / 2) / STEP;                           // outer radius of a ring, in grid steps
-            const st = { diag: 0.5 + rng() * 0.4, newest: 0.1 + rng() * 0.2, loops: 0, voids: 0.01 + rng() * 0.015, hubs: 0.8 + rng() * 0.5, dia: 0.85 };
+            const st = { diag: 0.8 + rng() * 0.2, newest: 0.35 + rng() * 0.3, loops: 0, voids: 0.02 + rng() * 0.025, hubs: 1.1 + rng() * 0.6, dia: 0.85 };
             const key = n => n[0] + ',' + n[1];
             const pos = n => [x0 + n[0] * P, y0 + n[1] * P];
             const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [-1, -1], [1, -1]];
@@ -5269,7 +5269,7 @@ service cloud.firestore {
                 if (m.edges.length !== 1 || m.n[1] === R) return;
                 const e = m.edges[0], u = (e[0][0] === m.n[0] && e[0][1] === m.n[1]) ? e[1] : e[0], d = [Math.sign(m.n[0] - u[0]), Math.sign(m.n[1] - u[1])];
                 if (hubKeys.has(key(u)) && false) return;
-                const r = rng(); let L = r < 0.12 ? 1 : r < 0.3 ? 2 : r < 0.82 ? 3 : 4 + (rng() < 0.4 ? 1 : 0);
+                const r = rng(); let L = r < 0.04 ? 1 : r < 0.12 ? 2 : r < 0.78 ? 3 : 4 + (rng() < 0.4 ? 1 : 0);
                 const a = pos(u); let tip = [a[0] + d[0] * L, a[1] + d[1] * L];
                 if (L > 3) { const far = pos(m.n), ext = [far[0] + d[0] * (L - 3), far[1] + d[1] * (L - 3)];
                     const bad = edges.some(o => !(key(o[0]) === key(m.n) || key(o[1]) === key(m.n)) && genSegDist(far[0], far[1], ext[0], ext[1], pos(o[0])[0], pos(o[0])[1], pos(o[1])[0], pos(o[1])[1]) < 2.4)
