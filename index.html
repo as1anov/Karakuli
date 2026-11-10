@@ -5301,18 +5301,19 @@ service cloud.firestore {
             return { ops, strokes: edges.length, rings: hubs.length, mirror: false, edges: edges.length, diamonds: dia.size };
         }
         let genSeedLast = 0, genMarks = null;
-        // For now the generated lines are shown in red on top of the pattern: whatever you erase disappears from the red, whatever you draw stays black
+        // For now: the generated pattern is black, and everything the author adds on top of it is shown in red (for teaching the generator)
         function drawGenMarks() {
             if (!genMarks) return;
             const c = drawingContext, RED = '#e5322d';
             c.save();
             c.beginPath(); c.rect(-1e6, -1e6, 2e6, 2e6);   // the holes of the rings stay open
-            genMarks.nodes.forEach(id => { if (specialElements[id] && specialElements[id].isNode) { const [i, j] = id.split(',').map(Number); c.moveTo(i * STEP + (BASE_STEP_VAL - LINE_WEIGHT / 2), j * STEP); c.arc(i * STEP, j * STEP, BASE_STEP_VAL - LINE_WEIGHT / 2, 0, 2 * Math.PI); } });
+            const mine = (set, type) => Object.keys(specialElements).filter(id => specialElements[id][type] && !set.has(id));
+            mine(genMarks.nodes, 'isNode').forEach(id => { { const [i, j] = id.split(',').map(Number); c.moveTo(i * STEP + (BASE_STEP_VAL - LINE_WEIGHT / 2), j * STEP); c.arc(i * STEP, j * STEP, BASE_STEP_VAL - LINE_WEIGHT / 2, 0, 2 * Math.PI); } });
             c.clip('evenodd');
             c.strokeStyle = RED; c.fillStyle = RED; c.lineWidth = LINE_WEIGHT; c.lineCap = 'butt'; c.lineJoin = 'miter'; c.miterLimit = 2;
             // chains of generated lines, so that the corners are joined like in the pattern itself
             const adj = new Map(), list = [];
-            segments.forEach(sg => { if (genMarks.segs.has(segmentKey(sg))) { list.push(sg); const a = sg.p1.x + ',' + sg.p1.y, b2 = sg.p2.x + ',' + sg.p2.y; (adj.get(a) || adj.set(a, []).get(a)).push(sg); (adj.get(b2) || adj.set(b2, []).get(b2)).push(sg); } });
+            segments.forEach(sg => { if (!genMarks.segs.has(segmentKey(sg))) { list.push(sg); const a = sg.p1.x + ',' + sg.p1.y, b2 = sg.p2.x + ',' + sg.p2.y; (adj.get(a) || adj.set(a, []).get(a)).push(sg); (adj.get(b2) || adj.set(b2, []).get(b2)).push(sg); } });
             const seen = new Set(); c.beginPath();
             const walk = (start, sg0) => {
                 let sg = sg0, cur = start; c.moveTo(cur.x * STEP, cur.y * STEP);
@@ -5324,8 +5325,8 @@ service cloud.firestore {
             adj.forEach((v, k) => { if (v.length !== 2) { const [x, y] = k.split(',').map(Number); v.forEach(sg => { if (!seen.has(sg)) walk({ x, y }, sg); }); } });
             list.forEach(sg => { if (!seen.has(sg)) walk(sg.p1, sg); });
             c.stroke();
-            genMarks.nodes.forEach(id => { if (specialElements[id] && specialElements[id].isNode) { const [i, j] = id.split(',').map(Number); c.beginPath(); c.arc(i * STEP, j * STEP, BASE_STEP_VAL, 0, 2 * Math.PI); c.stroke(); } });
-            genMarks.dias.forEach(id => { if (specialElements[id] && specialElements[id].isDiamond) { const [i, j] = id.split(',').map(Number); c.save(); c.translate(i * STEP, j * STEP + LINE_WEIGHT / 2); c.rotate(Math.PI / 4); c.fillRect(-LINE_WEIGHT / 2, -LINE_WEIGHT / 2, LINE_WEIGHT, LINE_WEIGHT); c.restore(); } });
+            mine(genMarks.nodes, 'isNode').forEach(id => { const [i, j] = id.split(',').map(Number); c.beginPath(); c.arc(i * STEP, j * STEP, BASE_STEP_VAL, 0, 2 * Math.PI); c.stroke(); });
+            mine(genMarks.dias, 'isDiamond').forEach(id => { { const [i, j] = id.split(',').map(Number); c.save(); c.translate(i * STEP, j * STEP + LINE_WEIGHT / 2); c.rotate(Math.PI / 4); c.fillRect(-LINE_WEIGHT / 2, -LINE_WEIGHT / 2, LINE_WEIGHT, LINE_WEIGHT); c.restore(); } });
             c.restore();
         }
         function runShelfGenerator() {
