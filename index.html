@@ -6,6 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=none, viewport-fit=cover">
     <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#e8e8e8">
     <title>Karakuli: Digital Editor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1292,7 +1293,7 @@
         let offsetX = 0, offsetY = 0; let zoom = 0.48; 
         let history = [], redoStack = []; let isExporting = false; let isTimelapseExport = false;
         let actionTimeout = null; let currentTheme = 'light';
-        try { const t0 = localStorage.getItem('kk-theme-v2'); if (t0 === 'dark') { currentTheme = 'dark'; document.body.setAttribute('data-theme', 'dark'); document.documentElement.setAttribute('data-cs', 'dark'); document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.theme-opt').forEach(o => o.classList.remove('active')); const o = document.getElementById('opt-dark'); if (o) o.classList.add('active'); }); } } catch (e) {}
+        try { const t0 = localStorage.getItem('kk-theme-v2'); if (t0 === 'dark') { currentTheme = 'dark'; document.body.setAttribute('data-theme', 'dark'); document.documentElement.setAttribute('data-cs', 'dark'); document.addEventListener('DOMContentLoaded', () => { try { document.querySelector('meta[name=theme-color]').setAttribute('content', '#111111'); } catch (e) {} }); document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.theme-opt').forEach(o => o.classList.remove('active')); const o = document.getElementById('opt-dark'); if (o) o.classList.add('active'); }); } } catch (e) {}
         let isPanning = false;
 
         let tlHistory = []; 
@@ -3719,7 +3720,7 @@ service cloud.firestore {
 
         function setTheme(m) { 
             if (m !== 'light' && m !== 'dark') m = 'dark';   // the old 'system' theme no longer exists (saved projects fall back to dark)
-            currentTheme = m; document.body.setAttribute('data-theme', m); document.documentElement.setAttribute('data-cs', m); try { localStorage.setItem('kk-theme-v2', m); } catch (e) {}
+            currentTheme = m; document.body.setAttribute('data-theme', m); document.documentElement.setAttribute('data-cs', m); try { document.querySelector('meta[name=theme-color]').setAttribute('content', m === 'dark' ? '#111111' : '#e8e8e8'); } catch (e) {} try { localStorage.setItem('kk-theme-v2', m); } catch (e) {}
             document.querySelectorAll('.theme-opt').forEach(opt => opt.classList.remove('active'));
             document.getElementById('opt-' + m).classList.add('active');
             if (isTimelapseUIOpen) tlTheme = m;
