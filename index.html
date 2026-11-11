@@ -247,7 +247,7 @@
         #plate-pop .hp-dot { width: 16px; height: 16px; margin: -8px 0 0 -8px; }
         .pp-sheet { position: relative; background: #fff; border: 1.5px solid var(--border-color); border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
         .pp-sheet.round { border-radius: 50%; }
-        :root[data-theme="dark"] .pp-sheet, body[data-theme="dark"] .pp-sheet { background: #d2d2d2; }
+        :root[data-theme="dark"] .pp-sheet, body[data-theme="dark"] .pp-sheet { background: #2b2b2b; }
         .pp-opt { width: 96px; height: 96px; padding: 6px; border-radius: 16px; border: 1.5px solid var(--border-color); background: transparent; color: var(--text-color); cursor: pointer; }
         .pp-opt svg { width: 100%; height: 100%; display: block; }
         .pp-opt.on { border-color: var(--text-color); background: var(--btn-on); }
@@ -2140,7 +2140,7 @@ service cloud.firestore {
 
         const themeConfig = {
             light: { canvasBg: '#e8e8e8', dotColor: '0, 0, 0', dotAlpha: 0.25, geomColor: '#000000', cursorColor: '#FF6666', drawCursor: '#404040' },
-            dark: { canvasBg: '#111111', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8', cursorColor: '#FF6666', drawCursor: '#58595B' }
+            dark: { canvasBg: '#000000', dotColor: '255, 255, 255', dotAlpha: 0.15, geomColor: '#E8E8E8', cursorColor: '#FF6666', drawCursor: '#58595B' }
         };
 
         function switchDashTab(tab) {
@@ -2671,7 +2671,7 @@ service cloud.firestore {
             const ctx = drawingContext;
             push(); ctx.save();
             ctx.clip(new Path2D(productOutlineD()));
-            noStroke(); fill(0); rectMode(CORNER);
+            noStroke(); if (currentTheme === 'dark' && !isExporting) fill('#E8E8E8'); else fill(0); rectMode(CORNER);
             rect(-wPx / 2, -hPx / 2 + yMm * MM, wPx, hPx - yMm * MM);
             ctx.restore(); pop();
         }
@@ -4473,7 +4473,7 @@ service cloud.firestore {
             push(); translate(offsetX, offsetY); scale(zoom);
             
             if (isPaperVisible && !isExporting && !isTimelapseUIOpen) {
-                let paperColor = currentTheme === 'light' ? '#ffffff' : '#d2d2d2';   // dark theme: a light sheet, so the black pattern stays visible
+                let paperColor = currentTheme === 'light' ? '#ffffff' : '#2b2b2b';   // dark theme: dark grey sheet on a black background, light pattern
                 fill(paperColor); stroke('rgba(128,128,128,0.2)'); strokeWeight(2 / zoom); rectMode(CENTER);
                 let wPx = paperWidthMm * (LINE_WEIGHT / 12); let hPx = paperHeightMm * (LINE_WEIGHT / 12);
                 if (templateKind() !== 'free') drawProductTemplate(paperColor); else rect(0, 0, wPx, hPx);
@@ -4490,7 +4490,7 @@ service cloud.firestore {
             const clipSheet = isPaperVisible && !clipToProduct && templateKind() !== 'product';
             if (clipSheet) { push(); drawingContext.save(); drawingContext.clip(sheetPath()); }
             // On a sheet the pattern is always black (like the product), also in the dark theme.
-            drawGeometry(isPaperVisible ? '#000000' : colors.geomColor);
+            drawGeometry((renderTheme === 'dark' && (!isExporting || isTimelapseExport)) ? colors.geomColor : (isPaperVisible ? '#000000' : colors.geomColor));
             if (!isExporting && !isTimelapseUIOpen) drawGenMarks();
             if (clipSheet) { drawingContext.restore(); pop(); }
             if (clipToProduct) { drawingContext.restore(); pop(); }
