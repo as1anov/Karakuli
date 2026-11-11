@@ -761,52 +761,6 @@
 </head>
 <body data-theme="light"> 
     
-
-    <style id="site-css">
-    #site { position: fixed; inset: 0; z-index: 3580; display: none; flex-direction: column; background: var(--bg-color); color: var(--text-color); }
-    #site.open { display: flex; }
-    #site-nav { display: flex; align-items: center; gap: 6px; padding: max(12px, env(safe-area-inset-top)) 16px 12px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; }
-    #site-nav .brand { font-weight: 700; letter-spacing: .18em; margin-right: auto; font-size: 15px; }
-    #site-nav button { background: transparent; color: var(--text-color); border: 1px solid transparent; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer; }
-    #site-nav button:hover { background: var(--card-hl); }
-    #site-nav button.on { border-color: var(--border-color); background: var(--card-hl); }
-    #site-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-    .site-pg { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; }
-    .site-pg h1 { font-size: 26px; margin: 0 0 12px; }
-    .site-pg p { line-height: 1.6; max-width: 640px; opacity: .85; }
-    .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 20px; }
-    .shop-card { border: 1px solid var(--border-color); border-radius: 18px; overflow: hidden; cursor: pointer; background: var(--card-hl); }
-    .shop-card:hover { border-color: var(--text-color); }
-    .shop-card .ph { background: var(--bg-color); padding: 18px; display: flex; justify-content: center; color: var(--text-color); }
-    .shop-card .ph svg { width: 100%; height: auto; max-width: 240px; }
-    .shop-card .tx { padding: 12px 16px 16px; }
-    .shop-card b { display: block; font-size: 16px; } .shop-card span { font-size: 12px; opacity: .7; }
-    .prod { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 16px; }
-    @media (max-width: 720px) { .prod { grid-template-columns: 1fr; } }
-    .prod .ph { border: 1px solid var(--border-color); border-radius: 18px; padding: 24px; display: flex; justify-content: center; align-items: center; color: var(--text-color); }
-    .prod .ph svg { width: 100%; height: auto; max-width: 420px; }
-    .prod label.lb { display: block; font-size: 12px; opacity: .7; margin: 16px 0 6px; }
-    .prod .row { display: flex; gap: 10px; align-items: center; }
-    .prod input[type=number] { width: 100px; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font: inherit; font-size: 14px; }
-    .sw { display: flex; gap: 10px; }
-    .sw button { display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; border-radius: 999px; border: 1.5px solid var(--border-color); background: transparent; color: var(--text-color); font: inherit; font-size: 13px; cursor: pointer; }
-    .sw button.on { border-color: var(--text-color); background: var(--card-hl); }
-    .sw i { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(128,128,128,.5); }
-    .site-cta { margin-top: 24px; padding: 13px 24px; border-radius: 999px; border: 0; background: var(--text-color); color: var(--bg-color); font: inherit; font-weight: 600; cursor: pointer; }
-    .site-back { background: none; border: 0; color: var(--text-color); opacity: .7; cursor: pointer; font: inherit; font-size: 13px; padding: 0; }
-    #site textarea { width: 100%; max-width: 560px; min-height: 150px; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font: inherit; font-size: 13px; }
-    </style>
-
-    <div id="site">
-        <div id="site-nav">
-            <span class="brand">KARAKULI</span>
-            <button data-p="about" onclick="siteGo('about')">About us</button>
-            <button data-p="generate" onclick="siteGo('generate')">Generate</button>
-            <button data-p="shop" onclick="siteGo('shop')">Shop</button>
-            <button data-p="contact" onclick="siteGo('contact')">Contact us</button>
-        </div>
-        <div id="site-body"></div>
-    </div>
     <div id="dashboard-overlay" onclick="toggleDashboard()"></div>
     <div id="dashboard">
         <div class="dash-header-tabs">
@@ -821,13 +775,6 @@
         </div>
 
         <div class="dash-content-container" id="dash-home">
-            <div class="dash-section">
-                <span class="dash-label">Site</span>
-                <div class="dash-btn" onclick="siteGo('about')">About us</div>
-                <div class="dash-btn" onclick="siteGo('generate')">Generate</div>
-                <div class="dash-btn" onclick="siteGo('shop')">Shop</div>
-                <div class="dash-btn" onclick="siteGo('contact')">Contact us</div>
-            </div>
             <div class="dash-section">
                 <span class="dash-label">Workspace</span>
                 <div class="dash-btn" onclick="openNewCanvasModal()">
@@ -8921,52 +8868,6 @@ setInterval(() => {
     }, true);
     ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, () => { st = null; }, true));
 })();
-</script>
-<script>
-// ===== Site: About us / Generate (the editor) / Shop / Contact us =====
-const SITE_INFO = {
-    shelf: { text: 'A wall shelf folded from one sheet of laser-cut metal. The face carries your pattern; the shelf and the mounting tail are plain metal. Fixed to the wall through the bolt holes.' },
-    hanger: { text: 'A wall hanger cut from one sheet: a patterned plate with hooks that bend out of the metal. Choose how many hooks you need, from 4 to 7.' },
-    magazine: { text: 'A magazine holder folded from one sheet of laser-cut metal, with the pattern on its front. Made for A4 magazines and fixed to the wall through the bolt holes.' }
-};
-const SITE_COLORS = { steel: ['Stainless steel', 'linear-gradient(135deg,#cfd1d4,#9b9ea3)'], powder: ['Black powder coat', '#161616'] };
-let siteSel = null;
-function siteDefaults(key) { const d = PRODUCTS[key].def; return { key, w: Math.round(d.w), h: Math.round(d.h), color: 'steel', hooks: PRODUCTS[key].hooks ? hooksFromWidth(d.w) : 0 }; }
-function siteGo(page, arg) {
-    if (isDashboardOpen) toggleDashboard();
-    const el = document.getElementById('site');
-    if (page === 'generate') { el.classList.remove('open'); return; }   // the drawing editor
-    el.classList.add('open');
-    document.querySelectorAll('#site-nav button').forEach(b => b.classList.toggle('on', b.dataset.p === (page === 'product' ? 'shop' : page)));
-    const body = document.getElementById('site-body'); let h = '';
-    if (page === 'about') h = '<div class="site-pg"><h1>About us</h1><p>Karakuli makes wall pieces from laser-cut metal. Every pattern is drawn on a grid by strict rules, and every order gets its own pattern.</p><p>Draw it yourself in Generate, or order a pattern from us.</p></div>';
-    else if (page === 'contact') h = '<div class="site-pg"><h1>Contact us</h1><p>Write to us about an order or a question.</p>' + (arg ? '<p>Your pre-order:</p><textarea readonly>' + arg + '</textarea>' : '') + '<p style="opacity:.6">Contact details: to be added.</p></div>';
-    else if (page === 'shop') {
-        h = '<div class="site-pg"><h1>Shop</h1><div class="shop-grid">' + Object.keys(PRODUCTS).map(k => { const d = PRODUCTS[k].def;
-            return `<div class="shop-card" onclick="siteGo('product','${k}')"><div class="ph">${productIconSVG(k, 120, 78, d)}</div><div class="tx"><b>${PRODUCTS[k].name}</b><span>from ${Math.round(d.w)} × ${Math.round(d.h)} mm</span></div></div>`; }).join('') + '</div></div>';
-    } else if (page === 'product') {
-        if (arg) siteSel = siteDefaults(arg);
-        const o = siteSel, P = PRODUCTS[o.key], d = { w: o.w, h: o.h };
-        h = `<div class="site-pg"><button class="site-back" onclick="siteGo('shop')">← Shop</button><div class="prod"><div class="ph">${productIconSVG(o.key, 120, 78, d)}</div><div>
-            <h1>${P.name}</h1><p>${SITE_INFO[o.key].text}</p>
-            <label class="lb">Size, mm (width × height)</label>
-            <div class="row"><input type="number" id="s-w" value="${o.w}" ${P.hooks ? 'disabled' : ''} onchange="siteSize()"> × <input type="number" id="s-h" value="${o.h}" onchange="siteSize()"></div>
-            ${P.hooks ? `<label class="lb">Hooks</label><div class="row"><button class="site-back" style="font-size:22px" onclick="siteHooks(-1)">−</button><b>${o.hooks}</b><button class="site-back" style="font-size:22px" onclick="siteHooks(1)">+</button></div>` : ''}
-            <label class="lb">Colour</label><div class="sw">${Object.keys(SITE_COLORS).map(c => `<button class="${o.color === c ? 'on' : ''}" onclick="siteColor('${c}')"><i style="background:${SITE_COLORS[c][1]}"></i>${SITE_COLORS[c][0]}</button>`).join('')}</div>
-            <button class="site-cta" onclick="sitePreorder()">Pre-order</button></div></div></div>`;
-    }
-    body.innerHTML = h; body.scrollTop = 0;
-}
-function siteSize() {
-    const o = siteSel, n = normalizeProductSize(o.key, +document.getElementById('s-w').value, +document.getElementById('s-h').value);
-    o.w = Math.round(n.w); o.h = Math.round(n.h); siteGo('product');
-}
-function siteHooks(dl) { const c = PRODUCTS.hanger.hooks, o = siteSel; o.hooks = Math.max(c.min, Math.min(c.max, o.hooks + dl)); o.w = Math.round(hookWidth(o.hooks)); siteGo('product'); }
-function siteColor(c) { siteSel.color = c; siteGo('product'); }
-function sitePreorder() {
-    const o = siteSel;
-    siteGo('contact', `${PRODUCTS[o.key].name}\nSize: ${o.w} × ${o.h} mm\n` + (o.hooks ? `Hooks: ${o.hooks}\n` : '') + `Colour: ${SITE_COLORS[o.color][0]}`);
-}
 </script>
 </body>
 </html>
