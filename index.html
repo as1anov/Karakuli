@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=none, viewport-fit=cover">
-    <meta name="color-scheme" content="light">
+    <meta name="color-scheme" content="only light">
     <meta name="theme-color" content="#e8e8e8">
     <title>Karakuli: Digital Editor</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,8 +14,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         @media (inverted-colors: inverted) { html, body, canvas, img, video, svg { filter: none !important; -webkit-filter: none !important; } }   /* Smart Invert must not flip the app's own theme */
-        html { color-scheme: light; }   /* the browser must not darken the page by itself: the theme is the app's own setting */
+        html { color-scheme: only light; }   /* the browser must not darken the page by itself: the theme is the app's own setting */
         html[data-cs="dark"] { color-scheme: dark; }
+        #dbg { position: fixed; left: 8px; right: 8px; bottom: 90px; z-index: 99999; background: #fff; color: #000; font: 12px/1.35 monospace; padding: 8px; border: 2px solid #f00; border-radius: 8px; white-space: pre-wrap; }
         :root {
             --bg-color: #e8e8e8;
             --canvas-bg: #e8e8e8;
@@ -1294,6 +1295,14 @@
         let offsetX = 0, offsetY = 0; let zoom = 0.48; 
         let history = [], redoStack = []; let isExporting = false; let isTimelapseExport = false;
         let actionTimeout = null; let currentTheme = 'light';
+        if (/[?&]debug=1/.test(location.search)) window.addEventListener('load', () => setTimeout(() => {
+            const q = m => { try { return matchMedia(m).matches; } catch (e) { return 'n/a'; } };
+            const d = document.createElement('div'); d.id = 'dbg';
+            d.textContent = ['data-theme: ' + document.body.getAttribute('data-theme'), 'data-cs: ' + document.documentElement.getAttribute('data-cs'), 'stored: ' + (() => { try { return localStorage.getItem('kk-theme-v2'); } catch (e) { return 'err'; } })(),
+                'prefers dark: ' + q('(prefers-color-scheme: dark)'), 'inverted: ' + q('(inverted-colors: inverted)'), 'forced-colors: ' + q('(forced-colors: active)'),
+                'html color-scheme: ' + getComputedStyle(document.documentElement).colorScheme, 'body bg: ' + getComputedStyle(document.body).backgroundColor, 'panel-bg: ' + getComputedStyle(document.body).getPropertyValue('--panel-bg'), 'UA: ' + navigator.userAgent.slice(0, 90)].join('\n');
+            d.onclick = () => d.remove(); document.body.appendChild(d);
+        }, 1200));
         try { const t0 = localStorage.getItem('kk-theme-v2'); if (t0 === 'dark') { currentTheme = 'dark'; document.body.setAttribute('data-theme', 'dark'); document.documentElement.setAttribute('data-cs', 'dark'); document.addEventListener('DOMContentLoaded', () => { try { document.querySelector('meta[name=theme-color]').setAttribute('content', '#111111'); } catch (e) {} }); document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.theme-opt').forEach(o => o.classList.remove('active')); const o = document.getElementById('opt-dark'); if (o) o.classList.add('active'); }); } } catch (e) {}
         let isPanning = false;
 
