@@ -1289,7 +1289,7 @@
         let offsetX = 0, offsetY = 0; let zoom = 0.48; 
         let history = [], redoStack = []; let isExporting = false; let isTimelapseExport = false;
         let actionTimeout = null; let currentTheme = 'light';
-        try { const t0 = localStorage.getItem('kk-theme'); if (t0 === 'dark') { currentTheme = 'dark'; document.body.setAttribute('data-theme', 'dark'); document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.theme-opt').forEach(o => o.classList.remove('active')); const o = document.getElementById('opt-dark'); if (o) o.classList.add('active'); }); } } catch (e) {}
+        try { const t0 = localStorage.getItem('kk-theme-v2'); if (t0 === 'dark') { currentTheme = 'dark'; document.body.setAttribute('data-theme', 'dark'); document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.theme-opt').forEach(o => o.classList.remove('active')); const o = document.getElementById('opt-dark'); if (o) o.classList.add('active'); }); } } catch (e) {}
         let isPanning = false;
 
         let tlHistory = []; 
@@ -3716,7 +3716,7 @@ service cloud.firestore {
 
         function setTheme(m) { 
             if (m !== 'light' && m !== 'dark') m = 'dark';   // the old 'system' theme no longer exists (saved projects fall back to dark)
-            currentTheme = m; document.body.setAttribute('data-theme', m); try { localStorage.setItem('kk-theme', m); } catch (e) {}
+            currentTheme = m; document.body.setAttribute('data-theme', m); try { localStorage.setItem('kk-theme-v2', m); } catch (e) {}
             document.querySelectorAll('.theme-opt').forEach(opt => opt.classList.remove('active'));
             document.getElementById('opt-' + m).classList.add('active');
             if (isTimelapseUIOpen) tlTheme = m;
