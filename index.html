@@ -13,6 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300..800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
+        @media (inverted-colors: inverted) { html, body, canvas, img, video, svg { filter: none !important; -webkit-filter: none !important; } }   /* Smart Invert must not flip the app's own theme */
         html { color-scheme: light; }   /* the browser must not darken the page by itself: the theme is the app's own setting */
         html[data-cs="dark"] { color-scheme: dark; }
         :root {
