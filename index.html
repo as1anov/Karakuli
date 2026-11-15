@@ -7460,12 +7460,14 @@ function objAdd(kind) {
     else if (S.fold < 0.995) { S.fold = 1; S.playing = false; R.prog = null; updatePose(); }   // things stand on the folded product
     syncUI();
 }
+let objSel = -1;
 function objAct(i, act) {
-    if (act === 'del') S.objs.splice(i, 1);
-    else if (act === 'left' && i > 0) [S.objs[i - 1], S.objs[i]] = [S.objs[i], S.objs[i - 1]];
-    else if (act === 'right' && i < S.objs.length - 1) [S.objs[i + 1], S.objs[i]] = [S.objs[i], S.objs[i + 1]];
+    if (act === 'sel') { objSel = objSel === i ? -1 : i; syncUI(); return; }
+    if (act === 'del') { S.objs.splice(i, 1); objSel = -1; }
+    else if (act === 'left' && i > 0) { [S.objs[i - 1], S.objs[i]] = [S.objs[i], S.objs[i - 1]]; objSel = i - 1; }
+    else if (act === 'right' && i < S.objs.length - 1) { [S.objs[i + 1], S.objs[i]] = [S.objs[i], S.objs[i + 1]]; objSel = i + 1; }
     else if (act === 'flip' && S.objs[i]) S.objs[i].f = !S.objs[i].f;
-    else if (act === 'clear') S.objs = [];
+    else if (act === 'clear') { S.objs = []; objSel = -1; }
     placeObjects(); syncUI();
 }
 function objUI() {
@@ -7473,8 +7475,14 @@ function objUI() {
     const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine';
     cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
-    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
-        + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
+    if (objSel >= S.objs.length) objSel = -1;
+    const ico = p => `<svg viewBox="0 0 24 24">${p}</svg>`, sel = objSel >= 0 ? S.objs[objSel] : null;
+    const act = (a, t, p, dis) => `<button class="v3-oa" data-oi="${objSel}" data-oa="${a}" title="${t}" aria-label="${t}"${dis ? ' disabled' : ''}>${ico(p)}</button>`;
+    document.getElementById('v3-objlist').innerHTML = (sel ? `<div class="v3-oacts">${act('left', 'Move left', '<path d="M15 5l-7 7 7 7"/>', objSel === 0)}`
+        + (OBJ_KINDS[sel.k].turn && (sel.k !== 'magazine' || modelInfo().key === 'magazine') ? act('flip', OBJ_KINDS[sel.k].turn, '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/>') : '')
+        + act('right', 'Move right', '<path d="M9 5l7 7-7 7"/>', objSel === S.objs.length - 1)
+        + act('del', 'Remove', '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>') + '</div>' : '')
+        + (S.objs.length ? '<div class="v3-ochips">' + S.objs.map((it, i) => `<button class="v3-oc${i === objSel ? ' on' : ''}" data-oi="${i}" data-oa="sel" title="${nm(i)}" aria-label="${nm(i)}">${ico(OBJ_KINDS[it.k].icon)}</button>`).join('') + '</div>' : '');
     document.getElementById('v3-objnote').style.display = 'none';   // only icons and names in Objects
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
@@ -8181,9 +8189,16 @@ function ensureCss() {
     #v3-rail #v3d-close { margin-right: calc(var(--tpad) + 1px); }
     #v3d-panel .v3-sec .v3-body, #v3d-panel #v3-mats, #v3d-panel .v3-cat, #v3d-panel #v3-ts, #v3d-panel #v3-cols, #v3d-panel [data-sec="dl"] .v3-chips, #v3d-panel #v3-objlist, #v3d-panel #v3-price { gap: var(--tgap); }
     /* Objects: the chosen objects are listed in a second row under the icons, so a long list never runs off the screen */
-    #v3d-panel .v3-sec[data-sec="obj"] .v3-body { height: auto; flex-direction: column; align-items: flex-start; gap: var(--tgap); }
+    #v3d-panel .v3-sec[data-sec="obj"] .v3-body { height: auto; flex-direction: column-reverse; align-items: center; gap: var(--tgap); }   /* the catalogue stays next to the bottom bar, the added things grow upwards */
     #v3d-panel .v3-sec[data-sec="obj"] .v3-body > .v3-cat { flex: none; }
-    #v3d-panel #v3-objlist { align-self: stretch; flex-direction: column; align-items: stretch; gap: 6px; }
+    #v3d-panel #v3-objlist { align-self: stretch; flex-direction: column; align-items: center; gap: 8px; }
+    #v3d-panel #v3-objlist:empty { display: none; }
+    .v3-ochips, .v3-oacts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+    .v3-oc, .v3-oa { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: var(--tb); height: var(--tb); padding: 0; border-radius: var(--border-radius); border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); cursor: pointer; }
+    .v3-oc svg, .v3-oa svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .v3-oc.on { background: var(--text-color); color: var(--bg-color); }
+    .v3-oa { width: calc(var(--tb) - 8px); height: calc(var(--tb) - 8px); border-radius: 10px; }
+    .v3-oa:disabled { opacity: .35; cursor: default; }
     #v3d-panel .v3-body .v3-orow { display: flex; justify-content: space-between; width: 100%; }
     #v3d-panel .v3-body .v3-orow > span:first-child { flex: 1; max-width: none; }
     #v3d-panel .v3-body .v3-clear { align-self: flex-start; }
