@@ -7475,8 +7475,7 @@ function objUI() {
     cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     const TRASH = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
-    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel"><button type="button" data-odel="${i}" aria-label="Delete">${TRASH}<span>Delete</span></button></div><div class="v3-ord"><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<i class="v3-grip" title="Press the name and drag to reorder"></i></div></div>`).join('')
-        + (S.objs.length > 1 ? `<button type="button" class="v3-chip v3-clear" data-oa="clear" title="Remove all" aria-label="Remove all">${TRASH}</button>` : '');
+    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel">${TRASH}</div><div class="v3-ord"><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<i class="v3-grip" title="Press the name and drag to reorder"></i></div></div>`).join('');
     document.getElementById('v3-objnote').style.display = 'none';   // only icons and names in Objects
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
@@ -8195,8 +8194,8 @@ function ensureCss() {
     #v3d-panel .v3-os { position: relative; overflow: hidden; border-radius: var(--border-radius); width: 100%; flex: none; --d: 0; }
     #v3d-panel .v3-os.lift { z-index: 5; overflow: visible; filter: drop-shadow(0 6px 14px rgba(0,0,0,.25)); }
     #v3d-panel .v3-os.lift .v3-ord { transition: none; }
-    .v3-odel { position: absolute; inset: 0; display: none; justify-content: flex-end; background: #ef4444; border-radius: var(--border-radius); }
-    .v3-os.opened .v3-odel, .v3-os.swiping .v3-odel { display: flex; }
+    .v3-odel { position: absolute; inset: 0; display: none; justify-content: flex-end; align-items: center; padding-right: 18px; color: #fff; background: #ef4444; border-radius: var(--border-radius); }
+    .v3-os.swiping .v3-odel { display: flex; }
     .v3-odel button { width: 40%; height: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: #ef4444; color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
     .v3-odel svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
     .v3-ord { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: 8px; height: var(--tb); padding: 0 12px 0 14px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: linear-gradient(var(--btn-bg), var(--btn-bg)), var(--bg-color); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
@@ -8332,14 +8331,20 @@ function buildUI() {
             if (g.mode === 'swipe') { const lim = g.W * 0.4; let x = Math.min(0, g.base + dx); if (x < -lim) x = -lim - (-lim - x) * 0.35; g.cur = x; rowX(g.w, x, false); }
             else g.w.style.transform = `translateY(${dy}px)`;
         });
-        const end = e => {
+        const end = async e => {
             if (!g || e.pointerId !== g.id) return;
             const q = g; g = null; if (!q.mode) return;
             noClick = true; setTimeout(() => { noClick = false; }, 0);
             if (q.mode === 'swipe') {
-                const lim = q.W * 0.4, open = e.type !== 'pointercancel' && q.cur < -lim * 0.5;
-                q.w.classList.toggle('opened', open); rowX(q.w, open ? -lim : 0, true);
-                setTimeout(() => q.w.classList.remove('swiping'), 300); return;
+                if (e.type !== 'pointercancel' && q.cur < -q.W * 0.3) {   // a swipe to the left deletes at once
+                    const it = q.w.querySelector('.v3-ord');
+                    it.style.transition = 'transform 0.2s ease-in'; it.style.transform = `translateX(${-q.W - 20}px)`;
+                    await new Promise(r => setTimeout(r, 190));
+                    q.w.style.height = q.w.offsetHeight + 'px'; q.w.offsetHeight; q.w.style.transition = 'height 0.18s ease, opacity 0.18s ease'; q.w.style.height = '0px'; q.w.style.opacity = '0';
+                    await new Promise(r => setTimeout(r, 180));
+                    objAct(+q.w.dataset.oi, 'del'); return;
+                }
+                rowX(q.w, 0, true); setTimeout(() => q.w.classList.remove('swiping'), 300); return;
             }
             const me = q.w.getBoundingClientRect(), c = me.top + me.height / 2;
             const others = [...box.querySelectorAll('.v3-os')].filter(el => el !== q.w);
@@ -8353,17 +8358,7 @@ function buildUI() {
             placeObjects(); syncUI();
         };
         box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
-        box.addEventListener('click', async e => {
-            if (noClick) { e.stopPropagation(); e.preventDefault(); return; }
-            const b = e.target.closest('[data-odel]'); if (!b) return;
-            e.stopPropagation();
-            const w = b.closest('.v3-os'), it = w.querySelector('.v3-ord');
-            it.style.transition = 'transform 0.2s ease-in'; it.style.transform = `translateX(${-w.offsetWidth - 20}px)`;
-            await new Promise(r => setTimeout(r, 190));
-            w.style.height = w.offsetHeight + 'px'; w.offsetHeight; w.style.transition = 'height 0.18s ease, opacity 0.18s ease'; w.style.height = '0px'; w.style.opacity = '0';
-            await new Promise(r => setTimeout(r, 180));
-            objAct(+b.dataset.odel, 'del');
-        }, true);
+        box.addEventListener('click', e => { if (noClick) { e.stopPropagation(); e.preventDefault(); } }, true);
     })();
     $('v3d-panel').addEventListener('click', e => {
         const c = e.target.closest('[data-ok]'); if (c) { objAdd(c.dataset.ok); return; }
