@@ -8173,7 +8173,7 @@ function ensureCss() {
     #v3-fx { top: calc(var(--rtop) + var(--tb) + var(--tpad) * 2 + 10px); bottom: auto; max-height: calc(100% - var(--rtop) - var(--tb) - 140px); }
     #v3d-title, #v3d-title { top: calc(var(--rtop) + var(--tb) + 30px); }
     #v3-name { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-    @media (min-width: 1040px) { #v3-trow { min-height: 62px; } #v3d-title, #v3d-title { top: var(--rtop); left: 20px; right: auto; max-width: calc(50% - 280px); } #v3d-title #v3-info { margin-top: -12px; } }
+    @media (min-width: 744px) { #v3-trow { min-height: calc(var(--tb) + var(--tpad) * 2 + 2px); } #v3d-title, #v3d-title { top: var(--rtop); left: 20px; right: auto; max-width: max(96px, calc(50% - 280px)); } #v3d-title #v3-info { margin-top: -20px; } }
     @keyframes v3bar { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
     @keyframes v3item { from { opacity: 0; transform: translateY(8px) scale(0.55); } to { opacity: 1; transform: none; } }
     /* ---- spacing as in the sketch: the gap between buttons = the distance from the toolbar's edge to its first button = the distance either side of the separator ---- */
