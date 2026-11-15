@@ -7875,6 +7875,7 @@ function ensureCss() {
     [data-sec="dl"] .v3-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
     #v3-png, #v3-glb, #v3-dxf { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 100%; padding: 8px 2px 6px; border-radius: 12px; font-size: 11px; font-weight: 600; }
     #v3-png, #v3-glb, #v3-dxf { border-color: transparent; }
+    #v3-glb { display: none !important; }   /* no 3D-model download: only the picture (and the pattern for the owner) */
     #v3-png:hover, #v3-glb:hover, #v3-dxf:hover { background: transparent; color: var(--disabled-color); }
     #v3-png:active, #v3-glb:active, #v3-dxf:active { background: transparent; color: var(--disabled-color); opacity: 0.7; }
     #v3-png svg, #v3-glb svg, #v3-dxf svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
