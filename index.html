@@ -8842,7 +8842,14 @@ setInterval(() => {
     const pi = document.getElementById('prod-info'), pRow = document.getElementById('pi-row');
     try { if (localStorage.getItem('kk-v3-info') === '0') pi.classList.add('fold'); } catch (e) {}
     pRow.addEventListener('click', e => { e.stopPropagation(); const f = pi.classList.toggle('fold'); try { localStorage.setItem('kk-v3-info', f ? '0' : '1'); } catch (er) {} });
-    let sig = '';
+    // weight of the flat sheet from the drawing (the same maths as the 3D view): recalculated shortly after the drawing stops changing
+    let wKg = null, wKey = '', wBusy = false;
+    async function calcWeight(key, w, h) {
+        wBusy = true;
+        try { const V = window.__v3d, m = await V.rasterMask(w, h); if (m && key === wKey) { wKg = m.count / (m.ppm * m.ppm) * V.S.t * 7.9 / 1e6; sig = ''; } } catch (e) {}
+        wBusy = false;
+    }
+    let sig = '', wTimer = 0;
     function refreshInfo() {
         let html = '', name = '';
         try {
@@ -8850,9 +8857,13 @@ setInterval(() => {
                 const P = PRODUCTS[activeProductKey], w = paperWidthMm, h = paperHeightMm, L = [`${+w.toFixed(1)} × ${+h.toFixed(1)} mm flat`];
                 const nh = currentHolesMm().length; L.push(`${nh} ${nh === 1 ? 'mounting hole' : 'mounting holes'}`);
                 if (P.hooks) { const n = hooksFromWidth(w); L.push(`${n} ${n === 1 ? 'hook' : 'hooks'}`); }
+                let sx = 0; for (const sg of segments) sx += sg.p1.x * 3 + sg.p1.y * 5 + sg.p2.x * 7 + sg.p2.y * 11;
+                const key = [w, h, window.__v3d.S.t, segments.length, sx, currentHolesMm().length].join('|');
+                if (key !== wKey) { wKey = key; clearTimeout(wTimer); wTimer = setTimeout(function again() { if (wBusy) { wTimer = setTimeout(again, 300); return; } calcWeight(wKey, w, h); }, 700); }
+                if (wKg) L.splice(1, 0, `≈ ${wKg.toFixed(wKg < 10 ? 2 : 1)} kg`);
                 name = P.name; html = L.map(t => `<em>${t}</em>`).join('');
             }
-        } catch (e) {}
+        } catch (e) { console.warn('prod-info', e); }
         const k = name + '|' + html; if (k === sig) return; sig = k;
         document.getElementById('pi-name').textContent = name; document.getElementById('pi-facts').innerHTML = html; pi.classList.toggle('show', !!name);
     }
