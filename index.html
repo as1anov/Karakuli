@@ -374,6 +374,7 @@
         #main-content { transition: filter 0.4s ease, transform 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
         body.projects-open #main-content { filter: none; transform: translateX(var(--sidebar-width)); }   /* My Projects: the menu pushes the canvas to the right, no blur */
         body.projects-open #dashboard-overlay { background: transparent; pointer-events: none; }   /* the canvas stays usable beside the open menu */
+        body.projects-open.v3d-open #dashboard-overlay, body.projects-open.timelapse-active #dashboard-overlay, body.projects-open.game-active #dashboard-overlay { pointer-events: auto; }   /* over 3D / time-lapse the canvas can't catch the closing tap, so the overlay does */
         @keyframes trashPop { 0% { transform: scale(1); } 45% { transform: scale(1.5) rotate(-12deg); } 100% { transform: scale(1.18); } }
         .project-hint { margin-top: 4px; text-align: center; font-size: 11px; color: var(--disabled-color); }
         .project-group { margin: 6px 2px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
@@ -8181,9 +8182,10 @@ function ensureCss() {
     #v3-rail #v3d-close { margin-right: calc(var(--tpad) + 1px); }
     #v3d-panel .v3-sec .v3-body, #v3d-panel #v3-mats, #v3d-panel .v3-cat, #v3d-panel #v3-ts, #v3d-panel #v3-cols, #v3d-panel [data-sec="dl"] .v3-chips, #v3d-panel #v3-objlist, #v3d-panel #v3-price { gap: var(--tgap); }
     /* Objects: the chosen objects are listed in a second row under the icons, so a long list never runs off the screen */
-    #v3d-panel .v3-sec[data-sec="obj"] .v3-body { height: auto; flex-direction: column; align-items: flex-start; gap: var(--tgap); }
+    #v3d-panel .v3-sec[data-sec="obj"] .v3-body { height: auto; flex-direction: column-reverse; align-items: flex-start; gap: var(--tgap); }   /* the catalogue stays next to the bottom bar, the added things grow upwards */
     #v3d-panel .v3-sec[data-sec="obj"] .v3-body > .v3-cat { flex: none; }
-    #v3d-panel #v3-objlist { align-self: stretch; flex-direction: column; align-items: stretch; gap: 6px; }
+    #v3d-panel #v3-objlist { align-self: stretch; flex-direction: column-reverse; align-items: stretch; gap: 6px; }
+    #v3d-panel #v3-objlist:empty { display: none; }
     #v3d-panel .v3-body .v3-orow { display: flex; justify-content: space-between; width: 100%; }
     #v3d-panel .v3-body .v3-orow > span:first-child { flex: 1; max-width: none; }
     #v3d-panel .v3-body .v3-clear { align-self: flex-start; }
