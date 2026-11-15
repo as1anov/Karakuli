@@ -8189,7 +8189,8 @@ function ensureCss() {
     @media (max-width: 600px) { #v3d-title { display: none !important; } }
     /* the close button (X) stands at the end of the 3D toolbar, where the hand is */
     #v3-rail #v3d-close { order: 99; margin-right: 0; margin-left: calc(var(--tpad) + 1px); --d: 9; }
-    #v3-rail #v3d-close::after { right: auto; left: calc(-1 * var(--tpad) - 1px); }
+    #v3-rail #v3d-close { margin-left: var(--tgap); }   /* the gap is 2 x tgap (flex gap + margin); the divider stands exactly in the middle of it */
+    #v3-rail #v3d-close::after { right: auto; left: calc(-1 * var(--tgap) - 0.5px); }
     /* the price and the shop buttons are hidden for now (the calculation is not placed yet); all the code stays */
     #v3-rail button[data-go="price"], #v3-rail.hasprice button[data-go="price"], #v3-rail #v3d-shop, #v3-rail #v3d-shop.owner { display: none !important; }
     @media (max-width: 600px) { #v3d-panel .v3-tk .mm { display: none; } }   /* phones: digits only */
