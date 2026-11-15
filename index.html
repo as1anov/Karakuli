@@ -738,7 +738,8 @@
         body.customer-view #cv-head { display: block; }
         body.customer-view .top-nav-container, body.customer-view .handle-arrow, body.customer-view #mobile-keyboard,
         body.customer-view #dashboard, body.customer-view #dashboard-overlay, body.customer-view #share-badge,
-        body.customer-view #tl-close-btn, body.customer-view #v3d-close { display: none !important; }
+        body.customer-view #tl-close-btn { display: none !important; }
+        body.customer-view.v3d-open #cv-bar, body.customer-view.v3d-open #cv-brand, body.customer-view.v3d-open #cv-title { display: none !important; }   /* in 3D the tabs give way to the X at the end of the toolbar */
         #cv-bar { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 3600; display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--panel-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); }
         .cv-tab { white-space: nowrap; height: 34px; padding: 0 16px; border: 0; border-radius: 12px; background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
         .cv-tab:hover:not(:disabled) { background: var(--active-btn-bg); }
@@ -8055,7 +8056,6 @@ function ensureCss() {
     }
     /* ---- 3D toolbar: one horizontal bar at the top centre (Back first); every section opens below it as a horizontal strip ---- */
     #v3d, #v3d { --rw: 0px; --rtop: max(20px, env(safe-area-inset-top)); }
-    body.customer-view #v3d { --rtop: 70px; }
     #v3-rail, #v3-rail.hide { display: flex; position: absolute; top: var(--rtop); left: 0; right: 0; bottom: auto; width: fit-content; margin: 0 auto; flex-direction: row; align-items: center; gap: 5px; padding: var(--tpad); border-width: 1px; border-radius: 16px; z-index: 6; }
     #v3-rail.v3-glass { background: var(--tbar-bg); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); pointer-events: auto; }
     #v3-rail.v3-glass button { backdrop-filter: none; -webkit-backdrop-filter: none; }
