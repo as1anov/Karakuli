@@ -7474,8 +7474,9 @@ function objUI() {
     const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine';
     cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
-    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-orow"><span>${nm(i)}</span><span><button data-oi="${i}" data-oa="left" title="Move left">‹</button>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<button data-oi="${i}" data-oa="right" title="Move right">›</button><button data-oi="${i}" data-oa="del" title="Remove">×</button></span></div>`).join('')
-        + (S.objs.length > 1 ? '<button class="v3-chip v3-clear" data-oa="clear">Clear all</button>' : '');
+    const TRASH = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
+    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel"><button type="button" data-odel="${i}" aria-label="Delete">${TRASH}<span>Delete</span></button></div><div class="v3-ord"><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<i class="v3-grip" title="Press the name and drag to reorder"></i></div></div>`).join('')
+        + (S.objs.length > 1 ? `<button type="button" class="v3-chip v3-clear" data-oa="clear" title="Remove all" aria-label="Remove all">${TRASH}</button>` : '');
     document.getElementById('v3-objnote').style.display = 'none';   // only icons and names in Objects
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
@@ -8190,6 +8191,22 @@ function ensureCss() {
     #v3d-panel .v3-body .v3-orow > span:first-child { flex: 1; max-width: none; }
     #v3d-panel .v3-body .v3-clear { align-self: flex-end; height: 30px; min-width: 0; padding: 0 14px; margin: 0; border-radius: 10px; font-size: 12px; }   /* a small button at the right edge */
     #v3d-panel .v3-body .v3-orow > span:first-child { font-size: 14.5px; }
+    /* Objects list rows: name + (turn) + grip; swipe left = red Delete, drag the name to reorder */
+    #v3d-panel .v3-os { position: relative; overflow: hidden; border-radius: var(--border-radius); width: 100%; flex: none; --d: 0; }
+    #v3d-panel .v3-os.lift { z-index: 5; overflow: visible; filter: drop-shadow(0 6px 14px rgba(0,0,0,.25)); }
+    #v3d-panel .v3-os.lift .v3-ord { transition: none; }
+    .v3-odel { position: absolute; inset: 0; display: none; justify-content: flex-end; background: #ef4444; border-radius: var(--border-radius); }
+    .v3-os.opened .v3-odel, .v3-os.swiping .v3-odel { display: flex; }
+    .v3-odel button { width: 40%; height: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: #ef4444; color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .v3-odel svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .v3-ord { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: 8px; height: var(--tb); padding: 0 12px 0 14px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: linear-gradient(var(--btn-bg), var(--btn-bg)), var(--bg-color); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+    .v3-onm { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .v3-oflip { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 9px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); cursor: pointer; }
+    .v3-oflip svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .v3-grip { flex: none; width: 14px; height: 10px; opacity: .4; background: linear-gradient(currentColor 0 0) 0 0 / 100% 2px no-repeat, linear-gradient(currentColor 0 0) 0 4px / 100% 2px no-repeat, linear-gradient(currentColor 0 0) 0 8px / 100% 2px no-repeat; color: var(--text-color); }
+    #v3d-panel .v3-body .v3-clear { width: 36px; min-width: 36px; height: 30px; padding: 0; }
+    #v3d-panel .v3-body .v3-chip.v3-clear > svg { box-sizing: content-box; width: 17px; height: 17px; padding: 0; border: 0; background: none; }
+    #v3d-panel .v3-body .v3-clear svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     #v3d-panel .v3-sec[data-sec="obj"] .v3-body { gap: 6px; padding-top: 8px !important; padding-bottom: 8px !important; }
     #v3d-panel .v3-body .v3-clear { background: var(--btn-bg); border: 1px solid var(--border-color); color: var(--text-color); }
     #v3d-panel #v3-objlist { gap: 2px; }
@@ -8292,6 +8309,62 @@ function buildUI() {
     $('v3-sheet').onclick = () => { const m = $('v3d-panel').classList.toggle('min'); if (!m && window.innerWidth <= 700) $('v3-fx').classList.remove('show'); $('v3d-panel').classList.remove('fxopen'); };
     if (window.innerWidth <= 700) document.querySelectorAll('#v3d-panel .v3-sec[data-sec]').forEach(sc => { if (sc.dataset.sec !== 'mat') sc.classList.add('closed'); });
     $('v3-glb').onclick = exportGLB; $('v3-png').onclick = exportPNG;
+    // Objects list: swipe a row to the left to delete it, press the name and drag up / down to reorder (no dialogs)
+    (function () {
+        const box = $('v3-objlist'); let g = null, noClick = false;
+        const rowX = (w, x, anim) => { const it = w.querySelector('.v3-ord'); it.style.transition = anim ? 'transform 0.28s cubic-bezier(.2,1,.3,1)' : 'none'; it.style.transform = x ? `translateX(${x}px)` : ''; };
+        const closeOthers = ex => box.querySelectorAll('.v3-os.opened').forEach(w => { if (w !== ex) { w.classList.remove('opened'); rowX(w, 0, true); } });
+        box.addEventListener('pointerdown', e => {
+            if (e.button > 0 || e.target.closest('button')) return;
+            const w = e.target.closest('.v3-os'); closeOthers(w); if (!w) return;
+            g = { w, x: e.clientX, y: e.clientY, id: e.pointerId, mode: '', cur: 0, W: w.offsetWidth, base: w.classList.contains('opened') ? -w.offsetWidth * 0.4 : 0 };
+        });
+        box.addEventListener('pointermove', e => {
+            if (!g || e.pointerId !== g.id) return;
+            const dx = e.clientX - g.x, dy = e.clientY - g.y;
+            if (!g.mode) {
+                if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+                g.mode = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'drag';
+                try { box.setPointerCapture(e.pointerId); } catch (_) {}
+                if (g.mode === 'drag') { closeOthers(null); g.w.classList.add('lift'); }
+                else g.w.classList.add('swiping');
+            }
+            if (g.mode === 'swipe') { const lim = g.W * 0.4; let x = Math.min(0, g.base + dx); if (x < -lim) x = -lim - (-lim - x) * 0.35; g.cur = x; rowX(g.w, x, false); }
+            else g.w.style.transform = `translateY(${dy}px)`;
+        });
+        const end = e => {
+            if (!g || e.pointerId !== g.id) return;
+            const q = g; g = null; if (!q.mode) return;
+            noClick = true; setTimeout(() => { noClick = false; }, 0);
+            if (q.mode === 'swipe') {
+                const lim = q.W * 0.4, open = e.type !== 'pointercancel' && q.cur < -lim * 0.5;
+                q.w.classList.toggle('opened', open); rowX(q.w, open ? -lim : 0, true);
+                setTimeout(() => q.w.classList.remove('swiping'), 300); return;
+            }
+            const me = q.w.getBoundingClientRect(), c = me.top + me.height / 2;
+            const others = [...box.querySelectorAll('.v3-os')].filter(el => el !== q.w);
+            const prevT = q.w.style.transform; q.w.style.transform = '';
+            const rects = others.map(el => { const b = el.getBoundingClientRect(); return { el, c: b.top + b.height / 2 }; });
+            q.w.style.transform = prevT;
+            const above = rects.filter(o => o.c < c).sort((a, b) => a.c - b.c).map(o => o.el), below = rects.filter(o => o.c >= c).sort((a, b) => a.c - b.c).map(o => o.el);
+            const visual = [...above, q.w, ...below];             // top -> bottom; the newest object is on top, so the data order is the reverse
+            const next = visual.slice().reverse().map(el => S.objs[+el.dataset.oi]);
+            if (e.type === 'pointercancel' || next.some((o, k) => o !== S.objs[k])) { if (e.type !== 'pointercancel') S.objs = next; }
+            placeObjects(); syncUI();
+        };
+        box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+        box.addEventListener('click', async e => {
+            if (noClick) { e.stopPropagation(); e.preventDefault(); return; }
+            const b = e.target.closest('[data-odel]'); if (!b) return;
+            e.stopPropagation();
+            const w = b.closest('.v3-os'), it = w.querySelector('.v3-ord');
+            it.style.transition = 'transform 0.2s ease-in'; it.style.transform = `translateX(${-w.offsetWidth - 20}px)`;
+            await new Promise(r => setTimeout(r, 190));
+            w.style.height = w.offsetHeight + 'px'; w.offsetHeight; w.style.transition = 'height 0.18s ease, opacity 0.18s ease'; w.style.height = '0px'; w.style.opacity = '0';
+            await new Promise(r => setTimeout(r, 180));
+            objAct(+b.dataset.odel, 'del');
+        }, true);
+    })();
     $('v3d-panel').addEventListener('click', e => {
         const c = e.target.closest('[data-ok]'); if (c) { objAdd(c.dataset.ok); return; }
         const a = e.target.closest('[data-oa]'); if (a) objAct(a.dataset.oi === undefined ? -1 : +a.dataset.oi, a.dataset.oa);
