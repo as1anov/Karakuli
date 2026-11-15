@@ -8188,7 +8188,11 @@ function ensureCss() {
     #v3d-panel #v3-objlist:empty { display: none; }
     #v3d-panel .v3-body .v3-orow { display: flex; justify-content: space-between; width: 100%; }
     #v3d-panel .v3-body .v3-orow > span:first-child { flex: 1; max-width: none; }
-    #v3d-panel .v3-body .v3-clear { align-self: flex-start; }
+    #v3d-panel .v3-body .v3-clear { align-self: flex-end; height: 30px; min-width: 0; padding: 0 14px; margin: 0; border-radius: 10px; font-size: 12px; }   /* a small button at the right edge */
+    #v3d-panel .v3-body .v3-orow > span:first-child { font-size: 14.5px; }
+    #v3d-panel .v3-sec[data-sec="obj"] .v3-body { gap: 6px; padding-top: 8px !important; padding-bottom: 8px !important; }
+    #v3d-panel .v3-body .v3-clear { background: var(--btn-bg); border: 1px solid var(--border-color); color: var(--text-color); }
+    #v3d-panel #v3-objlist { gap: 2px; }
     @media (max-width: 600px) { #v3d-title { display: none !important; } }
     /* the close button (X) stands at the end of the 3D toolbar, where the hand is */
     #v3-rail #v3d-close { order: 99; margin-right: 0; margin-left: calc(var(--tpad) + 1px); --d: 9; }
