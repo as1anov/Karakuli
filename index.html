@@ -8349,7 +8349,7 @@ function buildUI() {
         pn.querySelectorAll('.v3-card, .v3-chip').forEach(b => { const t = b.querySelector('span, b'); if (t && !b.title) b.title = t.textContent; if (t) b.setAttribute('aria-label', b.title || t.textContent); });   // names live in the tooltip when the strip shows icons only
     };
     document.querySelectorAll('#v3-rail button').forEach(b => b.onclick = () => railSet($('v3d-panel').classList.contains('open') && $('v3d-panel').dataset.act === b.dataset.go ? null : b.dataset.go));
-    $('v3d-view').addEventListener('pointerdown', () => { if ($('v3d-panel').dataset.act !== 'obj') railSet(null); });   // the Objects window stays open while the view is moved; only its icon closes it
+    // the open window (colour, objects, ...) stays while the view is turned or zoomed; only its icon in the bar closes it
     window.__railSet = railSet;
     new ResizeObserver(() => {   // the panel grew (an object was added): keep it just above the toolbar
         const pn = $('v3d-panel'); if (!pn.classList.contains('open')) return;
