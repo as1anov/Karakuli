@@ -7684,6 +7684,24 @@ function applyMaterial() {
     updateInfo();
 }
 
+// Light colours vanish on a light wall, so the backdrop turns dark for them (and back): 0 = the usual soft light wall, 1 = a calm dark slate
+const WALL_DARK = '#2f3238';
+function bgTarget() {
+    if (MATS[S.mat].brushed) return 0;                                   // plain steel keeps the usual look
+    const h = String(S.color || MATS[S.mat].color).replace('#', ''), v = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16) / 255);
+    const l = 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2], q = Math.min(1, Math.max(0, (l - 0.55) / 0.22));
+    return q * q * (3 - 2 * q);                                          // smoothstep: grey tones in the middle fade gently
+}
+function applyBg() {
+    const t = R.bgT, c = new T.Color(WALLS[S.env]).lerp(new T.Color(WALL_DARK), t);
+    R.wall.material.color.copy(c); R.scene.backgroundIntensity = 1 - 0.8 * t;
+    const v = document.getElementById('v3d'); if (v) v.classList.toggle('bgdark', t > 0.5);
+}
+function stepBg(dt) {
+    const tg = bgTarget(); if (R.bgT === undefined) R.bgT = tg;
+    if (Math.abs(tg - R.bgT) < 0.002) { if (R.bgT !== tg) { R.bgT = tg; applyBg(); R.dirty = true; } return; }
+    R.bgT += (tg - R.bgT) * (1 - Math.exp(-dt * 4)); applyBg(); R.dirty = true;   // about a second to settle
+}
 function applyEnv() {
     if (!R) return;
     R.dirty = true;
@@ -7692,6 +7710,7 @@ function applyEnv() {
     R.scene.background = R.envs[S.env];
     R.scene.backgroundBlurriness = 0.55;
     R.wall.material.color.set(WALLS[S.env]);
+    R.bgT = bgTarget(); applyBg();
 }
 
 function fitCamera() {
@@ -7912,6 +7931,10 @@ function ensureCss() {
     #v3d-panel .v3-sec[data-sec="col"] .v3-body { height: auto !important; overflow: visible !important; white-space: normal !important; width: min(372px, calc(100vw - 24px)); max-width: none !important; justify-content: center; }
     #v3d-panel .v3-sec[data-sec="col"] #v3-cols { flex: 1 1 auto !important; min-width: 0; flex-wrap: wrap !important; justify-content: center !important; gap: 8px !important; max-width: none !important; }
     #v3d-panel .v3-sec[data-sec="col"] .v3-dot { width: 40px !important; height: 40px !important; margin: 0 !important; }
+    #v3d-title { transition: color .8s; }
+    #v3d.bgdark #v3d-title { color: #eceef1; }
+    #v3d.bgdark #v3-info, #v3d.bgdark #v3-infot { color: #b9bec6; }
+    #v3-info { transition: color .8s; }
     #v3-ral { position: absolute; left: 50%; top: calc(var(--rtop, 20px) + var(--tb, 48px) + 36px); transform: translate(-50%, -6px); z-index: 30; display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: var(--panel-bg); border: 1px solid var(--border-color); color: var(--text-color); font-size: 14px; font-weight: 600; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; }
     #v3-ral.show { opacity: 1; transform: translate(-50%, 0); }
     #v3-ral i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(128,128,128,.5); }
@@ -8824,6 +8847,7 @@ function loop(now) {
         if (!S.playing) syncUI();
     }
     if (R.cam) stepCamera(dt);
+    stepBg(dt);
     if (R.spawn) stepSpawn(dt);
     if (R.fxRun && !R.fxHold) stepFx(dt);
     const moved = R.controls.update();
