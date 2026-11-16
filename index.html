@@ -7393,6 +7393,15 @@ function placeObjects() {
             total += gb + o.w; o.gb = gb; built.push(o); prev = it.k;
         }
         S.objs.length = built.length;
+        // the real footprint of each thing (its lower part: flowers and pages stick out higher up), so the visible gaps are equal whatever the order
+        const foot = g => {
+            g.updateMatrixWorld(true); const bb = new T.Box3().setFromObject(g), yl = bb.min.y + (bb.max.y - bb.min.y) * 0.45, v = new T.Vector3(); let a = Infinity, b = -Infinity;
+            g.traverse(m => { const p = m.isMesh && m.geometry.attributes.position; if (!p) return; for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); if (v.y <= yl) { if (v.x < a) a = v.x; if (v.x > b) b = v.x; } } });
+            return a < b ? [a, b] : [bb.min.x, bb.max.x];
+        };
+        let okFoot = !forbid.length;
+        if (okFoot) { try { total = 0; built.forEach(o => { const f = foot(o.g); o.fa = f[0] - o.g.position.x; o.fw = f[1] - f[0]; total += o.gb + o.fw; }); if (!(total > 0) || built.some(o => !isFinite(o.fa))) throw 0; } catch (e) { okFoot = false; total = built.reduce((t, o) => t + o.gb + o.w, 0); } }
+        built.forEach(o => { if (!okFoot) { o.fa = -o.w / 2; o.fw = o.w; } });
         const root = new T.Group(); let x = -total / 2;
         if (forbid.length && built.length) {   // fit the magazines into the free stretches between the barrels
             const lim = sup.w / 2 - 20; let segs = [[-lim, lim]];
@@ -7403,7 +7412,7 @@ function placeObjects() {
             built.forEach((o, q) => { o.g.position.set(use[q], o.at.y, o.at.z); root.add(o.g); });
             R.objs = root; R.scene.add(root); R.objs.visible = S.fold >= 0.995; R.dirty = true; return;
         }
-        built.forEach(o => { x += o.gb; o.g.position.set(x + o.w / 2, o.at ? o.at.y : sup.y, o.at ? o.at.z : (sup.z0 + sup.z1) / 2); root.add(o.g); x += o.w; });
+        built.forEach(o => { x += o.gb; o.g.position.set(x - o.fa, o.at ? o.at.y : sup.y, o.at ? o.at.z : (sup.z0 + sup.z1) / 2); root.add(o.g); x += o.fw; });
         R.objs = root; R.scene.add(root);
     }
     R.objs && (R.objs.visible = S.fold >= 0.995);
@@ -7475,7 +7484,12 @@ function objUI() {
     cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     const TRASH = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
-    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel">${TRASH}</div><div class="v3-ord"><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<i class="v3-grip" title="Press the name and drag to reorder"></i></div></div>`).join('');
+    document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel">${TRASH}</div><div class="v3-ord"><i class="v3-grip" title="Press and drag to reorder"></i><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<span class="v3-ohint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 6l-6 6 6 6M20 6l-6 6 6 6"/></svg></span></div></div>`).join('')
+        + (S.objs.length ? '<div class="v3-ocap">drag ≡ to reorder · swipe left to delete</div>' : '');
+    if (S.objs.length && !window.__oPeek && document.getElementById('v3d-panel').dataset.act === 'obj') {   // once: the top row slides left a little and back, showing that a swipe deletes
+        window.__oPeek = true; const w = [...document.querySelectorAll('#v3-objlist .v3-os')].pop(), it = w && w.querySelector('.v3-ord');
+        if (it && it.animate) { w.classList.add('swiping'); const an = it.animate([{ transform: 'none' }, { transform: 'translateX(-52px)', offset: 0.45 }, { transform: 'translateX(-52px)', offset: 0.6 }, { transform: 'none' }], { duration: 1100, delay: 350, easing: 'ease-in-out' }); an.onfinish = an.oncancel = () => w.classList.remove('swiping'); }
+    }
     document.getElementById('v3-objnote').style.display = 'none';   // only icons and names in Objects
     document.getElementById('v3-sum-obj').textContent = S.objs.length ? String(S.objs.length) : '';
 }
@@ -8202,7 +8216,10 @@ function ensureCss() {
     .v3-onm { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .v3-oflip { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-radius: 9px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); cursor: pointer; }
     .v3-oflip svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    .v3-grip { flex: none; width: 14px; height: 10px; opacity: .4; background: linear-gradient(currentColor 0 0) 0 0 / 100% 2px no-repeat, linear-gradient(currentColor 0 0) 0 4px / 100% 2px no-repeat, linear-gradient(currentColor 0 0) 0 8px / 100% 2px no-repeat; color: var(--text-color); }
+    .v3-ohint { flex: none; display: inline-flex; opacity: .45; color: var(--text-color); }
+    .v3-ohint svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .v3-ocap { font-size: 11px; line-height: 1; text-align: center; color: var(--disabled-color); padding: 2px 0 0; }
+    .v3-grip { flex: none; width: 16px; height: 12px; opacity: .55; background: linear-gradient(currentColor 0 0) 0 0 / 100% 2px no-repeat, linear-gradient(currentColor 0 0) 0 4px / 100% 2px no-repeat, linear-gradient(currentColor 0 0) 0 8px / 100% 2px no-repeat; color: var(--text-color); }
     #v3d-panel .v3-body .v3-clear { width: 36px; min-width: 36px; height: 30px; padding: 0; }
     #v3d-panel .v3-body .v3-chip.v3-clear > svg { box-sizing: content-box; width: 17px; height: 17px; padding: 0; border: 0; background: none; }
     #v3d-panel .v3-body .v3-clear svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -8290,7 +8307,7 @@ function buildUI() {
         pn.querySelectorAll('.v3-card, .v3-chip').forEach(b => { const t = b.querySelector('span, b'); if (t && !b.title) b.title = t.textContent; if (t) b.setAttribute('aria-label', b.title || t.textContent); });   // names live in the tooltip when the strip shows icons only
     };
     document.querySelectorAll('#v3-rail button').forEach(b => b.onclick = () => railSet($('v3d-panel').classList.contains('open') && $('v3d-panel').dataset.act === b.dataset.go ? null : b.dataset.go));
-    $('v3d-view').addEventListener('pointerdown', () => railSet(null));
+    $('v3d-view').addEventListener('pointerdown', () => { if ($('v3d-panel').dataset.act !== 'obj') railSet(null); });   // the Objects window stays open while the view is moved; only its icon closes it
     window.__railSet = railSet;
     new ResizeObserver(() => {   // the panel grew (an object was added): keep it just above the toolbar
         const pn = $('v3d-panel'); if (!pn.classList.contains('open')) return;
