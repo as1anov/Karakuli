@@ -8031,7 +8031,7 @@ function ensureCss() {
     #v3-railth { display: flex; flex-direction: column; align-items: center; gap: 3px; line-height: 1; }
     #v3-railth b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
     #v3-railth i { display: block; width: 20px; border-radius: 1px; background: currentColor; }
-    #v3-railcol { display: block; width: 23px; height: 23px; border-radius: 50%; box-shadow: none; }
+    #v3-railcol { box-sizing: border-box; display: block; width: 23px; height: 23px; border-radius: 50%; box-shadow: none; border: 1px solid color-mix(in srgb, var(--text-color) 55%, transparent); }   /* a thin ring so a light colour does not melt into the button */
     #v3-rail button.on { color: var(--text-color); background: var(--btn-on); }
     #v3-rail button[data-go="price"] { display: none; } #v3-rail.hasprice button[data-go="price"] { display: flex; }
     #v3d-close, #v3d-shop { z-index: 4; right: calc((var(--rw) - var(--tb)) / 2); }
