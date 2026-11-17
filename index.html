@@ -7366,7 +7366,7 @@ function placeObjects() {
     if (R.objs) { R.scene.remove(R.objs); R.objs.traverse(o => { if (o.geometry) o.geometry.dispose(); }); R.objs = null; }
     const key = modelInfo().key;
     if (S.objKey !== key) { S.objs = []; S.objKey = key; }
-    R.support = supportInfo();
+    R.support = supportInfo(); R.room = null;
     const sup = R.support;
     if (sup && sup.type === 'hooks' && S.objs.length) {
         // item j hangs on the j-th hook counted from the middle outwards; neighbours are shifted in depth so wide items do not cut each other
@@ -7388,6 +7388,7 @@ function placeObjects() {
             root.add(o.g);
         });
         S.objs.length = 0; S.objs.push(...kept);
+        R.room = { type: 'hooks', taken, n, hooks: sup.hooks, pitch };
         R.objs = root; R.scene.add(root);
     } else if (sup && S.objs.length) {
         const GAPMIN = 18, GAPMAX = 70, built = [];   // roomy by default (up to 7 cm), closer only when there are many things
@@ -7426,6 +7427,7 @@ function placeObjects() {
         {   // the gap: as wide as the shelf allows (GAPMAX), shrinking to GAPMIN only when the things need the room; books keep standing together
             const ks = lay.map(q => q.k); let fixed = 0, n = 0;
             built.forEach((o, i) => { if (i) { if (ks[i - 1] === 'book' && ks[i] === 'book') fixed += 1; else n++; } });
+            R.minFree = (sup.w - 40) - built.reduce((t, o) => t + o.fw, 0) - fixed - GAPMIN * n;   // room left when every gap is at its minimum
             const free = (sup.w - 40) - built.reduce((t, o) => t + o.fw, 0) - fixed, gap = n ? Math.max(GAPMIN, Math.min(GAPMAX, free / n)) : 0;
             total = 0; built.forEach((o, i) => { o.gb = i ? (ks[i - 1] === 'book' && ks[i] === 'book' ? 1 : gap) : 0; total += o.gb + o.fw; });
         }
@@ -7436,9 +7438,11 @@ function placeObjects() {
             const slots = []; segs.forEach(([p, q]) => { let cx = p; const w1 = built[0].w; while (cx + w1 <= q + 0.01) { slots.push(cx + w1 / 2); cx += w1 + 14; } });
             slots.sort((a, b) => Math.abs(a) - Math.abs(b)); const use = slots.slice(0, built.length).sort((a, b) => a - b);
             built.length = Math.min(built.length, use.length); S.objs.length = built.length;
+            R.room = { type: 'slots', free: slots.length - built.length };
             built.forEach((o, q) => { o.g.position.set(use[q], o.at.y, o.at.z); root.add(o.g); });
             R.objs = root; R.scene.add(root); R.objs.visible = S.fold >= 0.995; R.dirty = true; return;
         }
+        R.room = { type: 'ledge', free: R.minFree, hasBook: built.some(o => o.g.userData.kind === 'book') };
         built.forEach(o => { x += o.gb; o.g.position.set(x - o.fa, o.at ? o.at.y : sup.y, o.at ? o.at.z : (sup.z0 + sup.z1) / 2); root.add(o.g); x += o.fw; });
         R.objs = root; R.scene.add(root);
     }
@@ -7487,13 +7491,32 @@ function stepSpawn(dt) {
     R.dirty = true;
     if (t >= D) { sp.w.scale.setScalar(1); sp.w.rotation.set(0, 0, 0); R.spawn = null; }
 }
+// Does one more thing of this kind still fit on the product? (the Objects icons go grey when not)
+function objFits(k) {
+    try {
+        const rm = R && R.room, sup = R && R.support; if (!rm || !sup) return true;
+        if (rm.type === 'slots') return rm.free > 0;
+        if (rm.type === 'hooks') {
+            const n = rm.n, cands = [];
+            if (k === 'magazine' && n > 1) for (let i = 0; i + 1 < n; i++) cands.push({ x: (rm.hooks[i] + rm.hooks[i + 1]) / 2, w: 210 });
+            else for (let i = 0; i < n; i++) cands.push({ x: rm.hooks[i], w: k === 'towel' ? towelSize().w : k === 'magazine' ? 210 : 160 });
+            return cands.some(q => rm.taken.every(([a, b]) => q.x + q.w / 2 + 6 <= a || q.x - q.w / 2 - 6 >= b));
+        }
+        R.kw = R.kw || {}; const ck = modelInfo().key + '|' + k;
+        if (R.kw[ck] === undefined) { const o = makeObject(k, 1, sup.depth, { sup, key: modelInfo().key, flip: false, hmax: 275, zc: (sup.z0 + sup.z1) / 2, n: 0 }); R.kw[ck] = o.w; o.g.traverse(m => { if (m.geometry) m.geometry.dispose(); }); }
+        const gap = !S.objs.length ? 0 : (k === 'book' && rm.hasBook) ? 1 : 18;
+        return R.kw[ck] * 1.05 + gap <= rm.free;
+    } catch (e) { return true; }
+}
 function objAdd(kind) {
     if (!R || !R.support) return;
+    if (!objFits(kind)) { note('There is no room for one more on this ' + modelInfo().P.name.toLowerCase() + '.'); return; }   // no animation, nothing is added
     const n0 = S.objs.length;
     S.objs.push({ k: kind, s: objSeed++ });
     placeObjects();
-    spawnLast();
     if (S.objs.length === n0) note('There is no room for one more on this ' + modelInfo().P.name.toLowerCase() + '.');
+    else spawnLast();
+    if (S.objs.length === n0) { /* nothing was added */ }
     else if (S.fold < 0.995) { S.fold = 1; S.playing = false; R.prog = null; updatePose(); }   // things stand on the folded product
     syncUI();
 }
@@ -7508,7 +7531,7 @@ function objAct(i, act) {
 function objUI() {
     const cat = document.getElementById('v3-cat'); if (!cat) return;
     const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine';
-    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
+    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) && objFits(k) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     const TRASH = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
     document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel">${TRASH}</div><div class="v3-ord"><svg class="v3-oic" viewBox="0 0 24 24">${OBJ_KINDS[it.k].icon}</svg><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<span class="v3-ohint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 6l-6 6 6 6M20 6l-6 6 6 6"/></svg></span></div></div>`).join('');
