@@ -7800,7 +7800,7 @@ function goCamera(name) {
     const p = R.camera.position, tg = R.controls.target, c = [tg.x, tg.y, tg.z], o = [p.x - c[0], p.y - c[1], p.z - c[2]], od = Math.hypot(...o) || 1;
     const from = o.map(v => v / od), ang = Math.acos(Math.max(-1, Math.min(1, from[0] * dir[0] + from[1] * dir[1] + from[2] * dir[2])));
     // a longer turn takes longer; the centre of view, the direction and the distance all glide together
-    R.cam = { from, fd: od, to: dir, td: dist, t: 0, c0: c, c1: newC || f.c, ang, dur: Math.max(0.9, Math.min(2, 0.85 + ang * 0.55)) };
+    R.cam = { from, fd: od, to: dir, td: dist, sph: from[1] > 0.98 || dir[1] > 0.98, t: 0, c0: c, c1: newC || f.c, ang, dur: Math.max(0.9, Math.min(2, 0.85 + ang * 0.55)) };
     fxStop(); S.cam = name; syncUI();
 }
 // ---- camera effects: moves of the camera around the product (one button in the bar opens the list and the settings) ----
@@ -7852,7 +7852,13 @@ function stepCamera(dt) {
     // direction: slerp along the great circle (constant turning speed), distance: even in proportion, centre: straight line
     let v;
     const sa = Math.sin(a.ang || 0);
-    if (sa < 1e-4) v = a.to;
+    if (a.sph) {   // to or from the top view: near the pole the turning direction is hair-trigger, so turn by polar angle + compass angle (a steady roll, no jump at the end)
+        const pol = u => [Math.acos(Math.max(-1, Math.min(1, u[1]))), Math.atan2(u[0], u[2])], p0 = pol(a.from), p1 = pol(a.to);
+        let dphi = p1[1] - p0[1]; dphi = ((dphi + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+        const th = p0[0] + (p1[0] - p0[0]) * k, ph = p0[1] + dphi * k;
+        v = [Math.sin(th) * Math.sin(ph), Math.cos(th), Math.sin(th) * Math.cos(ph)];
+    }
+    else if (sa < 1e-4) v = a.to;
     else { const w0 = Math.sin((1 - k) * a.ang) / sa, w1 = Math.sin(k * a.ang) / sa; v = a.from.map((x, i) => x * w0 + a.to[i] * w1); }
     const d = Math.exp(Math.log(a.fd) + (Math.log(a.td) - Math.log(a.fd)) * k);
     const c = a.c0.map((x, i) => x + (a.c1[i] - x) * k);
