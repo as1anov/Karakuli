@@ -1342,6 +1342,7 @@
         let currentProjectTitle = 'Karakuli #0000';
         let createProjectOnReset = false;
         let holeOff = new Set();      // bolt-hole slots switched off by the person: 'row,col' (col 0 / 1 / 2 = left / middle / right)
+        let shelfOpts = { hooks: false, towel: false };   // optional features of the shelf: key-hook lip, towel pocket
         let activeProductKey = null;   // product shown on the canvas (shelf / hanger / magazine)
         let selectedPresetKey = null;  // product selected inside the New Canvas window
         let projectShare = { edit: null, view: null };   // share tokens of the project on the canvas
@@ -1355,7 +1356,7 @@
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments: tlLive ? tlLive.segments : segments, specialElements: tlLive ? tlLive.specialElements : specialElements, curI, curJ, lastDirection,
                 paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
-                productKey: activeProductKey, holeOff: [...holeOff], plateHoles: [...plateHoleOn], plateBolts,
+                productKey: activeProductKey, shelfOpts: { ...shelfOpts }, holeOff: [...holeOff], plateHoles: [...plateHoleOn], plateBolts,
                 shareEditToken: projectShare.edit, shareViewToken: projectShare.view,
                 tlCurrentFrame, tlCaptureStride, tlCaptureCounter, ...tlPart
             }));
@@ -1809,6 +1810,7 @@
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
+            shelfOpts = { hooks: !!(project.shelfOpts && project.shelfOpts.hooks), towel: !!(project.shelfOpts && project.shelfOpts.towel) };
             holeOff = new Set(Array.isArray(project.holeOff) ? project.holeOff : []);
             plateHoleOn = new Set(Array.isArray(project.plateHoles) ? project.plateHoles : []); plateBolts = project.plateBolts !== false;
             if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
@@ -2631,6 +2633,19 @@ service cloud.firestore {
         }
 
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
+        // Shelf options: positions (canvas px) of the key-hook notches and of the towel slot
+        const SHELF_NOTCH = { w: 20, depth: 10, pitch: 50, margin: 30 }, SHELF_SLOT_H = 36;
+        function shelfFeat(dx = 0, dy = 0) {
+            if (templateKind() !== 'product' || activeProductKey !== 'shelf') return null;
+            const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM, G = productGeom('shelf', paperWidthMm, paperHeightMm);
+            const L = -wPx / 2 + dx, R = wPx / 2 + dx, T = -hPx / 2 + dy, B = hPx / 2 + dy, cx0 = (L + R) / 2;
+            const n = Math.max(1, Math.floor((paperWidthMm - 2 * SHELF_NOTCH.margin) / SHELF_NOTCH.pitch) + 1), span = (n - 1) * SHELF_NOTCH.pitch * MM;
+            const notches = []; for (let i = 0; i < n; i++) notches.push({ cx: cx0 - span / 2 + i * SHELF_NOTCH.pitch * MM, rw: SHELF_NOTCH.w / 2 * MM, d: SHELF_NOTCH.depth * MM });
+            const len = Math.min(500, paperWidthMm * 0.55), hh = SHELF_SLOT_H / 2 * MM;
+            const slot = { cx: cx0, cy: T + (G.anchor + 72) * MM, hh, a: Math.max(0, len / 2 * MM - hh) };
+            return { L, R, T, B, notches, slot, MM };
+        }
+
         function productOutlineD(dx = 0, dy = 0) {
             const kind = templateKind();
             if (kind === 'free') return '';
@@ -2656,8 +2671,12 @@ service cloud.firestore {
                 return d + 'Z';
             }
             if (P.radius) {
-                const r = P.radius * MM;
-                return `M${f(L)} ${f(T)}H${f(R)}V${f(B - r)}A${f(r)} ${f(r)} 0 0 1 ${f(R - r)} ${f(B)}H${f(L + r)}A${f(r)} ${f(r)} 0 0 1 ${f(L)} ${f(B - r)}Z`;
+                const r = P.radius * MM, F = shelfFeat(dx, dy);
+                // key-hook lip: rounded notches cut into the bottom edge, walking from right to left
+                const notches = (shelfOpts.hooks && F) ? F.notches.map(n => `H${f(n.cx + n.rw)}V${f(B - n.d + n.rw)}A${f(n.rw)} ${f(n.rw)} 0 0 0 ${f(n.cx - n.rw)} ${f(B - n.d + n.rw)}V${f(B)}`).reverse().join('') : '';
+                // towel pocket: an obround hole in the tray, wound the other way so every fill / clip leaves it open
+                const slot = (shelfOpts.towel && F) ? `M${f(F.slot.cx + F.slot.a)} ${f(F.slot.cy - F.slot.hh)}H${f(F.slot.cx - F.slot.a)}A${f(F.slot.hh)} ${f(F.slot.hh)} 0 0 0 ${f(F.slot.cx - F.slot.a)} ${f(F.slot.cy + F.slot.hh)}H${f(F.slot.cx + F.slot.a)}A${f(F.slot.hh)} ${f(F.slot.hh)} 0 0 0 ${f(F.slot.cx + F.slot.a)} ${f(F.slot.cy - F.slot.hh)}Z` : '';
+                return `M${f(L)} ${f(T)}H${f(R)}V${f(B - r)}A${f(r)} ${f(r)} 0 0 1 ${f(R - r)} ${f(B)}${notches}H${f(L + r)}A${f(r)} ${f(r)} 0 0 1 ${f(L)} ${f(B - r)}Z${slot}`;
             }
             return `M${f(L)} ${f(T)}H${f(R)}V${f(B)}H${f(L)}Z`;
         }
@@ -2713,6 +2732,89 @@ service cloud.firestore {
             noStroke(); fill(RED); textAlign(RIGHT, CENTER); textSize(9 / zoom); textStyle(NORMAL);
             marks.forEach(m => { const y = -hPx / 2 + m.y * MM; text(m.label, -wPx / 2 - 8 / zoom, y); });
             pop();
+        }
+
+        // ---- Shelf options in the drawing view: a dark-grey line + a round "+" with the name of the feature.
+        // Tap the "+" : a ring ripples out, the plus turns, the new edge is traced; tap again to take the feature away.
+        const SHELF_HINTS = [{ key: 'hooks', label: 'Key hooks' }, { key: 'towel', label: 'Towel pocket' }];
+        let shelfAnim = null;
+        function shelfHintPos(key) {
+            const F = shelfFeat(); if (!F) return null;
+            const u = 1 / zoom;
+            if (key === 'hooks') return { x: F.R - 60 * F.MM, y: F.B + 34 * u, lx: 'left', F };
+            return { x: F.R + 34 * u, y: F.slot.cy, lx: 'left', F };
+        }
+        function shelfFeatPath(key, F) {
+            const p = new Path2D();
+            if (key === 'hooks') { F.notches.forEach(n => { p.moveTo(n.cx + n.rw, F.B); p.lineTo(n.cx + n.rw, F.B - n.d + n.rw); p.arc(n.cx, F.B - n.d + n.rw, n.rw, 0, Math.PI, true); p.lineTo(n.cx - n.rw, F.B); }); }
+            else { const s = F.slot; p.moveTo(s.cx + s.a, s.cy - s.hh); p.lineTo(s.cx - s.a, s.cy - s.hh); p.arc(s.cx - s.a, s.cy, s.hh, -Math.PI / 2, Math.PI / 2, true); p.lineTo(s.cx + s.a, s.cy + s.hh); p.arc(s.cx + s.a, s.cy, s.hh, Math.PI / 2, -Math.PI / 2, true); p.closePath(); }
+            return p;
+        }
+        function drawShelfHints() {
+            if (isViewOnly || templateKind() !== 'product' || activeProductKey !== 'shelf') return;
+            const F0 = shelfFeat(); if (!F0) return;
+            const ctx = drawingContext, u = 1 / zoom, dark = currentTheme === 'dark';
+            const ink = dark ? '#9a9a9a' : '#4a4a4a', onSheet = '#7c7c7c';
+            const now = performance.now(), far = isFarOutOnMobile();
+            ctx.save();
+            SHELF_HINTS.forEach(h => {
+                const P = shelfHintPos(h.key), on = shelfOpts[h.key], F = P.F;
+                const a = shelfAnim && shelfAnim.key === h.key ? Math.min(1, (now - shelfAnim.t0) / 700) : 1;
+                const path = shelfFeatPath(h.key, F);
+                // the dark-grey line: dashed preview of the cut-out while off, solid while on
+                ctx.save();
+                ctx.strokeStyle = on ? ink : onSheet; ctx.lineWidth = 1.6 * u; ctx.lineCap = 'round';
+                if (!on) ctx.setLineDash([6 * u, 5 * u]);
+                ctx.stroke(path);
+                ctx.restore();
+                // leader from the feature to the icon
+                ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath();
+                if (h.key === 'hooks') { ctx.moveTo(P.x, F.B + 2 * u); ctx.lineTo(P.x, P.y - 13 * u); }
+                else { ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); }
+                ctx.stroke(); ctx.restore();
+                // the round icon: "+" (turns into "x" = remove while the feature is on)
+                const mine = shelfAnim && shelfAnim.key === h.key, ease = a < 1 ? 1 - Math.pow(1 - a, 3) : 1, base = on ? Math.PI / 4 : 0, ang = mine ? (Math.PI / 4 - base) + (base - (Math.PI / 4 - base)) * ease : base;
+                ctx.save(); ctx.translate(P.x, P.y);
+                const pop = a < 1 ? 1 + 0.25 * Math.sin(a * Math.PI) : 1;
+                ctx.scale(pop, pop);
+                ctx.beginPath(); ctx.arc(0, 0, 12 * u, 0, Math.PI * 2);
+                ctx.fillStyle = on ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill();
+                ctx.strokeStyle = ink; ctx.lineWidth = 1.6 * u; ctx.stroke();
+                ctx.rotate(ang); ctx.strokeStyle = on ? (dark ? '#111' : '#f2f2f2') : ink; ctx.lineWidth = 2 * u; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(-5 * u, 0); ctx.lineTo(5 * u, 0); ctx.moveTo(0, -5 * u); ctx.lineTo(0, 5 * u); ctx.stroke();
+                ctx.restore();
+                // ripple + tracing of the feature while the animation runs
+                if (a < 1) {
+                    ctx.save(); ctx.strokeStyle = ink; ctx.globalAlpha = 1 - a; ctx.lineWidth = 2 * u;
+                    ctx.beginPath(); ctx.arc(P.x, P.y, (12 + 26 * a) * u, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+                    ctx.save(); ctx.strokeStyle = dark ? '#ffffff' : '#ff7a00'; ctx.lineWidth = 3 * u; ctx.lineCap = 'round'; ctx.globalAlpha = 1 - a * 0.6;
+                    ctx.setLineDash([Math.max(1, a * 2400) * u, 4000 * u]); ctx.stroke(path); ctx.restore();
+                }
+                if (!far) {
+                    ctx.fillStyle = ink; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                    ctx.fillText(h.label, P.x + 19 * u, P.y);
+                }
+            });
+            ctx.restore();
+            if (shelfAnim && now - shelfAnim.t0 >= 700) shelfAnim = null;
+            else if (shelfAnim) requestAnimationFrame(() => redraw());
+        }
+        function shelfHintHit(cx, cy) {
+            if (isViewOnly || isTimelapseUIOpen || isExporting || !isPaperVisible || templateKind() !== 'product' || activeProductKey !== 'shelf') return null;
+            const wx = (cx - offsetX) / zoom, wy = (cy - offsetY) / zoom;
+            for (const h of SHELF_HINTS) {
+                const P = shelfHintPos(h.key); if (!P) continue;
+                const r = Math.max(16, 12 * zoom) / zoom + 6 / zoom, lw = (h.label.length * 7.5 + 22) / zoom;
+                if (wx >= P.x - r && wx <= P.x + r + lw && Math.abs(wy - P.y) <= r) return h.key;
+            }
+            return null;
+        }
+        function toggleShelfOpt(key) {
+            shelfOpts[key] = !shelfOpts[key];
+            shelfAnim = { key, t0: performance.now() };
+            redraw();
+            try { scheduleProjectSave(); } catch (e) {}
+            try { if (window.__v3d && window.__v3d.refresh) window.__v3d.refresh(); } catch (e) {}
         }
 
         // The corner "ears" that resize the canvas.
@@ -2968,7 +3070,7 @@ service cloud.firestore {
                 if (!(await keepCurrentDrawing())) return;
                 if (shareSession) leaveSharedSession();
                 const create = createProjectOnReset;
-                isPaperVisible = false; activeProductKey = null; holeOff.clear(); plateHoleOn.clear(); plateBolts = true;
+                isPaperVisible = false; activeProductKey = null; shelfOpts = { hooks: false, towel: false }; holeOff.clear(); plateHoleOn.clear(); plateBolts = true;
                 closeNewCanvasModal();
                 if (create) { activeProjectId = null; projectShare = { edit: null, view: null }; currentProjectTitle = 'Karakuli #0000'; updateCurrentProjectUI(); }
                 try { performReset({ preserveUndo: false }); } catch (err) { console.error(err); }
@@ -2984,7 +3086,7 @@ service cloud.firestore {
             paperWidthMm = PRODUCTS[selectedPresetKey] ? w : +w.toFixed(2);
             paperHeightMm = +h.toFixed(2);
             isPaperVisible = true;
-            if (!isResizingOnly || activeProductKey !== selectedPresetKey) { holeOff.clear(); plateHoleOn.clear(); plateBolts = true; }
+            if (!isResizingOnly || activeProductKey !== selectedPresetKey) { shelfOpts = { hooks: false, towel: false }; holeOff.clear(); plateHoleOn.clear(); plateBolts = true; }
             activeProductKey = selectedPresetKey;
             closeNewCanvasModal();
             if (!isResizingOnly) {
@@ -4352,6 +4454,13 @@ service cloud.firestore {
             // With the menu pushing the canvas to the right, a pointer's x on the screen is the canvas x plus the menu's width
             const pushDx = () => document.body.classList.contains('projects-open') ? document.getElementById('dashboard').offsetWidth : 0;
             const adj = ev => { const d = pushDx(); if (!d) return ev; return new Proxy(ev, { get(t, k) { if (k === 'clientX' || k === 'pageX' || k === 'x') return t[k] - d; const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } }); };
+            // the "+" hints of the shelf options: a tap on one toggles the feature and never starts a stroke
+            window.addEventListener('pointerdown', (e0) => {
+                if (e0.target !== canvasElem) return;
+                const e = adj(e0), k = shelfHintHit(e.clientX, e.clientY);
+                if (!k) return;
+                e0.preventDefault(); e0.stopImmediatePropagation(); toggleShelfOpt(k);
+            }, true);
             canvasElem.addEventListener('pointerdown', (e0) => {
                 const e = adj(e0);
                 e.preventDefault();
@@ -4496,7 +4605,7 @@ service cloud.firestore {
             if (!isExporting && !isTimelapseUIOpen) drawGenMarks();
             if (clipSheet) { drawingContext.restore(); pop(); }
             if (clipToProduct) { drawingContext.restore(); pop(); }
-            if (isPaperVisible && !isExporting && !isTimelapseUIOpen) drawBendLines();
+            if (isPaperVisible && !isExporting && !isTimelapseUIOpen) { drawBendLines(); drawShelfHints(); }
             if (!isExporting || isTimelapseExport) drawCursor();
             pop();
             if (!isExporting) updateHookBadge();
@@ -6589,7 +6698,7 @@ function designPrimitives(w, h, W, H, ppm) {
     // the outline of the product itself: straight edges, the solid zone's top edge, rounded corners, hook arms
     if (templateKind() === 'product') {
         const P = PRODUCTS[activeProductKey], G = productGeom(activeProductKey, w, h), L = -pw / 2, R = pw / 2, T = -ph / 2, B = ph / 2;
-        line(L, T, L, B); line(R, T, R, B); line(L, T, R, T); line(L, B, R, B);
+        line(L, T, L, B); line(R, T, R, B); line(L, T, R, T); if (!(shelfOpts.hooks && P.radius)) line(L, B, R, B);
         if (G.patternEnd != null) line(L, T + G.patternEnd * mm, R, T + G.patternEnd * mm);
         if (P.radius) { const r = P.radius * mm; [[R - r, B - r], [L + r, B - r]].forEach(([cx, cy]) => { const c = U(cx, cy); circles.push({ cx: c[0], cy: c[1], r: r * sx }); }); }
         if (P.hooks && G.arms) { const r = Math.min(HOOK_CORNER_MM, 6) * mm; G.arms.forEach(a => [[L + a[1] * mm - r, B - r], [L + a[0] * mm + r, B - r]].forEach(([cx, cy]) => { const c = U(cx, cy); circles.push({ cx: c[0], cy: c[1], r: r * sx }); })); }
@@ -7545,9 +7654,10 @@ function objUI() {
 
 async function buildModel() {
     const { key, P, w, h } = modelInfo();
-    if (!R.mask || R.mask.w !== w || R.mask.h !== h || R.mask.key !== key) {
+    const mkey = key + (shelfOpts.hooks ? '+h' : '') + (shelfOpts.towel ? '+t' : '');
+    if (!R.mask || R.mask.w !== w || R.mask.h !== h || R.mask.key !== mkey) {
         R.mask = await rasterMask(w, h);
-        if (R.mask) R.mask.key = key;
+        if (R.mask) R.mask.key = mkey;
     }
     const mask = R.mask;
     if (mask && mask.cutMm === undefined) { try { mask.cutMm = cutLengthMm(mask); } catch (e) { mask.cutMm = 0; } }
@@ -9080,7 +9190,7 @@ setInterval(() => {
                 const nh = currentHolesMm().length; L.push(`${nh} ${nh === 1 ? 'mounting hole' : 'mounting holes'}`);
                 if (P.hooks) { const n = hooksFromWidth(w); L.push(`${n} ${n === 1 ? 'hook' : 'hooks'}`); }
                 let sx = 0; for (const sg of segments) sx += sg.p1.x * 3 + sg.p1.y * 5 + sg.p2.x * 7 + sg.p2.y * 11;
-                const key = [w, h, window.__v3d.S.t, segments.length, sx, currentHolesMm().length].join('|');
+                const key = [w, h, window.__v3d.S.t, segments.length, sx, currentHolesMm().length, shelfOpts.hooks ? 1 : 0, shelfOpts.towel ? 1 : 0].join('|');
                 if (key !== wKey) { wKey = key; clearTimeout(wTimer); wTimer = setTimeout(function again() { if (wBusy) { wTimer = setTimeout(again, 300); return; } calcWeight(wKey, w, h); }, 700); }
                 { const ri = window.ralInfo && window.ralInfo(); if (ri && ri.code) L.splice(1, 0, `RAL ${ri.code} ${ri.name}`); }
                 if (wKg) L.splice(1, 0, `≈ ${wKg.toFixed(wKg < 10 ? 2 : 1)} kg`);
