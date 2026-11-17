@@ -7805,43 +7805,71 @@ function goCamera(name) {
 }
 // ---- camera effects: moves of the camera around the product (one button in the bar opens the list and the settings) ----
 const FX = {
-    rotate:    { name: 'Rotate',     period: 22, uses: ['speed', 'dir'], icon: '<path d="M12 3l4.6 2.5v4.6L12 12.6 7.4 10.1V5.5zM12 8v4.6M7.4 5.5L12 8l4.6-2.5"/><path d="M5 14.3C3.8 14.8 3 15.6 3 16.5c0 2 4 3.5 9 3.5s9-1.5 9-3.5c0-.9-.8-1.7-2-2.2"/>' },
-    boomerang: { name: 'Boomerang',  period: 8,  uses: ['speed', 'range', 'dir'], icon: '<path d="M17 2.5l3.5 3.5L17 9.5M3.5 11v-1a4 4 0 0 1 4-4h13M7 21.5L3.5 18 7 14.5M20.5 13v1a4 4 0 0 1-4 4h-13"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/>' },
-    push:      { name: 'Push-in',    period: 7,  uses: ['speed', 'zoom'], icon: '<path d="M3 8V4h4M21 8V4h-4M3 16v4h4M21 16v4h-4"/><rect x="9" y="9.5" width="6" height="5" rx=".8"/><path d="M7 7l2.2 2.2M17 7l-2.2 2.2M7 17l2.2-2.2M17 17l-2.2-2.2"/>' },
-    crane:     { name: 'Crane',      period: 9,  uses: ['speed', 'range'], icon: '<path d="M6.5 3v18M4 5.5L6.5 3 9 5.5M4 18.5L6.5 21 9 18.5"/><path d="M9.5 12H12"/><rect x="12" y="8.5" width="6.5" height="7" rx="1.3"/><path d="M18.5 10.6l3-1.7v6.2l-3-1.7"/>' },
-    spiral:    { name: 'Spiral',     period: 18, uses: ['speed', 'zoom', 'dir'], icon: '<g transform="translate(-1.5 .5)"><path d="M12 12a1.5 1.5 0 0 1 1.5-1.5 3 3 0 0 1 3 3 4.5 4.5 0 0 1-4.5 4.5 6 6 0 0 1-6-6 7.5 7.5 0 0 1 7.5-7.5 7.5 7.5 0 0 1 7.5 7.5"/></g>' },
-    figure8:   { name: 'Figure 8',   period: 12, uses: ['speed', 'range', 'dir'], icon: '<path d="M12 12c-2.5-4.2-8.5-4.2-8.5 0s6 4.2 8.5 0 8.5-4.2 8.5 0-6 4.2-8.5 0z"/>' }
+    reveal: { name: 'Reveal',     period: 14, uses: ['speed', 'range', 'zoom', 'dir'], icon: '<path d="M3 8V4h4M21 8V4h-4M3 16v4h4M21 16v4h-4"/><rect x="9" y="9.5" width="6" height="5" rx=".8"/><path d="M7 7l2.2 2.2M17 7l-2.2 2.2M7 17l2.2-2.2M17 17l-2.2-2.2"/>' },
+    pass:   { name: 'Close pass', period: 12, uses: ['speed', 'zoom', 'dir'], icon: '<rect x="8" y="8.5" width="8" height="7" rx="1"/><path d="M3 12h2.5M18.5 12H21M4.5 10.5L3 12l1.5 1.5M19.5 10.5L21 12l-1.5 1.5"/>' },
+    rotate: { name: 'Rotate',     period: 22, uses: ['speed', 'dir'], icon: '<path d="M12 3l4.6 2.5v4.6L12 12.6 7.4 10.1V5.5zM12 8v4.6M7.4 5.5L12 8l4.6-2.5"/><path d="M5 14.3C3.8 14.8 3 15.6 3 16.5c0 2 4 3.5 9 3.5s9-1.5 9-3.5c0-.9-.8-1.7-2-2.2"/>' }
 };
+// Easing the way motion designers do it: a cubic-bezier curve per move, never a flat ease. Slow start, fast middle, long soft landing.
+const bez = (x1, y1, x2, y2) => t => {
+    if (t <= 0) return 0; if (t >= 1) return 1; let u = t;
+    for (let i = 0; i < 8; i++) {
+        const cx = 3 * (1 - u) * (1 - u) * u * x1 + 3 * (1 - u) * u * u * x2 + u * u * u - t, dx = 3 * (1 - u) * (1 - u) * x1 + 6 * (1 - u) * u * (x2 - x1) + 3 * u * u * (1 - x2);
+        if (Math.abs(dx) < 1e-6) break; u = Math.max(0, Math.min(1, u - cx / dx));
+    }
+    return 3 * (1 - u) * (1 - u) * u * y1 + 3 * (1 - u) * u * u * y2 + u * u * u;
+};
+const EZ_IN = bez(0.55, 0, 0.15, 1), EZ_SIDE = bez(0.3, 0, 0.2, 1), EZ_TRACK = bez(0.45, 0, 0.3, 1), EZ_OUT = bez(0.4, 0, 0.2, 1);
 function camPose() {
-    const c = R.fit.c, p = R.camera.position, x = p.x - c[0], y = p.y - c[1], z = p.z - c[2], d = Math.hypot(x, y, z) || 1;
-    return { th: Math.atan2(x, z), ph: Math.asin(Math.max(-1, Math.min(1, y / d))), d };
+    const t = R.controls.target, p = R.camera.position, x = p.x - t.x, y = p.y - t.y, z = p.z - t.z, d = Math.hypot(x, y, z) || 1;
+    return { th: Math.atan2(x, z), ph: Math.asin(Math.max(-1, Math.min(1, y / d))), d, c: [t.x, t.y, t.z] };
 }
 function fxStart(name) {
     if (!R || !R.fit) return;
     R.cam = null;
-    S.fx.name = name; R.fxRun = { t: 0, base: camPose() };
+    let W = R.fit.sx; try { if (R.model) { const sz = new T.Box3().setFromObject(R.model).getSize(new T.Vector3()); if (sz.x > 0) W = sz.x; } } catch (e) {}
+    S.fx.name = name; R.fxRun = { t: 0, base: camPose(), W };
     S.cam = null; R.dirty = true; syncUI();
 }
 function fxStop() {
     if (R) { R.fxRun = null; R.fxHold = false; }
     if (S.fx.name) { S.fx.name = null; syncUI(); }
 }
+// the camera moves in = dolly in, slides sideways along the product (truck) and pulls back; k = how close (0..1), s = where along the pattern (-1..1)
+function fxSeq(name, u, dir) {
+    if (name === 'reveal') {
+        if (u < 0.26) { const a = u / 0.26; return { k: EZ_IN(a), s: -dir * EZ_SIDE(a) }; }               // push in, drifting to the start of the pattern
+        if (u < 0.33) return { k: 1, s: -dir };                                                           // a beat to read the first part
+        if (u < 0.76) return { k: 1, s: -dir + 2 * dir * EZ_TRACK((u - 0.33) / 0.43) };                   // glide along the whole pattern: slow, fast, slow
+        if (u < 0.82) return { k: 1, s: dir };                                                            // a beat at the end
+        const a = EZ_OUT((u - 0.82) / 0.18); return { k: 1 - a, s: dir * (1 - a) };                       // pull back to the start frame
+    }
+    if (u < 0.12) { const a = u / 0.12; return { k: EZ_IN(a), s: -dir * EZ_SIDE(a) }; }                   // close pass: in, there, and back, without stopping
+    if (u < 0.5) return { k: 1, s: -dir + 2 * dir * EZ_TRACK((u - 0.12) / 0.38) };
+    if (u < 0.88) return { k: 1, s: dir - 2 * dir * EZ_TRACK((u - 0.5) / 0.38) };
+    const a = EZ_OUT((u - 0.88) / 0.12); return { k: 1 - a, s: -dir * (1 - a) };
+}
 function stepFx(dt) {
     const run = R.fxRun, fx = S.fx, def = FX[fx.name]; if (!run || !def) return;
     run.t += dt * fx.speed;
     let u = run.t / def.period, done = false;
     if (!fx.loop && u >= 1) { u = 1; done = true; }
-    const b = run.base, w = 2 * Math.PI * u, A = fx.range * Math.PI / 180, Z = fx.zoom / 100, bump = 0.5 - 0.5 * Math.cos(w);
-    let th = b.th, ph = b.ph, d = b.d;
-    if (fx.name === 'rotate') th = b.th + fx.dir * w;
-    else if (fx.name === 'boomerang') th = b.th + fx.dir * A * Math.sin(w);
-    else if (fx.name === 'push') d = b.d * (1 - Z * bump);
-    else if (fx.name === 'crane') ph = b.ph + A * 0.5 * Math.sin(w);
-    else if (fx.name === 'spiral') { th = b.th + fx.dir * w; d = b.d * (1 - Z * bump); }
-    else if (fx.name === 'figure8') { th = b.th + fx.dir * A * 0.6 * Math.sin(w); ph = b.ph + A * 0.3 * Math.sin(2 * w); }
+    if (fx.loop) u = u % 1;
+    const b = run.base, A = fx.range * Math.PI / 180, Z = fx.zoom / 100;
+    let th = b.th, ph = b.ph, d = b.d, off = 0;
+    if (fx.name === 'rotate') th = b.th + fx.dir * 2 * Math.PI * (run.t / def.period);
+    else {
+        const deep = fx.name === 'pass' ? Math.min(0.7, Z * 2.2) : Math.min(0.7, Z * 1.7), d1 = b.d * (1 - deep);
+        const sq = fxSeq(fx.name, u, fx.dir), tanV = R.fit.tanV, asp = R.camera.aspect || R.fit.asp;
+        const L = Math.max(0, run.W / 2 - 0.9 * d1 * tanV * asp);                 // how far the view can slide until it reaches the product's edges
+        d = b.d + (d1 - b.d) * sq.k; off = L * sq.s;
+        if (fx.name === 'reveal') th = b.th + A * 0.12 * sq.s;                    // a touch of parallax while it slides
+        else th = b.th + 0.06 * sq.s;
+    }
     ph = Math.max(-0.12, Math.min(1.45, ph));
-    const c = R.fit.c, cp = Math.cos(ph);
-    R.camera.position.set(c[0] + d * cp * Math.sin(th), c[1] + d * Math.sin(ph), c[2] + d * cp * Math.cos(th));
+    const cp = Math.cos(ph), rx = Math.cos(th), rz = -Math.sin(th);               // "right" of the view, horizontal
+    const cx = b.c[0] + off * rx, cy = b.c[1], cz = b.c[2] + off * rz;
+    R.controls.target.set(cx, cy, cz);
+    R.camera.position.set(cx + d * cp * Math.sin(th), cy + d * Math.sin(ph), cz + d * cp * Math.cos(th));
     R.dirty = true;
     if (done) fxStop();
 }
