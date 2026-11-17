@@ -7390,7 +7390,7 @@ function placeObjects() {
         S.objs.length = 0; S.objs.push(...kept);
         R.objs = root; R.scene.add(root);
     } else if (sup && S.objs.length) {
-        const GAP = 14, built = [];
+        const GAPMIN = 18, GAPMAX = 70, built = [];   // roomy by default (up to 7 cm), closer only when there are many things
         let total = 0; const cn = {}; let prev = null;
         // wall bolts: barrels cross the pocket, so magazines either stay below the lowest one or stand between them
         let hmax = 275, forbid = [];
@@ -7401,7 +7401,7 @@ function placeObjects() {
         }
         for (const it of S.objs) {
             const o = makeObject(it.k, it.s, sup.depth, { sup, key, flip: !!it.f, hmax, zc: (sup.z0 + sup.z1) / 2, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
-            const gb = prev ? (prev === 'book' && it.k === 'book' ? 1 : GAP) : 0;     // books stand shoulder to shoulder
+            const gb = prev ? (prev === 'book' && it.k === 'book' ? 1 : GAPMIN) : 0;     // books stand shoulder to shoulder
             if (total + gb + o.w > sup.w - 40) break;          // no more room on this product
             total += gb + o.w; o.gb = gb; built.push(o); prev = it.k;
         }
@@ -7410,11 +7410,17 @@ function placeObjects() {
         const foot = g => {
             g.updateMatrixWorld(true); const bb = new T.Box3().setFromObject(g), yl = bb.min.y + (bb.max.y - bb.min.y) * 0.45, v = new T.Vector3(); let a = Infinity, b = -Infinity;
             g.traverse(m => { const p = m.isMesh && m.geometry.attributes.position; if (!p) return; for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); if (v.y <= yl) { if (v.x < a) a = v.x; if (v.x > b) b = v.x; } } });
-            return a < b ? [a, b] : [bb.min.x, bb.max.x];
+            return a < b ? [a - 0.3 * (a - bb.min.x), b + 0.3 * (bb.max.x - b)] : [bb.min.x, bb.max.x];   // plus a third of what overhangs higher up
         };
         let okFoot = !forbid.length;
         if (okFoot) { try { total = 0; built.forEach(o => { const f = foot(o.g); o.fa = f[0] - o.g.position.x; o.fw = f[1] - f[0]; total += o.gb + o.fw; }); if (!(total > 0) || built.some(o => !isFinite(o.fa))) throw 0; } catch (e) { okFoot = false; total = built.reduce((t, o) => t + o.gb + o.w, 0); } }
         built.forEach(o => { if (!okFoot) { o.fa = -o.w / 2; o.fw = o.w; } });
+        {   // the gap: as wide as the shelf allows (GAPMAX), shrinking to GAPMIN only when the things need the room; books keep standing together
+            const ks = S.objs.map(q => q.k); let fixed = 0, n = 0;
+            built.forEach((o, i) => { if (i) { if (ks[i - 1] === 'book' && ks[i] === 'book') fixed += 1; else n++; } });
+            const free = (sup.w - 40) - built.reduce((t, o) => t + o.fw, 0) - fixed, gap = n ? Math.max(GAPMIN, Math.min(GAPMAX, free / n)) : 0;
+            total = 0; built.forEach((o, i) => { o.gb = i ? (ks[i - 1] === 'book' && ks[i] === 'book' ? 1 : gap) : 0; total += o.gb + o.fw; });
+        }
         const root = new T.Group(); let x = -total / 2;
         if (forbid.length && built.length) {   // fit the magazines into the free stretches between the barrels
             const lim = sup.w / 2 - 20; let segs = [[-lim, lim]];
