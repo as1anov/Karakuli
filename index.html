@@ -7399,13 +7399,21 @@ function placeObjects() {
             const above = bar.filter(b => b[1] - 10 > sup.y);
             forbid = above.map(b => [b[0] - 10, b[0] + 10]);                  // full-size magazines stand in the gaps between the barrels
         }
-        for (const it of S.objs) {
+        // standing order: all the books form ONE pile (wherever they sit in the list), and the pile is never the first or the last thing on the shelf
+        const lay = (() => {
+            const bk = S.objs.filter(q => q.k === 'book'), ot = S.objs.filter(q => q.k !== 'book');
+            if (!bk.length || !ot.length) return S.objs.slice();
+            let at = S.objs.findIndex(q => q.k === 'book');                 // the pile stands where the first book was added, counted among the other things
+            if (ot.length >= 2) at = Math.min(Math.max(at, 1), ot.length - 1);
+            return [...ot.slice(0, at), ...bk, ...ot.slice(at)];
+        })();
+        for (const it of lay) {
             const o = makeObject(it.k, it.s, sup.depth, { sup, key, flip: !!it.f, hmax, zc: (sup.z0 + sup.z1) / 2, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
             const gb = prev ? (prev === 'book' && it.k === 'book' ? 1 : GAPMIN) : 0;     // books stand shoulder to shoulder
             if (total + gb + o.w > sup.w - 40) break;          // no more room on this product
             total += gb + o.w; o.gb = gb; built.push(o); prev = it.k;
         }
-        S.objs.length = built.length;
+        if (forbid.length) S.objs.length = built.length; else lay.slice(built.length).forEach(q => { const i = S.objs.indexOf(q); if (i >= 0) S.objs.splice(i, 1); });
         // the real footprint of each thing (its lower part: flowers and pages stick out higher up), so the visible gaps are equal whatever the order
         const foot = g => {
             g.updateMatrixWorld(true); const bb = new T.Box3().setFromObject(g), yl = bb.min.y + (bb.max.y - bb.min.y) * 0.45, v = new T.Vector3(); let a = Infinity, b = -Infinity;
@@ -7416,7 +7424,7 @@ function placeObjects() {
         if (okFoot) { try { total = 0; built.forEach(o => { const f = foot(o.g); o.fa = f[0] - o.g.position.x; o.fw = f[1] - f[0]; total += o.gb + o.fw; }); if (!(total > 0) || built.some(o => !isFinite(o.fa))) throw 0; } catch (e) { okFoot = false; total = built.reduce((t, o) => t + o.gb + o.w, 0); } }
         built.forEach(o => { if (!okFoot) { o.fa = -o.w / 2; o.fw = o.w; } });
         {   // the gap: as wide as the shelf allows (GAPMAX), shrinking to GAPMIN only when the things need the room; books keep standing together
-            const ks = S.objs.map(q => q.k); let fixed = 0, n = 0;
+            const ks = lay.map(q => q.k); let fixed = 0, n = 0;
             built.forEach((o, i) => { if (i) { if (ks[i - 1] === 'book' && ks[i] === 'book') fixed += 1; else n++; } });
             const free = (sup.w - 40) - built.reduce((t, o) => t + o.fw, 0) - fixed, gap = n ? Math.max(GAPMIN, Math.min(GAPMAX, free / n)) : 0;
             total = 0; built.forEach((o, i) => { o.gb = i ? (ks[i - 1] === 'book' && ks[i] === 'book' ? 1 : gap) : 0; total += o.gb + o.fw; });
