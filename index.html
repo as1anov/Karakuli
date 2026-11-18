@@ -1811,7 +1811,7 @@
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
-            shelfOpts = { hooks: (project.shelfOpts && Array.isArray(project.shelfOpts.hooks)) ? project.shelfOpts.hooks.map(Number).filter(Number.isFinite).slice(0, 5) : [], towel: !!(project.shelfOpts && project.shelfOpts.towel), tx: project.shelfOpts ? project.shelfOpts.tx : null, tl: project.shelfOpts ? project.shelfOpts.tl : null };
+            shelfOpts = { hooks: (project.shelfOpts && Array.isArray(project.shelfOpts.hooks)) ? project.shelfOpts.hooks.map(Number).filter(Number.isFinite).slice(0, 5) : [], towel: !!(project.shelfOpts && project.shelfOpts.towel), tx: project.shelfOpts ? (project.shelfOpts.tx != null ? project.shelfOpts.tx : (project.shelfOpts.towel ? paperWidthMm / 2 : null)) : null, tl: project.shelfOpts ? project.shelfOpts.tl : null };
             holeOff = new Set(Array.isArray(project.holeOff) ? project.holeOff : []);
             plateHoleOn = new Set(Array.isArray(project.plateHoles) ? project.plateHoles : []); plateBolts = project.plateBolts !== false;
             if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
@@ -2639,9 +2639,19 @@ service cloud.firestore {
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         // Shelf options: positions (canvas px) of the key-hook notches and of the towel slot
         const SHELF_NOTCH_DEPTH = PRODUCTS.shelf.profile.lip, SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 24, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
+        // where the options appear: the middle of the part of the sheet that is on screen right now
+        function shelfViewMm() {
+            const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, l = -wPx / 2 * zoom + offsetX, r = wPx / 2 * zoom + offsetX;
+            const a = Math.max(l, 0), b = Math.min(r, width), sx = b > a ? (a + b) / 2 : (l + r) / 2;
+            return ((sx - offsetX) / zoom + wPx / 2) / MM;
+        }
+        function shelfDefaultHooks() {
+            const span = 2 * SHELF_HOOK_PITCH, c = Math.max(SHELF_HOOK_MARGIN + span, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - span, shelfViewMm()));
+            return [-2, -1, 0, 1, 2].map(k => Math.round(c + k * SHELF_HOOK_PITCH));
+        }
         function shelfTowel() {   // pocket centre / length in mm (defaults: centred, 40 cm)
             const len = Math.max(SHELF_TOWEL_MIN, Math.min(SHELF_TOWEL_MAX, shelfOpts.tl || Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55)));
-            const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? paperWidthMm / 2 : shelfOpts.tx));
+            const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? shelfViewMm() : shelfOpts.tx));
             return { cx, len };
         }
         function shelfFeat(dx = 0, dy = 0) {
@@ -2649,7 +2659,7 @@ service cloud.firestore {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM, G = productGeom('shelf', paperWidthMm, paperHeightMm);
             const L = -wPx / 2 + dx, R = wPx / 2 + dx, T = -hPx / 2 + dy, B = hPx / 2 + dy, cx0 = (L + R) / 2;
             const hk = PRODUCTS.hanger.hooks, rr = Math.min(SHELF_CORNER, hk.armW / 2);
-            const notches = shelfOpts.hooks.slice().sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: hk.armW / 2 * MM, r: rr * MM, rm: rr * MM, d: SHELF_NOTCH_DEPTH * MM }));
+            const notches = (shelfOpts.hooks.length ? shelfOpts.hooks.slice() : shelfDefaultHooks()).sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: hk.armW / 2 * MM, r: rr * MM, rm: rr * MM, d: SHELF_NOTCH_DEPTH * MM }));
             const tw = shelfTowel(), hh = SHELF_SLOT_H / 2 * MM;
             const slot = { cx: L + tw.cx * MM, cy: T + (G.anchor + SHELF_SLOT_Y) * MM, hh, hl: tw.len / 2 * MM, r: SHELF_CORNER * MM };
             return { L, R, T, B, notches, slot, MM };
@@ -2786,8 +2796,7 @@ service cloud.firestore {
                 const a = shelfAnim && shelfAnim.key === h.key ? Math.min(1, (now - shelfAnim.t0) / 700) : 1;
                 const path = shelfFeatPath(h.key, F);
                 ctx.save();
-                ctx.strokeStyle = onSheet; ctx.lineWidth = 1.6 * u; ctx.lineCap = 'round';
-                if (!on) { ctx.setLineDash([6 * u, 5 * u]); ctx.stroke(path); }   // only the dashed preview; the real cut keeps the sheet's own edge
+                if (!on) { ctx.fillStyle = dark ? '#3d3d3d' : '#4a4a4a'; ctx.fill(path); ctx.strokeStyle = '#5a5a5a'; ctx.lineWidth = 1.2 * u; ctx.stroke(path); }   // off: the shape in dark grey; on: the real cut keeps the sheet's own edge
                 ctx.restore();
                 if (on && h.key === 'hooks') {
                     const xs = F.notches.map(n => n.cx), mid = (xs[0] + xs[xs.length - 1]) / 2, hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u;
@@ -2846,9 +2855,8 @@ service cloud.firestore {
         }
         function toggleShelfOpt(key) {
             if (key === 'hooks') {
-                if (shelfOpts.hooks.length) shelfOpts.hooks = [];
-                else { const c = paperWidthMm / 2; shelfOpts.hooks = [-2, -1, 0, 1, 2].map(k => Math.round(c + k * SHELF_HOOK_PITCH)).filter(x => x >= SHELF_HOOK_MARGIN && x <= paperWidthMm - SHELF_HOOK_MARGIN).slice(0, SHELF_HOOK_MAX); }
-            } else shelfOpts.towel = !shelfOpts.towel;
+                shelfOpts.hooks = shelfOpts.hooks.length ? [] : shelfDefaultHooks();
+            } else { if (!shelfOpts.towel) shelfOpts.tx = shelfTowel().cx; else shelfOpts.tx = null; shelfOpts.towel = !shelfOpts.towel; }
             shelfAnim = { key, t0: performance.now() };
             redraw();
             try { scheduleProjectSave(); } catch (e) {}
