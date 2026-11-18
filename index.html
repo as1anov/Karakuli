@@ -2634,7 +2634,7 @@ service cloud.firestore {
 
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         // Shelf options: positions (canvas px) of the key-hook notches and of the towel slot
-        const SHELF_NOTCH_DEPTH = 10, SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 24, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
+        const SHELF_NOTCH_DEPTH = PRODUCTS.shelf.profile.lip, SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 24, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
         function shelfTowel() {   // pocket centre / length in mm (defaults: centred, 40 cm)
             const len = Math.max(SHELF_TOWEL_MIN, Math.min(SHELF_TOWEL_MAX, shelfOpts.tl || Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55)));
             const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? paperWidthMm / 2 : shelfOpts.tx));
