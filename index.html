@@ -2638,7 +2638,8 @@ service cloud.firestore {
 
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         // Shelf options: positions (canvas px) of the key-hook notches and of the towel slot
-        const SHELF_NOTCH_DEPTH = PRODUCTS.shelf.profile.lip, SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 24, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
+        const SHELF_NOTCH_DEPTH = PRODUCTS.shelf.profile.lip - 2,   // stops 2 mm short of the bend so the bend strip keeps one solid edge in 3D
+             SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 24, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
         // phone, zoomed out (the background dots are not drawn yet): no leaders, arrows or labels, they would pile on each other
         function shelfFar() { return ((window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768) && zoom < 0.395; }
         function shelfDefaultHooks() {
