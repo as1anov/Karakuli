@@ -1854,9 +1854,10 @@
             el.classList.add('show');
         }
 
-        function tapOpenProject(el, id) {   // a light tap animation, then the project opens and the side menu folds away
+        function tapOpenProject(el, id) {   // tap animation, the side menu folds at once, the project loads right behind it
             const it = el.closest('.project-item'); if (it) it.classList.add('tap');
-            setTimeout(() => { openProject(id); if (it) setTimeout(() => it.classList.remove('tap'), 400); }, 160);
+            try { setProjectsMode(false); if (isDashboardOpen) toggleDashboard(); } catch (e) {}
+            openProject(id).finally(() => { if (it) setTimeout(() => it.classList.remove('tap'), 250); });
         }
         async function openProject(id) {
             const project = await window.karakuliProjects?.load(id);
@@ -2762,7 +2763,7 @@ service cloud.firestore {
         // ---- Shelf options in the drawing view: a dark-grey line + a round "+" with the name of the feature.
         // Tap the "+" : a ring ripples out, the plus turns, the new edge is traced; tap again to take the feature away.
         const SHELF_HINTS = [{ key: 'hooks', label: 'Key hooks' }, { key: 'towel', label: 'Towel pocket' }];
-        let shelfAnim = null, shelfDrag = null;
+        let shelfAnim = null, shelfDrag = null, shelfHint = null, shelfTap = null;
         function shelfHintPos(key) {
             const F = shelfFeat(); if (!F) return null;
             const u = 1 / zoom;
@@ -2792,6 +2793,11 @@ service cloud.firestore {
             ctx.moveTo(x + 4 * u, y - 3 * u); ctx.lineTo(x + 7 * u, y); ctx.lineTo(x + 4 * u, y + 3 * u); ctx.stroke(); ctx.restore();
         }
         // the stop animation: the arrow knocks against the end and springs back, in red
+        function shelfHintArrow(key, now) {   // 1.8 s after the option is switched on: a small arrow slides left-right and fades
+            if (!shelfHint || shelfHint.key !== key) return null;
+            const t = (now - shelfHint.t0) / 1800; if (t >= 1) return null;
+            return { dx: Math.sin(t * Math.PI * 4) * 14, alpha: Math.sin(Math.min(1, t * 1.15) * Math.PI) };
+        }
         function shelfBump(kind, u, now) {
             const D = shelfDrag; if (!D || D.kind !== kind || !D.bump) return null;
             const dt = now - D.bump; if (dt > 520) return null;
@@ -2812,15 +2818,18 @@ service cloud.firestore {
                 ctx.save();
                 if (!on) { ctx.fillStyle = '#2b2b2b'; ctx.fill(path); }   // off: the shape in dark grey; on: the real cut keeps the sheet's own edge
                 ctx.restore();
-                if (on && h.key === 'hooks' && !far) {
-                    const xs = F.notches.map(n => n.cx), mid = (xs[0] + xs[xs.length - 1]) / 2, hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u;
-                    drawShelfGrip(ctx, mid, shelfGripY(F), u, shelfDrag && shelfDrag.kind === 'hooks', ink, dark, 0, shelfBump('hooks', u, now));
-                }
-                if (on && h.key === 'towel' && !far) {
-                    const s = F.slot, cx = s.cx, act = shelfDrag && shelfDrag.kind.startsWith('towel');
-                    drawShelfGrip(ctx, cx, s.cy, u, shelfDrag && shelfDrag.kind === 'towelM', ink, dark, 0, shelfBump('towelM', u, now));
-                    [-1, 1].forEach(sd => { const pul = shelfAnim && shelfAnim.key === 'towel' ? Math.sin((now - shelfAnim.t0) / 110) * (1 - a) : 0, x = cx + sd * s.hl, on2 = shelfDrag && shelfDrag.kind === (sd < 0 ? 'towelL' : 'towelR'); ctx.save(); ctx.translate(x, s.cy); ctx.scale(1 + 0.09 * pul, 1 + 0.09 * pul); ctx.translate(-x - sd * 1.2 * u * pul, -s.cy); ctx.beginPath(); ctx.arc(x, s.cy, (on2 ? 10 : 8) * u, 0, Math.PI * 2); ctx.fillStyle = on2 ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); ctx.strokeStyle = on2 ? (dark ? '#111' : '#f2f2f2') : ink; ctx.beginPath(); ctx.moveTo(x - 4 * u, s.cy); ctx.lineTo(x + 4 * u, s.cy); ctx.moveTo(x - 2 * u, s.cy - 2.5 * u); ctx.lineTo(x - 4 * u, s.cy); ctx.lineTo(x - 2 * u, s.cy + 2.5 * u); ctx.moveTo(x + 2 * u, s.cy - 2.5 * u); ctx.lineTo(x + 4 * u, s.cy); ctx.lineTo(x + 2 * u, s.cy + 2.5 * u); ctx.stroke(); ctx.restore(); });
-                    if (!far) { ctx.save(); ctx.fillStyle = onSheet; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((s.hl * 2 / F.MM / 10).toFixed(1).replace(/\.0$/, '') + ' cm × ' + SHELF_SLOT_H / 10 + ' cm', cx, s.cy - s.hh - 6 * u); ctx.restore(); }
+                // no standing arrows: a small arrow shows up for a moment after activation (a hint that the part can be slid), or when the stop is hit
+                if (on && !far) {
+                    const key = h.key === 'hooks' ? 'hooks' : 'towelM', hint = shelfHintArrow(h.key, now), bump = shelfBump(key, u, now);
+                    if (hint || bump) {
+                        let ax, ay;
+                        if (h.key === 'hooks') { const xs = F.notches.map(n => n.cx); ax = (xs[0] + xs[xs.length - 1]) / 2; ay = shelfGripY(F); }
+                        else { ax = F.slot.cx; ay = F.slot.cy; }
+                        ctx.save(); if (!bump && hint) ctx.globalAlpha = hint.alpha;
+                        drawShelfGrip(ctx, ax, ay, u * 1.25, false, ink, dark, 0, bump || { dx: hint.dx * u, warn: false });
+                        if (h.key === 'towel') { const s = F.slot; ctx.globalAlpha = 1; ctx.fillStyle = onSheet; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((s.hl * 2 / F.MM / 10).toFixed(1).replace(/\.0$/, '') + ' cm × ' + SHELF_SLOT_H / 10 + ' cm', s.cx, s.cy - s.hh - 6 * u); }
+                        ctx.restore();
+                    }
                 }
                 if (!far) { ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath(); ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); ctx.stroke(); ctx.restore(); }
                 const mine = shelfAnim && shelfAnim.key === h.key, ease = a < 1 ? 1 - Math.pow(1 - a, 3) : 1;
@@ -2843,7 +2852,8 @@ service cloud.firestore {
             ctx.restore();
             if (shelfAnim && now - shelfAnim.t0 >= 700) shelfAnim = null;
             // frames are requested only while a short animation runs (an endless loop made phones crawl)
-            if (shelfAnim || (shelfDrag && shelfDrag.bump && now - shelfDrag.bump < 540)) requestAnimationFrame(() => redraw());
+            if (shelfHint && now - shelfHint.t0 >= 1800) shelfHint = null;
+            if (shelfAnim || shelfHint || (shelfDrag && shelfDrag.bump && now - shelfDrag.bump < 540)) requestAnimationFrame(() => redraw());
         }
         // what lies under a pointer: 'hooks' / 'towel' (the + icons) or a drag kind { drag }
         function shelfHintHit(cx, cy) {
@@ -2855,14 +2865,17 @@ service cloud.firestore {
                 const P = shelfHintPos(h.key), r = 16 * u, lw = (h.label.length * 7.5 + 40) * u;
                 if (wx >= P.x - r && wx <= P.x + r + lw && Math.abs(wy - P.y) <= r) return h.key;
             }
-            if (shelfOpts.hooks.length && !far) {
-                const xs = F.notches.map(n => n.cx), hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u, mid = (xs[0] + xs[xs.length - 1]) / 2;
-                if (Math.abs(wx - mid) <= 18 * u + pad && Math.abs(wy - shelfGripY(F)) <= 12 * u + pad) return { drag: 'hooks' };
+            if (shelfOpts.hooks.length) {   // the whole row of hooks (and the strip right under it) slides
+                const a = F.notches[0], z = F.notches[F.notches.length - 1], x0 = a.cx - a.hw - a.rm - pad, x1 = z.cx + z.hw + z.rm + pad;
+                if (wx >= x0 && wx <= x1 && wy >= F.B - a.d - pad && wy <= F.B + 16 * u + pad) return { drag: 'hooks' };
             }
-            if (shelfOpts.towel && !far) {
-                const s = F.slot;
-                for (const sd of [-1, 1]) if (Math.hypot(wx - (s.cx + sd * s.hl), wy - s.cy) <= 11 * u + pad) return { drag: sd < 0 ? 'towelL' : 'towelR' };
-                if (Math.abs(wx - s.cx) <= 20 * u + pad && Math.abs(wy - s.cy) <= 10 * u + pad) return { drag: 'towelM' };
+            if (shelfOpts.towel) {
+                const s = F.slot, ez = Math.min(s.hl / 3, 14 * u + pad);   // a thumb-wide strip at each end stretches, the rest moves
+                if (wx >= s.cx - s.hl - pad && wx <= s.cx + s.hl + pad && wy >= s.cy - s.hh - pad && wy <= s.cy + s.hh + pad) {
+                    if (wx <= s.cx - s.hl + ez) return { drag: 'towelL' };
+                    if (wx >= s.cx + s.hl - ez) return { drag: 'towelR' };
+                    return { drag: 'towelM' };
+                }
             }
             return null;
         }
@@ -2871,6 +2884,8 @@ service cloud.firestore {
                 shelfOpts.hooks = shelfOpts.hooks.length ? [] : shelfDefaultHooks();
             } else { if (!shelfOpts.towel) shelfOpts.tx = shelfTowel().cx; else shelfOpts.tx = null; shelfOpts.towel = !shelfOpts.towel; }
             shelfAnim = { key, t0: performance.now() };
+            const nowOn = key === 'hooks' ? shelfOpts.hooks.length > 0 : shelfOpts.towel;
+            shelfHint = nowOn ? { key, t0: performance.now() } : null;
             redraw();
             try { scheduleProjectSave(); } catch (e) {}
         }
@@ -4532,23 +4547,33 @@ service cloud.firestore {
             const pushDx = () => document.body.classList.contains('projects-open') ? document.getElementById('dashboard').offsetWidth : 0;
             const adj = ev => { const d = pushDx(); if (!d) return ev; return new Proxy(ev, { get(t, k) { if (k === 'clientX' || k === 'pageX' || k === 'x') return t[k] - d; const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; } }); };
             // the "+" hints of the shelf options: a tap on one toggles the feature and never starts a stroke
+            // The shelf options. A second finger (pinch) is never taken away from the canvas: the first finger is registered as a normal pointer,
+            // the "+" icons act on release (a tap), the slides act at once.
             window.addEventListener('pointerdown', (e0) => {
                 if (e0.target !== canvasElem) return;
+                if (activePointers.size >= 1) { shelfTap = null; if (shelfDrag) { shelfDrag = null; redraw(); } return; }   // pinch: leave it to the canvas
                 const e = adj(e0), k = shelfHintHit(e.clientX, e.clientY);
                 if (!k) return;
                 e0.preventDefault(); e0.stopImmediatePropagation();
+                activePointers.set(e0.pointerId, e); mainPointerId = -1; isPointerDrawing = false; isPanning = false;
                 if (typeof k === 'object') {
                     const F = shelfFeat(), mm = ((e.clientX - offsetX) / zoom - F.L) / F.MM, h = shelfOpts.hooks, T = shelfTowel();
                     shelfDrag = { kind: k.drag, id: e0.pointerId, grab: k.drag === 'hooks' ? mm - (h[0] + h[h.length - 1]) / 2 : mm - T.cx };
-                    canvasElem.setPointerCapture?.(e0.pointerId); shelfDragMove(e.clientX); redraw();
-                }
-                else toggleShelfOpt(k);
+                    if (k.drag === 'towelL' || k.drag === 'towelR') shelfDrag.grab = 0;
+                    else { shelfDrag.x0 = e.clientX; shelfDrag.moved = false; }
+                    canvasElem.setPointerCapture?.(e0.pointerId);
+                } else shelfTap = { id: e0.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), key: k };
             }, true);
             window.addEventListener('pointermove', (e0) => {
+                if (shelfTap && e0.pointerId === shelfTap.id && Math.hypot(e0.clientX - shelfTap.x, e0.clientY - shelfTap.y) > 10) shelfTap = null;
                 if (!shelfDrag || e0.pointerId !== shelfDrag.id) return;
                 e0.stopImmediatePropagation(); shelfDragMove(adj(e0).clientX); redraw();
             }, true);
-            const shelfDragEnd = (e0) => { if (!shelfDrag || e0.pointerId !== shelfDrag.id) return; e0.stopImmediatePropagation(); shelfDrag = null; redraw(); try { scheduleProjectSave(); } catch (er) {} };
+            const shelfDragEnd = (e0) => {
+                if (shelfTap && e0.pointerId === shelfTap.id) { const t = shelfTap; shelfTap = null; activePointers.delete(e0.pointerId); if (e0.type === 'pointerup' && performance.now() - t.t < 700) toggleShelfOpt(t.key); return; }
+                if (!shelfDrag || e0.pointerId !== shelfDrag.id) return;
+                e0.stopImmediatePropagation(); activePointers.delete(e0.pointerId); shelfDrag = null; redraw(); try { scheduleProjectSave(); } catch (er) {}
+            };
             window.addEventListener('pointerup', shelfDragEnd, true); window.addEventListener('pointercancel', shelfDragEnd, true);
             canvasElem.addEventListener('pointerdown', (e0) => {
                 const e = adj(e0);
