@@ -1356,7 +1356,7 @@
             return JSON.parse(JSON.stringify({
                 title: currentProjectTitle, segments: tlLive ? tlLive.segments : segments, specialElements: tlLive ? tlLive.specialElements : specialElements, curI, curJ, lastDirection,
                 paperWidthMm, paperHeightMm, isPaperVisible, currentTheme,
-                productKey: activeProductKey, shelfOpts: { hooks: [...shelfOpts.hooks], towel: shelfOpts.towel }, holeOff: [...holeOff], plateHoles: [...plateHoleOn], plateBolts,
+                productKey: activeProductKey, shelfOpts: { hooks: [...shelfOpts.hooks], towel: shelfOpts.towel, tx: shelfOpts.tx, tl: shelfOpts.tl }, holeOff: [...holeOff], plateHoles: [...plateHoleOn], plateBolts,
                 shareEditToken: projectShare.edit, shareViewToken: projectShare.view,
                 tlCurrentFrame, tlCaptureStride, tlCaptureCounter, ...tlPart
             }));
@@ -1810,7 +1810,7 @@
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
-            shelfOpts = { hooks: (project.shelfOpts && Array.isArray(project.shelfOpts.hooks)) ? project.shelfOpts.hooks.map(Number).filter(Number.isFinite).slice(0, 5) : [], towel: !!(project.shelfOpts && project.shelfOpts.towel) };
+            shelfOpts = { hooks: (project.shelfOpts && Array.isArray(project.shelfOpts.hooks)) ? project.shelfOpts.hooks.map(Number).filter(Number.isFinite).slice(0, 5) : [], towel: !!(project.shelfOpts && project.shelfOpts.towel), tx: project.shelfOpts ? project.shelfOpts.tx : null, tl: project.shelfOpts ? project.shelfOpts.tl : null };
             holeOff = new Set(Array.isArray(project.holeOff) ? project.holeOff : []);
             plateHoleOn = new Set(Array.isArray(project.plateHoles) ? project.plateHoles : []); plateBolts = project.plateBolts !== false;
             if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
@@ -2634,15 +2634,20 @@ service cloud.firestore {
 
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         // Shelf options: positions (canvas px) of the key-hook notches and of the towel slot
-        const SHELF_NOTCH_DEPTH = 10, SHELF_SLOT_H = 36, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_GAP = 30, SHELF_TOWEL_MAX = 400;
+        const SHELF_NOTCH_DEPTH = 10, SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 60, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
+        function shelfTowel() {   // pocket centre / length in mm (defaults: centred, 40 cm)
+            const len = Math.max(SHELF_TOWEL_MIN, Math.min(SHELF_TOWEL_MAX, shelfOpts.tl || Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55)));
+            const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? paperWidthMm / 2 : shelfOpts.tx));
+            return { cx, len };
+        }
         function shelfFeat(dx = 0, dy = 0) {
             if (templateKind() !== 'product' || activeProductKey !== 'shelf') return null;
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM, G = productGeom('shelf', paperWidthMm, paperHeightMm);
             const L = -wPx / 2 + dx, R = wPx / 2 + dx, T = -hPx / 2 + dy, B = hPx / 2 + dy, cx0 = (L + R) / 2;
-            const hk = PRODUCTS.hanger.hooks, rr = Math.min(HOOK_CORNER_MM, hk.armW / 2);
+            const hk = PRODUCTS.hanger.hooks, rr = Math.min(SHELF_CORNER, hk.armW / 2);
             const notches = shelfOpts.hooks.slice().sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: hk.armW / 2 * MM, r: rr * MM, d: SHELF_NOTCH_DEPTH * MM }));
-            const len = Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55), hh = SHELF_SLOT_H / 2 * MM;
-            const slot = { cx: cx0, cy: T + (G.anchor + 72) * MM, hh, hl: len / 2 * MM };
+            const tw = shelfTowel(), hh = SHELF_SLOT_H / 2 * MM;
+            const slot = { cx: L + tw.cx * MM, cy: T + (G.anchor + SHELF_SLOT_Y) * MM, hh, hl: tw.len / 2 * MM, r: SHELF_CORNER * MM };
             return { L, R, T, B, notches, slot, MM };
         }
 
@@ -2674,7 +2679,7 @@ service cloud.firestore {
                 const r = P.radius * MM, F = shelfFeat(dx, dy);
                 // key-hook lip: rounded notches cut into the bottom edge, walking from right to left
                 const notches = (shelfOpts.hooks.length && F) ? F.notches.map(n => `H${f(n.cx + n.hw)}V${f(B - n.d + n.r)}A${f(n.r)} ${f(n.r)} 0 0 0 ${f(n.cx + n.hw - n.r)} ${f(B - n.d)}H${f(n.cx - n.hw + n.r)}A${f(n.r)} ${f(n.r)} 0 0 0 ${f(n.cx - n.hw)} ${f(B - n.d + n.r)}V${f(B)}`).reverse().join('') : '';
-                const slot = (shelfOpts.towel && F) ? `M${f(F.slot.cx + F.slot.hl)} ${f(F.slot.cy - F.slot.hh)}H${f(F.slot.cx - F.slot.hl)}V${f(F.slot.cy + F.slot.hh)}H${f(F.slot.cx + F.slot.hl)}Z` : '';
+                const sl = F && F.slot, sr = sl && sl.r, slot = (shelfOpts.towel && F) ? `M${f(sl.cx + sl.hl - sr)} ${f(sl.cy - sl.hh)}H${f(sl.cx - sl.hl + sr)}A${f(sr)} ${f(sr)} 0 0 0 ${f(sl.cx - sl.hl)} ${f(sl.cy - sl.hh + sr)}V${f(sl.cy + sl.hh - sr)}A${f(sr)} ${f(sr)} 0 0 0 ${f(sl.cx - sl.hl + sr)} ${f(sl.cy + sl.hh)}H${f(sl.cx + sl.hl - sr)}A${f(sr)} ${f(sr)} 0 0 0 ${f(sl.cx + sl.hl)} ${f(sl.cy + sl.hh - sr)}V${f(sl.cy - sl.hh + sr)}A${f(sr)} ${f(sr)} 0 0 0 ${f(sl.cx + sl.hl - sr)} ${f(sl.cy - sl.hh)}Z` : '';
                 return `M${f(L)} ${f(T)}H${f(R)}V${f(B - r)}A${f(r)} ${f(r)} 0 0 1 ${f(R - r)} ${f(B)}${notches}H${f(L + r)}A${f(r)} ${f(r)} 0 0 1 ${f(L)} ${f(B - r)}Z${slot}`;
             }
             return `M${f(L)} ${f(T)}H${f(R)}V${f(B)}H${f(L)}Z`;
@@ -2736,14 +2741,14 @@ service cloud.firestore {
         // ---- Shelf options in the drawing view: a dark-grey line + a round "+" with the name of the feature.
         // Tap the "+" : a ring ripples out, the plus turns, the new edge is traced; tap again to take the feature away.
         const SHELF_HINTS = [{ key: 'hooks', label: 'Key hooks' }, { key: 'towel', label: 'Towel pocket' }];
-        let shelfAnim = null, hookDrag = null;
+        let shelfAnim = null, shelfDrag = null;
         function shelfHintPos(key) {
             const F = shelfFeat(); if (!F) return null;
             const u = 1 / zoom;
             if (key === 'hooks') return { x: F.R + 34 * u, y: F.B - 8 * F.MM, F };
             return { x: F.R + 34 * u, y: F.slot.cy, F };
         }
-        function shelfNotchPath(n, B) {   // one hook notch, bottom to top and back: rounded inner corners
+        function shelfNotchPath(n, B) {   // one hook notch: rounded inner corners
             const p = new Path2D(), hw = n.hw, r = n.r, d = n.d;
             p.moveTo(n.cx + hw, B); p.lineTo(n.cx + hw, B - d + r); p.arc(n.cx + hw - r, B - d + r, r, 0, -Math.PI / 2, true);
             p.lineTo(n.cx - hw + r, B - d); p.arc(n.cx - hw + r, B - d + r, r, -Math.PI / 2, -Math.PI, true); p.lineTo(n.cx - hw, B);
@@ -2752,14 +2757,16 @@ service cloud.firestore {
         function shelfFeatPath(key, F) {
             const p = new Path2D();
             if (key === 'hooks') F.notches.forEach(n => p.addPath(shelfNotchPath(n, F.B)));
-            else { const s = F.slot; p.rect(s.cx - s.hl, s.cy - s.hh, 2 * s.hl, 2 * s.hh); }
+            else { const s = F.slot; p.roundRect(s.cx - s.hl, s.cy - s.hh, 2 * s.hl, 2 * s.hh, s.r); }
             return p;
         }
-        function nextHookX() {   // a free spot for a new hook: from the middle outwards
-            const W = paperWidthMm, c = W / 2, tries = [0];
-            for (let k = 1; k < 30; k++) tries.push(k * 60, -k * 60);
-            for (const t of tries) { const x = c + t; if (x < SHELF_HOOK_MARGIN || x > W - SHELF_HOOK_MARGIN) continue; if (shelfOpts.hooks.every(q => Math.abs(q - x) >= SHELF_HOOK_GAP)) return Math.round(x); }
-            return null;
+        function shelfGripY(F) { return F.B + 18 * (1 / zoom); }
+        function drawShelfGrip(ctx, x, y, u, active, ink, dark, halfW) {   // a pill with a left-right arrow: press and slide
+            ctx.save(); ctx.beginPath(); ctx.roundRect(x - halfW, y - 8 * u, 2 * halfW, 16 * u, 8 * u);
+            ctx.fillStyle = active ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke();
+            ctx.strokeStyle = active ? (dark ? '#111' : '#f2f2f2') : ink; ctx.lineWidth = 1.5 * u; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+            ctx.moveTo(x - 7 * u, y); ctx.lineTo(x + 7 * u, y); ctx.moveTo(x - 4 * u, y - 3 * u); ctx.lineTo(x - 7 * u, y); ctx.lineTo(x - 4 * u, y + 3 * u);
+            ctx.moveTo(x + 4 * u, y - 3 * u); ctx.lineTo(x + 7 * u, y); ctx.lineTo(x + 4 * u, y + 3 * u); ctx.stroke(); ctx.restore();
         }
         function drawShelfHints() {
             if (isViewOnly || templateKind() !== 'product' || activeProductKey !== 'shelf') return;
@@ -2769,9 +2776,8 @@ service cloud.firestore {
             const now = performance.now(), far = isFarOutOnMobile();
             ctx.save();
             SHELF_HINTS.forEach(h => {
-                const P = shelfHintPos(h.key), F = P.F, nH = shelfOpts.hooks.length;
-                const on = h.key === 'hooks' ? nH > 0 : shelfOpts.towel;
-                const full = h.key === 'hooks' && nH >= SHELF_HOOK_MAX;
+                const P = shelfHintPos(h.key), F = P.F;
+                const on = h.key === 'hooks' ? shelfOpts.hooks.length > 0 : shelfOpts.towel;
                 const a = shelfAnim && shelfAnim.key === h.key ? Math.min(1, (now - shelfAnim.t0) / 700) : 1;
                 const path = shelfFeatPath(h.key, F);
                 ctx.save();
@@ -2779,79 +2785,86 @@ service cloud.firestore {
                 if (!on) ctx.setLineDash([6 * u, 5 * u]);
                 ctx.stroke(path);
                 ctx.restore();
-                if (h.key === 'hooks') {   // a round grip under each hook: press and slide it along the edge
-                    F.notches.forEach((n, i) => {
-                        const gx = n.cx, gy = F.B + 16 * u, act = hookDrag && hookDrag.i === i;
-                        ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.beginPath(); ctx.moveTo(gx, F.B + 1 * u); ctx.lineTo(gx, gy - 7 * u); ctx.stroke();
-                        ctx.beginPath(); ctx.arc(gx, gy, (act ? 9 : 7) * u, 0, Math.PI * 2); ctx.fillStyle = act ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.stroke();
-                        ctx.strokeStyle = act ? (dark ? '#111' : '#f2f2f2') : ink; ctx.lineWidth = 1.3 * u; ctx.beginPath(); ctx.moveTo(gx - 3 * u, gy); ctx.lineTo(gx + 3 * u, gy); ctx.moveTo(gx - 2 * u, gy - 2.5 * u); ctx.lineTo(gx - 3.5 * u, gy); ctx.lineTo(gx - 2 * u, gy + 2.5 * u); ctx.moveTo(gx + 2 * u, gy - 2.5 * u); ctx.lineTo(gx + 3.5 * u, gy); ctx.lineTo(gx + 2 * u, gy + 2.5 * u); ctx.stroke();
-                        ctx.restore();
-                    });
-                    if (hookDrag) { ctx.save(); ctx.fillStyle = ink; ctx.font = `600 ${11 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(Math.round(hookDrag.x) + ' mm', hookDrag.px, F.B + 28 * u); ctx.restore(); }
+                if (on && h.key === 'hooks') {
+                    const xs = F.notches.map(n => n.cx), mid = (xs[0] + xs[xs.length - 1]) / 2, hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u;
+                    drawShelfGrip(ctx, mid, shelfGripY(F), u, shelfDrag && shelfDrag.kind === 'hooks', ink, dark, Math.max(hw, 16 * u));
+                    if (shelfDrag && shelfDrag.kind === 'hooks') { ctx.save(); ctx.fillStyle = ink; ctx.font = `600 ${11 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(Math.round((mid - F.L) / F.MM) + ' mm', mid, shelfGripY(F) + 12 * u); ctx.restore(); }
                 }
-                ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath();
-                if (h.key === 'hooks') { ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); } else { ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); }
-                ctx.stroke(); ctx.restore();
+                if (on && h.key === 'towel') {
+                    const s = F.slot, cx = s.cx, act = shelfDrag && shelfDrag.kind.startsWith('towel');
+                    drawShelfGrip(ctx, cx, s.cy, u, shelfDrag && shelfDrag.kind === 'towelM', ink, dark, 16 * u);
+                    [-1, 1].forEach(sd => { const x = cx + sd * s.hl, on2 = shelfDrag && shelfDrag.kind === (sd < 0 ? 'towelL' : 'towelR'); ctx.save(); ctx.beginPath(); ctx.arc(x, s.cy, (on2 ? 10 : 8) * u, 0, Math.PI * 2); ctx.fillStyle = on2 ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); ctx.strokeStyle = on2 ? (dark ? '#111' : '#f2f2f2') : ink; ctx.beginPath(); ctx.moveTo(x - 4 * u, s.cy); ctx.lineTo(x + 4 * u, s.cy); ctx.moveTo(x - 2 * u, s.cy - 2.5 * u); ctx.lineTo(x - 4 * u, s.cy); ctx.lineTo(x - 2 * u, s.cy + 2.5 * u); ctx.moveTo(x + 2 * u, s.cy - 2.5 * u); ctx.lineTo(x + 4 * u, s.cy); ctx.lineTo(x + 2 * u, s.cy + 2.5 * u); ctx.stroke(); ctx.restore(); });
+                    if (!far) { ctx.save(); ctx.fillStyle = onSheet; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((s.hl * 2 / F.MM / 10).toFixed(1).replace(/\.0$/, '') + ' cm × ' + SHELF_SLOT_H / 10 + ' cm', cx, s.cy - s.hh - 6 * u); ctx.restore(); }
+                }
+                ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath(); ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); ctx.stroke(); ctx.restore();
                 const mine = shelfAnim && shelfAnim.key === h.key, ease = a < 1 ? 1 - Math.pow(1 - a, 3) : 1;
-                const base = (h.key === 'towel' && on) ? Math.PI / 4 : 0, ang = mine ? (h.key === 'towel' ? (on ? ease : 1 - ease) * Math.PI / 4 : ease * Math.PI / 2) : base;
+                const base = on ? Math.PI / 4 : 0, ang = mine ? (on ? ease : 1 - ease) * Math.PI / 4 : base;
                 ctx.save(); ctx.translate(P.x, P.y);
                 const pop = a < 1 ? 1 + 0.25 * Math.sin(a * Math.PI) : 1;
                 ctx.scale(pop, pop);
                 ctx.beginPath(); ctx.arc(0, 0, 12 * u, 0, Math.PI * 2);
-                const filled = (h.key === 'towel' && on); if (full) ctx.globalAlpha = 0.4;
-                ctx.fillStyle = filled ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill();
+                ctx.fillStyle = on ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill();
                 ctx.strokeStyle = ink; ctx.lineWidth = 1.6 * u; ctx.stroke();
-                ctx.rotate(ang); ctx.strokeStyle = filled ? (dark ? '#111' : '#f2f2f2') : ink; ctx.lineWidth = 2 * u; ctx.lineCap = 'round';
+                ctx.rotate(ang); ctx.strokeStyle = on ? (dark ? '#111' : '#f2f2f2') : ink; ctx.lineWidth = 2 * u; ctx.lineCap = 'round';
                 ctx.beginPath(); ctx.moveTo(-5 * u, 0); ctx.lineTo(5 * u, 0); ctx.moveTo(0, -5 * u); ctx.lineTo(0, 5 * u); ctx.stroke();
                 ctx.restore();
-                if (h.key === 'hooks' && nH > 0) {   // minus: take the last hook away
-                    ctx.save(); ctx.translate(P.x, P.y + 30 * u); ctx.beginPath(); ctx.arc(0, 0, 10 * u, 0, Math.PI * 2);
-                    ctx.fillStyle = dark ? '#2a2a2a' : '#e4e4e4'; ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.6 * u; ctx.stroke();
-                    ctx.lineWidth = 2 * u; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-4 * u, 0); ctx.lineTo(4 * u, 0); ctx.stroke(); ctx.restore();
-                }
                 if (a < 1) {
                     ctx.save(); ctx.strokeStyle = ink; ctx.globalAlpha = 1 - a; ctx.lineWidth = 2 * u;
                     ctx.beginPath(); ctx.arc(P.x, P.y, (12 + 26 * a) * u, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
                     ctx.save(); ctx.strokeStyle = dark ? '#ffffff' : '#ff7a00'; ctx.lineWidth = 3 * u; ctx.lineCap = 'round'; ctx.globalAlpha = 1 - a * 0.6;
                     ctx.setLineDash([Math.max(1, a * 2400) * u, 4000 * u]); ctx.stroke(path); ctx.restore();
                 }
-                if (!far) {
-                    ctx.fillStyle = ink; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-                    ctx.fillText(h.label + (h.key === 'hooks' ? ` ${nH}/${SHELF_HOOK_MAX}` : ''), P.x + 19 * u, P.y);
-                }
+                if (!far) { ctx.fillStyle = ink; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(h.label, P.x + 19 * u, P.y); }
             });
             ctx.restore();
             if (shelfAnim && now - shelfAnim.t0 >= 700) shelfAnim = null;
             else if (shelfAnim) requestAnimationFrame(() => redraw());
         }
-        // what lies under a pointer: 'hooks' / 'towel' (the + icons), 'minus', or { grip: i }
+        // what lies under a pointer: 'hooks' / 'towel' (the + icons) or a drag kind { drag }
         function shelfHintHit(cx, cy) {
             if (isViewOnly || isTimelapseUIOpen || isExporting || !isPaperVisible || templateKind() !== 'product' || activeProductKey !== 'shelf') return null;
             const F = shelfFeat(); if (!F) return null;
             const wx = (cx - offsetX) / zoom, wy = (cy - offsetY) / zoom, u = 1 / zoom, pad = Math.max(0, 14 - 7 * zoom) * u;
-            for (let i = 0; i < F.notches.length; i++) { const n = F.notches[i]; if (Math.hypot(wx - n.cx, wy - (F.B + 16 * u)) <= 12 * u + pad) return { grip: i }; }
-            const pm = shelfHintPos('hooks'); if (shelfOpts.hooks.length && Math.hypot(wx - pm.x, wy - (pm.y + 30 * u)) <= 14 * u) return 'minus';
             for (const h of SHELF_HINTS) {
                 const P = shelfHintPos(h.key), r = 16 * u, lw = (h.label.length * 7.5 + 40) * u;
                 if (wx >= P.x - r && wx <= P.x + r + lw && Math.abs(wy - P.y) <= r) return h.key;
+            }
+            if (shelfOpts.hooks.length) {
+                const xs = F.notches.map(n => n.cx), hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u, mid = (xs[0] + xs[xs.length - 1]) / 2;
+                if (Math.abs(wx - mid) <= Math.max(hw, 16 * u) + pad && Math.abs(wy - shelfGripY(F)) <= 10 * u + pad) return { drag: 'hooks' };
+            }
+            if (shelfOpts.towel) {
+                const s = F.slot;
+                for (const sd of [-1, 1]) if (Math.hypot(wx - (s.cx + sd * s.hl), wy - s.cy) <= 11 * u + pad) return { drag: sd < 0 ? 'towelL' : 'towelR' };
+                if (Math.abs(wx - s.cx) <= 20 * u + pad && Math.abs(wy - s.cy) <= 10 * u + pad) return { drag: 'towelM' };
             }
             return null;
         }
         function toggleShelfOpt(key) {
             if (key === 'hooks') {
-                const x = nextHookX(); if (x == null || shelfOpts.hooks.length >= SHELF_HOOK_MAX) { showActionHint && showActionHint('Max ' + SHELF_HOOK_MAX + ' key hooks'); return; }
-                shelfOpts.hooks.push(x); shelfOpts.hooks.sort((p, q) => p - q);
-            } else if (key === 'minus') { shelfOpts.hooks.pop(); key = 'hooks'; }
-            else shelfOpts.towel = !shelfOpts.towel;
+                if (shelfOpts.hooks.length) shelfOpts.hooks = [];
+                else { const c = paperWidthMm / 2; shelfOpts.hooks = [-2, -1, 0, 1, 2].map(k => Math.round(c + k * SHELF_HOOK_PITCH)).filter(x => x >= SHELF_HOOK_MARGIN && x <= paperWidthMm - SHELF_HOOK_MARGIN).slice(0, SHELF_HOOK_MAX); }
+            } else shelfOpts.towel = !shelfOpts.towel;
             shelfAnim = { key, t0: performance.now() };
             redraw();
             try { scheduleProjectSave(); } catch (e) {}
         }
-        function shelfHookMove(i, cx) {   // slide hook i: follows the pointer, stays in bounds and clear of its neighbours
-            const W = paperWidthMm, h = shelfOpts.hooks, F = shelfFeat(); if (!F) return;
-            let x = Math.round(((cx - offsetX) / zoom - F.L) / F.MM);
-            const lo = i > 0 ? h[i - 1] + SHELF_HOOK_GAP : SHELF_HOOK_MARGIN, hi = i < h.length - 1 ? h[i + 1] - SHELF_HOOK_GAP : W - SHELF_HOOK_MARGIN;
-            x = Math.max(lo, Math.min(hi, x)); h[i] = x; hookDrag.x = x; hookDrag.px = F.L + x * F.MM;
+        function shelfDragMove(cx) {   // follow the pointer: whole hook row, or the pocket (move / stretch an end)
+            const W = paperWidthMm, F = shelfFeat(); if (!F || !shelfDrag) return;
+            const mm = Math.round(((cx - offsetX) / zoom - F.L) / F.MM), D = shelfDrag, M = SHELF_HOOK_MARGIN;
+            if (D.kind === 'hooks') {
+                const h = shelfOpts.hooks, c0 = (h[0] + h[h.length - 1]) / 2;
+                const d = Math.max(M - h[0], Math.min(W - M - h[h.length - 1], mm - D.grab - c0));
+                shelfOpts.hooks = h.map(x => x + d); D.show = mm - D.grab;
+            } else {
+                const T = shelfTowel();
+                if (D.kind === 'towelM') shelfOpts.tx = Math.max(M + T.len / 2, Math.min(W - M - T.len / 2, mm - D.grab));
+                else {
+                    const l0 = T.cx - T.len / 2, r0 = T.cx + T.len / 2;
+                    if (D.kind === 'towelL') { const l = Math.max(M, r0 - SHELF_TOWEL_MAX, Math.min(r0 - SHELF_TOWEL_MIN, mm)); shelfOpts.tx = (l + r0) / 2; shelfOpts.tl = r0 - l; }
+                    else { const r = Math.min(W - M, l0 + SHELF_TOWEL_MAX, Math.max(l0 + SHELF_TOWEL_MIN, mm)); shelfOpts.tx = (l0 + r) / 2; shelfOpts.tl = r - l0; }
+                }
+            }
         }
 
         // The corner "ears" that resize the canvas.
@@ -4497,15 +4510,19 @@ service cloud.firestore {
                 const e = adj(e0), k = shelfHintHit(e.clientX, e.clientY);
                 if (!k) return;
                 e0.preventDefault(); e0.stopImmediatePropagation();
-                if (typeof k === 'object') { hookDrag = { i: k.grip, id: e0.pointerId, x: shelfOpts.hooks[k.grip], px: 0 }; shelfHookMove(k.grip, e.clientX); canvasElem.setPointerCapture?.(e0.pointerId); redraw(); }
+                if (typeof k === 'object') {
+                    const F = shelfFeat(), mm = ((e.clientX - offsetX) / zoom - F.L) / F.MM, h = shelfOpts.hooks, T = shelfTowel();
+                    shelfDrag = { kind: k.drag, id: e0.pointerId, grab: k.drag === 'hooks' ? mm - (h[0] + h[h.length - 1]) / 2 : mm - T.cx };
+                    canvasElem.setPointerCapture?.(e0.pointerId); shelfDragMove(e.clientX); redraw();
+                }
                 else toggleShelfOpt(k);
             }, true);
             window.addEventListener('pointermove', (e0) => {
-                if (!hookDrag || e0.pointerId !== hookDrag.id) return;
-                e0.stopImmediatePropagation(); shelfHookMove(hookDrag.i, adj(e0).clientX); redraw();
+                if (!shelfDrag || e0.pointerId !== shelfDrag.id) return;
+                e0.stopImmediatePropagation(); shelfDragMove(adj(e0).clientX); redraw();
             }, true);
-            const hookDragEnd = (e0) => { if (!hookDrag || e0.pointerId !== hookDrag.id) return; e0.stopImmediatePropagation(); hookDrag = null; shelfOpts.hooks.sort((p, q) => p - q); redraw(); try { scheduleProjectSave(); } catch (er) {} };
-            window.addEventListener('pointerup', hookDragEnd, true); window.addEventListener('pointercancel', hookDragEnd, true);
+            const shelfDragEnd = (e0) => { if (!shelfDrag || e0.pointerId !== shelfDrag.id) return; e0.stopImmediatePropagation(); shelfDrag = null; redraw(); try { scheduleProjectSave(); } catch (er) {} };
+            window.addEventListener('pointerup', shelfDragEnd, true); window.addEventListener('pointercancel', shelfDragEnd, true);
             canvasElem.addEventListener('pointerdown', (e0) => {
                 const e = adj(e0);
                 e.preventDefault();
@@ -7699,7 +7716,7 @@ function objUI() {
 
 async function buildModel() {
     const { key, P, w, h } = modelInfo();
-    const mkey = key + (shelfOpts.hooks.length ? '+h' + shelfOpts.hooks.join(',') : '') + (shelfOpts.towel ? '+t' : '');
+    const mkey = key + (shelfOpts.hooks.length ? '+h' + shelfOpts.hooks.join(',') : '') + (shelfOpts.towel ? '+t' + shelfOpts.tx + ',' + shelfOpts.tl : '');
     if (!R.mask || R.mask.w !== w || R.mask.h !== h || R.mask.key !== mkey) {
         R.mask = await rasterMask(w, h);
         if (R.mask) R.mask.key = mkey;
@@ -9235,7 +9252,7 @@ setInterval(() => {
                 const nh = currentHolesMm().length; L.push(`${nh} ${nh === 1 ? 'mounting hole' : 'mounting holes'}`);
                 if (P.hooks) { const n = hooksFromWidth(w); L.push(`${n} ${n === 1 ? 'hook' : 'hooks'}`); }
                 let sx = 0; for (const sg of segments) sx += sg.p1.x * 3 + sg.p1.y * 5 + sg.p2.x * 7 + sg.p2.y * 11;
-                const key = [w, h, window.__v3d.S.t, segments.length, sx, currentHolesMm().length, shelfOpts.hooks.join(','), shelfOpts.towel ? 1 : 0].join('|');
+                const key = [w, h, window.__v3d.S.t, segments.length, sx, currentHolesMm().length, shelfOpts.hooks.join(','), shelfOpts.towel ? shelfOpts.tx + ',' + shelfOpts.tl : 0].join('|');
                 if (key !== wKey) { wKey = key; clearTimeout(wTimer); wTimer = setTimeout(function again() { if (wBusy) { wTimer = setTimeout(again, 300); return; } calcWeight(wKey, w, h); }, 700); }
                 { const ri = window.ralInfo && window.ralInfo(); if (ri && ri.code) L.splice(1, 0, `RAL ${ri.code} ${ri.name}`); }
                 if (wKg) L.splice(1, 0, `≈ ${wKg.toFixed(wKg < 10 ? 2 : 1)} kg`);
