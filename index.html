@@ -2645,7 +2645,7 @@ service cloud.firestore {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM, G = productGeom('shelf', paperWidthMm, paperHeightMm);
             const L = -wPx / 2 + dx, R = wPx / 2 + dx, T = -hPx / 2 + dy, B = hPx / 2 + dy, cx0 = (L + R) / 2;
             const hk = PRODUCTS.hanger.hooks, rr = Math.min(SHELF_CORNER, hk.armW / 2);
-            const notches = shelfOpts.hooks.slice().sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: hk.armW / 2 * MM, r: rr * MM, rm: 4 * MM, d: SHELF_NOTCH_DEPTH * MM }));
+            const notches = shelfOpts.hooks.slice().sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: hk.armW / 2 * MM, r: rr * MM, rm: rr * MM, d: SHELF_NOTCH_DEPTH * MM }));
             const tw = shelfTowel(), hh = SHELF_SLOT_H / 2 * MM;
             const slot = { cx: L + tw.cx * MM, cy: T + (G.anchor + SHELF_SLOT_Y) * MM, hh, hl: tw.len / 2 * MM, r: SHELF_CORNER * MM };
             return { L, R, T, B, notches, slot, MM };
