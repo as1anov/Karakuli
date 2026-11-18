@@ -2639,19 +2639,15 @@ service cloud.firestore {
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         // Shelf options: positions (canvas px) of the key-hook notches and of the towel slot
         const SHELF_NOTCH_DEPTH = PRODUCTS.shelf.profile.lip, SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 24, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
-        // where the options appear: the middle of the part of the sheet that is on screen right now
-        function shelfViewMm() {
-            const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, l = -wPx / 2 * zoom + offsetX, r = wPx / 2 * zoom + offsetX;
-            const a = Math.max(l, 0), b = Math.min(r, width), sx = b > a ? (a + b) / 2 : (l + r) / 2;
-            return ((sx - offsetX) / zoom + wPx / 2) / MM;
-        }
+        // phone, zoomed out (the background dots are not drawn yet): no leaders, arrows or labels, they would pile on each other
+        function shelfFar() { return ((window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768) && zoom < 0.395; }
         function shelfDefaultHooks() {
-            const span = 2 * SHELF_HOOK_PITCH, c = Math.max(SHELF_HOOK_MARGIN + span, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - span, shelfViewMm()));
+            const span = 2 * SHELF_HOOK_PITCH, c = paperWidthMm - SHELF_HOOK_MARGIN - span;   // pushed to the far right, and it stays there
             return [-2, -1, 0, 1, 2].map(k => Math.round(c + k * SHELF_HOOK_PITCH));
         }
         function shelfTowel() {   // pocket centre / length in mm (defaults: centred, 40 cm)
             const len = Math.max(SHELF_TOWEL_MIN, Math.min(SHELF_TOWEL_MAX, shelfOpts.tl || Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55)));
-            const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? shelfViewMm() : shelfOpts.tx));
+            const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? paperWidthMm : shelfOpts.tx));
             return { cx, len };
         }
         function shelfFeat(dx = 0, dy = 0) {
@@ -2788,7 +2784,7 @@ service cloud.firestore {
             const F0 = shelfFeat(); if (!F0) return;
             const ctx = drawingContext, u = 1 / zoom, dark = currentTheme === 'dark';
             const ink = dark ? '#9a9a9a' : '#4a4a4a', onSheet = '#7c7c7c';
-            const now = performance.now(), far = isFarOutOnMobile();
+            const now = performance.now(), far = shelfFar();
             ctx.save();
             SHELF_HINTS.forEach(h => {
                 const P = shelfHintPos(h.key), F = P.F;
@@ -2796,20 +2792,20 @@ service cloud.firestore {
                 const a = shelfAnim && shelfAnim.key === h.key ? Math.min(1, (now - shelfAnim.t0) / 700) : 1;
                 const path = shelfFeatPath(h.key, F);
                 ctx.save();
-                if (!on) { ctx.fillStyle = dark ? '#3d3d3d' : '#4a4a4a'; ctx.fill(path); ctx.strokeStyle = '#5a5a5a'; ctx.lineWidth = 1.2 * u; ctx.stroke(path); }   // off: the shape in dark grey; on: the real cut keeps the sheet's own edge
+                if (!on) { ctx.fillStyle = '#1b1b1b'; ctx.fill(path); ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1.2 * u; ctx.stroke(path); }   // off: the shape in dark grey; on: the real cut keeps the sheet's own edge
                 ctx.restore();
-                if (on && h.key === 'hooks') {
+                if (on && h.key === 'hooks' && !far) {
                     const xs = F.notches.map(n => n.cx), mid = (xs[0] + xs[xs.length - 1]) / 2, hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u;
                     drawShelfGrip(ctx, mid, shelfGripY(F), u, shelfDrag && shelfDrag.kind === 'hooks', ink, dark, 0);
                     if (shelfDrag && shelfDrag.kind === 'hooks') { ctx.save(); ctx.fillStyle = ink; ctx.font = `600 ${11 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(Math.round((mid - F.L) / F.MM) + ' mm', mid, shelfGripY(F) + 12 * u); ctx.restore(); }
                 }
-                if (on && h.key === 'towel') {
+                if (on && h.key === 'towel' && !far) {
                     const s = F.slot, cx = s.cx, act = shelfDrag && shelfDrag.kind.startsWith('towel');
                     drawShelfGrip(ctx, cx, s.cy, u, shelfDrag && shelfDrag.kind === 'towelM', ink, dark, 0);
                     [-1, 1].forEach(sd => { const pul = Math.sin(now / 450), x = cx + sd * s.hl, on2 = shelfDrag && shelfDrag.kind === (sd < 0 ? 'towelL' : 'towelR'); ctx.save(); ctx.translate(x, s.cy); ctx.scale(1 + 0.09 * pul, 1 + 0.09 * pul); ctx.translate(-x - sd * 1.2 * u * pul, -s.cy); ctx.beginPath(); ctx.arc(x, s.cy, (on2 ? 10 : 8) * u, 0, Math.PI * 2); ctx.fillStyle = on2 ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); ctx.strokeStyle = on2 ? (dark ? '#111' : '#f2f2f2') : ink; ctx.beginPath(); ctx.moveTo(x - 4 * u, s.cy); ctx.lineTo(x + 4 * u, s.cy); ctx.moveTo(x - 2 * u, s.cy - 2.5 * u); ctx.lineTo(x - 4 * u, s.cy); ctx.lineTo(x - 2 * u, s.cy + 2.5 * u); ctx.moveTo(x + 2 * u, s.cy - 2.5 * u); ctx.lineTo(x + 4 * u, s.cy); ctx.lineTo(x + 2 * u, s.cy + 2.5 * u); ctx.stroke(); ctx.restore(); });
                     if (!far) { ctx.save(); ctx.fillStyle = onSheet; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((s.hl * 2 / F.MM / 10).toFixed(1).replace(/\.0$/, '') + ' cm × ' + SHELF_SLOT_H / 10 + ' cm', cx, s.cy - s.hh - 6 * u); ctx.restore(); }
                 }
-                ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath(); ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); ctx.stroke(); ctx.restore();
+                if (!far) { ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath(); ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); ctx.stroke(); ctx.restore(); }
                 const mine = shelfAnim && shelfAnim.key === h.key, ease = a < 1 ? 1 - Math.pow(1 - a, 3) : 1;
                 const base = on ? Math.PI / 4 : 0, ang = mine ? (on ? ease : 1 - ease) * Math.PI / 4 : base;
                 ctx.save(); ctx.translate(P.x, P.y);
@@ -2837,16 +2833,17 @@ service cloud.firestore {
         function shelfHintHit(cx, cy) {
             if (isViewOnly || isTimelapseUIOpen || isExporting || !isPaperVisible || templateKind() !== 'product' || activeProductKey !== 'shelf') return null;
             const F = shelfFeat(); if (!F) return null;
+            const far = shelfFar();
             const wx = (cx - offsetX) / zoom, wy = (cy - offsetY) / zoom, u = 1 / zoom, pad = Math.max(0, 14 - 7 * zoom) * u;
             for (const h of SHELF_HINTS) {
                 const P = shelfHintPos(h.key), r = 16 * u, lw = (h.label.length * 7.5 + 40) * u;
                 if (wx >= P.x - r && wx <= P.x + r + lw && Math.abs(wy - P.y) <= r) return h.key;
             }
-            if (shelfOpts.hooks.length) {
+            if (shelfOpts.hooks.length && !far) {
                 const xs = F.notches.map(n => n.cx), hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u, mid = (xs[0] + xs[xs.length - 1]) / 2;
                 if (Math.abs(wx - mid) <= 18 * u + pad && Math.abs(wy - shelfGripY(F)) <= 12 * u + pad) return { drag: 'hooks' };
             }
-            if (shelfOpts.towel) {
+            if (shelfOpts.towel && !far) {
                 const s = F.slot;
                 for (const sd of [-1, 1]) if (Math.hypot(wx - (s.cx + sd * s.hl), wy - s.cy) <= 11 * u + pad) return { drag: sd < 0 ? 'towelL' : 'towelR' };
                 if (Math.abs(wx - s.cx) <= 20 * u + pad && Math.abs(wy - s.cy) <= 10 * u + pad) return { drag: 'towelM' };
