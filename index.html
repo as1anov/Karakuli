@@ -2802,7 +2802,7 @@ service cloud.firestore {
                 const a = shelfAnim && shelfAnim.key === h.key ? Math.min(1, (now - shelfAnim.t0) / 700) : 1;
                 const path = shelfFeatPath(h.key, F);
                 ctx.save();
-                if (!on) { ctx.fillStyle = '#1b1b1b'; ctx.fill(path); }   // off: the shape in dark grey; on: the real cut keeps the sheet's own edge
+                if (!on) { ctx.fillStyle = '#2b2b2b'; ctx.fill(path); }   // off: the shape in dark grey; on: the real cut keeps the sheet's own edge
                 ctx.restore();
                 if (on && h.key === 'hooks' && !far) {
                     const xs = F.notches.map(n => n.cx), mid = (xs[0] + xs[xs.length - 1]) / 2, hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u;
@@ -2823,7 +2823,7 @@ service cloud.firestore {
                 ctx.scale(pop, pop);
                 ctx.beginPath(); ctx.arc(0, 0, 12 * u, 0, Math.PI * 2);
                 ctx.fillStyle = on ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill();
-                ctx.strokeStyle = ink; ctx.lineWidth = 1.6 * u; ctx.stroke();
+                if (zoom >= 0.3) { ctx.strokeStyle = ink; ctx.lineWidth = 1.6 * u; ctx.stroke(); }   // no ring round the + when far out
                 ctx.rotate(ang); ctx.strokeStyle = on ? (dark ? '#111' : '#f2f2f2') : ink; ctx.lineWidth = 2 * u; ctx.lineCap = 'round';
                 ctx.beginPath(); ctx.moveTo(-5 * u, 0); ctx.lineTo(5 * u, 0); ctx.moveTo(0, -5 * u); ctx.lineTo(0, 5 * u); ctx.stroke();
                 ctx.restore();
