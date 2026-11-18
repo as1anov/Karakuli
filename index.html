@@ -386,8 +386,9 @@
         .project-tile svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
         .project-open { flex: 1; min-width: 0; cursor: pointer; }
         .project-item.current .project-open { cursor: default; }
-        .project-open:hover .project-name { text-decoration: underline; text-underline-offset: 2px; }
-        .project-item.current .project-open:hover .project-name { text-decoration: none; }
+        .project-item { transition: background 0.15s, scale 0.18s cubic-bezier(.2,1,.3,1), border-color 0.15s; }
+        .project-item.tap { scale: 0.972; background: var(--active-btn-bg); border-color: color-mix(in srgb, var(--text-color) 45%, transparent); }
+        .project-swipe .project-item.tap { background: linear-gradient(var(--active-btn-bg), var(--active-btn-bg)), var(--bg-color); }
         .project-name { display: block; font-size: 12px; font-weight: 700; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .project-meta { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 11px; color: var(--disabled-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .project-meta svg { width: 11px; height: 11px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -1574,7 +1575,7 @@
                         <div class="project-main">
                             ${key ? `<input type="checkbox" class="project-chk" data-id="${key}"${plSel.has(key) ? ' checked' : ''} aria-label="Select project">` : ''}
                             <div class="project-tile">${projectTileIcon(p)}</div>
-                            <div class="project-open"${isCurrent ? '' : ` onclick="openProject('${p.id}')"`}>${name}${meta}<span class="project-meta project-stats${p.segments && !p.segments.length && !Object.keys(p.specialElements || {}).length ? ' empty' : ''}">${escapeProjectText(projectStats(p))}</span></div>
+                            <div class="project-open"${isCurrent ? '' : ` onclick="tapOpenProject(this, '${p.id}')"`}>${name}${meta}<span class="project-meta project-stats${p.segments && !p.segments.length && !Object.keys(p.specialElements || {}).length ? ' empty' : ''}">${escapeProjectText(projectStats(p))}</span></div>
                             <button class="project-more" aria-label="Project actions" title="Actions" onclick="toggleProjectActions(this)">${PROJECT_ICONS.dots}</button>
                         </div>
                         <div class="project-actions">
@@ -1853,6 +1854,10 @@
             el.classList.add('show');
         }
 
+        function tapOpenProject(el, id) {   // a light tap animation, then the project opens and the side menu folds away
+            const it = el.closest('.project-item'); if (it) it.classList.add('tap');
+            setTimeout(() => { openProject(id); if (it) setTimeout(() => it.classList.remove('tap'), 400); }, 160);
+        }
         async function openProject(id) {
             const project = await window.karakuliProjects?.load(id);
             if (!project) return;
@@ -1871,8 +1876,7 @@
             if (projectRecovered && !isViewOnly) { setTimeout(() => { showActionHint('Drawing restored from the time-lapse'); scheduleProjectSave(); }, 1200); }
             cvFitDrawing(true);   // the whole drawing in view (a big pattern used to open as a small corner of itself)
             showActionHint('Project opened');
-            if (window.innerWidth > 700) renderProjectsList();   // the list stays, next to the opened drawing
-            else { setProjectsMode(false); if (isDashboardOpen) toggleDashboard(); }
+            setProjectsMode(false); if (isDashboardOpen) toggleDashboard();   // the side menu folds away at once
             updateCurrentProjectUI();
         }
 
