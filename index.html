@@ -7125,6 +7125,7 @@ const OBJ_KINDS = {
     pencils:  { name: 'Pencils',  icon: '<path d="M7 11h10l-1 9H8z"/><path d="M9 11 8 4M12 11V3M15 11l1-7"/>' },
     towel:    { name: 'Towel',    hook: true, icon: '<path d="M4 6h16"/><path d="M6 6v14h12V6"/><path d="M6 15h12"/>' },
     jacket:   { name: 'Jacket',   hook: true, off: true, icon: '<path d="M9 3l-5 4 1 13h4V9M15 3l5 4-1 13h-4V9M9 3c1 2 5 2 6 0"/>' },
+    keys:     { name: 'Hanging keys', key: true, icon: '<circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M16 16l2-2M18 18l2-2"/>' },
     umbrella: { name: 'Umbrella', hook: true, icon: '<path d="M12 3v1M4 14c0-5 3.5-9 8-9s8 4 8 9c-1.5-1.5-3-1.5-4 0-1-1.5-3-1.5-4 0-1-1.5-3-1.5-4 0-1-1.5-2.5-1.5-4 0z"/><path d="M12 14v6a2 2 0 0 0 4 0"/>' }
 };
 const BOOK_COLS = ['#8b2e2e', '#2e4a8b', '#2f6b4f', '#c79a1f', '#5b3f77', '#c4642b', '#2c7a86', '#3d3d3d'];
@@ -7169,6 +7170,14 @@ function supportInfo() {
     if (!best) return null;
     const za = best.P[1], zb = best.P[1] + best.T[1] * best.L;
     const sup = { type: 'surface', y: best.P[0] + R.t / 2, z0: Math.min(za, zb), z1: Math.max(za, zb), depth: best.L, w };
+    if (key === 'shelf' && shelfOpts.hooks.length > 1) {   // key hooks: the ring lies in the notches either side of a tooth
+        const lf = chain.frames[chain.frames.indexOf(best) + 1];
+        if (lf) {
+            const ll = Math.hypot(lf.T[0], lf.T[1]) || 1, hs = shelfOpts.hooks.slice().sort((a, b) => a - b);
+            sup.klip = { P: lf.P.slice(), T: [lf.T[0] / ll, lf.T[1] / ll], L: lf.L }; sup.keySpots = [];
+            for (let i = 0; i + 1 < hs.length; i++) sup.keySpots.push((hs[i] + hs[i + 1]) / 2 - w / 2);
+        }
+    }
     if (key === 'hanger') {   // things hang from the J-shaped arms: one spot per hook, x in the centred scene
         const n = hooksFromWidth(w), pitch = PRODUCTS.hanger.hooks.pitch;
         const lf = chain.frames[chain.frames.indexOf(best) + 1];
@@ -7310,6 +7319,34 @@ function umbrellaData() {
     }
     for (let i = 0; i < pos.length; i += 3) pts.push(pos[i], pos[i + 1], pos[i + 2]);
     return (umbrellaData.c = { nv, nt, pos, nrm, idx, pts: new Float32Array(pts) });
+}
+function makeKeys(seed, ctx) {
+    const g = new T.Group(), lip = ctx.sup && ctx.sup.klip, sup = ctx.sup;
+    if (!lip) return { g, w: 30, d: 30 };
+    const dir = lip.P[1] >= (sup.z0 + sup.z1) / 2 ? 1 : -1;                        // +1: the lip is at the far end of the foot, away from the wall
+    const dep = PRODUCTS.shelf.profile.lip - 2, ds = Math.max(0, lip.L - dep);       // the closed end of a notch, measured up the lip from the bend
+    const qy = lip.P[0] + lip.T[0] * ds, qz = lip.P[1] + lip.T[1] * ds;
+    const Rr = 12.5, wr = 0.9, ry = qy + wr, front = qz + dir * Rr;
+    const steel = objMaterial('#b8bcc2', { roughness: 0.3, metalness: 0.85 });
+    const ring = new T.Mesh(new T.TorusGeometry(Rr, wr, 8, 56).rotateX(Math.PI / 2), steel); ring.position.set(0, ry, qz); ring.castShadow = ring.receiveShadow = true; g.add(ring);
+    const cols = [['#c9a13b', '#b8bcc2'], ['#b8bcc2', '#c9a13b'], ['#8d6a3b', '#c9a13b']][seed % 3], metal = c => objMaterial(c, { roughness: 0.35, metalness: 0.9 });
+    const keyShape = (len, bw) => {   // in (u, v): the hole sits at the origin, the blade hangs down with a few teeth on one side
+        const sh = new T.Shape(), hr = 8.5;
+        sh.absarc(0, 0, hr, -Math.PI * 0.378, Math.PI * 1.378, false);          // the round head, open at the bottom where the blade joins
+        sh.lineTo(-bw / 2, -hr); sh.lineTo(-bw / 2, -len); sh.lineTo(bw / 2, -len);
+        for (let k = 0; k < 4; k++) { const y0 = -len + 5 + k * 6; sh.lineTo(bw / 2, y0); sh.lineTo(bw / 2 - 3.2, y0 + 1.6); sh.lineTo(bw / 2 - 3.2, y0 + 3.4); }
+        sh.lineTo(bw / 2, -hr);
+        const hole = new T.Path(); hole.absarc(0, 0, 3.2, 0, Math.PI * 2, true); sh.holes.push(hole);
+        return sh;
+    };
+    [[-2.4, 0.10, 52, 11, cols[0]], [2.4, -0.14, 44, 10, cols[1]]].forEach(([dx, rot, len, bw, c]) => {
+        const geo = new T.ExtrudeGeometry([keyShape(len, bw)], { depth: 2.2, bevelEnabled: true, bevelThickness: 0.3, bevelSize: 0.3, bevelSegments: 1, curveSegments: 14 });
+        geo.translate(0, 0, -1.1);
+        const m = new T.Mesh(geo, metal(c)); m.rotation.y = Math.PI / 2 * dir;                     // the plate lies in the (depth, height) plane, the ring passes its hole along x
+        const pv = new T.Group(); pv.position.set(dx, ry, front); pv.rotation.x = rot * dir; pv.add(m); m.castShadow = m.receiveShadow = true; g.add(pv);
+    });
+    g.userData.pivot = { y: ry, z: front };
+    return { g, w: 30, d: 30 };
 }
 function makeUmbrella(seed, ctx) {
     const g = new T.Group(), sup = ctx.sup, d = umbrellaData(), { S, YAW, CX, YC, ZT } = UMB;
@@ -7560,6 +7597,7 @@ function makeObject0(kind, seed, depthAvail, ctx) {
         return { g, w: 460, d: 78 };
     }
     if (kind === 'umbrella') return makeUmbrella(seed, ctx);
+    if (kind === 'keys') return makeKeys(seed, ctx);
     // ceramic pot with coloured pencils
     const n = ctx.n || 0, Rp = 40 + (n % 3) * 4, Hp = (88 + (n % 4) * 8);
     const outer = smoothCurve([[0, 0], [Rp - 5, 0], [Rp - 1, 3], [Rp + 1, Hp * 0.5], [Rp - 1, Hp - 4], [Rp - 3, Hp]], 8).map(p => new T.Vector2(p[0], p[1]));
@@ -7584,7 +7622,34 @@ function makeObject0(kind, seed, depthAvail, ctx) {
     return { g, w: (2 * Rp + 10) * 0.8, d: (2 * Rp + 10) * 0.8 };
 }
 
+// The towel pocket (a slot in the tray) is never used to stand things: the widest free stretch beside it is all that is left of the shelf
+function shelfFreeSeg(W) {
+    if (!(shelfOpts.towel && modelInfo().key === 'shelf')) return { w: W, c: 0 };
+    const T0 = shelfTowel(), l = Math.max(0, T0.cx - T0.len / 2 - 12), r = Math.min(W, T0.cx + T0.len / 2 + 12);
+    const a = [0, l], b = [r, W], s = (a[1] - a[0]) >= (b[1] - b[0]) ? a : b;
+    return { w: Math.max(0, s[1] - s[0]), c: (s[0] + s[1]) / 2 - W / 2 };
+}
+// Hanging keys: a key ring lies in two neighbouring hook notches (it rests on their closed ends), the keys hang in front of the lip
 function placeObjects() {
+    if (!R) return;
+    const key = modelInfo().key;
+    if (S.objKey !== key) { S.objs = []; S.objKey = key; }
+    const keyAll = S.objs.filter(q => q.k === 'keys');
+    if (keyAll.length) S.objs = S.objs.filter(q => q.k !== 'keys');
+    placeObjects0();
+    const sup = R.support, spots = (sup && sup.keySpots) || [];
+    R.keysFree = spots.length;
+    if (!keyAll.length || !sup || !spots.length) { if (keyAll.length) { /* no hooks any more: the keys go away */ } return; }
+    const order = spots.slice().sort((a, b) => Math.abs(a) - Math.abs(b) || a - b), kept = [], root = R.objs || new T.Group();
+    keyAll.slice(0, order.length).forEach((it, i) => {
+        const o = makeObject('keys', it.s, sup.depth, { sup, key, n: i });
+        o.g.position.set(order[i], 0, 0); root.add(o.g); kept.push(it);
+    });
+    S.objs.unshift(...kept); R.keysFree = order.length - kept.length;
+    if (!R.objs) { R.objs = root; R.scene.add(root); }
+    R.objs.visible = S.fold >= 0.995; R.dirty = true;
+}
+function placeObjects0() {
     if (!R) return;
     R.spawn = null;
     if (R.objs) { R.scene.remove(R.objs); R.objs.traverse(o => { if (o.geometry) o.geometry.dispose(); }); R.objs = null; }
@@ -7615,6 +7680,7 @@ function placeObjects() {
         R.room = { type: 'hooks', taken, n, hooks: sup.hooks, pitch };
         R.objs = root; R.scene.add(root);
     } else if (sup && S.objs.length) {
+        const seg = shelfFreeSeg(sup.w), wEff = seg.w;   // the towel pocket of a shelf is a no-go zone: things stand beside it
         const GAPMIN = 18, GAPMAX = 70, built = [];   // roomy by default (up to 7 cm), closer only when there are many things
         let total = 0; const cn = {}; let prev = null;
         // wall bolts: barrels cross the pocket, so magazines either stay below the lowest one or stand between them
@@ -7635,7 +7701,7 @@ function placeObjects() {
         for (const it of lay) {
             const o = makeObject(it.k, it.s, sup.depth, { sup, key, flip: !!it.f, hmax, zc: (sup.z0 + sup.z1) / 2, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
             const gb = prev ? (prev === 'book' && it.k === 'book' ? 1 : GAPMIN) : 0;     // books stand shoulder to shoulder
-            if (total + gb + o.w > sup.w - 40) break;          // no more room on this product
+            if (total + gb + o.w > wEff - 40) break;          // no more room on this product
             total += gb + o.w; o.gb = gb; built.push(o); prev = it.k;
         }
         if (forbid.length) S.objs.length = built.length; else lay.slice(built.length).forEach(q => { const i = S.objs.indexOf(q); if (i >= 0) S.objs.splice(i, 1); });
@@ -7651,11 +7717,11 @@ function placeObjects() {
         {   // the gap: as wide as the shelf allows (GAPMAX), shrinking to GAPMIN only when the things need the room; books keep standing together
             const ks = lay.map(q => q.k); let fixed = 0, n = 0;
             built.forEach((o, i) => { if (i) { if (ks[i - 1] === 'book' && ks[i] === 'book') fixed += 1; else n++; } });
-            R.minFree = (sup.w - 40) - built.reduce((t, o) => t + o.fw, 0) - fixed - GAPMIN * n;   // room left when every gap is at its minimum
-            const free = (sup.w - 40) - built.reduce((t, o) => t + o.fw, 0) - fixed, gap = n ? Math.max(GAPMIN, Math.min(GAPMAX, free / n)) : 0;
+            R.minFree = (wEff - 40) - built.reduce((t, o) => t + o.fw, 0) - fixed - GAPMIN * n;   // room left when every gap is at its minimum
+            const free = (wEff - 40) - built.reduce((t, o) => t + o.fw, 0) - fixed, gap = n ? Math.max(GAPMIN, Math.min(GAPMAX, free / n)) : 0;
             total = 0; built.forEach((o, i) => { o.gb = i ? (ks[i - 1] === 'book' && ks[i] === 'book' ? 1 : gap) : 0; total += o.gb + o.fw; });
         }
-        const root = new T.Group(); let x = -total / 2;
+        const root = new T.Group(); let x = -total / 2 + seg.c;
         if (forbid.length && built.length) {   // fit the magazines into the free stretches between the barrels
             const lim = sup.w / 2 - 20; let segs = [[-lim, lim]];
             forbid.forEach(([a, b]) => { segs = segs.flatMap(([p, q]) => (b <= p || a >= q) ? [[p, q]] : [[p, Math.max(p, a)], [Math.min(q, b), q]]).filter(([p, q]) => q - p > 1); });
@@ -7677,10 +7743,10 @@ function placeObjects() {
 // A new object appears out of nothing: it grows with a little overshoot, turns slightly into place and sways for a moment
 function spawnLast() {
     if (!R || !R.objs || !S.objs.length) return;
-    const sd = S.objs[S.objs.length - 1].s, g = R.objs.children.find(c => c.userData && c.userData.seed === sd);
+    const sd = R.lastSeed != null ? R.lastSeed : S.objs[S.objs.length - 1].s, g = R.objs.children.find(c => c.userData && c.userData.seed === sd);
     if (!g) return;
     const w = new T.Group(); w.position.copy(g.position); g.position.set(0, 0, 0);
-    const pv = (g.userData.kind === 'umbrella' || g.userData.kind === 'towel') && g.userData.pivot;
+    const pv = (g.userData.kind === 'umbrella' || g.userData.kind === 'towel' || g.userData.kind === 'keys') && g.userData.pivot;
     if (pv) { w.position.y += pv.y; w.position.z += pv.z; g.position.set(0, -pv.y, -pv.z); }   // the umbrella turns about the lip it hangs on
     R.objs.remove(g); w.add(g); R.objs.add(w);
     if (pv) { R.spawn = { w, t: 0, sway: true, y0: w.position.y }; R.dirty = true; return; }   // no growing or turning: it is simply there and swings a little
@@ -7718,6 +7784,7 @@ function stepSpawn(dt) {
 // Does one more thing of this kind still fit on the product? (the Objects icons go grey when not)
 function objFits(k) {
     try {
+        if (k === 'keys') return !!R && (R.keysFree || 0) > 0 && !!R.support && !!R.support.keySpots;
         const rm = R && R.room, sup = R && R.support; if (!rm || !sup) return true;
         if (rm.type === 'slots') return rm.free > 0;
         if (rm.type === 'hooks') {
@@ -7736,7 +7803,7 @@ function objAdd(kind) {
     if (!R || !R.support) return;
     if (!objFits(kind)) { note('There is no room for one more on this ' + modelInfo().P.name.toLowerCase() + '.'); return; }   // no animation, nothing is added
     const n0 = S.objs.length;
-    S.objs.push({ k: kind, s: objSeed++ });
+    const it0 = { k: kind, s: objSeed++ }; S.objs.push(it0); R.lastSeed = it0.s;
     placeObjects();
     if (S.objs.length === n0) note('There is no room for one more on this ' + modelInfo().P.name.toLowerCase() + '.');
     else spawnLast();
@@ -7754,8 +7821,8 @@ function objAct(i, act) {
 }
 function objUI() {
     const cat = document.getElementById('v3-cat'); if (!cat) return;
-    const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine';
-    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (onHooks ? !!o.hook : o.hook !== true) && objFits(k) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
+    const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine', keysOk = ok && !!R.support.keySpots;
+    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (o.key ? keysOk : (onHooks ? !!o.hook : o.hook !== true)) && objFits(k) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     const TRASH = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
     document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel">${TRASH}</div><div class="v3-ord"><svg class="v3-oic" viewBox="0 0 24 24">${OBJ_KINDS[it.k].icon}</svg><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<span class="v3-ohint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 6l-6 6 6 6M20 6l-6 6 6 6"/></svg></span></div></div>`).join('');
