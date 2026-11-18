@@ -2645,7 +2645,7 @@ service cloud.firestore {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM, G = productGeom('shelf', paperWidthMm, paperHeightMm);
             const L = -wPx / 2 + dx, R = wPx / 2 + dx, T = -hPx / 2 + dy, B = hPx / 2 + dy, cx0 = (L + R) / 2;
             const hk = PRODUCTS.hanger.hooks, rr = Math.min(SHELF_CORNER, hk.armW / 2);
-            const notches = shelfOpts.hooks.slice().sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: hk.armW / 2 * MM, r: rr * MM, d: SHELF_NOTCH_DEPTH * MM }));
+            const notches = shelfOpts.hooks.slice().sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: hk.armW / 2 * MM, r: rr * MM, rm: 4 * MM, d: SHELF_NOTCH_DEPTH * MM }));
             const tw = shelfTowel(), hh = SHELF_SLOT_H / 2 * MM;
             const slot = { cx: L + tw.cx * MM, cy: T + (G.anchor + SHELF_SLOT_Y) * MM, hh, hl: tw.len / 2 * MM, r: SHELF_CORNER * MM };
             return { L, R, T, B, notches, slot, MM };
@@ -2678,7 +2678,7 @@ service cloud.firestore {
             if (P.radius) {
                 const r = P.radius * MM, F = shelfFeat(dx, dy);
                 // key-hook lip: rounded notches cut into the bottom edge, walking from right to left
-                const notches = (shelfOpts.hooks.length && F) ? F.notches.map(n => `H${f(n.cx + n.hw)}V${f(B - n.d + n.r)}A${f(n.r)} ${f(n.r)} 0 0 0 ${f(n.cx + n.hw - n.r)} ${f(B - n.d)}H${f(n.cx - n.hw + n.r)}A${f(n.r)} ${f(n.r)} 0 0 0 ${f(n.cx - n.hw)} ${f(B - n.d + n.r)}V${f(B)}`).reverse().join('') : '';
+                const notches = (shelfOpts.hooks.length && F) ? F.notches.map(n => `H${f(n.cx + n.hw + n.rm)}A${f(n.rm)} ${f(n.rm)} 0 0 1 ${f(n.cx + n.hw)} ${f(B - n.rm)}V${f(B - n.d + n.r)}A${f(n.r)} ${f(n.r)} 0 0 0 ${f(n.cx + n.hw - n.r)} ${f(B - n.d)}H${f(n.cx - n.hw + n.r)}A${f(n.r)} ${f(n.r)} 0 0 0 ${f(n.cx - n.hw)} ${f(B - n.d + n.r)}V${f(B - n.rm)}A${f(n.rm)} ${f(n.rm)} 0 0 1 ${f(n.cx - n.hw - n.rm)} ${f(B)}`).reverse().join('') : '';
                 const sl = F && F.slot, sr = sl && sl.r, slot = (shelfOpts.towel && F) ? `M${f(sl.cx + sl.hl - sr)} ${f(sl.cy - sl.hh)}H${f(sl.cx - sl.hl + sr)}A${f(sr)} ${f(sr)} 0 0 0 ${f(sl.cx - sl.hl)} ${f(sl.cy - sl.hh + sr)}V${f(sl.cy + sl.hh - sr)}A${f(sr)} ${f(sr)} 0 0 0 ${f(sl.cx - sl.hl + sr)} ${f(sl.cy + sl.hh)}H${f(sl.cx + sl.hl - sr)}A${f(sr)} ${f(sr)} 0 0 0 ${f(sl.cx + sl.hl)} ${f(sl.cy + sl.hh - sr)}V${f(sl.cy - sl.hh + sr)}A${f(sr)} ${f(sr)} 0 0 0 ${f(sl.cx + sl.hl - sr)} ${f(sl.cy - sl.hh)}Z` : '';
                 return `M${f(L)} ${f(T)}H${f(R)}V${f(B - r)}A${f(r)} ${f(r)} 0 0 1 ${f(R - r)} ${f(B)}${notches}H${f(L + r)}A${f(r)} ${f(r)} 0 0 1 ${f(L)} ${f(B - r)}Z${slot}`;
             }
@@ -2750,8 +2750,8 @@ service cloud.firestore {
         }
         function shelfNotchPath(n, B) {   // one hook notch: rounded inner corners
             const p = new Path2D(), hw = n.hw, r = n.r, d = n.d;
-            p.moveTo(n.cx + hw, B); p.lineTo(n.cx + hw, B - d + r); p.arc(n.cx + hw - r, B - d + r, r, 0, -Math.PI / 2, true);
-            p.lineTo(n.cx - hw + r, B - d); p.arc(n.cx - hw + r, B - d + r, r, -Math.PI / 2, -Math.PI, true); p.lineTo(n.cx - hw, B);
+            p.moveTo(n.cx + hw + n.rm, B); p.arc(n.cx + hw + n.rm, B - n.rm, n.rm, Math.PI / 2, Math.PI, false); p.lineTo(n.cx + hw, B - d + r); p.arc(n.cx + hw - r, B - d + r, r, 0, -Math.PI / 2, true);
+            p.lineTo(n.cx - hw + r, B - d); p.arc(n.cx - hw + r, B - d + r, r, -Math.PI / 2, -Math.PI, true); p.lineTo(n.cx - hw, B - n.rm); p.arc(n.cx - hw - n.rm, B - n.rm, n.rm, 0, Math.PI / 2, false);
             return p;
         }
         function shelfFeatPath(key, F) {
@@ -2793,7 +2793,7 @@ service cloud.firestore {
                 }
                 if (on && h.key === 'towel') {
                     const s = F.slot, cx = s.cx, act = shelfDrag && shelfDrag.kind.startsWith('towel');
-                    drawShelfGrip(ctx, cx, s.cy, u, shelfDrag && shelfDrag.kind === 'towelM', ink, dark, 16 * u);
+                    drawShelfGrip(ctx, cx, s.cy, u, shelfDrag && shelfDrag.kind === 'towelM', ink, dark, 0);
                     [-1, 1].forEach(sd => { const pul = Math.sin(now / 450), x = cx + sd * s.hl, on2 = shelfDrag && shelfDrag.kind === (sd < 0 ? 'towelL' : 'towelR'); ctx.save(); ctx.translate(x, s.cy); ctx.scale(1 + 0.09 * pul, 1 + 0.09 * pul); ctx.translate(-x - sd * 1.2 * u * pul, -s.cy); ctx.beginPath(); ctx.arc(x, s.cy, (on2 ? 10 : 8) * u, 0, Math.PI * 2); ctx.fillStyle = on2 ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); ctx.strokeStyle = on2 ? (dark ? '#111' : '#f2f2f2') : ink; ctx.beginPath(); ctx.moveTo(x - 4 * u, s.cy); ctx.lineTo(x + 4 * u, s.cy); ctx.moveTo(x - 2 * u, s.cy - 2.5 * u); ctx.lineTo(x - 4 * u, s.cy); ctx.lineTo(x - 2 * u, s.cy + 2.5 * u); ctx.moveTo(x + 2 * u, s.cy - 2.5 * u); ctx.lineTo(x + 4 * u, s.cy); ctx.lineTo(x + 2 * u, s.cy + 2.5 * u); ctx.stroke(); ctx.restore(); });
                     if (!far) { ctx.save(); ctx.fillStyle = onSheet; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((s.hl * 2 / F.MM / 10).toFixed(1).replace(/\.0$/, '') + ' cm × ' + SHELF_SLOT_H / 10 + ' cm', cx, s.cy - s.hh - 6 * u); ctx.restore(); }
                 }
