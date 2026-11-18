@@ -2634,7 +2634,7 @@ service cloud.firestore {
 
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         // Shelf options: positions (canvas px) of the key-hook notches and of the towel slot
-        const SHELF_NOTCH_DEPTH = 10, SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 60, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
+        const SHELF_NOTCH_DEPTH = 10, SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 24, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
         function shelfTowel() {   // pocket centre / length in mm (defaults: centred, 40 cm)
             const len = Math.max(SHELF_TOWEL_MIN, Math.min(SHELF_TOWEL_MAX, shelfOpts.tl || Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55)));
             const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? paperWidthMm / 2 : shelfOpts.tx));
@@ -2762,9 +2762,10 @@ service cloud.firestore {
         }
         function shelfGripY(F) { return F.B + 18 * (1 / zoom); }
         function drawShelfGrip(ctx, x, y, u, active, ink, dark, halfW) {   // a pill with a left-right arrow: press and slide
-            ctx.save(); ctx.beginPath(); ctx.roundRect(x - halfW, y - 8 * u, 2 * halfW, 16 * u, 8 * u);
-            ctx.fillStyle = active ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke();
-            ctx.strokeStyle = active ? (dark ? '#111' : '#f2f2f2') : ink; ctx.lineWidth = 1.5 * u; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+            ctx.save();
+            if (halfW > 0) { ctx.beginPath(); ctx.roundRect(x - halfW, y - 8 * u, 2 * halfW, 16 * u, 8 * u); ctx.fillStyle = active ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); }
+            else { ctx.strokeStyle = ink; ctx.lineWidth = 1.5 * u; }
+            ctx.strokeStyle = (halfW > 0 && active) ? (dark ? '#111' : '#f2f2f2') : ink; ctx.lineWidth = 1.5 * u; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
             ctx.moveTo(x - 7 * u, y); ctx.lineTo(x + 7 * u, y); ctx.moveTo(x - 4 * u, y - 3 * u); ctx.lineTo(x - 7 * u, y); ctx.lineTo(x - 4 * u, y + 3 * u);
             ctx.moveTo(x + 4 * u, y - 3 * u); ctx.lineTo(x + 7 * u, y); ctx.lineTo(x + 4 * u, y + 3 * u); ctx.stroke(); ctx.restore();
         }
@@ -2787,13 +2788,13 @@ service cloud.firestore {
                 ctx.restore();
                 if (on && h.key === 'hooks') {
                     const xs = F.notches.map(n => n.cx), mid = (xs[0] + xs[xs.length - 1]) / 2, hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u;
-                    drawShelfGrip(ctx, mid, shelfGripY(F), u, shelfDrag && shelfDrag.kind === 'hooks', ink, dark, Math.max(hw, 16 * u));
+                    drawShelfGrip(ctx, mid, shelfGripY(F), u, shelfDrag && shelfDrag.kind === 'hooks', ink, dark, 0);
                     if (shelfDrag && shelfDrag.kind === 'hooks') { ctx.save(); ctx.fillStyle = ink; ctx.font = `600 ${11 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(Math.round((mid - F.L) / F.MM) + ' mm', mid, shelfGripY(F) + 12 * u); ctx.restore(); }
                 }
                 if (on && h.key === 'towel') {
                     const s = F.slot, cx = s.cx, act = shelfDrag && shelfDrag.kind.startsWith('towel');
                     drawShelfGrip(ctx, cx, s.cy, u, shelfDrag && shelfDrag.kind === 'towelM', ink, dark, 16 * u);
-                    [-1, 1].forEach(sd => { const x = cx + sd * s.hl, on2 = shelfDrag && shelfDrag.kind === (sd < 0 ? 'towelL' : 'towelR'); ctx.save(); ctx.beginPath(); ctx.arc(x, s.cy, (on2 ? 10 : 8) * u, 0, Math.PI * 2); ctx.fillStyle = on2 ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); ctx.strokeStyle = on2 ? (dark ? '#111' : '#f2f2f2') : ink; ctx.beginPath(); ctx.moveTo(x - 4 * u, s.cy); ctx.lineTo(x + 4 * u, s.cy); ctx.moveTo(x - 2 * u, s.cy - 2.5 * u); ctx.lineTo(x - 4 * u, s.cy); ctx.lineTo(x - 2 * u, s.cy + 2.5 * u); ctx.moveTo(x + 2 * u, s.cy - 2.5 * u); ctx.lineTo(x + 4 * u, s.cy); ctx.lineTo(x + 2 * u, s.cy + 2.5 * u); ctx.stroke(); ctx.restore(); });
+                    [-1, 1].forEach(sd => { const pul = Math.sin(now / 450), x = cx + sd * s.hl, on2 = shelfDrag && shelfDrag.kind === (sd < 0 ? 'towelL' : 'towelR'); ctx.save(); ctx.translate(x, s.cy); ctx.scale(1 + 0.09 * pul, 1 + 0.09 * pul); ctx.translate(-x - sd * 1.2 * u * pul, -s.cy); ctx.beginPath(); ctx.arc(x, s.cy, (on2 ? 10 : 8) * u, 0, Math.PI * 2); ctx.fillStyle = on2 ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); ctx.strokeStyle = on2 ? (dark ? '#111' : '#f2f2f2') : ink; ctx.beginPath(); ctx.moveTo(x - 4 * u, s.cy); ctx.lineTo(x + 4 * u, s.cy); ctx.moveTo(x - 2 * u, s.cy - 2.5 * u); ctx.lineTo(x - 4 * u, s.cy); ctx.lineTo(x - 2 * u, s.cy + 2.5 * u); ctx.moveTo(x + 2 * u, s.cy - 2.5 * u); ctx.lineTo(x + 4 * u, s.cy); ctx.lineTo(x + 2 * u, s.cy + 2.5 * u); ctx.stroke(); ctx.restore(); });
                     if (!far) { ctx.save(); ctx.fillStyle = onSheet; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((s.hl * 2 / F.MM / 10).toFixed(1).replace(/\.0$/, '') + ' cm × ' + SHELF_SLOT_H / 10 + ' cm', cx, s.cy - s.hh - 6 * u); ctx.restore(); }
                 }
                 ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath(); ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); ctx.stroke(); ctx.restore();
@@ -2818,7 +2819,7 @@ service cloud.firestore {
             });
             ctx.restore();
             if (shelfAnim && now - shelfAnim.t0 >= 700) shelfAnim = null;
-            else if (shelfAnim) requestAnimationFrame(() => redraw());
+            if (shelfAnim || (shelfOpts.towel && !shelfDrag)) requestAnimationFrame(() => redraw());
         }
         // what lies under a pointer: 'hooks' / 'towel' (the + icons) or a drag kind { drag }
         function shelfHintHit(cx, cy) {
@@ -2831,7 +2832,7 @@ service cloud.firestore {
             }
             if (shelfOpts.hooks.length) {
                 const xs = F.notches.map(n => n.cx), hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u, mid = (xs[0] + xs[xs.length - 1]) / 2;
-                if (Math.abs(wx - mid) <= Math.max(hw, 16 * u) + pad && Math.abs(wy - shelfGripY(F)) <= 10 * u + pad) return { drag: 'hooks' };
+                if (Math.abs(wx - mid) <= 18 * u + pad && Math.abs(wy - shelfGripY(F)) <= 12 * u + pad) return { drag: 'hooks' };
             }
             if (shelfOpts.towel) {
                 const s = F.slot;
