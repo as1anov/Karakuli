@@ -2818,7 +2818,7 @@ service cloud.firestore {
                 if (on && h.key === 'towel' && !far) {
                     const s = F.slot, cx = s.cx, act = shelfDrag && shelfDrag.kind.startsWith('towel');
                     drawShelfGrip(ctx, cx, s.cy, u, shelfDrag && shelfDrag.kind === 'towelM', ink, dark, 0, shelfBump('towelM', u, now));
-                    [-1, 1].forEach(sd => { const pul = Math.sin(now / 450), x = cx + sd * s.hl, on2 = shelfDrag && shelfDrag.kind === (sd < 0 ? 'towelL' : 'towelR'); ctx.save(); ctx.translate(x, s.cy); ctx.scale(1 + 0.09 * pul, 1 + 0.09 * pul); ctx.translate(-x - sd * 1.2 * u * pul, -s.cy); ctx.beginPath(); ctx.arc(x, s.cy, (on2 ? 10 : 8) * u, 0, Math.PI * 2); ctx.fillStyle = on2 ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); ctx.strokeStyle = on2 ? (dark ? '#111' : '#f2f2f2') : ink; ctx.beginPath(); ctx.moveTo(x - 4 * u, s.cy); ctx.lineTo(x + 4 * u, s.cy); ctx.moveTo(x - 2 * u, s.cy - 2.5 * u); ctx.lineTo(x - 4 * u, s.cy); ctx.lineTo(x - 2 * u, s.cy + 2.5 * u); ctx.moveTo(x + 2 * u, s.cy - 2.5 * u); ctx.lineTo(x + 4 * u, s.cy); ctx.lineTo(x + 2 * u, s.cy + 2.5 * u); ctx.stroke(); ctx.restore(); });
+                    [-1, 1].forEach(sd => { const pul = shelfAnim && shelfAnim.key === 'towel' ? Math.sin((now - shelfAnim.t0) / 110) * (1 - a) : 0, x = cx + sd * s.hl, on2 = shelfDrag && shelfDrag.kind === (sd < 0 ? 'towelL' : 'towelR'); ctx.save(); ctx.translate(x, s.cy); ctx.scale(1 + 0.09 * pul, 1 + 0.09 * pul); ctx.translate(-x - sd * 1.2 * u * pul, -s.cy); ctx.beginPath(); ctx.arc(x, s.cy, (on2 ? 10 : 8) * u, 0, Math.PI * 2); ctx.fillStyle = on2 ? ink : (dark ? '#2a2a2a' : '#e4e4e4'); ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 1.4 * u; ctx.stroke(); ctx.strokeStyle = on2 ? (dark ? '#111' : '#f2f2f2') : ink; ctx.beginPath(); ctx.moveTo(x - 4 * u, s.cy); ctx.lineTo(x + 4 * u, s.cy); ctx.moveTo(x - 2 * u, s.cy - 2.5 * u); ctx.lineTo(x - 4 * u, s.cy); ctx.lineTo(x - 2 * u, s.cy + 2.5 * u); ctx.moveTo(x + 2 * u, s.cy - 2.5 * u); ctx.lineTo(x + 4 * u, s.cy); ctx.lineTo(x + 2 * u, s.cy + 2.5 * u); ctx.stroke(); ctx.restore(); });
                     if (!far) { ctx.save(); ctx.fillStyle = onSheet; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((s.hl * 2 / F.MM / 10).toFixed(1).replace(/\.0$/, '') + ' cm × ' + SHELF_SLOT_H / 10 + ' cm', cx, s.cy - s.hh - 6 * u); ctx.restore(); }
                 }
                 if (!far) { ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath(); ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); ctx.stroke(); ctx.restore(); }
@@ -2836,14 +2836,13 @@ service cloud.firestore {
                 if (a < 1) {
                     ctx.save(); ctx.strokeStyle = ink; ctx.globalAlpha = 1 - a; ctx.lineWidth = 2 * u;
                     ctx.beginPath(); ctx.arc(P.x, P.y, (12 + 26 * a) * u, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-                    ctx.save(); ctx.strokeStyle = dark ? '#ffffff' : '#ff7a00'; ctx.lineWidth = 3 * u; ctx.lineCap = 'round'; ctx.globalAlpha = 1 - a * 0.6;
-                    ctx.setLineDash([Math.max(1, a * 2400) * u, 4000 * u]); ctx.stroke(path); ctx.restore();
                 }
                 if (!far) { ctx.fillStyle = ink; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(h.label, P.x + 19 * u, P.y); }
             });
             ctx.restore();
             if (shelfAnim && now - shelfAnim.t0 >= 700) shelfAnim = null;
-            if (shelfAnim || (shelfOpts.towel && !shelfDrag) || (shelfDrag && shelfDrag.bump && now - shelfDrag.bump < 540)) requestAnimationFrame(() => redraw());
+            // frames are requested only while a short animation runs (an endless loop made phones crawl)
+            if (shelfAnim || (shelfDrag && shelfDrag.bump && now - shelfDrag.bump < 540)) requestAnimationFrame(() => redraw());
         }
         // what lies under a pointer: 'hooks' / 'towel' (the + icons) or a drag kind { drag }
         function shelfHintHit(cx, cy) {
