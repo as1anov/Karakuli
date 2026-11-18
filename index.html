@@ -2782,9 +2782,8 @@ service cloud.firestore {
                 const a = shelfAnim && shelfAnim.key === h.key ? Math.min(1, (now - shelfAnim.t0) / 700) : 1;
                 const path = shelfFeatPath(h.key, F);
                 ctx.save();
-                ctx.strokeStyle = on ? ink : onSheet; ctx.lineWidth = 1.6 * u; ctx.lineCap = 'round';
-                if (!on) ctx.setLineDash([6 * u, 5 * u]);
-                ctx.stroke(path);
+                ctx.strokeStyle = onSheet; ctx.lineWidth = 1.6 * u; ctx.lineCap = 'round';
+                if (!on) { ctx.setLineDash([6 * u, 5 * u]); ctx.stroke(path); }   // only the dashed preview; the real cut keeps the sheet's own edge
                 ctx.restore();
                 if (on && h.key === 'hooks') {
                     const xs = F.notches.map(n => n.cx), mid = (xs[0] + xs[xs.length - 1]) / 2, hw = (xs[xs.length - 1] - xs[0]) / 2 + 22 * u;
