@@ -2831,6 +2831,7 @@ service cloud.firestore {
                         ctx.restore();
                     }
                 }
+                if (isFarOutOnMobile()) return;   // the + icons come and go together with the pattern-end / bend-line marks
                 if (!far) { ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath(); ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); ctx.stroke(); ctx.restore(); }
                 const mine = shelfAnim && shelfAnim.key === h.key, ease = a < 1 ? 1 - Math.pow(1 - a, 3) : 1;
                 const base = on ? Math.PI / 4 : 0, ang = mine ? (on ? ease : 1 - ease) * Math.PI / 4 : base;
@@ -2861,7 +2862,7 @@ service cloud.firestore {
             const F = shelfFeat(); if (!F) return null;
             const far = shelfFar();
             const wx = (cx - offsetX) / zoom, wy = (cy - offsetY) / zoom, u = 1 / zoom, pad = Math.max(0, 14 - 7 * zoom) * u;
-            for (const h of SHELF_HINTS) {
+            for (const h of (isFarOutOnMobile() ? [] : SHELF_HINTS)) {
                 const P = shelfHintPos(h.key), r = 16 * u, lw = (h.label.length * 7.5 + 40) * u;
                 if (wx >= P.x - r && wx <= P.x + r + lw && Math.abs(wy - P.y) <= r) return h.key;
             }
