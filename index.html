@@ -7344,7 +7344,7 @@ function makeKeys(seed, ctx) {
     const dep = PRODUCTS.shelf.profile.lip - 2, ds = Math.max(0, lip.L - dep);       // the closed end of a notch, measured up the lip from the bend
     const qy = lip.P[0] + lip.T[0] * ds, qz = lip.P[1] + lip.T[1] * ds;
     const ry = qy + 1.4, Rr = 12;                                                    // the ring (wire 3.4 mm) rests on the closed ends of the two notches either side of a tooth
-    const m = new T.Group(); m.position.set(0, ry, qz); if (dir < 0) m.rotation.y = Math.PI;
+    const m = new T.Group(); m.position.set(-1, ry, qz); if (dir < 0) m.rotation.y = Math.PI;
     const mat = objMaterial('#d3d6da', { roughness: 0.34, metalness: 1 }), set = (seed + (ctx.n || 0)) % KEYS_DATA.length;
     // gravity: the keys pull the front of the ring down, so the ring tips about the line through the two notch ends (leaning on the back of the tooth)
     // and the whole bunch hangs straight down from the ring's front point
@@ -7352,12 +7352,12 @@ function makeKeys(seed, ctx) {
     const th = 75 * Math.PI / 180, sn = Math.sin(th), cs = Math.cos(th);
     const dyK = -Rr * sn, dzK = Rr * cs - Rr;                                         // where the attachment point of the keys moves to
     const extra = 0;                                                                  // with the keys hanging straight down they are all below the foot's underside, so nothing can sink in
-    const inner = new T.Group(); inner.position.set(0, -5, extra + 2); m.add(inner);   // the whole bunch is shifted 2 mm away from the wall and 5 mm down (user's request)
+    const inner = new T.Group(); inner.position.set(0, -3, extra + 2); m.add(inner);   // the whole bunch is shifted 2 mm away from the wall and 3 mm down (user's request)
     const rg = new T.Group(); rg.rotation.x = th; inner.add(rg);
     const kg = new T.Group(); kg.position.set(0, dyK, dzK); inner.add(kg);
     [['ring', rg, keysGeometry(set, 'ring')], ['keys', kg, kgeo]].forEach(([part, par, geo]) => { const mesh = new T.Mesh(geo, mat); mesh.castShadow = mesh.receiveShadow = true; par.add(mesh); });
     g.add(m);
-    g.userData.pivot = { y: ry + dyK - 5, z: qz + dir * (Rr * cs + extra + 2) };                    // the keys swing about the ring's front point
+    g.userData.pivot = { y: ry + dyK - 3, z: qz + dir * (Rr * cs + extra + 2) };                    // the keys swing about the ring's front point
     return { g, w: 30, d: 30 };
 }
 function makeUmbrella(seed, ctx) {
