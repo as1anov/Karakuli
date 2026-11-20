@@ -7650,9 +7650,13 @@ function placeObjects() {
     if (keyAll.length) S.objs = S.objs.filter(q => q.k !== 'keys');
     placeObjects0();
     const sup = R.support, spots = (sup && sup.keySpots) || [];
-    R.keysFree = spots.length;
+    R.keysFree = Math.ceil(spots.length / 2);
     if (!keyAll.length || !sup || !spots.length) { if (keyAll.length) { /* no hooks any more: the keys go away */ } return; }
-    const order = spots.slice().sort((a, b) => Math.abs(a) - Math.abs(b) || a - b), kept = [], root = R.objs || new T.Group();
+    // a ring takes two notches (spot i = notches i, i+1), so neighbours must not share a notch: take every second spot, the longer / more central chain
+    let chain = [];
+    [0, 1].forEach(s0 => { const c = []; for (let i = s0; i < spots.length; i += 2) c.push(spots[i]); const sum = a => a.reduce((p, q) => p + Math.abs(q), 0); if (c.length > chain.length || (c.length === chain.length && sum(c) < sum(chain))) chain = c; });
+    R.keysFree = chain.length;
+    const order = chain.sort((a, b) => Math.abs(a) - Math.abs(b) || a - b), kept = [], root = R.objs || new T.Group();
     keyAll.slice(0, order.length).forEach((it, i) => {
         const o = makeObject('keys', it.s, sup.depth, { sup, key, n: i });
         o.g.position.set(order[i], 0, 0); root.add(o.g); kept.push(it);
