@@ -7352,12 +7352,12 @@ function makeKeys(seed, ctx) {
     const th = 75 * Math.PI / 180, sn = Math.sin(th), cs = Math.cos(th);
     const dyK = -Rr * sn, dzK = Rr * cs - Rr;                                         // where the attachment point of the keys moves to
     const extra = 0;                                                                  // with the keys hanging straight down they are all below the foot's underside, so nothing can sink in
-    const inner = new T.Group(); inner.position.set(0, -10, extra + 5); m.add(inner);   // the whole bunch is shifted 5 mm away from the wall and 1 cm down (user's request)
+    const inner = new T.Group(); inner.position.set(0, -10, extra + 2); m.add(inner);   // the whole bunch is shifted 2 mm away from the wall and 1 cm down (user's request)
     const rg = new T.Group(); rg.rotation.x = th; inner.add(rg);
     const kg = new T.Group(); kg.position.set(0, dyK, dzK); inner.add(kg);
     [['ring', rg, keysGeometry(set, 'ring')], ['keys', kg, kgeo]].forEach(([part, par, geo]) => { const mesh = new T.Mesh(geo, mat); mesh.castShadow = mesh.receiveShadow = true; par.add(mesh); });
     g.add(m);
-    g.userData.pivot = { y: ry + dyK - 10, z: qz + dir * (Rr * cs + extra + 5) };                    // the keys swing about the ring's front point
+    g.userData.pivot = { y: ry + dyK - 10, z: qz + dir * (Rr * cs + extra + 2) };                    // the keys swing about the ring's front point
     return { g, w: 30, d: 30 };
 }
 function makeUmbrella(seed, ctx) {
