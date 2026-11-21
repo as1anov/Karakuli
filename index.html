@@ -7664,31 +7664,42 @@ function syncShelfTowel(on) {
     // profile of the cloth in (y, z): it comes up out of the slot, lies on the tray, climbs the inside of the lip, goes over its top and hangs down in front (the open side)
     const prof = []; let sAcc = 0;
     const push = (y, z) => { if (prof.length) sAcc += Math.hypot(y - prof[prof.length - 1].y, z - prof[prof.length - 1].z); prof.push({ y, z, s: sAcc }); };
-    for (let k = 0; k <= 60; k++) push(yTop - 5 - HANG * (1 - k / 60), zA - dirF * 3);                    // the end that hangs down through the slot
-    for (let k = 1; k <= 8; k++) { const a = k / 8 * Math.PI / 2; push(yTop - 5 + 5 * Math.sin(a), zA - dirF * 3 + dirF * 5 * (1 - Math.cos(a))); }   // up over the slot edge
+    const RB = 10;                                                                                         // the dense cloth is stiff: wide, gentle bends and no folds
+    for (let k = 0; k <= 60; k++) push(yTop - RB - HANG * (1 - k / 60), zA - dirF * 3);                    // the end that hangs down through the slot
+    for (let k = 1; k <= 12; k++) { const a = k / 12 * Math.PI / 2; push(yTop - RB + RB * Math.sin(a), zA - dirF * 3 + dirF * RB * (1 - Math.cos(a))); }   // up over the slot edge
     const ll = Math.hypot(lf.T[0], lf.T[1]) || 1, ty = lf.T[0] / ll, tz = lf.T[1] / ll;
     let ny = -tz * dirF, nz = ty * dirF; if (nz * dirF > 0) { ny = -ny; nz = -nz; }                      // the normal of the lip that looks at the tray
     const off = R.t / 2 + 0.9, bp = { y: lf.P[0] + ny * off, z: lf.P[1] + nz * off };
     const tau = ty > 0.2 ? (yTop - bp.y) / ty : 0, p2 = { y: bp.y + ty * tau, z: bp.z + tz * tau }, p3 = { y: bp.y + ty * (lf.L + 0.5), z: bp.z + tz * (lf.L + 0.5) };
     for (let k = 1; k <= 10; k++) push(yTop, zA + (p2.z - zA) * k / 10);                                // flat on the tray up to the lip
     for (let k = 1; k <= 10; k++) push(p2.y + (p3.y - p2.y) * k / 10, p2.z + (p3.z - p2.z) * k / 10);   // up the lip
-    const q1 = { y: p3.y + ty * 4, z: p3.z + tz * 4 }, q2 = { y: p3.y + ty * 4 - 7, z: p3.z + tz * 4 + dirF * 7 };
+    const q1 = { y: p3.y + ty * 7, z: p3.z + tz * 7 }, q2 = { y: p3.y + ty * 7 - 11, z: p3.z + tz * 7 + dirF * 11 };
     for (let k = 1; k <= 10; k++) { const u = k / 10, a = (1 - u) * (1 - u), b2 = 2 * (1 - u) * u, c = u * u; push(a * p3.y + b2 * q1.y + c * q2.y, a * p3.z + b2 * q1.z + c * q2.z); }
     for (let k = 1; k <= 60; k++) push(q2.y - HANG * k / 60, q2.z + dirF * 0.5 * Math.min(1, k / 20));  // hangs straight down in front of the shelf
     const Wt = Math.max(100, tw.len - 24);
     const nx = Math.ceil(Wt / 6), ns = prof.length, pos = new Float32Array(nx * ns * 3 + 0), uv = new Float32Array(nx * ns * 2), idx = [];
     const hang0 = sAcc - HANG, dirS = dirF;
     for (let j = 0; j < ns; j++) for (let i = 0; i < nx; i++) {
-        const u = i / (nx - 1), x = (u - 0.5) * Wt, p = prof[j], dd = Math.max(0, yTop - 8 - p.y), amp = Math.min(1, dd / 70) * 3.2;   // soft folds that grow with the drop, the same on both halves
+        const u = i / (nx - 1), x = (u - 0.5) * Wt, p = prof[j], dd = Math.max(0, yTop - 8 - p.y), amp = Math.min(1, dd / 70) * 0.5;   // only a slight waviness: the cloth is dense and stiff
         const fold = amp * (Math.sin(x * 0.11 + 0.6) + 0.55 * Math.sin(x * 0.27 + dd * 0.012)) * dirF;
         const o = (j * nx + i) * 3; pos[o] = xc + x; pos[o + 1] = p.y; pos[o + 2] = p.z + fold;
         uv[(j * nx + i) * 2] = x / 26; uv[(j * nx + i) * 2 + 1] = p.s / 26;
         if (j < ns - 1 && i < nx - 1) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; idx.push(a, c, b, b, c, d); }
     }
+    const g0 = new T.BufferGeometry();
+    g0.setAttribute('position', new T.BufferAttribute(pos, 3)); g0.setIndex(idx); g0.computeVertexNormals();
+    const nrm0 = g0.attributes.normal.array, nv = nx * ns, TH = 0.5, p2a = new Float32Array(nv * 6), uv2 = new Float32Array(nv * 4), nr2 = new Float32Array(nv * 6), idx2 = [];
+    for (let v = 0; v < nv; v++) for (let q = 0; q < 3; q++) {      // the cloth is 0.5 mm thick: a front and a back surface, 0.25 mm each side of the middle
+        p2a[v * 3 + q] = pos[v * 3 + q] + nrm0[v * 3 + q] * TH / 2; p2a[(nv + v) * 3 + q] = pos[v * 3 + q] - nrm0[v * 3 + q] * TH / 2;
+        nr2[v * 3 + q] = nrm0[v * 3 + q]; nr2[(nv + v) * 3 + q] = -nrm0[v * 3 + q];
+    }
+    for (let v = 0; v < nv; v++) { uv2[v * 2] = uv2[(nv + v) * 2] = uv[v * 2]; uv2[v * 2 + 1] = uv2[(nv + v) * 2 + 1] = uv[v * 2 + 1]; }
+    for (let k = 0; k < idx.length; k += 3) { idx2.push(idx[k], idx[k + 1], idx[k + 2]); idx2.push(nv + idx[k], nv + idx[k + 2], nv + idx[k + 1]); }
+    g0.dispose();
     const geo = new T.BufferGeometry();
-    geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    geo.setAttribute('position', new T.BufferAttribute(p2a, 3)); geo.setAttribute('normal', new T.BufferAttribute(nr2, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv2, 2)); geo.setIndex(idx2);
     const tex = terryTexture().clone(); tex.needsUpdate = true; tex.repeat.set(1, 1);
-    const mat = objMaterial('#3f8fa8', { roughness: 1, map: tex, bumpMap: tex, bumpScale: 0.8, side: T.DoubleSide });
+    const mat = objMaterial('#3f8fa8', { roughness: 1, map: tex, bumpMap: tex, bumpScale: 0.8, side: T.FrontSide });
     const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false;
     const grp = new T.Group(); grp.add(m); grp.visible = S.fold >= 0.995; R.stGroup = grp; R.scene.add(grp); R.dirty = true;
 }
