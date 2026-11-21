@@ -7344,10 +7344,10 @@ function makeKeys(seed, ctx) {
     if (sup && sup.type === 'hooks') {   // hanger: the ring hangs over the arm of a hook, its plane across the arm, the keys below it
         const set = (seed + (ctx.n || 0)) % KEYS_DATA.length, cr = KEYS_DATA[set].c, mat = objMaterial('#d3d6da', { roughness: 0.34, metalness: 1 });
         const zc = (sup.z0 + sup.z1) / 2, kg = new T.Group();
-        kg.position.set(0, sup.y + 3.3 - 24, zc);                                         // the ring (wire 3.4 mm, 24 mm across) rests on the two top corners of the 12 mm arm
+        kg.position.set(0, sup.y + 3.3 - 24 - 12, zc);                                         // the ring (wire 3.4 mm, 24 mm across) rests on the two top corners of the 12 mm arm
         const rg = new T.Group(); rg.rotation.x = Math.atan2(-cr[2], cr[1]); kg.add(rg);   // the ring stands upright over the arm
         [['ring', rg], ['keys', kg]].forEach(([part, par]) => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = part === 'keys'; mesh.receiveShadow = false; par.add(mesh); });
-        g.add(kg); g.userData.pivot = { y: sup.y + 1.7, z: zc };
+        g.add(kg); g.userData.pivot = { y: sup.y + 1.7 - 12, z: zc };
         return { g, w: 40, d: 30 };
     }
     if (!lip) return { g, w: 30, d: 30 };
@@ -7925,7 +7925,7 @@ async function buildModel() {
     return true;
 }
 
-const ARC_SEG = 14;
+const ARC_SEG = 24;
 // A bend is drawn in two layers over the same surface. The lower layer is lit with the normal of the upper flat piece, the upper layer with the
 // normal of the lower flat piece and fades in from 0 to 1 across the bend. So the colour on a bend is exactly the colour of the piece above
 // blended into the colour of the piece below (reflections included, from any camera angle): no brighter or darker band in between.
@@ -7936,7 +7936,7 @@ function makeStrip(xa0, xa1, xb0, xb1) {
     geo.setAttribute('normal', new T.BufferAttribute(new Float32Array(nv * 3), 3));
     geo.setAttribute('uv', new T.BufferAttribute(new Float32Array(nv * 2), 2));
     const mesh = new T.Mesh(geo, R.material);
-    mesh.castShadow = mesh.receiveShadow = true; mesh.frustumCulled = false;
+    mesh.castShadow = true; mesh.receiveShadow = false; mesh.frustumCulled = false;   // a bend does not receive a shadow itself: the shadow map made a dark seam where it meets the flat pieces
     const geo2 = new T.BufferGeometry();
     geo2.setAttribute('position', geo.attributes.position);
     geo2.setAttribute('uv', geo.attributes.uv);
@@ -7944,7 +7944,7 @@ function makeStrip(xa0, xa1, xb0, xb1) {
     geo2.setAttribute('color', new T.BufferAttribute(new Float32Array(nv * 4), 4));
     if (!R.stripMat) { R.stripMat = R.material.clone(); syncStripMat(); }
     const mesh2 = new T.Mesh(geo2, R.stripMat);
-    mesh2.castShadow = false; mesh2.receiveShadow = true; mesh2.frustumCulled = false; mesh2.renderOrder = 1; mesh2.userData.blend = true;
+    mesh2.castShadow = false; mesh2.receiveShadow = false; mesh2.frustumCulled = false; mesh2.renderOrder = 1; mesh2.userData.blend = true;
     return { mesh, mesh2, xa0, xa1, xb0, xb1 };
 }
 
