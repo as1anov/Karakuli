@@ -7344,10 +7344,10 @@ function makeKeys(seed, ctx) {
     if (sup && sup.type === 'hooks') {   // hanger: the ring hangs over the arm of a hook, its plane across the arm, the keys below it
         const set = (seed + (ctx.n || 0)) % KEYS_DATA.length, cr = KEYS_DATA[set].c, mat = objMaterial('#d3d6da', { roughness: 0.34, metalness: 1 });
         const zc = (sup.z0 + sup.z1) / 2, kg = new T.Group();
-        kg.position.set(0, sup.y + 3.3 - 24 - 12, zc);                                         // the ring (wire 3.4 mm, 24 mm across) rests on the two top corners of the 12 mm arm
+        kg.position.set(0, sup.y + 1.3 - 24, zc);                                         // the ring (wire 3.4 mm, 24 mm across) rests on the two top corners of the 12 mm arm
         const rg = new T.Group(); rg.rotation.x = Math.atan2(-cr[2], cr[1]); kg.add(rg);   // the ring stands upright over the arm
         [['ring', rg], ['keys', kg]].forEach(([part, par]) => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = part === 'keys'; mesh.receiveShadow = false; par.add(mesh); });
-        g.add(kg); g.userData.pivot = { y: sup.y + 1.7 - 12, z: zc };
+        g.add(kg); g.userData.pivot = { y: sup.y - 0.3, z: zc };
         return { g, w: 40, d: 30 };
     }
     if (!lip) return { g, w: 30, d: 30 };
