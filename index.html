@@ -7347,7 +7347,7 @@ function makeKeys(seed, ctx) {
         const zc = (sup.z0 + sup.z1) / 2, kg = new T.Group();
         kg.position.set(0, sup.y + 3.3 - 24, zc);                                         // the ring (wire 3.4 mm, 24 mm across) rests on the two top corners of the 12 mm arm
         const rg = new T.Group(); rg.rotation.x = Math.atan2(-cr[2], cr[1]); kg.add(rg);   // the ring stands upright over the arm
-        [['ring', rg], ['keys', kg]].forEach(([part, par]) => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = mesh.receiveShadow = true; par.add(mesh); });
+        [['ring', rg], ['keys', kg]].forEach(([part, par]) => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = part === 'keys'; mesh.receiveShadow = false; par.add(mesh); });
         g.add(kg); g.userData.pivot = { y: sup.y + 1.7, z: zc };
         return { g, w: 40, d: 30 };
     }
@@ -7361,7 +7361,7 @@ function makeKeys(seed, ctx) {
     // the bunch is posed as in the supplied file: the ring leans (about 73 deg) and the keys hang straight down from the lowest point of the ring, with holes in their heads
     const cr = KEYS_DATA[set].c;                                                      // ring centre in the bunch frame (origin = the hanging point)
     const kg = new T.Group(); kg.position.set(0, -cr[1] - 2.4, -cr[2] + 2); m.add(kg);   // the ring centre sits on the notch ends (user's fine offsets: 2.4 mm down, 2 mm forward)
-    ['ring', 'keys'].forEach(part => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = mesh.receiveShadow = true; kg.add(mesh); });
+    ['ring', 'keys'].forEach(part => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = part === 'keys'; mesh.receiveShadow = false; kg.add(mesh); });
     g.add(m);
     g.userData.pivot = { y: ry - 2.4 - cr[1], z: qz + dir * (2 - cr[2]) };              // the keys swing about the lowest point of the ring
     return { g, w: 30, d: 30 };
