@@ -7648,23 +7648,23 @@ function shelfFreeSeg(W) {
     return { w: Math.max(0, s[1] - s[0]), c: (s[0] + s[1]) / 2 - W / 2 };
 }
 // The towel pocket of the shelf: a towel lies on the tray, passes through the slot over its wall-side edge and hangs down under the shelf
-function syncShelfTowel() {
+function syncShelfTowel(on) {
     if (!R) return;
     if (R.stGroup) { R.scene.remove(R.stGroup); R.stGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); R.stGroup = null; }
     const sup = R.support;
-    if (modelInfo().key !== 'shelf' || !shelfOpts.towel || !sup || !R.layout || !R.mask) return;
+    if (!on || modelInfo().key !== 'shelf' || !shelfOpts.towel || !sup || !R.layout || !R.mask) return;
     const chain = computeChain(R.layout, R.mask.ppm, R.gap + R.t / 2, 1);
     let best = null; chain.frames.forEach(f => { if (Math.abs(f.T[0]) < 0.25 && Math.abs(f.T[1]) > 0.85 && f.L > 15 && (!best || f.L > best.L)) best = f; });
     if (!best) return;
     const ba = (BEND_ANGLES.shelf[0] || 90) * Math.PI / 180 * (R.t + K_FACTOR * R.t), dirF = best.T[1] > 0 ? 1 : -1;
     const tw = shelfTowel(), xc = tw.cx - sup.w / 2;
     const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2), zA = zc + dirF * SHELF_SLOT_H / 2;      // the slot's edge on the side of the lip
-    const lf = chain.frames[chain.frames.indexOf(best) + 1], yTop = sup.y + 0.9, HANG = 300;
+    const lf = chain.frames[chain.frames.indexOf(best) + 1], yTop = sup.y + 0.9, HANG = 240;   // both halves of the towel hang the same length
     if (!lf) return;
     // profile of the cloth in (y, z): it comes up out of the slot, lies on the tray, climbs the inside of the lip, goes over its top and hangs down in front (the open side)
     const prof = []; let sAcc = 0;
     const push = (y, z) => { if (prof.length) sAcc += Math.hypot(y - prof[prof.length - 1].y, z - prof[prof.length - 1].z); prof.push({ y, z, s: sAcc }); };
-    for (let k = 0; k <= 8; k++) push(yTop - 5 - 40 * (1 - k / 8), zA - dirF * 3);                       // the tucked end inside the slot
+    for (let k = 0; k <= 60; k++) push(yTop - 5 - HANG * (1 - k / 60), zA - dirF * 3);                    // the end that hangs down through the slot
     for (let k = 1; k <= 8; k++) { const a = k / 8 * Math.PI / 2; push(yTop - 5 + 5 * Math.sin(a), zA - dirF * 3 + dirF * 5 * (1 - Math.cos(a))); }   // up over the slot edge
     const ll = Math.hypot(lf.T[0], lf.T[1]) || 1, ty = lf.T[0] / ll, tz = lf.T[1] / ll;
     let ny = -tz * dirF, nz = ty * dirF; if (nz * dirF > 0) { ny = -ny; nz = -nz; }                      // the normal of the lip that looks at the tray
@@ -7674,12 +7674,12 @@ function syncShelfTowel() {
     for (let k = 1; k <= 10; k++) push(p2.y + (p3.y - p2.y) * k / 10, p2.z + (p3.z - p2.z) * k / 10);   // up the lip
     const q1 = { y: p3.y + ty * 4, z: p3.z + tz * 4 }, q2 = { y: p3.y + ty * 4 - 7, z: p3.z + tz * 4 + dirF * 7 };
     for (let k = 1; k <= 10; k++) { const u = k / 10, a = (1 - u) * (1 - u), b2 = 2 * (1 - u) * u, c = u * u; push(a * p3.y + b2 * q1.y + c * q2.y, a * p3.z + b2 * q1.z + c * q2.z); }
-    for (let k = 1; k <= 75; k++) push(q2.y - HANG * k / 75, q2.z + dirF * 0.5 * Math.min(1, k / 20));  // hangs straight down in front of the shelf
+    for (let k = 1; k <= 60; k++) push(q2.y - HANG * k / 60, q2.z + dirF * 0.5 * Math.min(1, k / 20));  // hangs straight down in front of the shelf
     const Wt = Math.max(100, tw.len - 24);
     const nx = Math.ceil(Wt / 6), ns = prof.length, pos = new Float32Array(nx * ns * 3 + 0), uv = new Float32Array(nx * ns * 2), idx = [];
     const hang0 = sAcc - HANG, dirS = dirF;
     for (let j = 0; j < ns; j++) for (let i = 0; i < nx; i++) {
-        const u = i / (nx - 1), x = (u - 0.5) * Wt, p = prof[j], dd = Math.max(0, p.s - hang0 - 6), amp = Math.min(1, dd / 70) * 3.2;   // soft folds that grow down the cloth
+        const u = i / (nx - 1), x = (u - 0.5) * Wt, p = prof[j], dd = Math.max(0, yTop - 8 - p.y), amp = Math.min(1, dd / 70) * 3.2;   // soft folds that grow with the drop, the same on both halves
         const fold = amp * (Math.sin(x * 0.11 + 0.6) + 0.55 * Math.sin(x * 0.27 + dd * 0.012)) * dirF;
         const o = (j * nx + i) * 3; pos[o] = xc + x; pos[o + 1] = p.y; pos[o + 2] = p.z + fold;
         uv[(j * nx + i) * 2] = x / 26; uv[(j * nx + i) * 2 + 1] = p.s / 26;
@@ -7692,7 +7692,14 @@ function syncShelfTowel() {
     const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false;
     const grp = new T.Group(); grp.add(m); grp.visible = S.fold >= 0.995; R.stGroup = grp; R.scene.add(grp); R.dirty = true;
 }
-function placeObjects() { placeObjectsK(); syncShelfTowel(); }
+function placeObjects() {
+    // on the shelf the towel is an object of the list that hangs through the pocket (only one, and only while the pocket is on)
+    let tw = null;
+    if (R && modelInfo().key === 'shelf') { const t = S.objs.find(q => q.k === 'towel'); if (t) { S.objs = S.objs.filter(q => q !== t); if (shelfOpts.towel) tw = t; } }
+    placeObjectsK();
+    if (tw) S.objs.push(tw);
+    syncShelfTowel(!!tw);
+}
 // Hanging keys: a key ring lies in two neighbouring hook notches (it rests on their closed ends), the keys hang in front of the lip
 function placeObjectsK() {
     if (!R) return;
@@ -7853,6 +7860,7 @@ function stepSpawn(dt) {
 // Does one more thing of this kind still fit on the product? (the Objects icons go grey when not)
 function objFits(k) {
     try {
+        if (k === 'towel' && R && R.support && R.support.type !== 'hooks' && modelInfo().key === 'shelf') return !!shelfOpts.towel && !S.objs.some(q => q.k === 'towel');   // the pocket's towel: one only
         if (k === 'keys' && !(R && R.support && R.support.type === 'hooks')) return !!R && (R.keysFree || 0) > 0 && !!R.support && !!R.support.keySpots;
         const rm = R && R.room, sup = R && R.support; if (!rm || !sup) return true;
         if (rm.type === 'slots') return rm.free > 0;
@@ -7891,7 +7899,7 @@ function objAct(i, act) {
 function objUI() {
     const cat = document.getElementById('v3-cat'); if (!cat) return;
     const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine', keysOk = ok && !!R.support.keySpots;
-    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (o.key ? (keysOk || onHooks) : (onHooks ? !!o.hook : o.hook !== true)) && objFits(k) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
+    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (k === 'towel' && !onHooks && !mag ? modelInfo().key === 'shelf' : (o.key ? (keysOk || onHooks) : (onHooks ? !!o.hook : o.hook !== true))) && objFits(k) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     const TRASH = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
     document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel">${TRASH}</div><div class="v3-ord"><svg class="v3-oic" viewBox="0 0 24 24">${OBJ_KINDS[it.k].icon}</svg><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<span class="v3-ohint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 6l-6 6 6 6M20 6l-6 6 6 6"/></svg></span></div></div>`).join('');
