@@ -7657,18 +7657,27 @@ function syncShelfTowel() {
     let best = null; chain.frames.forEach(f => { if (Math.abs(f.T[0]) < 0.25 && Math.abs(f.T[1]) > 0.85 && f.L > 15 && (!best || f.L > best.L)) best = f; });
     if (!best) return;
     const ba = (BEND_ANGLES.shelf[0] || 90) * Math.PI / 180 * (R.t + K_FACTOR * R.t), dirF = best.T[1] > 0 ? 1 : -1;
-    const tw = shelfTowel(), xc = tw.cx - sup.w / 2, Wt = Math.max(100, tw.len - 24);
-    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2), zEdge = zc - dirF * SHELF_SLOT_H / 2;     // the slot's edge on the wall side
-    const flap = Math.max(14, Math.min(60, Math.abs(zEdge - best.P[1]) - 4)), HANG = 330, RB = 5, yTop = sup.y + 0.9;
-    // profile of the cloth in (y, z): flat on the tray, over the edge, straight down
-    const prof = [];                                                                       // {y, z, s}
-    let sAcc = 0; const push = (y, z) => { if (prof.length) sAcc += Math.hypot(y - prof[prof.length - 1].y, z - prof[prof.length - 1].z); prof.push({ y, z, s: sAcc }); };
-    for (let k = 0; k <= 12; k++) push(yTop, zEdge - dirF * flap * (1 - k / 12));
-    for (let k = 1; k <= 8; k++) { const a = k / 8 * Math.PI / 2; push(yTop - RB + RB * Math.cos(a), zEdge + dirF * RB * Math.sin(a)); }
-    const yb = yTop - RB, zb = zEdge + dirF * RB;
-    for (let k = 1; k <= 80; k++) push(yb - HANG * k / 80, zb);
+    const tw = shelfTowel(), xc = tw.cx - sup.w / 2;
+    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2), zA = zc + dirF * SHELF_SLOT_H / 2;      // the slot's edge on the side of the lip
+    const lf = chain.frames[chain.frames.indexOf(best) + 1], yTop = sup.y + 0.9, HANG = 300;
+    if (!lf) return;
+    // profile of the cloth in (y, z): it comes up out of the slot, lies on the tray, climbs the inside of the lip, goes over its top and hangs down in front (the open side)
+    const prof = []; let sAcc = 0;
+    const push = (y, z) => { if (prof.length) sAcc += Math.hypot(y - prof[prof.length - 1].y, z - prof[prof.length - 1].z); prof.push({ y, z, s: sAcc }); };
+    for (let k = 0; k <= 8; k++) push(yTop - 5 - 40 * (1 - k / 8), zA - dirF * 3);                       // the tucked end inside the slot
+    for (let k = 1; k <= 8; k++) { const a = k / 8 * Math.PI / 2; push(yTop - 5 + 5 * Math.sin(a), zA - dirF * 3 + dirF * 5 * (1 - Math.cos(a))); }   // up over the slot edge
+    const ll = Math.hypot(lf.T[0], lf.T[1]) || 1, ty = lf.T[0] / ll, tz = lf.T[1] / ll;
+    let ny = -tz * dirF, nz = ty * dirF; if (nz * dirF > 0) { ny = -ny; nz = -nz; }                      // the normal of the lip that looks at the tray
+    const off = R.t / 2 + 0.9, bp = { y: lf.P[0] + ny * off, z: lf.P[1] + nz * off };
+    const tau = ty > 0.2 ? (yTop - bp.y) / ty : 0, p2 = { y: bp.y + ty * tau, z: bp.z + tz * tau }, p3 = { y: bp.y + ty * (lf.L + 0.5), z: bp.z + tz * (lf.L + 0.5) };
+    for (let k = 1; k <= 10; k++) push(yTop, zA + (p2.z - zA) * k / 10);                                // flat on the tray up to the lip
+    for (let k = 1; k <= 10; k++) push(p2.y + (p3.y - p2.y) * k / 10, p2.z + (p3.z - p2.z) * k / 10);   // up the lip
+    const q1 = { y: p3.y + ty * 4, z: p3.z + tz * 4 }, q2 = { y: p3.y + ty * 4 - 7, z: p3.z + tz * 4 + dirF * 7 };
+    for (let k = 1; k <= 10; k++) { const u = k / 10, a = (1 - u) * (1 - u), b2 = 2 * (1 - u) * u, c = u * u; push(a * p3.y + b2 * q1.y + c * q2.y, a * p3.z + b2 * q1.z + c * q2.z); }
+    for (let k = 1; k <= 75; k++) push(q2.y - HANG * k / 75, q2.z + dirF * 0.5 * Math.min(1, k / 20));  // hangs straight down in front of the shelf
+    const Wt = Math.max(100, tw.len - 24);
     const nx = Math.ceil(Wt / 6), ns = prof.length, pos = new Float32Array(nx * ns * 3 + 0), uv = new Float32Array(nx * ns * 2), idx = [];
-    const hang0 = sAcc - HANG;
+    const hang0 = sAcc - HANG, dirS = dirF;
     for (let j = 0; j < ns; j++) for (let i = 0; i < nx; i++) {
         const u = i / (nx - 1), x = (u - 0.5) * Wt, p = prof[j], dd = Math.max(0, p.s - hang0 - 6), amp = Math.min(1, dd / 70) * 3.2;   // soft folds that grow down the cloth
         const fold = amp * (Math.sin(x * 0.11 + 0.6) + 0.55 * Math.sin(x * 0.27 + dd * 0.012)) * dirF;
