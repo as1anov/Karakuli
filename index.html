@@ -7339,6 +7339,15 @@ function keysGeometry(set, part) {
 }
 function makeKeys(seed, ctx) {
     const g = new T.Group(), lip = ctx.sup && ctx.sup.klip, sup = ctx.sup;
+    if (sup && sup.type === 'hooks') {   // hanger: the ring hangs over the arm of a hook, its plane across the arm, the keys below it
+        const set = (seed + (ctx.n || 0)) % KEYS_DATA.length, cr = KEYS_DATA[set].c, mat = objMaterial('#d3d6da', { roughness: 0.34, metalness: 1 });
+        const zc = (sup.z0 + sup.z1) / 2, kg = new T.Group();
+        kg.position.set(0, sup.y + 3.3 - 24, zc);                                         // the ring (wire 3.4 mm, 24 mm across) rests on the two top corners of the 12 mm arm
+        const rg = new T.Group(); rg.rotation.x = Math.atan2(-cr[2], cr[1]); kg.add(rg);   // the ring stands upright over the arm
+        [['ring', rg], ['keys', kg]].forEach(([part, par]) => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = mesh.receiveShadow = true; par.add(mesh); });
+        g.add(kg); g.userData.pivot = { y: sup.y + 1.7, z: zc };
+        return { g, w: 40, d: 30 };
+    }
     if (!lip) return { g, w: 30, d: 30 };
     const dir = lip.P[1] >= (sup.z0 + sup.z1) / 2 ? 1 : -1;                        // +1: the lip is at the far end of the foot, away from the wall
     const dep = PRODUCTS.shelf.profile.lip - 2, ds = Math.max(0, lip.L - dep);       // the closed end of a notch, measured up the lip from the bend
@@ -7640,6 +7649,7 @@ function placeObjects() {
     if (!R) return;
     const key = modelInfo().key;
     if (S.objKey !== key) { S.objs = []; S.objKey = key; }
+    if (key === 'hanger') { placeObjects0(); return; }   // on the hanger the keys hang over the arms like any hanging thing
     const keyAll = S.objs.filter(q => q.k === 'keys');
     if (keyAll.length) S.objs = S.objs.filter(q => q.k !== 'keys');
     placeObjects0();
@@ -7675,14 +7685,14 @@ function placeObjects0() {
             // candidate spots: one hook, or (magazine) the middle of two neighbouring hooks; nearest to the middle first
             const cands = [];
             if (it.k === 'magazine' && n > 1) for (let i = 0; i + 1 < n; i++) cands.push({ x: (sup.hooks[i] + sup.hooks[i + 1]) / 2, w: 210, hi: i, two: true });
-            else for (let i = 0; i < n; i++) cands.push({ x: sup.hooks[i], w: it.k === 'towel' ? towelSize().w : it.k === 'magazine' ? 210 : 160, hi: i });
+            else for (let i = 0; i < n; i++) cands.push({ x: sup.hooks[i], w: it.k === 'towel' ? towelSize().w : it.k === 'magazine' ? 210 : it.k === 'keys' ? 44 : 160, hi: i });
             cands.sort((a, b) => Math.abs(a.x) - Math.abs(b.x) || a.x - b.x);
             const c = cands.find(q => taken.every(([a, b]) => q.x + q.w / 2 + 6 <= a || q.x - q.w / 2 - 6 >= b));
             if (!c) return;
             taken.push([c.x - c.w / 2, c.x + c.w / 2]); kept.push(it);
             const o = makeObject(it.k, it.s, sup.depth, { sup, key, flip: !!it.f, pitch: c.two ? pitch : 0, n: cn[it.k] = (cn[it.k] === undefined ? 0 : cn[it.k] + 1) });
             if (o.at) o.g.position.set(c.x, o.at.y, o.at.z);
-            else if (it.k === 'towel' || it.k === 'umbrella') o.g.position.set(c.x, 0, 0);              // built in absolute y / z: it hangs exactly on the lip
+            else if (it.k === 'towel' || it.k === 'umbrella' || it.k === 'keys') o.g.position.set(c.x, 0, 0);              // built in absolute y / z: it hangs exactly on the lip
             else o.g.position.set(c.x, sup.y + 2, (sup.z0 + sup.z1) / 2);
             root.add(o.g);
         });
@@ -7794,13 +7804,13 @@ function stepSpawn(dt) {
 // Does one more thing of this kind still fit on the product? (the Objects icons go grey when not)
 function objFits(k) {
     try {
-        if (k === 'keys') return !!R && (R.keysFree || 0) > 0 && !!R.support && !!R.support.keySpots;
+        if (k === 'keys' && !(R && R.support && R.support.type === 'hooks')) return !!R && (R.keysFree || 0) > 0 && !!R.support && !!R.support.keySpots;
         const rm = R && R.room, sup = R && R.support; if (!rm || !sup) return true;
         if (rm.type === 'slots') return rm.free > 0;
         if (rm.type === 'hooks') {
             const n = rm.n, cands = [];
             if (k === 'magazine' && n > 1) for (let i = 0; i + 1 < n; i++) cands.push({ x: (rm.hooks[i] + rm.hooks[i + 1]) / 2, w: 210 });
-            else for (let i = 0; i < n; i++) cands.push({ x: rm.hooks[i], w: k === 'towel' ? towelSize().w : k === 'magazine' ? 210 : 160 });
+            else for (let i = 0; i < n; i++) cands.push({ x: rm.hooks[i], w: k === 'towel' ? towelSize().w : k === 'magazine' ? 210 : k === 'keys' ? 44 : 160 });
             return cands.some(q => rm.taken.every(([a, b]) => q.x + q.w / 2 + 6 <= a || q.x - q.w / 2 - 6 >= b));
         }
         R.kw = R.kw || {}; const ck = modelInfo().key + '|' + k;
@@ -7832,7 +7842,7 @@ function objAct(i, act) {
 function objUI() {
     const cat = document.getElementById('v3-cat'); if (!cat) return;
     const ok = !!(R && R.support), onHooks = ok && R.support.type === 'hooks', mag = ok && modelInfo().key === 'magazine', keysOk = ok && !!R.support.keySpots;
-    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (o.key ? keysOk : (onHooks ? !!o.hook : o.hook !== true)) && objFits(k) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
+    cat.innerHTML = Object.entries(OBJ_KINDS).map(([k, o]) => `<button class="v3-card" data-ok="${k}"${ok && !o.off && !(mag && k !== 'magazine') && (o.key ? (keysOk || onHooks) : (onHooks ? !!o.hook : o.hook !== true)) && objFits(k) ? '' : ' disabled'}${o.off ? ' title="Coming soon"' : ''}><svg viewBox="0 0 24 24">${o.icon}</svg><span>${o.name}</span></button>`).join('');
     const nm = i => { const it = S.objs[i]; return OBJ_KINDS[it.k].name + (S.objs.filter(q => q.k === it.k).length > 1 ? ' ' + (S.objs.slice(0, i + 1).filter(q => q.k === it.k).length) : ''); };
     const TRASH = '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
     document.getElementById('v3-objlist').innerHTML = S.objs.map((it, i) => `<div class="v3-os" data-oi="${i}"><div class="v3-odel">${TRASH}</div><div class="v3-ord"><svg class="v3-oic" viewBox="0 0 24 24">${OBJ_KINDS[it.k].icon}</svg><span class="v3-onm">${nm(i)}</span>${OBJ_KINDS[it.k].turn && (it.k !== 'magazine' || modelInfo().key === 'magazine') ? `<button type="button" class="v3-oflip" data-oi="${i}" data-oa="flip" title="${OBJ_KINDS[it.k].turn}" aria-label="${OBJ_KINDS[it.k].turn}"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg></button>` : ''}<span class="v3-ohint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 6l-6 6 6 6M20 6l-6 6 6 6"/></svg></span></div></div>`).join('');
