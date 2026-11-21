@@ -7116,6 +7116,7 @@ function disposeModel() {
     R.model.traverse(o => { if (o.geometry) o.geometry.dispose(); });
     R.model = null; R.pieces = []; R.strips = [];
     if (R.objs) { R.scene.remove(R.objs); R.objs = null; }
+    if (R.stGroup) { R.scene.remove(R.stGroup); R.stGroup = null; }
 }
 
 
@@ -7646,8 +7647,45 @@ function shelfFreeSeg(W) {
     const a = [0, l], b = [r, W], s = (a[1] - a[0]) >= (b[1] - b[0]) ? a : b;
     return { w: Math.max(0, s[1] - s[0]), c: (s[0] + s[1]) / 2 - W / 2 };
 }
+// The towel pocket of the shelf: a towel lies on the tray, passes through the slot over its wall-side edge and hangs down under the shelf
+function syncShelfTowel() {
+    if (!R) return;
+    if (R.stGroup) { R.scene.remove(R.stGroup); R.stGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); }); R.stGroup = null; }
+    const sup = R.support;
+    if (modelInfo().key !== 'shelf' || !shelfOpts.towel || !sup || !R.layout || !R.mask) return;
+    const chain = computeChain(R.layout, R.mask.ppm, R.gap + R.t / 2, 1);
+    let best = null; chain.frames.forEach(f => { if (Math.abs(f.T[0]) < 0.25 && Math.abs(f.T[1]) > 0.85 && f.L > 15 && (!best || f.L > best.L)) best = f; });
+    if (!best) return;
+    const ba = (BEND_ANGLES.shelf[0] || 90) * Math.PI / 180 * (R.t + K_FACTOR * R.t), dirF = best.T[1] > 0 ? 1 : -1;
+    const tw = shelfTowel(), xc = tw.cx - sup.w / 2, Wt = Math.max(100, tw.len - 24);
+    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2), zEdge = zc - dirF * SHELF_SLOT_H / 2;     // the slot's edge on the wall side
+    const flap = Math.max(14, Math.min(60, Math.abs(zEdge - best.P[1]) - 4)), HANG = 330, RB = 5, yTop = sup.y + 0.9;
+    // profile of the cloth in (y, z): flat on the tray, over the edge, straight down
+    const prof = [];                                                                       // {y, z, s}
+    let sAcc = 0; const push = (y, z) => { if (prof.length) sAcc += Math.hypot(y - prof[prof.length - 1].y, z - prof[prof.length - 1].z); prof.push({ y, z, s: sAcc }); };
+    for (let k = 0; k <= 12; k++) push(yTop, zEdge - dirF * flap * (1 - k / 12));
+    for (let k = 1; k <= 8; k++) { const a = k / 8 * Math.PI / 2; push(yTop - RB + RB * Math.cos(a), zEdge + dirF * RB * Math.sin(a)); }
+    const yb = yTop - RB, zb = zEdge + dirF * RB;
+    for (let k = 1; k <= 80; k++) push(yb - HANG * k / 80, zb);
+    const nx = Math.ceil(Wt / 6), ns = prof.length, pos = new Float32Array(nx * ns * 3 + 0), uv = new Float32Array(nx * ns * 2), idx = [];
+    const hang0 = sAcc - HANG;
+    for (let j = 0; j < ns; j++) for (let i = 0; i < nx; i++) {
+        const u = i / (nx - 1), x = (u - 0.5) * Wt, p = prof[j], dd = Math.max(0, p.s - hang0 - 6), amp = Math.min(1, dd / 70) * 3.2;   // soft folds that grow down the cloth
+        const fold = amp * (Math.sin(x * 0.11 + 0.6) + 0.55 * Math.sin(x * 0.27 + dd * 0.012)) * dirF;
+        const o = (j * nx + i) * 3; pos[o] = xc + x; pos[o + 1] = p.y; pos[o + 2] = p.z + fold;
+        uv[(j * nx + i) * 2] = x / 26; uv[(j * nx + i) * 2 + 1] = p.s / 26;
+        if (j < ns - 1 && i < nx - 1) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; idx.push(a, c, b, b, c, d); }
+    }
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    const tex = terryTexture().clone(); tex.needsUpdate = true; tex.repeat.set(1, 1);
+    const mat = objMaterial('#3f8fa8', { roughness: 1, map: tex, bumpMap: tex, bumpScale: 0.8, side: T.DoubleSide });
+    const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false;
+    const grp = new T.Group(); grp.add(m); grp.visible = S.fold >= 0.995; R.stGroup = grp; R.scene.add(grp); R.dirty = true;
+}
+function placeObjects() { placeObjectsK(); syncShelfTowel(); }
 // Hanging keys: a key ring lies in two neighbouring hook notches (it rests on their closed ends), the keys hang in front of the lip
-function placeObjects() {
+function placeObjectsK() {
     if (!R) return;
     const key = modelInfo().key;
     if (S.objKey !== key) { S.objs = []; S.objKey = key; }
@@ -8019,6 +8057,7 @@ function updatePose() {
     });
     chain.arcs.forEach((a, i) => (R.strips[i] || []).forEach(s => updateStrip(s, a, t)));
     if (R.objs) R.objs.visible = S.fold >= 0.995;   // things stand on the folded product only
+    if (R.stGroup) R.stGroup.visible = S.fold >= 0.995;
 }
 
 function applyMaterial() {
