@@ -8665,6 +8665,8 @@ function ensureCss() {
     #v3d-panel .v3-sec[data-sec="obj"] .v3-body { gap: 14px; padding-top: 10px !important; padding-bottom: 10px !important; }
     #v3d-panel .v3-body .v3-clear { background: var(--btn-bg); border: 1px solid var(--border-color); color: var(--text-color); }
     #v3d-panel #v3-objlist { gap: 8px; }
+    #v3d-panel #v3-objlist { max-height: calc(3 * var(--tb) + 16px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }   /* three rows at most, the rest scrolls, so the list never covers the screen */
+    #v3d-panel #v3-objlist::-webkit-scrollbar { display: none; }
     @media (max-width: 600px) { #v3d-title { display: none !important; } }
     /* the close button (X) stands at the end of the 3D toolbar, where the hand is */
     #v3-rail #v3d-close { order: 99; margin-right: 0; margin-left: calc(var(--tpad) + 1px); --d: 9; }
