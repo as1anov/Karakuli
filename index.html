@@ -7046,7 +7046,7 @@ function roundCorners(vs, hole, rho, skip) {
         let bxm = u1x + u2x, bym = u1y + u2y; const bl = Math.hypot(bxm, bym) || 1; bxm /= bl; bym /= bl;
         const k = r / Math.sin(phi / 2), ox = c.x + bxm * k, oy = c.y + bym * k;
         const a1 = Math.atan2(t1y - oy, t1x - ox); let da = Math.atan2(t2y - oy, t2x - ox) - a1; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
-        const m = Math.max(2, Math.ceil(Math.abs(da) / 0.4));
+        const m = Math.max(2, Math.ceil(Math.abs(da) / 0.3));
         for (let j = 0; j <= m; j++) { const a = a1 + da * j / m; out.push(new T.Vector2(ox + r * Math.cos(a), oy + r * Math.sin(a))); }
     }
     return out;
@@ -8015,13 +8015,13 @@ async function buildModel() {
     R.model = model; R.layout = layout; R.pieces = []; R.strips = []; R.gap = gap; R.t = t;
     showLoad('Cutting the pattern…', 'Making the sheet and its bends', 65); await nextFrame();
     layout.pieces.forEach((pc, i) => {
-        const ex = Math.ceil(0.4 * ppm), rr = Math.min(0.3, t * 0.15);          // powder coat: the cut edges and corners are slightly rounded (0.3 mm edge, 0.8 mm corner)
-        const shapes = shapesForRows(mask, pc.r0, pc.r1, { top: i > 0 ? ex : 0, bot: i < layout.pieces.length - 1 ? ex : 0, round: 0.8 });
+        const ex = Math.ceil(0.4 * ppm), rr = Math.min(0.05, t * 0.05);         // powder coat: the cut edges (0.05 mm) and the convex corners (0.3 mm) are slightly rounded
+        const shapes = shapesForRows(mask, pc.r0, pc.r1, { top: i > 0 ? ex : 0, bot: i < layout.pieces.length - 1 ? ex : 0, round: 0.3 });
         if (!shapes.length) { R.pieces.push(null); return; }
         let geo;
-        try { geo = new T.ExtrudeGeometry(shapes, { depth: t - 2 * rr, bevelEnabled: true, bevelThickness: rr, bevelSize: rr, bevelOffset: -rr, bevelSegments: 3, curveSegments: 1, steps: 1 }); geo.translate(0, shapes.dy, rr - t / 2); }
+        try { geo = new T.ExtrudeGeometry(shapes, { depth: t - 2 * rr, bevelEnabled: true, bevelThickness: rr, bevelSize: rr, bevelOffset: -rr, bevelSegments: 2, curveSegments: 1, steps: 1 }); geo.translate(0, shapes.dy, rr - t / 2); }
         catch (e) { console.warn('rounded edges not available', e); geo = new T.ExtrudeGeometry(shapesForRows(mask, pc.r0, pc.r1), { depth: t, bevelEnabled: false, curveSegments: 1, steps: 1 }); geo.translate(0, 0, -t / 2); }
-        geo = creaseNormals(geo, 40);
+        geo = creaseNormals(geo, 18);       // below the first bevel facet (22 deg): the big flat faces keep one exact normal, so gloss reflections stay clean and undistorted
         const mesh = new T.Mesh(geo, R.material);
         mesh.castShadow = mesh.receiveShadow = true;
         mesh.matrixAutoUpdate = false;
