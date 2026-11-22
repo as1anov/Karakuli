@@ -8015,7 +8015,7 @@ async function buildModel() {
     R.model = model; R.layout = layout; R.pieces = []; R.strips = []; R.gap = gap; R.t = t;
     showLoad('Cutting the pattern…', 'Making the sheet and its bends', 65); await nextFrame();
     layout.pieces.forEach((pc, i) => {
-        const ex = Math.ceil(0.4 * ppm), rr = Math.min(0.2, t * 0.1);         // powder coat: the cut edges (0.2 mm) and the convex corners (0.4 mm) are slightly rounded
+        const ex = Math.ceil(0.4 * ppm), rr = Math.min(0.25, t * 0.125);         // powder coat: the cut edges (0.25 mm) and the convex corners (0.4 mm) are slightly rounded
         const shapes = shapesForRows(mask, pc.r0, pc.r1, { top: i > 0 ? ex : 0, bot: i < layout.pieces.length - 1 ? ex : 0, round: 0.4 });
         if (!shapes.length) { R.pieces.push(null); return; }
         let geo;
