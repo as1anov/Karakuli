@@ -6821,6 +6821,13 @@ function designPrimitives(w, h, W, H, ppm) {
         if (P.hooks && G.arms) { const r = Math.min(HOOK_CORNER_MM, 6) * mm; G.arms.forEach(a => [[L + a[1] * mm - r, B - r], [L + a[0] * mm + r, B - r]].forEach(([cx, cy]) => { const c = U(cx, cy); circles.push({ cx: c[0], cy: c[1], r: r * sx }); })); }
         if (P.hooks && G.arms) { const sy0 = T + G.anchor * mm; line(L, sy0, R, sy0); G.arms.forEach(a => { line(L + a[0] * mm, sy0, L + a[0] * mm, B); line(L + a[1] * mm, sy0, L + a[1] * mm, B); }); }
     }
+    if (templateKind() === 'product' && activeProductKey === 'shelf' && shelfOpts.hooks.length) {   // the key-hook notches: exact straight sides, bottom and the four rounded corners, so the bent lip has clean edges
+        const F = shelfFeat();
+        if (F) F.notches.forEach(n => {
+            [[n.cx + n.hw + n.rm, F.B - n.rm, n.rm], [n.cx - n.hw - n.rm, F.B - n.rm, n.rm], [n.cx + n.hw - n.r, F.B - n.d + n.r, n.r], [n.cx - n.hw + n.r, F.B - n.d + n.r, n.r]].forEach(([cx, cy, r]) => { const c = U(cx, cy); circles.push({ cx: c[0], cy: c[1], r: r * sx }); });
+            line(n.cx + n.hw, F.B - n.d + n.r, n.cx + n.hw, F.B - n.rm); line(n.cx - n.hw, F.B - n.d + n.r, n.cx - n.hw, F.B - n.rm); line(n.cx - n.hw + n.r, F.B - n.d, n.cx + n.hw - n.r, F.B - n.d);
+        });
+    }
     holesMm().forEach(([hx, hy]) => circles.push({ cx: hx * ppm + 1, cy: hy * ppm + 1, r: HOLE_DIAMETER_MM / 2 * ppm }));
     return { circles, lines };
 }
