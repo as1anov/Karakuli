@@ -7665,7 +7665,7 @@ function syncShelfTowel(on) {
     // It stands in the slot with the dome above the tray; the legs go through the slot and are lengthened so both hang the same, with soft folds that grow down the legs.
     const SC = 10, HANG = 240, Wt = Math.max(60, tw.len - 8), yRef = sup.y - 20;
     const P0 = TOWEL_PROF, ymin = Math.min(...P0.map(q => q[0])), yS = -0.3, extra = Math.max(0, HANG - (0 - ymin) * SC);
-    let ring = P0.map(q => { let y = q[0]; if (y < yS) y -= extra / SC * (yS - y) / (yS - ymin); return [y * SC, q[1] * SC * 0.9]; });   // (y, z) in mm, relative to the tray surface / the middle of the legs
+    let ring = P0.map(q => { let y = q[0]; if (y < yS) y -= extra / SC * (yS - y) / (yS - ymin); return [y * SC, q[1] * SC * 0.72]; });   // (y, z) in mm, relative to the tray surface / the middle of the legs
     const dense = [];                                                                       // no segment longer than 6 mm, so the folds have vertices to move
     for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6)); for (let k = 0; k < n; k++) dense.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); }
     let sa = 0; for (let i = 0; i < dense.length; i++) { const a = dense[i], b = dense[(i + 1) % dense.length]; sa += a[0] * b[1] - b[0] * a[1]; }
