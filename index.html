@@ -7660,7 +7660,7 @@ function syncShelfTowel(on) {
     if (!best) return;
     const ba = (BEND_ANGLES.shelf[0] || 90) * Math.PI / 180 * (R.t + K_FACTOR * R.t), dirF = best.T[1] > 0 ? 1 : -1;
     const tw = shelfTowel(), xc = tw.cx - sup.w / 2;
-    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2);                                       // the middle of the slot along the tray
+    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2 + 10);                                     // the middle of the slot along the tray
     // The cloth is the cross-section of the supplied towel.obj (a thin sheet folded into a hairpin: a dome on top, two legs), one unit = 10 mm, so the sheet is 0.5 mm thick.
     // It stands in the slot with the dome above the tray; the legs go through the slot and are lengthened so both hang the same, with soft folds that grow down the legs.
     const SC = 10, HANG = 240, Wt = Math.max(60, tw.len - 8), yRef = sup.y;
@@ -7668,10 +7668,17 @@ function syncShelfTowel(on) {
     let ring = P0.map(q => { let y = q[0]; if (y < yS) y -= extra / SC * (yS - y) / (yS - ymin); return [y * SC, q[1] * SC]; });   // (y, z) in mm, relative to the tray surface / the middle of the legs
     const dense = [];                                                                       // no segment longer than 6 mm, so the folds have vertices to move
     for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6)); for (let k = 0; k < n; k++) dense.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); }
-    const M = dense.length, nx = Math.ceil(Wt / 5) + 1, pos = new Float32Array(M * nx * 3), uv = new Float32Array(M * nx * 2), idx = [], arc = [0];
+    let sa = 0; for (let i = 0; i < dense.length; i++) { const a = dense[i], b = dense[(i + 1) % dense.length]; sa += a[0] * b[1] - b[0] * a[1]; }
+    const sg = sa >= 0 ? 1 : -1, nrm = dense.map((q, i) => { const a = dense[(i + dense.length - 1) % dense.length], b = dense[(i + 1) % dense.length], tx = b[0] - a[0], tz = b[1] - a[1], l = Math.hypot(tx, tz) || 1; return [sg * tz / l, -sg * tx / l]; });   // outward normals of the sheet outline
+    const RE = 0.6, HALF = 0.25, xs = [];                                                  // rounded edges: over the last 0.6 mm both faces close into a half circle
+    for (let k = 0; k <= 6; k++) xs.push(-Wt / 2 + RE * (1 - Math.cos(k / 6 * Math.PI / 2)));
+    for (let j = 1; j < Math.ceil(Wt / 5); j++) xs.push(-Wt / 2 + RE + (Wt - 2 * RE) * j / Math.ceil(Wt / 5));
+    for (let k = 6; k >= 0; k--) xs.push(Wt / 2 - RE * (1 - Math.cos(k / 6 * Math.PI / 2)));
+    const M = dense.length, nx = xs.length, pos = new Float32Array(M * nx * 3), uv = new Float32Array(M * nx * 2), idx = [], arc = [0];
     for (let i = 1; i < M; i++) arc.push(arc[i - 1] + Math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]));
     for (let i = 0; i < M; i++) for (let j = 0; j < nx; j++) {
-        const x = (j / (nx - 1) - 0.5) * Wt, y = dense[i][0], z = dense[i][1];
+        const x = xs[j], de = Math.min(x + Wt / 2, Wt / 2 - x), fe = de < RE ? 1 - Math.sqrt(Math.max(0, 1 - Math.pow(1 - de / RE, 2))) : 0;
+        const y = dense[i][0] - nrm[i][0] * HALF * fe, z = dense[i][1] - nrm[i][1] * HALF * fe;
         const drop = Math.max(0, -y - 5), rise = Math.max(0, y - 5), k = Math.min(1, drop / 40) + 0.4 * Math.min(1, rise / 25);   // folds: none at the tray, stronger down the legs
         const fold = 3.2 * k * (Math.sin(x * 0.12 + 0.7) + 0.6 * Math.sin(x * 0.29 + drop * 0.02 + 1.3) + 0.25 * Math.sin(x * 0.61 + drop * 0.05));
         const o = (i * nx + j) * 3; pos[o] = xc + x; pos[o + 1] = yRef + y; pos[o + 2] = zc + dirF * (z + fold);
