@@ -2823,7 +2823,7 @@ service cloud.firestore {
                 ctx.restore();
                 // no standing arrows: a small arrow shows up for a moment after activation (a hint that the part can be slid), or when the stop is hit
                 if (on && !far) {
-                    const key = h.key === 'hooks' ? 'hooks' : 'towelM', hint = shelfHintArrow(h.key, now), bump = shelfBump(key, u, now);
+                    const key = h.key === 'hooks' ? 'hooks' : 'towelM', hint = shelfHintArrow(h.key, now), bump = null;   // no red arrow when a limit is hit
                     if (hint || bump) {
                         let ax, ay;
                         if (h.key === 'hooks') { const xs = F.notches.map(n => n.cx); ax = (xs[0] + xs[xs.length - 1]) / 2; ay = shelfGripY(F); }
