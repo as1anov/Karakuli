@@ -2757,7 +2757,7 @@ service cloud.firestore {
             ctx.setLineDash([8 / zoom, 6 / zoom]);
             marks.forEach(m => { const y = -hPx / 2 + m.y * MM; line(-wPx / 2, y, wPx / 2, y); });
             ctx.restore();
-            if (isFarOutOnMobile()) { pop(); return; }
+            if (zoom < 0.2) { pop(); return; }   // below 20% zoom the labels are left out (every device)
             noStroke(); fill(RED); textAlign(RIGHT, CENTER); textSize(9 / zoom); textStyle(NORMAL);
             marks.forEach(m => { const y = -hPx / 2 + m.y * MM; text(m.label, -wPx / 2 - 8 / zoom, y); });
             pop();
@@ -2835,7 +2835,6 @@ service cloud.firestore {
                     }
                 }
                 if (isFarOutOnMobile()) return;   // the + icons come and go together with the pattern-end / bend-line marks
-                if (!far) { ctx.save(); ctx.strokeStyle = ink; ctx.lineWidth = 1.2 * u; ctx.setLineDash([2 * u, 4 * u]); ctx.beginPath(); ctx.moveTo(F.R, P.y); ctx.lineTo(P.x - 13 * u, P.y); ctx.stroke(); ctx.restore(); }
                 const mine = shelfAnim && shelfAnim.key === h.key, ease = a < 1 ? 1 - Math.pow(1 - a, 3) : 1;
                 const base = on ? Math.PI / 4 : 0, ang = mine ? (on ? ease : 1 - ease) * Math.PI / 4 : base;
                 ctx.save(); ctx.translate(P.x, P.y);
@@ -2851,7 +2850,7 @@ service cloud.firestore {
                     ctx.save(); ctx.strokeStyle = ink; ctx.globalAlpha = 1 - a; ctx.lineWidth = 2 * u;
                     ctx.beginPath(); ctx.arc(P.x, P.y, (12 + 26 * a) * u, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
                 }
-                if (!far) { ctx.fillStyle = ink; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(h.label, P.x + 19 * u, P.y); }
+                if (!far && zoom >= 0.2) { ctx.fillStyle = ink; ctx.font = `600 ${12 * u}px system-ui, sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(h.label, P.x + 19 * u, P.y); }
             });
             ctx.restore();
             if (shelfAnim && now - shelfAnim.t0 >= 700) shelfAnim = null;
