@@ -7027,9 +7027,35 @@ async function rasterMask(w, h) {
 }
 
 // ---------------------------------------------------------------- Three.js parts
-function shapesForRows(mask, r0, r1) {
+// Powder coat softens the corners of a cut sheet: every convex corner of the material (outline and the edges of cut-outs) gets a small radius.
+// pts: Vector2 loop; hole: the loop is a cut-out; skip(y): corners on a cut made only to split the sheet into pieces stay as they are.
+function roundCorners(vs, hole, rho, skip) {
+    const n = vs.length; if (n < 3) return vs;
+    let ar = 0; for (let i = 0; i < n; i++) { const a = vs[i], b = vs[(i + 1) % n]; ar += a.x * b.y - b.x * a.y; }
+    const sgn = (ar >= 0 ? 1 : -1) * (hole ? -1 : 1), out = [];
+    for (let i = 0; i < n; i++) {
+        const p = vs[(i + n - 1) % n], c = vs[i], q = vs[(i + 1) % n];
+        const ax = p.x - c.x, ay = p.y - c.y, bx = q.x - c.x, by = q.y - c.y, l1 = Math.hypot(ax, ay), l2 = Math.hypot(bx, by);
+        if (l1 < 1e-6 || l2 < 1e-6 || (skip && skip(c.y))) { out.push(c); continue; }
+        const u1x = ax / l1, u1y = ay / l1, u2x = bx / l2, u2y = by / l2;
+        const cr = -u1x * u2y + u1y * u2x;                                   // turn direction of p -> c -> q
+        const dot = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y)), phi = Math.acos(dot);   // interior angle
+        if (cr * sgn <= 0 || Math.PI - phi < 0.35 || phi < 0.05) { out.push(c); continue; }
+        let d = rho / Math.tan(phi / 2); const dm = 0.4 * Math.min(l1, l2); let r = rho; if (d > dm) { d = dm; r = d * Math.tan(phi / 2); }
+        const t1x = c.x + u1x * d, t1y = c.y + u1y * d, t2x = c.x + u2x * d, t2y = c.y + u2y * d;
+        let bxm = u1x + u2x, bym = u1y + u2y; const bl = Math.hypot(bxm, bym) || 1; bxm /= bl; bym /= bl;
+        const k = r / Math.sin(phi / 2), ox = c.x + bxm * k, oy = c.y + bym * k;
+        const a1 = Math.atan2(t1y - oy, t1x - ox); let da = Math.atan2(t2y - oy, t2x - ox) - a1; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+        const m = Math.max(2, Math.ceil(Math.abs(da) / 0.4));
+        for (let j = 0; j <= m; j++) { const a = a1 + da * j / m; out.push(new T.Vector2(ox + r * Math.cos(a), oy + r * Math.sin(a))); }
+    }
+    return out;
+}
+function shapesForRows(mask, r0full, r1full, ext) {
     const { A, W, ppm } = mask;
-    const hh = r1 - r0;
+    ext = ext || {};
+    const r0 = Math.max(0, r0full - (ext.top || 0)), r1 = Math.min(mask.H, r1full + (ext.bot || 0));   // a few rows more at the ends that meet a bend: the rounded rim of the cut sits inside the bend, no groove at the fold
+    const hh = r1 - r0, yTop = r0 < r0full, yBot = r1 > r1full;
     if (hh < 1) return [];
     const W2 = W + 2, H2 = hh + 2, sub = new Uint8Array(W2 * H2);
     let any = false;
@@ -7037,11 +7063,15 @@ function shapesForRows(mask, r0, r1) {
     if (!any) return [];
     const groups = refineGroups(groupLoops(traceContours(sub, W2, H2), 0.12), ppm, shiftDesign(mask.design, -r0));
     const toPts = pts => { const v = []; for (let i = 0; i < pts.length; i += 2) v.push(new T.Vector2((pts[i] - 1) / ppm, -(pts[i + 1] - 1) / ppm)); return v; };   // the tracer works on a mask padded by 1 px
-    return groups.map(o => {
-        const s = new T.Shape(toPts(o.pts));
-        o.holes.forEach(hp => s.holes.push(new T.Path(toPts(hp))));
+    const RHO = ext.round || 0, ey = 1.5 / ppm, skip = y => (yTop && Math.abs(y) < ey) || (yBot && Math.abs(y + hh / ppm) < ey);
+    const fin = (pts, hole) => RHO ? roundCorners(toPts(pts), hole, RHO, skip) : toPts(pts);
+    const res = groups.map(o => {
+        const s = new T.Shape(fin(o.pts, false));
+        o.holes.forEach(hp => s.holes.push(new T.Path(fin(hp, true))));
         return s;
     });
+    res.dy = (r0full - r0) / ppm;                                              // shift that puts the piece's own first row back at y = 0
+    return res;
 }
 
 // Brushed stainless steel: a seamless grain (every stroke wraps round the edges, so tiles join without a visible line),
@@ -7985,10 +8015,13 @@ async function buildModel() {
     R.model = model; R.layout = layout; R.pieces = []; R.strips = []; R.gap = gap; R.t = t;
     showLoad('Cutting the pattern…', 'Making the sheet and its bends', 65); await nextFrame();
     layout.pieces.forEach((pc, i) => {
-        const shapes = shapesForRows(mask, pc.r0, pc.r1);
+        const ex = Math.ceil(0.4 * ppm), rr = Math.min(0.3, t * 0.15);          // powder coat: the cut edges and corners are slightly rounded (0.3 mm edge, 0.8 mm corner)
+        const shapes = shapesForRows(mask, pc.r0, pc.r1, { top: i > 0 ? ex : 0, bot: i < layout.pieces.length - 1 ? ex : 0, round: 0.8 });
         if (!shapes.length) { R.pieces.push(null); return; }
-        const geo = creaseNormals(new T.ExtrudeGeometry(shapes, { depth: t, bevelEnabled: false, curveSegments: 1, steps: 1 }), 40);
-        geo.translate(0, 0, -t / 2);
+        let geo;
+        try { geo = new T.ExtrudeGeometry(shapes, { depth: t - 2 * rr, bevelEnabled: true, bevelThickness: rr, bevelSize: rr, bevelOffset: -rr, bevelSegments: 3, curveSegments: 1, steps: 1 }); geo.translate(0, shapes.dy, rr - t / 2); }
+        catch (e) { console.warn('rounded edges not available', e); geo = new T.ExtrudeGeometry(shapesForRows(mask, pc.r0, pc.r1), { depth: t, bevelEnabled: false, curveSegments: 1, steps: 1 }); geo.translate(0, 0, -t / 2); }
+        geo = creaseNormals(geo, 40);
         const mesh = new T.Mesh(geo, R.material);
         mesh.castShadow = mesh.receiveShadow = true;
         mesh.matrixAutoUpdate = false;
@@ -8831,7 +8864,7 @@ function buildUI() {
         const b = e.target.closest('[data-m]'); if (!b) return;
         const t0 = S.t; S.mat = b.dataset.m;
         if (MATS[S.mat].brushed) S.color = null;   // steel is steel: a colour picked for the powder coat is dropped, no mixing
-        ensureSel(); applyMaterial(); syncUI();
+        ensureSel(); applyMaterial(); syncUI(); finishToast();
         if (S.t !== t0) { await rebuild(); syncUI(); }
     };
     $('v3-ts').onclick = async e => { const b = e.target.closest('[data-t]'); if (!b || +b.dataset.t === S.t) return; S.t = +b.dataset.t; syncUI(); await rebuild(); syncUI(); };
@@ -9050,7 +9083,7 @@ function syncUI() {
     };
     $('v3-cols').onclick = async e => { const b = e.target.closest('[data-c]'); if (!b) return; if (await pickColour(b.dataset.c || null)) ralToast(); };
     ensureSel();
-    $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip v3-mc${k === S.mat ? ' on' : ''}" data-m="${k}"><i class="v3-mdot" style="background:${MAT_DOT[k] || MATS[k].color}"></i><span>${MATS[k].short || MATS[k].name}</span></button>`).join('');
+    $('v3-mats').innerHTML = allowedMats().map(k => `<button class="v3-chip v3-mc${k === S.mat ? ' on' : ''}" data-m="${k}"><i class="v3-mdot" style="background:${matDot(k)}"></i><span>${MATS[k].short || MATS[k].name}</span></button>`).join('');
     $('v3-ts').innerHTML = allowedThick().map(t => `<button class="v3-chip v3-tk${t === S.t ? ' on' : ''}" data-t="${t}"><span>${t}<small class="mm">mm</small></span><i style="--bar:${Math.max(2, Math.round(t * 2))}px"></i></button>`).join('');
     $('v3-sum-mat').textContent = MATS[S.mat].name; $('v3-sum-thick').textContent = S.t + ' mm';
     $('v3-sum-col').innerHTML = `<span class="v3-dot-s" style="background:${S.color || MATS[S.mat].color}"></span>`;
@@ -9064,7 +9097,21 @@ function syncUI() {
         : '<svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>';
 }
 
+// the swatch of a finish: steel, flat paint, grainy, glossy: each reads differently at a glance (and takes the chosen colour)
+function matDot(k) {
+    const base = S.color || MATS[k].color;
+    if (k === 'steel') return 'linear-gradient(135deg, #cfd1d4, #9b9ea3)';
+    if (MATS[k].grain) return `radial-gradient(rgba(255,255,255,.4) 0.7px, transparent 1px) 0 0/3.4px 3.4px, radial-gradient(rgba(0,0,0,.4) 0.7px, transparent 1px) 1.7px 1.7px/3.4px 3.4px, ${base}`;
+    if (MATS[k].gloss) return `radial-gradient(ellipse 36% 22% at 32% 24%, rgba(255,255,255,.95), rgba(255,255,255,0)), linear-gradient(160deg, rgba(255,255,255,.28), rgba(0,0,0,.4)), ${base}`;
+    return `radial-gradient(circle at 35% 30%, rgba(255,255,255,.14), rgba(255,255,255,0) 60%), ${base}`;
+}
 let ralTimer = 0;
+function finishToast() {   // choosing a finish writes its name at the top, like the RAL pick
+    let el = document.getElementById('v3-ral');
+    if (!el) { el = document.createElement('div'); el.id = 'v3-ral'; document.getElementById('v3d').appendChild(el); }
+    el.innerHTML = `<i style="background:${matDot(S.mat)}"></i>${MATS[S.mat].name}`; el.classList.add('show');
+    clearTimeout(ralTimer); ralTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
 function ralToast() {   // the pick shows its RAL number at the top, like the zoom value
     const ri = window.ralInfo(); if (!ri || !ri.code) return;
     let el = document.getElementById('v3-ral');
