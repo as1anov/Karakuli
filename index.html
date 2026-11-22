@@ -7647,6 +7647,8 @@ function shelfFreeSeg(W) {
     const a = [0, l], b = [r, W], s = (a[1] - a[0]) >= (b[1] - b[0]) ? a : b;
     return { w: Math.max(0, s[1] - s[0]), c: (s[0] + s[1]) / 2 - W / 2 };
 }
+// Cross-section of towel.obj (y, z in model units, y = 0 at the tray surface): a 0.05-unit thin sheet folded into a hairpin
+const TOWEL_PROF = [[-6.0163,1.5543],[3.1474,1.5511],[3.2185,1.5477],[3.2843,1.5376],[3.3302,1.5258],[3.373,1.5106],[3.4128,1.4919],[3.4495,1.47],[3.4831,1.4449],[3.5135,1.4168],[3.5407,1.3857],[3.5647,1.3518],[3.5855,1.3151],[3.6029,1.2758],[3.6171,1.234],[3.6308,1.1744],[3.6353,1.1431],[3.6394,1.0944],[3.6392,1.0832],[3.6261,0.9765],[3.5463,0.5979],[3.4068,0.1457],[3.2303,-0.2711],[3.0441,-0.6037],[2.8756,-0.8398],[2.6806,-1.0554],[2.5351,-1.1837],[2.3765,-1.297],[2.2044,-1.3926],[2.0183,-1.4682],[1.8177,-1.5215],[1.6022,-1.5499],[1.3711,-1.5511],[1.2496,-1.5407],[0.9944,-1.4965],[0.5595,-1.4295],[-0.1795,-1.37],[-2.3696,-1.3907],[-5.9384,-1.4552],[-5.9345,-1.505],[-0.6515,-1.4326],[-0.1793,-1.4337],[0.7379,-1.4991],[0.9843,-1.5454],[1.2448,-1.5906],[1.4889,-1.6043],[1.717,-1.589],[1.9295,-1.5471],[2.127,-1.4812],[2.31,-1.3936],[2.6344,-1.1635],[2.7768,-1.0259],[2.967,-0.7982],[3.1308,-0.5524],[3.3108,-0.211],[3.4797,0.2102],[3.6106,0.6564],[3.6688,0.9337],[3.6894,1.0954],[3.6827,1.1666],[3.6693,1.2336],[3.6494,1.2959],[3.6302,1.3394],[3.6074,1.38],[3.581,1.4176],[3.5511,1.452],[3.5176,1.4832],[3.4807,1.5111],[3.4403,1.5354],[3.3965,1.5561],[3.3493,1.573],[3.2987,1.5861],[3.2261,1.5973],[3.1477,1.6011],[-6.0163,1.6043]];
 // The towel pocket of the shelf: a towel lies on the tray, passes through the slot over its wall-side edge and hangs down under the shelf
 function syncShelfTowel(on) {
     if (!R) return;
@@ -7658,48 +7660,28 @@ function syncShelfTowel(on) {
     if (!best) return;
     const ba = (BEND_ANGLES.shelf[0] || 90) * Math.PI / 180 * (R.t + K_FACTOR * R.t), dirF = best.T[1] > 0 ? 1 : -1;
     const tw = shelfTowel(), xc = tw.cx - sup.w / 2;
-    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2), zA = zc + dirF * SHELF_SLOT_H / 2;      // the slot's edge on the side of the lip
-    const lf = chain.frames[chain.frames.indexOf(best) + 1], yTop = sup.y + 0.9, HANG = 240;   // both halves of the towel hang the same length
-    if (!lf) return;
-    // profile of the cloth in (y, z): it comes up out of the slot, lies on the tray, climbs the inside of the lip, goes over its top and hangs down in front (the open side)
-    const prof = []; let sAcc = 0;
-    const push = (y, z) => { if (prof.length) sAcc += Math.hypot(y - prof[prof.length - 1].y, z - prof[prof.length - 1].z); prof.push({ y, z, s: sAcc }); };
-    const RB = 10;                                                                                         // the dense cloth is stiff: wide, gentle bends and no folds
-    for (let k = 0; k <= 60; k++) push(yTop - RB - HANG * (1 - k / 60), zA - dirF * 3);                    // the end that hangs down through the slot
-    for (let k = 1; k <= 12; k++) { const a = k / 12 * Math.PI / 2; push(yTop - RB + RB * Math.sin(a), zA - dirF * 3 + dirF * RB * (1 - Math.cos(a))); }   // up over the slot edge
-    const ll = Math.hypot(lf.T[0], lf.T[1]) || 1, ty = lf.T[0] / ll, tz = lf.T[1] / ll;
-    let ny = -tz * dirF, nz = ty * dirF; if (nz * dirF > 0) { ny = -ny; nz = -nz; }                      // the normal of the lip that looks at the tray
-    const off = R.t / 2 + 0.9, bp = { y: lf.P[0] + ny * off, z: lf.P[1] + nz * off };
-    const tau = ty > 0.2 ? (yTop - bp.y) / ty : 0, p2 = { y: bp.y + ty * tau, z: bp.z + tz * tau }, p3 = { y: bp.y + ty * (lf.L + 0.5), z: bp.z + tz * (lf.L + 0.5) };
-    for (let k = 1; k <= 10; k++) push(yTop, zA + (p2.z - zA) * k / 10);                                // flat on the tray up to the lip
-    for (let k = 1; k <= 10; k++) push(p2.y + (p3.y - p2.y) * k / 10, p2.z + (p3.z - p2.z) * k / 10);   // up the lip
-    const q1 = { y: p3.y + ty * 7, z: p3.z + tz * 7 }, q2 = { y: p3.y + ty * 7 - 11, z: p3.z + tz * 7 + dirF * 11 };
-    for (let k = 1; k <= 10; k++) { const u = k / 10, a = (1 - u) * (1 - u), b2 = 2 * (1 - u) * u, c = u * u; push(a * p3.y + b2 * q1.y + c * q2.y, a * p3.z + b2 * q1.z + c * q2.z); }
-    for (let k = 1; k <= 60; k++) push(q2.y - HANG * k / 60, q2.z + dirF * 0.5 * Math.min(1, k / 20));  // hangs straight down in front of the shelf
-    const Wt = Math.max(100, tw.len - 24);
-    const nx = Math.ceil(Wt / 6), ns = prof.length, pos = new Float32Array(nx * ns * 3 + 0), uv = new Float32Array(nx * ns * 2), idx = [];
-    const hang0 = sAcc - HANG, dirS = dirF;
-    for (let j = 0; j < ns; j++) for (let i = 0; i < nx; i++) {
-        const u = i / (nx - 1), x = (u - 0.5) * Wt, p = prof[j], dd = Math.max(0, yTop - 8 - p.y), amp = Math.min(1, dd / 70) * 0.5;   // only a slight waviness: the cloth is dense and stiff
-        const fold = amp * (Math.sin(x * 0.11 + 0.6) + 0.55 * Math.sin(x * 0.27 + dd * 0.012)) * dirF;
-        const o = (j * nx + i) * 3; pos[o] = xc + x; pos[o + 1] = p.y; pos[o + 2] = p.z + fold;
-        uv[(j * nx + i) * 2] = x / 26; uv[(j * nx + i) * 2 + 1] = p.s / 26;
-        if (j < ns - 1 && i < nx - 1) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; idx.push(a, c, b, b, c, d); }
+    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2);                                       // the middle of the slot along the tray
+    // The cloth is the cross-section of the supplied towel.obj (a thin sheet folded into a hairpin: a dome on top, two legs), one unit = 10 mm, so the sheet is 0.5 mm thick.
+    // It stands in the slot with the dome above the tray; the legs go through the slot and are lengthened so both hang the same, with soft folds that grow down the legs.
+    const SC = 10, HANG = 240, Wt = Math.max(60, tw.len - 8), yRef = sup.y;
+    const P0 = TOWEL_PROF, ymin = Math.min(...P0.map(q => q[0])), yS = -0.3, extra = Math.max(0, HANG - (0 - ymin) * SC);
+    let ring = P0.map(q => { let y = q[0]; if (y < yS) y -= extra / SC * (yS - y) / (yS - ymin); return [y * SC, q[1] * SC]; });   // (y, z) in mm, relative to the tray surface / the middle of the legs
+    const dense = [];                                                                       // no segment longer than 6 mm, so the folds have vertices to move
+    for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6)); for (let k = 0; k < n; k++) dense.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); }
+    const M = dense.length, nx = Math.ceil(Wt / 5) + 1, pos = new Float32Array(M * nx * 3), uv = new Float32Array(M * nx * 2), idx = [], arc = [0];
+    for (let i = 1; i < M; i++) arc.push(arc[i - 1] + Math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]));
+    for (let i = 0; i < M; i++) for (let j = 0; j < nx; j++) {
+        const x = (j / (nx - 1) - 0.5) * Wt, y = dense[i][0], z = dense[i][1];
+        const drop = Math.max(0, -y - 5), rise = Math.max(0, y - 5), k = Math.min(1, drop / 40) + 0.4 * Math.min(1, rise / 25);   // folds: none at the tray, stronger down the legs
+        const fold = 3.2 * k * (Math.sin(x * 0.12 + 0.7) + 0.6 * Math.sin(x * 0.29 + drop * 0.02 + 1.3) + 0.25 * Math.sin(x * 0.61 + drop * 0.05));
+        const o = (i * nx + j) * 3; pos[o] = xc + x; pos[o + 1] = yRef + y; pos[o + 2] = zc + dirF * (z + fold);
+        uv[(i * nx + j) * 2] = x / 26; uv[(i * nx + j) * 2 + 1] = arc[i] / 26;
+        const i2 = (i + 1) % M; if (j < nx - 1) { const a = i * nx + j, b = a + 1, c = i2 * nx + j, d = c + 1; idx.push(a, c, b, b, c, d); }
     }
-    const g0 = new T.BufferGeometry();
-    g0.setAttribute('position', new T.BufferAttribute(pos, 3)); g0.setIndex(idx); g0.computeVertexNormals();
-    const nrm0 = g0.attributes.normal.array, nv = nx * ns, TH = 0.5, p2a = new Float32Array(nv * 6), uv2 = new Float32Array(nv * 4), nr2 = new Float32Array(nv * 6), idx2 = [];
-    for (let v = 0; v < nv; v++) for (let q = 0; q < 3; q++) {      // the cloth is 0.5 mm thick: a front and a back surface, 0.25 mm each side of the middle
-        p2a[v * 3 + q] = pos[v * 3 + q] + nrm0[v * 3 + q] * TH / 2; p2a[(nv + v) * 3 + q] = pos[v * 3 + q] - nrm0[v * 3 + q] * TH / 2;
-        nr2[v * 3 + q] = nrm0[v * 3 + q]; nr2[(nv + v) * 3 + q] = -nrm0[v * 3 + q];
-    }
-    for (let v = 0; v < nv; v++) { uv2[v * 2] = uv2[(nv + v) * 2] = uv[v * 2]; uv2[v * 2 + 1] = uv2[(nv + v) * 2 + 1] = uv[v * 2 + 1]; }
-    for (let k = 0; k < idx.length; k += 3) { idx2.push(idx[k], idx[k + 1], idx[k + 2]); idx2.push(nv + idx[k], nv + idx[k + 2], nv + idx[k + 1]); }
-    g0.dispose();
     const geo = new T.BufferGeometry();
-    geo.setAttribute('position', new T.BufferAttribute(p2a, 3)); geo.setAttribute('normal', new T.BufferAttribute(nr2, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv2, 2)); geo.setIndex(idx2);
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
     const tex = terryTexture().clone(); tex.needsUpdate = true; tex.repeat.set(1, 1);
-    const mat = objMaterial('#3f8fa8', { roughness: 1, map: tex, bumpMap: tex, bumpScale: 0.8, side: T.FrontSide });
+    const mat = objMaterial('#3f8fa8', { roughness: 1, map: tex, bumpMap: tex, bumpScale: 0.8, side: T.DoubleSide });
     const m = new T.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false;
     const grp = new T.Group(); grp.add(m); grp.visible = S.fold >= 0.995; R.stGroup = grp; R.scene.add(grp); R.dirty = true;
 }
