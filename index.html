@@ -7701,7 +7701,7 @@ function syncShelfTowel(on) {
             if (ya === -0.6 && xa === x0) sIdx.push(sp.length / 3 - 1, sp.length / 3, sp.length / 3 + 1, sp.length / 3 - 1, sp.length / 3 + 1, sp.length / 3 + 2);
         }
     }
-    if (sp.length) { const sg2 = new T.BufferGeometry(); sg2.setAttribute('position', new T.Float32BufferAttribute(sp, 3)); sg2.setIndex(sIdx); sg2.computeVertexNormals(); const sm = new T.Mesh(sg2, new T.MeshStandardMaterial({ color: '#eef6f8', roughness: 0.9, side: T.DoubleSide })); sm.frustumCulled = false; grp.add(sm); }
+    if (sp.length) { const sg2 = new T.BufferGeometry(); sg2.setAttribute('position', new T.Float32BufferAttribute(sp, 3)); sg2.setIndex(sIdx); sg2.computeVertexNormals(); const sm = new T.Mesh(sg2, new T.MeshStandardMaterial({ color: '#34788f', roughness: 0.9, side: T.DoubleSide })); sm.frustumCulled = false; grp.add(sm); }
     grp.visible = S.fold >= 0.995; R.stGroup = grp; R.scene.add(grp); R.dirty = true;
 }
 function placeObjects() {
@@ -7831,6 +7831,8 @@ function placeObjects0() {
 // A new object appears out of nothing: it grows with a little overshoot, turns slightly into place and sways for a moment
 function spawnLast() {
     if (!R || !R.objs || !S.objs.length) return;
+    const it = S.objs.find(q => q.s === R.lastSeed);
+    if (it && it.k === 'towel' && R.stGroup && modelInfo().key === 'shelf') { R.spawn = { towel: true, t: 0 }; R.stGroup.position.y = 260; R.dirty = true; return; }   // the pocket's towel slides in from above
     const sd = R.lastSeed != null ? R.lastSeed : S.objs[S.objs.length - 1].s, g = R.objs.children.find(c => c.userData && c.userData.seed === sd);
     if (!g) return;
     const w = new T.Group(); w.position.copy(g.position); g.position.set(0, 0, 0);
@@ -7846,6 +7848,13 @@ function spawnLast() {
 function stepSpawn(dt) {
     const sp = R.spawn; if (!sp) return;
     sp.t += dt; const t = sp.t, D = 1.4;
+    if (sp.towel) {   // slides down through the pocket, settles with a small overshoot and a slight swing
+        const g = R.stGroup, q = Math.min(1, t / 0.9), c1 = 1.2, c3 = c1 + 1, e = 1 + c3 * Math.pow(q - 1, 3) + c1 * Math.pow(q - 1, 2);
+        if (g) { g.position.y = 260 * (1 - e); g.rotation.x = t > 0.7 ? Math.sin((t - 0.7) * 9) * 0.015 * Math.exp(-(t - 0.7) * 3) : 0; }
+        R.dirty = true;
+        if (t >= 1.8 || !g) { if (g) { g.position.y = 0; g.rotation.x = 0; } R.spawn = null; }
+        return;
+    }
     if (sp.sway) {   // a pendulum about the hook: a few small swings that die away
         const k = Math.exp(-t * 1.5);
         sp.w.rotation.z = Math.sin(t * 5.2) * 0.12 * k; sp.w.rotation.x = Math.sin(t * 4.1 + 0.8) * 0.03 * k;   // mostly sideways, about the arm
