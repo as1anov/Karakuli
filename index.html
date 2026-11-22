@@ -7839,7 +7839,7 @@ function placeObjects0() {
 function spawnLast() {
     if (!R || !R.objs || !S.objs.length) return;
     const it = S.objs.find(q => q.s === R.lastSeed);
-    if (it && it.k === 'towel' && R.stGroup && modelInfo().key === 'shelf') { R.spawn = { towel: true, t: 0 }; R.stGroup.position.y = 260; R.dirty = true; return; }   // the pocket's towel slides in from above
+    if (it && it.k === 'towel' && modelInfo().key === 'shelf') return;   // the pocket's towel simply appears
     const sd = R.lastSeed != null ? R.lastSeed : S.objs[S.objs.length - 1].s, g = R.objs.children.find(c => c.userData && c.userData.seed === sd);
     if (!g) return;
     const w = new T.Group(); w.position.copy(g.position); g.position.set(0, 0, 0);
