@@ -7660,10 +7660,10 @@ function syncShelfTowel(on) {
     if (!best) return;
     const ba = (BEND_ANGLES.shelf[0] || 90) * Math.PI / 180 * (R.t + K_FACTOR * R.t), dirF = best.T[1] > 0 ? 1 : -1;
     const tw = shelfTowel(), xc = tw.cx - sup.w / 2;
-    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2 + 5);                                   // the middle of the slot along the tray
+    const zc = best.P[1] + dirF * (SHELF_SLOT_Y - 12 - ba / 2 + 25);                                   // the middle of the slot along the tray
     // The cloth is the cross-section of the supplied towel.obj (a thin sheet folded into a hairpin: a dome on top, two legs), one unit = 10 mm, so the sheet is 0.5 mm thick.
     // It stands in the slot with the dome above the tray; the legs go through the slot and are lengthened so both hang the same, with soft folds that grow down the legs.
-    const SC = 10, HANG = 240, Wt = Math.max(60, tw.len - 8), yRef = sup.y - 5;
+    const SC = 10, HANG = 240, Wt = Math.max(60, tw.len - 8), yRef = sup.y - 15;
     const P0 = TOWEL_PROF, ymin = Math.min(...P0.map(q => q[0])), yS = -0.3, extra = Math.max(0, HANG - (0 - ymin) * SC);
     let ring = P0.map(q => { let y = q[0]; if (y < yS) y -= extra / SC * (yS - y) / (yS - ymin); return [y * SC, q[1] * SC]; });   // (y, z) in mm, relative to the tray surface / the middle of the legs
     const dense = [];                                                                       // no segment longer than 6 mm, so the folds have vertices to move
