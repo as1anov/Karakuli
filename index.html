@@ -6240,7 +6240,7 @@ const ORBIT_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/contr
 
 const MATS = {
     steel:     { name: 'Stainless steel', short: 'Steel',     color: '#c9ccd0', metal: 1,   rough: 0.55, brushed: true, density: 7.9 },
-    textured:  { name: 'Textured powder coat', short: 'Textured', color: '#161616', metal: 0.05, rough: 0.7, grain: true, density: 7.9 },   // structured matt powder coat (shagreen): visible ~0.5 mm grain, tiny glints
+    textured:  { name: 'Textured powder coat', short: 'Textured', color: '#161616', metal: 0.05, rough: 0.7, grain: true, density: 7.9 },   // structured matt powder coat (shagreen): visible ~0.25 mm grain, tiny glints
     gloss:     { name: 'Gloss paint', short: 'Gloss',           color: '#161616', metal: 0.0, rough: 0.5, gloss: true, density: 7.9 }   // glossy industrial paint on steel: a dielectric layer, soft broad highlights (not a mirror)
 };
 const MAT_DOT = { steel: 'linear-gradient(135deg, #cfd1d4, #9b9ea3)', textured: '#161616', gloss: '#161616' };
@@ -7084,7 +7084,7 @@ function makeGrainTexture(lite) {
     let lo = 1, hi = 0; for (let i = 0; i < a.length; i++) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]); }
     for (let i = 0; i < a.length; i++) { const v = (a[i] - lo) / (hi - lo), g = Math.round(70 + 185 * v); d[4 * i] = d[4 * i + 1] = d[4 * i + 2] = g; d[4 * i + 3] = 255; }
     x.putImageData(im, 0, 0);
-    const tex = new T.CanvasTexture(c); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(1 / 65, 1 / 65); tex.anisotropy = 8;   // UVs are millimetres: the pattern repeats every 65 mm, one grain is about 0.5 mm
+    const tex = new T.CanvasTexture(c); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(1 / 32, 1 / 32); tex.anisotropy = 8;   // UVs are millimetres: the pattern repeats every 32 mm, one grain is about 0.25 mm
     return tex;
 }
 function makeBrushTexture(lite) {
