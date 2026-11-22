@@ -1370,7 +1370,9 @@
         const SHOP_KEY = 'karakuli.shop.v1';
         const SHOP_DEFAULT = { currency: 'AZN', setup: 0, cutPerM: 0, bend: 0, waste: 0, markup: 0, mats: {
             steel:     { on: true, kg: 0, th: [1, 1.5, 2, 3] },
-            powder:    { on: true, kg: 0, th: [1.5, 2, 3] } } };
+            powder:    { on: true, kg: 0, th: [1.5, 2, 3] },
+            textured:  { on: true, kg: 0, th: [1.5, 2, 3] },
+            gloss:     { on: true, kg: 0, th: [1.5, 2, 3] } } };
         function shopNorm(x) {
             const num = (v, d) => { v = parseFloat(v); return isFinite(v) && v >= 0 ? v : d; };
             const o = JSON.parse(JSON.stringify(SHOP_DEFAULT)); x = x && typeof x === 'object' ? x : {};
@@ -6239,9 +6241,11 @@ const ORBIT_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/contr
 
 const MATS = {
     steel:     { name: 'Stainless steel', short: 'Steel',     color: '#c9ccd0', metal: 1,   rough: 0.55, brushed: true, density: 7.9 },
-    powder:    { name: 'Powder coat', short: 'Powder',         color: '#161616', metal: 0.1, rough: 0.62, density: 7.9 }
+    powder:    { name: 'Powder coat', short: 'Powder',         color: '#161616', metal: 0.1, rough: 0.62, density: 7.9 },
+    textured:  { name: 'Textured powder coat', short: 'Textured', color: '#161616', metal: 0.05, rough: 0.9, grain: true, density: 7.9 },   // fine-grained matt finish (shagreen)
+    gloss:     { name: 'Gloss paint', short: 'Gloss',           color: '#161616', metal: 0.0, rough: 0.1, gloss: true, density: 7.9 }
 };
-const MAT_DOT = { steel: 'linear-gradient(135deg, #cfd1d4, #9b9ea3)', powder: '#161616' };
+const MAT_DOT = { steel: 'linear-gradient(135deg, #cfd1d4, #9b9ea3)', powder: '#161616', textured: '#161616', gloss: '#161616' };
 const MAT_ICONS = {
     steel: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 16l5-7M12 17l6-8"/>',
     powder: '<path d="M9 9h6v12H9zM10 5h4v4h-4zM17.5 6h.01M20 4.5h.01M20 8h.01"/>'
@@ -7042,6 +7046,19 @@ function shapesForRows(mask, r0, r1) {
 
 // Brushed stainless steel: a seamless grain (every stroke wraps round the edges, so tiles join without a visible line),
 // drawn at 2048 px (1024 on phones) and repeated evenly in both directions: one tile is 240 mm, so the grain is never stretched.
+// Fine grain of a textured powder coat: soft random speckle (about 0.4 mm), used as bump and roughness
+function makeGrainTexture(lite) {
+    const N = 512, c = document.createElement('canvas'); c.width = c.height = N;
+    const x = c.getContext('2d'), im = x.createImageData(N, N), d = im.data;
+    let seed = 7741, rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    let a = new Float32Array(N * N); for (let i = 0; i < a.length; i++) a[i] = rnd();
+    for (let pass = 0; pass < 2; pass++) { const b = new Float32Array(N * N); for (let y = 0; y < N; y++) for (let xx = 0; xx < N; xx++) { let s = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) s += a[((y + dy + N) % N) * N + (xx + dx + N) % N]; b[y * N + xx] = s / 9; } a = b; }
+    let lo = 1, hi = 0; for (let i = 0; i < a.length; i++) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]); }
+    for (let i = 0; i < a.length; i++) { const v = (a[i] - lo) / (hi - lo), g = Math.round(150 + 105 * v); d[4 * i] = d[4 * i + 1] = d[4 * i + 2] = g; d[4 * i + 3] = 255; }
+    x.putImageData(im, 0, 0);
+    const tex = new T.CanvasTexture(c); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(1 / 60, 1 / 60); tex.anisotropy = 8;   // UVs are millimetres: the sheet repeats every 60 mm
+    return tex;
+}
 function makeBrushTexture(lite) {
     const N = lite ? 1024 : 2048, k = N / 512;
     const c = document.createElement('canvas'); c.width = c.height = N;
@@ -7091,7 +7108,7 @@ function makeBrushTexture(lite) {
     return tex;
 }
 
-function makeEnvScene() {
+function makeEnvScene(gloss) {
     // an even light box: big soft panels from several sides with slightly different strength, so flat faces stay bright
     // while bends, edges and the cut outline still get a visible gradient
     const sc = new T.Scene();
@@ -7100,6 +7117,15 @@ function makeEnvScene() {
         const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: new T.Color('#ffffff').multiplyScalar(power), side: T.DoubleSide }));
         m.position.set(x, y, z); m.rotation.set(rx, ry, 0); sc.add(m); return m;
     };
+    if (gloss) {   // glossy paint mirrors its surroundings: a darker room with a few crisp soft-boxes gives deep colour and clear, tidy highlights
+        room('#3b3f45', 40, 20, 40);
+        panel(22, 8, 6.0, 0, 19.5, 2, 0, Math.PI / 2);        // overhead strip
+        panel(6, 16, 7.0, -17, 4, 9, Math.PI / 2.6);          // left front strip
+        panel(6, 14, 4.5, 17, 3, 9, -Math.PI / 2.6);          // right front strip, weaker
+        panel(24, 4, 2.6, 0, 3, 19.5, Math.PI);               // from the viewer's side, low
+        panel(30, 6, 0.8, 0, -9.5, 8, 0, -Math.PI / 2.4);     // floor bounce
+        return sc;
+    }
     room('#8d9298', 40, 20, 40);
     panel(26, 26, 3.2, 0, 19.5, 0, 0, Math.PI / 2);         // overhead
     panel(16, 14, 3.0, -17, 5, 8, Math.PI / 2.6);            // left front
@@ -8111,9 +8137,12 @@ function applyMaterial() {
     const m = MATS[S.mat], mat = R.material;
     mat.color.set(S.color || m.color);
     mat.metalness = m.metal; mat.roughness = m.rough;
-    mat.roughnessMap = m.brushed ? R.brush : null;
-    mat.bumpMap = m.brushed ? R.brush : null; mat.bumpScale = 0.35;
+    if (m.grain && !R.grain) { R.grain = makeGrainTexture(R.lite); try { const mx = R.renderer.capabilities.getMaxAnisotropy(); if (mx) R.grain.anisotropy = Math.min(16, mx); } catch (e) {} }
+    const tx = m.brushed ? R.brush : (m.grain ? R.grain : null);
+    mat.roughnessMap = tx; mat.bumpMap = tx; mat.bumpScale = m.grain ? 0.9 : 0.35;
     mat.needsUpdate = true;
+    if (R.envGloss !== !!m.gloss && R.envs) applyEnv();     // glossy paint gets its own reflections
+    R.light.intensity = m.gloss ? 0.75 : m.grain ? 1.2 : 1.1;   // gloss: the highlights come from the soft-boxes, a strong sun would add a hard white dot
     syncStripMat();
     if (R.mask) R.weightKg = R.mask.count / (R.mask.ppm * R.mask.ppm) * S.t * m.density / 1e6;
     updateInfo();
@@ -8140,9 +8169,10 @@ function stepBg(dt) {
 function applyEnv() {
     if (!R) return;
     R.dirty = true;
-    if (!R.envs[S.env]) { const es = makeEnvScene(); R.envs[S.env] = R.pmrem.fromScene(es, 0.03).texture; es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
-    R.scene.environment = R.envs[S.env];
-    R.scene.background = R.envs[S.env];
+    const mk = (k, g) => { if (!R.envs[k]) { const es = makeEnvScene(g); R.envs[k] = R.pmrem.fromScene(es, g ? 0.01 : 0.03).texture; es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } return R.envs[k]; };
+    const gl = !!MATS[S.mat].gloss; R.envGloss = gl;
+    R.scene.environment = mk(gl ? S.env + '-g' : S.env, gl);
+    R.scene.background = mk(S.env, false);      // the backdrop stays the soft one for every finish
     R.scene.backgroundBlurriness = 0.55;
     R.wall.material.color.set(WALLS[S.env]);
     R.bgT = bgTarget(); applyBg();
@@ -9418,7 +9448,7 @@ function close3D() {
         cancelAnimationFrame(R.raf);
         disposeModel();
         Object.values(R.envs).forEach(t => t.dispose());
-        R.material.dispose(); if (R.stripMat) R.stripMat.dispose(); R.brush.dispose(); R.pmrem.dispose(); R.controls.dispose();
+        R.material.dispose(); if (R.stripMat) R.stripMat.dispose(); R.brush.dispose(); if (R.grain) R.grain.dispose(); R.pmrem.dispose(); R.controls.dispose();
         R.renderer.dispose(); R.renderer.forceContextLoss && R.renderer.forceContextLoss();
         R.renderer.domElement.remove();
         R = null;
