@@ -766,7 +766,28 @@
         #cv-hearts .pixel-heart { width: 22px; height: 22px; }
         #game-hearts { display: none; gap: 6px; align-items: center; justify-content: center; height: 100%; width: 100%; }
         .pixel-heart { width: 18px; height: 18px; }
-    </style>
+    
+        /* ---- Liquid Glass (as in the newest iOS): translucent, strongly blurred and saturated panels, a bright rim and a soft inner glow on the edges ---- */
+        :root {
+            --tbar-bg: rgba(246, 246, 248, 0.58);
+            --btn-bg: rgba(255, 255, 255, 0.42);
+            --btn-on: rgba(120, 124, 132, 0.38);
+            --glass-blur: blur(24px) saturate(185%);
+            --glass-edge: rgba(255, 255, 255, 0.75);
+            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.3), inset 0 0 14px rgba(255, 255, 255, 0.25), 0 8px 28px rgba(0, 0, 0, 0.12);
+            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+        }
+        [data-theme="dark"] {
+            --tbar-bg: rgba(40, 40, 44, 0.52);
+            --btn-bg: rgba(255, 255, 255, 0.09);
+            --glass-edge: rgba(255, 255, 255, 0.2);
+            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(255, 255, 255, 0.06), inset 0 0 14px rgba(255, 255, 255, 0.05), 0 8px 28px rgba(0, 0, 0, 0.35);
+            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+        }
+        html body :is(#main-toolbar, #left-nav-group, #v3-rail, #v3d-panel .v3-sec .v3-body) { border-color: var(--glass-edge); box-shadow: var(--glass-hi); }
+        html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn, .mode-header, .glass-panel, button:not(.v3-lab), #v3-rail > *):not(.active):not(.on) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        html body #left-nav-group #menu-btn { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+</style>
 </head>
 <body data-theme="light"> 
     
