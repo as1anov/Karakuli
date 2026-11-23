@@ -176,7 +176,7 @@
         body { --mode-bg: #FF6666; } body.mode-draw { --mode-bg: #404040; } body[data-theme="dark"].mode-draw { --mode-bg: #58595B; }
         #main-toolbar .control-btn.active, #v3d-btn.on { background: var(--btn-on); }
         /* editor icons wear the same colour as the 3D toolbar: soft grey, full colour on hover or when active */
-        #main-toolbar .control-btn:not(.active), #left-nav-group #menu-btn { color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); transition: color .15s; }
+        #main-toolbar .control-btn:not(.active), #left-nav-group #menu-btn { color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); transition: color .15s; }
         #main-toolbar .control-btn:not(.active):hover, #left-nav-group #menu-btn:hover { color: var(--text-color); }
         #main-toolbar { background: var(--tbar-bg); }
         #main-toolbar .control-btn { background: var(--btn-bg); }
@@ -237,10 +237,10 @@
         body.game-active #main-toolbar .mode-header { width: 96px; }
         body.game-active #mode-ico { display: none; }
         :root { --tbot: 34px; }   /* how far the bottom toolbars stand above the screen edge: within reach of the hand */
-        @media (min-width: 601px) { :root { --tb: 48px; --tbot: 56px; --ico: 24px; } }   /* tablets and desktops: bigger buttons */
-        @media (min-width: 601px) and (min-height: 600px) { :root { --tb: 57.6px; --ico: 28.8px; } }   /* tablets and desktops: the top and bottom bars and their buttons are 20% larger (phones, also in landscape, stay as they were) */
+        @media (min-width: 601px) { :root { --tb: 48px; --tbot: 56px; --ico: 20.4px; } }   /* tablets and desktops: bigger buttons */
+        @media (min-width: 601px) and (min-height: 600px) { :root { --tb: 57.6px; --ico: 24.5px; } }   /* tablets and desktops: the top and bottom bars and their buttons are 20% larger (phones, also in landscape, stay as they were) */
         @media (max-width: 600px) { :root { --tb: 36px; --tpad: 8px; --tgap: 9px; } #left-nav-group { padding: 4px !important; border-radius: 15px; } }
-        @media (max-width: 380px) { :root { --tb: 32px; --ico: 18px; } }
+        @media (max-width: 380px) { :root { --tb: 32px; --ico: 15.3px; } }
 
         /* --- BOLT HOLES WINDOW --- */
         #holes-pop { position: fixed; inset: 0; z-index: 2800; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; touch-action: none; }
@@ -516,7 +516,7 @@
         #action-indicator { position: fixed; left: 50%; top: calc(max(20px, env(safe-area-inset-top)) + 31px); transform: translate(-50%, -50%); z-index: 490; font-size: 14px; font-weight: 600; white-space: nowrap; }
         @media (max-width: 1039px) { #action-indicator { top: calc(max(20px, env(safe-area-inset-top)) + var(--tb) + 44px); } }
 
-        .theme-svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+        .theme-svg { width: var(--ico, 16.8px); height: var(--ico, 16.8px); stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 
         @media (max-width: 600px) {
             --sidebar-width: 85vw;
@@ -770,8 +770,8 @@
         /* ---- Liquid Glass (as in the newest iOS): translucent, strongly blurred and saturated panels, a bright rim on the edges ---- */
         :root {
             --tbar-bg: rgba(226, 227, 231, 0.64);
-            --btn-bg: rgba(70, 74, 82, 0.12);       /* a button is a touch darker than the panel it stands on */
-            --panel-bg: rgba(70, 74, 82, 0.1);
+            --btn-bg: transparent;       /* a button has the colour of its panel; the rim and the highlight draw it */
+            --panel-bg: transparent;
             --btn-on: rgba(70, 74, 82, 0.3);
             --glass-blur: blur(24px) saturate(185%);
             --glass-edge: rgba(255, 255, 255, 0.7);
@@ -780,8 +780,8 @@
         }
         [data-theme="dark"] {
             --tbar-bg: rgba(30, 30, 34, 0.58);
-            --btn-bg: rgba(0, 0, 0, 0.26);
-            --panel-bg: rgba(0, 0, 0, 0.22);
+            --btn-bg: transparent;
+            --panel-bg: transparent;
             --glass-edge: rgba(255, 255, 255, 0.18);
             --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.26), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 8px 28px rgba(0, 0, 0, 0.4);
             --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.18);
@@ -796,6 +796,7 @@
         html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn, .mode-header, .glass-panel, button:not(.v3-lab):not(.v3-card):not(.v3-chip), #v3-rail > *):not(.active):not(.on) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
         html body #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
         html body #left-nav-group #menu-btn { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        @media (max-width: 700px) { html body #v3-rail.v3-glass :is(button, #v3d-close, #v3d-shop) { background: var(--tbar-bg); } }
         /* the side menu and its buttons */
         html body #dashboard { background: var(--tbar-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-right: 1px solid var(--glass-edge); box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.3), 20px 0 50px rgba(0, 0, 0, 0.12); }
         html body #dashboard .dash-btn, html body #dashboard .pl-sel { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
@@ -8542,11 +8543,11 @@ function ensureCss() {
     [data-theme="dark"] .v3-range:active { filter: brightness(0.9); }
     #v3d-bar { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 10px 14px; width: min(520px, calc(100% - 40px)); }
     #v3-play { width: var(--tb); height: var(--tb); flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: grid; place-items: center; cursor: pointer; }
-    #v3-play svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); fill: currentColor; }   /* every icon in the bars: one size (--ico) and one line weight (1.8) */
+    #v3-play svg { width: var(--ico, 16.8px); height: var(--ico, 16.8px); fill: currentColor; }   /* every icon in the bars: one size (--ico) and one line weight (1.8) */
     #v3-fold { flex: 1; min-width: 0; height: 22px; border-radius: 11px; } #v3-fold::-webkit-slider-runnable-track, #v3-fold::-webkit-slider-thumb { height: 22px; }
     .v3-sep { width: 1px; align-self: stretch; margin: 2px 0; background: var(--border-color); flex-shrink: 0; }
     #v3-fxbtn { width: var(--tb); height: var(--tb); flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); display: grid; place-items: center; cursor: pointer; }
-    #v3-fxbtn svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    #v3-fxbtn svg { width: var(--ico, 16.8px); height: var(--ico, 16.8px); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     #v3-fxbtn:hover { background: var(--active-btn-bg); }
     #v3-fxbtn.on { background: var(--text-color); color: var(--bg-color); }
     #v3-fxbtn .ic-stop { display: none; }
@@ -8575,7 +8576,7 @@ function ensureCss() {
     @media (max-width: 700px) { .v3-fxg .v3-fxc { font-size: 9.5px; gap: 4px; } .v3-fxg .v3-fxc svg { width: 24px; height: 24px; } }
     .v3-fxc { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 4px 8px; border-radius: 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-color); font-family: var(--main-font); font-size: 11px; font-weight: 600; cursor: pointer; }
     .v3-fxc svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
-    .v3-fxc { border-color: transparent; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); transition: color 0.15s; }
+    .v3-fxc { border-color: transparent; color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); transition: color 0.15s; }
     .v3-fxc:hover, .v3-fxc:active { background: transparent; color: var(--text-color); }
     .v3-fxc.on, .v3-fxc.on:hover { background: transparent; color: var(--text-color); border-color: transparent; }
     .v3-fxr { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; row-gap: 6px; align-items: center; margin-bottom: 14px; font-size: 12px; font-weight: 600; }
@@ -8607,13 +8608,13 @@ function ensureCss() {
     #v3-rail.v3-glass button { pointer-events: auto; background: var(--btn-bg); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
     #v3-rail.v3-glass button.on { background: var(--btn-on); }
     #v3d-close.glass-panel, #v3d-shop.glass-panel { width: var(--tb); height: var(--tb); }
-    #v3-rail button { position: relative; box-sizing: border-box; width: var(--tb); height: var(--tb); flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border-color); border-radius: 12px; background: transparent; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); cursor: pointer; transition: color 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent; }
-    #v3-rail button svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    #v3-rail button { position: relative; box-sizing: border-box; width: var(--tb); height: var(--tb); flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border-color); border-radius: 12px; background: transparent; color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); cursor: pointer; transition: color 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent; }
+    #v3-rail button svg { width: var(--ico, 16.8px); height: var(--ico, 16.8px); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     #v3-rail button:hover { color: var(--text-color); }
     #v3-railth { display: flex; flex-direction: column; align-items: center; gap: 3px; line-height: 1; }
-    #v3-railth b { font-size: calc(var(--ico, 19.8px) * 0.625); font-weight: 700; font-variant-numeric: tabular-nums; }
-    #v3-railth i { display: block; width: calc(var(--ico, 19.8px) * 0.83); border-radius: 1px; background: currentColor; }
-    #v3-railcol { box-sizing: border-box; display: block; width: calc(var(--ico, 19.8px) * 0.95); height: calc(var(--ico, 19.8px) * 0.95); border-radius: 50%; box-shadow: none; border: 1px solid color-mix(in srgb, var(--text-color) 55%, transparent); }   /* a thin ring so a light colour does not melt into the button */
+    #v3-railth b { font-size: calc(var(--ico, 16.8px) * 0.625); font-weight: 700; font-variant-numeric: tabular-nums; }
+    #v3-railth i { display: block; width: calc(var(--ico, 16.8px) * 0.83); border-radius: 1px; background: currentColor; }
+    #v3-railcol { box-sizing: border-box; display: block; width: calc(var(--ico, 16.8px) * 0.95); height: calc(var(--ico, 16.8px) * 0.95); border-radius: 50%; box-shadow: none; border: 1px solid color-mix(in srgb, var(--text-color) 55%, transparent); }   /* a thin ring so a light colour does not melt into the button */
     #v3-rail button.on { color: var(--text-color); background: var(--btn-on); }
     #v3-rail button[data-go="price"] { display: none; } #v3-rail.hasprice button[data-go="price"] { display: flex; }
     #v3d-close, #v3d-shop { z-index: 4; right: calc((var(--rw) - var(--tb)) / 2); }
@@ -8655,7 +8656,7 @@ function ensureCss() {
     #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(10) { animation-delay: 0.830s; }
     #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(11) { animation-delay: 0.875s; }
     #v3d-panel.open.anim .v3-body :is(.v3-chip, .v3-dot, .v3-card, .v3-orow, .v3-prow):nth-child(12) { animation-delay: 0.920s; }
-    .v3-mc { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border: 0; border-radius: 12px; background: transparent; font-size: 11px; font-weight: 600; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); transition: color 0.15s; }
+    .v3-mc { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border: 0; border-radius: 12px; background: transparent; font-size: 11px; font-weight: 600; color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); transition: color 0.15s; }
     .v3-mc svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
     .v3-mc:hover, .v3-mc.on, .v3-mc.on:hover { background: transparent; color: var(--text-color); border-color: transparent; }
     .v3-mdot { display: block; width: 28px; height: 28px; border-radius: 50%; box-shadow: 0 0 0 1px var(--border-color); }
@@ -8670,7 +8671,7 @@ function ensureCss() {
     #v3d-panel .v3-cat > :last-child:nth-child(odd), #v3d-panel [data-sec="dl"] .v3-chips > :last-child:nth-child(odd), #v3d-panel #v3-mats > :last-child:nth-child(odd) { grid-column: 2; }
     #v3d-panel .v3-cat .v3-card, #v3d-panel [data-sec="dl"] .v3-chips > button, #v3d-panel #v3-mats .v3-chip { width: auto; min-width: 0; padding: 0; line-height: 1.2; }
     /* thickness: the name above a bar as thick as the sheet (2 px per mm) */
-    #v3d-panel .v3-tk { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; line-height: 1.2; border: 0; border-radius: 0; background: transparent; font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); transition: color 0.15s; }
+    #v3d-panel .v3-tk { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; line-height: 1.2; border: 0; border-radius: 0; background: transparent; font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); transition: color 0.15s; }
     #v3d-panel .v3-tk i { display: block; width: 100%; min-width: 46px; border-radius: 1px; background: currentColor; }
     #v3d-panel .v3-tk:hover, #v3d-panel .v3-tk.on, #v3d-panel .v3-tk.on:hover { background: transparent; color: var(--text-color); border-color: transparent; }
     #v3d-panel .v3-mc, #v3d-panel .v3-card { align-items: center; text-align: center; }
@@ -8699,7 +8700,7 @@ function ensureCss() {
     #v3-rail.v3-glass { background: var(--tbar-bg); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); pointer-events: auto; }
     #v3-rail.v3-glass button { backdrop-filter: none; -webkit-backdrop-filter: none; }
     #v3-rail #v3d-close, #v3-rail #v3d-shop { position: relative; right: auto; top: auto; bottom: auto; flex: none; width: var(--tb); height: var(--tb); box-sizing: border-box; background: var(--btn-bg); backdrop-filter: none; -webkit-backdrop-filter: none; z-index: auto; }
-    #v3-rail #v3d-close, #v3-rail #v3d-shop { color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); }
+    #v3-rail #v3d-close, #v3-rail #v3d-shop { color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); }
     #v3-rail #v3d-close:hover, #v3-rail #v3d-shop:hover { color: var(--text-color); }
     #v3-rail #v3d-close { margin-right: calc(var(--tpad) * 2 - 3px); }
     #v3-rail #v3d-close::after { content: ""; position: absolute; right: calc(-1 * var(--tpad) - 1px); top: 8px; bottom: 8px; width: 1px; background: var(--border-color); }
@@ -8741,7 +8742,7 @@ function ensureCss() {
     #v3d-panel .v3-body :is(.v3-chip, .v3-card).on { background: var(--active-btn-bg); color: var(--text-color); border-color: var(--border-color); }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card):hover:not(:disabled) { color: var(--text-color); }
     #v3d-panel .v3-body .v3-card:disabled { opacity: .4; }
-    #v3d-panel .v3-body :is(.v3-chip, .v3-card) svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); flex: none; stroke-width: 1.8; }
+    #v3d-panel .v3-body :is(.v3-chip, .v3-card) svg { width: var(--ico, 16.8px); height: var(--ico, 16.8px); flex: none; stroke-width: 1.8; }
     #v3d-panel .v3-body .v3-mdot { width: 22px; height: 22px; }
     #v3d-panel .v3-body .v3-tk { flex-direction: column; gap: 4px; }
     #v3d-panel .v3-body .v3-tk i { min-width: 28px; width: 100%; }
@@ -8758,7 +8759,7 @@ function ensureCss() {
     /* an item: the button itself is only the square icon; the label sits next to it */
     #v3d-panel .v3-body :is(.v3-chip, .v3-card, .v3-prow) { height: var(--tb); min-width: 0; padding: 0; gap: 8px; border: 0; background: none; border-radius: 0; justify-content: flex-start; }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { box-sizing: border-box; flex: none; width: var(--tb); height: var(--tb); padding: 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--btn-bg); }
-    #v3d-panel .v3-body :is(.v3-chip, .v3-card) > svg { padding: calc((var(--tb) - 2px - var(--ico, 19.8px)) / 2); stroke-width: 1.8; }   /* the glyph is exactly the toolbar icon size (--ico) and line weight */
+    #v3d-panel .v3-body :is(.v3-chip, .v3-card) > svg { padding: calc((var(--tb) - 2px - var(--ico, 16.8px)) / 2); stroke-width: 1.8; }   /* the glyph is exactly the toolbar icon size (--ico) and line weight */
     #v3d-panel .v3-body :is(.v3-chip, .v3-card).on > :is(svg, i) { background: var(--active-btn-bg); }
     #v3d-panel .v3-body .v3-mdot { padding: 0; box-shadow: none; }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(span, b) { order: 2; max-width: calc(var(--tb) * 2 + 4px); white-space: normal; text-align: left; line-height: 1.15; font-size: 12px; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -8840,7 +8841,7 @@ function ensureCss() {
     .v3-ord { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: 8px; height: var(--tb); padding: 0 12px 0 14px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: linear-gradient(var(--btn-bg), var(--btn-bg)), var(--bg-color); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
     .v3-onm { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .v3-oflip { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; background: none; color: var(--text-color); cursor: pointer; }
-    .v3-oic { flex: none; width: var(--ico, 19.8px); height: var(--ico, 19.8px); fill: none; stroke: var(--text-color); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+    .v3-oic { flex: none; width: var(--ico, 16.8px); height: var(--ico, 16.8px); fill: none; stroke: var(--text-color); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
     .v3-oflip svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .v3-ohint { flex: none; display: inline-flex; opacity: .45; color: var(--text-color); }
     .v3-ohint svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
