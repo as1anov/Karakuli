@@ -791,7 +791,12 @@
         /* Flat / Folded bar and the camera effects */
         html body :is(#v3-fxbtn, #v3-play) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
         html body #v3-fx :is(.v3-chip, .v3-fxc:not(.on)) { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
-        html body :is(.modal-content, .ad-card) :is(.field, .chip:not(.active), .preset-card, .seg, .modal-btn.secondary) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        html body :is(.modal-content, .ad-card) :is(.field input, .chip:not(.active), .preset-card, .seg, .modal-btn.secondary, .nc-close, .swap-btn, .tpl-btn, .preset-icon, .card-hooks) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        /* New Canvas (and Share): its cards, fields and buttons take the panel colour too */
+        html body #new-canvas-modal, html body #share-modal { --card: transparent; --card-hl: rgba(70, 74, 82, 0.14); }
+        html body[data-theme="dark"] #new-canvas-modal, html body[data-theme="dark"] #share-modal { --card: transparent; --card-hl: rgba(255, 255, 255, 0.08); }
+        html body :is(#new-canvas-modal, #share-modal) :is(.preset-icon, .card-hooks, .nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .field input, .chip:not(.active)) { background-color: transparent; }
+        html body :is(#new-canvas-modal, #share-modal) :is(.nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .chip:not(.active)):hover { background-color: var(--card-hl); }
         /* a button that is only a frame around a boxed icon (Objects, Download, Material) is left alone: the box inside is the visible button */
         html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn, .mode-header, .glass-panel, button:not(.v3-lab):not(.v3-card):not(.v3-chip), #v3-rail > *):not(.active):not(.on) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
         html body #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
