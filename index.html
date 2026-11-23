@@ -7076,15 +7076,16 @@ function shapesForRows(mask, r0full, r1full, ext) {
 // drawn at 2048 px (1024 on phones) and repeated evenly in both directions: one tile is 240 mm, so the grain is never stretched.
 // Fine grain of a textured powder coat: soft random speckle (about 0.4 mm), used as bump and roughness
 function makeGrainTexture(lite) {
-    const N = 512, c = document.createElement('canvas'); c.width = c.height = N;
+    // One texel is 0.25 mm and the tile is 512 mm (256 mm on phones / tablets): a sheet shows it once or twice, so no pattern can repeat in the eye.
+    const N = lite ? 1024 : 2048, c = document.createElement('canvas'); c.width = c.height = N;
     const x = c.getContext('2d'), im = x.createImageData(N, N), d = im.data;
     let seed = 7741, rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
     let a = new Float32Array(N * N); for (let i = 0; i < a.length; i++) a[i] = rnd();
-    for (let pass = 0; pass < 2; pass++) { const b = new Float32Array(N * N); for (let y = 0; y < N; y++) for (let xx = 0; xx < N; xx++) { let s = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) s += a[((y + dy + N) % N) * N + (xx + dx + N) % N]; b[y * N + xx] = s / 9; } a = b; }
+    { const b = new Float32Array(N * N); for (let y = 0; y < N; y++) { const y0 = ((y + N - 1) % N) * N, y1 = y * N, y2 = ((y + 1) % N) * N; for (let xx = 0; xx < N; xx++) { const l = (xx + N - 1) % N, r = (xx + 1) % N; b[y1 + xx] = (a[y0 + l] + a[y0 + xx] + a[y0 + r] + a[y1 + l] + 2 * a[y1 + xx] + a[y1 + r] + a[y2 + l] + a[y2 + xx] + a[y2 + r]) / 10; } } a = b; }   // a light blur: grains of about 1.5 texels
     let lo = 1, hi = 0; for (let i = 0; i < a.length; i++) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]); }
     for (let i = 0; i < a.length; i++) { const v = (a[i] - lo) / (hi - lo), g = Math.round(70 + 185 * v); d[4 * i] = d[4 * i + 1] = d[4 * i + 2] = g; d[4 * i + 3] = 255; }
     x.putImageData(im, 0, 0);
-    const tex = new T.CanvasTexture(c); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(1 / 32, 1 / 32); tex.anisotropy = 8;   // UVs are millimetres: the pattern repeats every 32 mm, one grain is about 0.25 mm
+    const tex = new T.CanvasTexture(c); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(1 / (N * 0.25), 1 / (N * 0.25)); tex.anisotropy = 8;   // UVs are millimetres
     return tex;
 }
 function makeBrushTexture(lite) {
