@@ -235,10 +235,10 @@
         body.game-active #main-toolbar .mode-header { width: 96px; }
         body.game-active #mode-ico { display: none; }
         :root { --tbot: 34px; }   /* how far the bottom toolbars stand above the screen edge: within reach of the hand */
-        @media (min-width: 601px) { :root { --tb: 48px; --tbot: 56px; } .theme-svg { width: 24px; height: 24px; } }   /* tablets and desktops: bigger buttons */
-        @media (min-width: 601px) and (min-height: 600px) { :root { --tb: 57.6px; } .theme-svg { width: 28.8px; height: 28.8px; } }   /* tablets and desktops: the top and bottom bars and their buttons are 20% larger (phones, also in landscape, stay as they were) */
+        @media (min-width: 601px) { :root { --tb: 48px; --tbot: 56px; --ico: 24px; } }   /* tablets and desktops: bigger buttons */
+        @media (min-width: 601px) and (min-height: 600px) { :root { --tb: 57.6px; --ico: 28.8px; } }   /* tablets and desktops: the top and bottom bars and their buttons are 20% larger (phones, also in landscape, stay as they were) */
         @media (max-width: 600px) { :root { --tb: 36px; --tpad: 8px; --tgap: 9px; } #left-nav-group { padding: 4px !important; border-radius: 15px; } }
-        @media (max-width: 380px) { :root { --tb: 32px; } .theme-svg { width: 18px; height: 18px; } }
+        @media (max-width: 380px) { :root { --tb: 32px; --ico: 18px; } }
 
         /* --- BOLT HOLES WINDOW --- */
         #holes-pop { position: fixed; inset: 0; z-index: 2800; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; touch-action: none; }
@@ -514,7 +514,7 @@
         #action-indicator { position: fixed; left: 50%; top: calc(max(20px, env(safe-area-inset-top)) + 31px); transform: translate(-50%, -50%); z-index: 490; font-size: 14px; font-weight: 600; white-space: nowrap; }
         @media (max-width: 1039px) { #action-indicator { top: calc(max(20px, env(safe-area-inset-top)) + var(--tb) + 44px); } }
 
-        .theme-svg { width: 19.8px; height: 19.8px; stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+        .theme-svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); stroke: currentColor; stroke-width: 1.8; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 
         @media (max-width: 600px) {
             --sidebar-width: 85vw;
@@ -8504,11 +8504,11 @@ function ensureCss() {
     [data-theme="dark"] .v3-range:active { filter: brightness(0.9); }
     #v3d-bar { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 10px 14px; width: min(520px, calc(100% - 40px)); }
     #v3-play { width: var(--tb); height: var(--tb); flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: grid; place-items: center; cursor: pointer; }
-    #v3-play svg { width: 18px; height: 18px; fill: currentColor; }
+    #v3-play svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); fill: currentColor; }   /* every icon in the bars: one size (--ico) and one line weight (1.8) */
     #v3-fold { flex: 1; min-width: 0; height: 22px; border-radius: 11px; } #v3-fold::-webkit-slider-runnable-track, #v3-fold::-webkit-slider-thumb { height: 22px; }
     .v3-sep { width: 1px; align-self: stretch; margin: 2px 0; background: var(--border-color); flex-shrink: 0; }
     #v3-fxbtn { width: var(--tb); height: var(--tb); flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--btn-bg); color: var(--text-color); display: grid; place-items: center; cursor: pointer; }
-    #v3-fxbtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    #v3-fxbtn svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     #v3-fxbtn:hover { background: var(--active-btn-bg); }
     #v3-fxbtn.on { background: var(--text-color); color: var(--bg-color); }
     #v3-fxbtn .ic-stop { display: none; }
@@ -8570,12 +8570,12 @@ function ensureCss() {
     #v3-rail.v3-glass button.on { background: var(--btn-on); }
     #v3d-close.glass-panel, #v3d-shop.glass-panel { width: var(--tb); height: var(--tb); }
     #v3-rail button { position: relative; box-sizing: border-box; width: var(--tb); height: var(--tb); flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border-color); border-radius: 12px; background: transparent; color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); cursor: pointer; transition: color 0.15s, background 0.15s; -webkit-tap-highlight-color: transparent; }
-    #v3-rail button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    #v3-rail button svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     #v3-rail button:hover { color: var(--text-color); }
     #v3-railth { display: flex; flex-direction: column; align-items: center; gap: 3px; line-height: 1; }
-    #v3-railth b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    #v3-railth i { display: block; width: 20px; border-radius: 1px; background: currentColor; }
-    #v3-railcol { box-sizing: border-box; display: block; width: 23px; height: 23px; border-radius: 50%; box-shadow: none; border: 1px solid color-mix(in srgb, var(--text-color) 55%, transparent); }   /* a thin ring so a light colour does not melt into the button */
+    #v3-railth b { font-size: calc(var(--ico, 19.8px) * 0.625); font-weight: 700; font-variant-numeric: tabular-nums; }
+    #v3-railth i { display: block; width: calc(var(--ico, 19.8px) * 0.83); border-radius: 1px; background: currentColor; }
+    #v3-railcol { box-sizing: border-box; display: block; width: calc(var(--ico, 19.8px) * 0.95); height: calc(var(--ico, 19.8px) * 0.95); border-radius: 50%; box-shadow: none; border: 1px solid color-mix(in srgb, var(--text-color) 55%, transparent); }   /* a thin ring so a light colour does not melt into the button */
     #v3-rail button.on { color: var(--text-color); background: var(--btn-on); }
     #v3-rail button[data-go="price"] { display: none; } #v3-rail.hasprice button[data-go="price"] { display: flex; }
     #v3d-close, #v3d-shop { z-index: 4; right: calc((var(--rw) - var(--tb)) / 2); }
@@ -8773,7 +8773,6 @@ function ensureCss() {
     #v3-fx { top: calc(var(--rtop) + var(--tb) + var(--tpad) * 2 + 10px); bottom: auto; max-height: calc(100% - var(--rtop) - var(--tb) - 140px); }
     #v3d-title, #v3d-title { top: calc(var(--rtop) + var(--tb) + 30px); }
     #v3-name { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-    @media (min-width: 601px) and (min-height: 600px) { #v3-play svg { width: 21.6px; height: 21.6px; } #v3-fxbtn svg { width: 24px; height: 24px; } #v3-rail button svg { width: 26.4px; height: 26.4px; } }
     @media (min-width: 744px) { #v3-trow { min-height: calc(var(--tb) + var(--tpad) * 2 + 2px); } #v3d-title, #v3d-title { top: var(--rtop); left: 20px; right: auto; max-width: max(96px, calc(50% - 280px)); } #v3d-title #v3-info { margin-top: -20px; } }
     @keyframes v3bar { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
     @keyframes v3item { from { opacity: 0; transform: translateY(8px) scale(0.55); } to { opacity: 1; transform: none; } }
