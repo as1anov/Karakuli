@@ -175,7 +175,9 @@
         /* the mode button wears the cursor's colour: red in Navigation, the dark pointer in Drawing */
         body { --mode-bg: #FF6666; } body.mode-draw { --mode-bg: #404040; } body[data-theme="dark"].mode-draw { --mode-bg: #58595B; }
         #main-toolbar .control-btn.active, #v3d-btn.on { background: var(--btn-on); }
-        #main-toolbar .control-btn:hover:not(.active) svg { opacity: .65; }
+        /* editor icons wear the same colour as the 3D toolbar: soft grey, full colour on hover or when active */
+        #main-toolbar .control-btn:not(.active), #left-nav-group #menu-btn { color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); transition: color .15s; }
+        #main-toolbar .control-btn:not(.active):hover, #left-nav-group #menu-btn:hover { color: var(--text-color); }
         #main-toolbar { background: var(--tbar-bg); }
         #main-toolbar .control-btn { background: var(--btn-bg); }
         #main-toolbar .control-btn.active { background: var(--btn-on); }
@@ -8661,6 +8663,8 @@ function ensureCss() {
     #v3-rail.v3-glass { background: var(--tbar-bg); border: 1px solid var(--border-color); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); pointer-events: auto; }
     #v3-rail.v3-glass button { backdrop-filter: none; -webkit-backdrop-filter: none; }
     #v3-rail #v3d-close, #v3-rail #v3d-shop { position: relative; right: auto; top: auto; bottom: auto; flex: none; width: var(--tb); height: var(--tb); box-sizing: border-box; background: var(--btn-bg); backdrop-filter: none; -webkit-backdrop-filter: none; z-index: auto; }
+    #v3-rail #v3d-close, #v3-rail #v3d-shop { color: color-mix(in srgb, var(--text-color) 58%, var(--bg-color)); }
+    #v3-rail #v3d-close:hover, #v3-rail #v3d-shop:hover { color: var(--text-color); }
     #v3-rail #v3d-close { margin-right: calc(var(--tpad) * 2 - 3px); }
     #v3-rail #v3d-close::after { content: ""; position: absolute; right: calc(-1 * var(--tpad) - 1px); top: 8px; bottom: 8px; width: 1px; background: var(--border-color); }
     #v3d.show #v3-rail { animation: v3tbin 0.5s cubic-bezier(0.19, 1, 0.22, 1) both; }
