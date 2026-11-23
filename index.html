@@ -774,11 +774,13 @@
             --panel-bg: transparent;
             --btn-on: rgba(70, 74, 82, 0.3);
             --glass-blur: blur(24px) saturate(185%);
+            --modal-bg: rgba(240, 240, 243, 0.94);
             --glass-edge: rgba(255, 255, 255, 0.7);
             --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(255, 255, 255, 0.22), 0 8px 28px rgba(0, 0, 0, 0.14);
             --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.55);
         }
         [data-theme="dark"] {
+            --modal-bg: rgba(34, 34, 38, 0.94);
             --tbar-bg: rgba(30, 30, 34, 0.58);
             --btn-bg: transparent;
             --panel-bg: transparent;
@@ -787,7 +789,7 @@
             --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.18);
         }
         html body :is(#main-toolbar, #left-nav-group, #v3-rail, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { border-color: var(--glass-edge); box-shadow: var(--glass-hi); }
-        html body :is(.modal-content, .ad-card, #cv-bar) { background: var(--tbar-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+        html body :is(.modal-content, .ad-card, #cv-bar) { background: var(--modal-bg, var(--tbar-bg));   /* windows stand over a dimmed picture, so they are almost opaque: they stay light */ -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
         /* Flat / Folded bar and the camera effects */
         html body :is(#v3-fxbtn, #v3-play) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
         html body #v3-fx :is(.v3-chip, .v3-fxc:not(.on)) { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
