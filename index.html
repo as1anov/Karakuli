@@ -767,48 +767,57 @@
         #game-hearts { display: none; gap: 6px; align-items: center; justify-content: center; height: 100%; width: 100%; }
         .pixel-heart { width: 18px; height: 18px; }
     
-        /* ---- Liquid Glass (as in the newest iOS): translucent, strongly blurred and saturated panels, a bright rim on the edges ---- */
+        /* ---- Panels and buttons: solid, with a thin outline and a soft relief (light from above): rim highlight on top, shade at the bottom, a small drop shadow ---- */
         :root {
-            --tbar-bg: rgba(226, 227, 231, 0.64);
-            --btn-bg: transparent;       /* a button has the colour of its panel; the rim and the highlight draw it */
+            --tbar-bg: #ebecee;
+            --btn-bg: transparent;       /* a button has the colour of its panel; the outline and the relief draw it */
             --panel-bg: transparent;
-            --btn-on: rgba(70, 74, 82, 0.3);
-            --glass-blur: blur(24px) saturate(185%);
-            --modal-bg: rgba(240, 240, 243, 0.94);
-            --glass-edge: rgba(255, 255, 255, 0.7);
-            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(255, 255, 255, 0.22), 0 8px 28px rgba(0, 0, 0, 0.14);
-            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+            --btn-on: rgba(70, 74, 82, 0.22);
+            --glass-blur: none;
+            --modal-bg: #ececef;
+            --glass-edge: rgba(0, 0, 0, 0.13);
+            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.1), 0 10px 28px rgba(0, 0, 0, 0.14);
+            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.14), 0 3px 7px rgba(0, 0, 0, 0.07);
+            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.035));
+            --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%);
+            --pressed: inset 0 2px 5px rgba(0, 0, 0, 0.22), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
         }
         [data-theme="dark"] {
-            --modal-bg: rgba(34, 34, 38, 0.94);
-            --tbar-bg: rgba(30, 30, 34, 0.58);
+            --tbar-bg: #232326;
+            --modal-bg: #262629;
             --btn-bg: transparent;
             --panel-bg: transparent;
-            --glass-edge: rgba(255, 255, 255, 0.18);
-            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.26), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 8px 28px rgba(0, 0, 0, 0.4);
-            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+            --glass-edge: rgba(255, 255, 255, 0.12);
+            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.45);
+            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.5), 0 3px 7px rgba(0, 0, 0, 0.25);
+            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.12));
+            --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%);
+            --pressed: inset 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
         }
         html body :is(#main-toolbar, #left-nav-group, #v3-rail, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { border-color: var(--glass-edge); box-shadow: var(--glass-hi); }
+        html body :is(#main-toolbar, #left-nav-group, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { background-image: var(--vol-panel); }
+        /* selected / pressed: sunk into the panel */
+        html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn.active, .on, button.on):not(.mode-header) { box-shadow: var(--pressed); background-image: none; }
         html body :is(.modal-content, .ad-card, #cv-bar) { background: var(--modal-bg, var(--tbar-bg));   /* windows stand over a dimmed picture, so they are almost opaque: they stay light */ -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
         /* Flat / Folded bar and the camera effects */
-        html body :is(#v3-fxbtn, #v3-play) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
-        html body #v3-fx :is(.v3-chip, .v3-fxc:not(.on)) { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
-        html body :is(.modal-content, .ad-card) :is(.field input, .chip:not(.active), .preset-card, .seg, .modal-btn.secondary, .nc-close, .swap-btn, .tpl-btn, .preset-icon, .card-hooks) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        html body :is(#v3-fxbtn, #v3-play) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
+        html body #v3-fx :is(.v3-chip, .v3-fxc:not(.on)) { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
+        html body :is(.modal-content, .ad-card) :is(.field input, .chip:not(.active), .preset-card, .seg, .modal-btn.secondary, .nc-close, .swap-btn, .tpl-btn, .preset-icon, .card-hooks) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         /* New Canvas (and Share): its cards, fields and buttons take the panel colour too */
         html body #new-canvas-modal, html body #share-modal { --card: transparent; --card-hl: rgba(70, 74, 82, 0.14); }
         html body[data-theme="dark"] #new-canvas-modal, html body[data-theme="dark"] #share-modal { --card: transparent; --card-hl: rgba(255, 255, 255, 0.08); }
         html body :is(#new-canvas-modal, #share-modal) :is(.preset-icon, .card-hooks, .nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .field input, .chip:not(.active)) { background-color: transparent; }
         html body :is(#new-canvas-modal, #share-modal) :is(.nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .chip:not(.active)):hover { background-color: var(--card-hl); }
         /* a button that is only a frame around a boxed icon (Objects, Download, Material) is left alone: the box inside is the visible button */
-        html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn, .mode-header, .glass-panel, button:not(.v3-lab):not(.v3-card):not(.v3-chip), #v3-rail > *):not(.active):not(.on) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
-        html body #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
-        html body #left-nav-group #menu-btn { border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn, .mode-header, .glass-panel, button:not(.v3-lab):not(.v3-card):not(.v3-chip), #v3-rail > *):not(.active):not(.on) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
+        html body #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
+        html body #left-nav-group #menu-btn { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         @media (max-width: 700px) { html body #v3-rail.v3-glass :is(button, #v3d-close, #v3d-shop) { background: var(--tbar-bg); } }
         /* the side menu and its buttons */
-        html body #dashboard { background: var(--tbar-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-right: 1px solid var(--glass-edge); box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.3), 20px 0 50px rgba(0, 0, 0, 0.12); }
-        html body #dashboard .dash-btn, html body #dashboard .pl-sel { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        html body #dashboard { background: var(--tbar-bg); border-right: 1px solid var(--glass-edge); box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.3), 20px 0 50px rgba(0, 0, 0, 0.12); }
+        html body #dashboard .dash-btn, html body #dashboard .pl-sel { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body #dashboard .dash-btn:hover, html body #dashboard .dash-btn.active { background: var(--active-btn-bg); }
-        html body #dashboard .project-swipe .project-item { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        html body #dashboard .project-swipe .project-item { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body #dashboard .project-swipe .project-item.current { background: var(--active-btn-bg); }
 </style>
 </head>
