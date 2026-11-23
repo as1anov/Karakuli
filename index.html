@@ -8705,7 +8705,7 @@ function ensureCss() {
     #v3d-panel .v3-body :is(.v3-chip, .v3-card).on { background: var(--active-btn-bg); color: var(--text-color); border-color: var(--border-color); }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card):hover:not(:disabled) { color: var(--text-color); }
     #v3d-panel .v3-body .v3-card:disabled { opacity: .4; }
-    #v3d-panel .v3-body :is(.v3-chip, .v3-card) svg { width: 20px; height: 20px; flex: none; }
+    #v3d-panel .v3-body :is(.v3-chip, .v3-card) svg { width: var(--ico, 19.8px); height: var(--ico, 19.8px); flex: none; stroke-width: 1.8; }
     #v3d-panel .v3-body .v3-mdot { width: 22px; height: 22px; }
     #v3d-panel .v3-body .v3-tk { flex-direction: column; gap: 4px; }
     #v3d-panel .v3-body .v3-tk i { min-width: 28px; width: 100%; }
@@ -8722,7 +8722,7 @@ function ensureCss() {
     /* an item: the button itself is only the square icon; the label sits next to it */
     #v3d-panel .v3-body :is(.v3-chip, .v3-card, .v3-prow) { height: var(--tb); min-width: 0; padding: 0; gap: 8px; border: 0; background: none; border-radius: 0; justify-content: flex-start; }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { box-sizing: border-box; flex: none; width: var(--tb); height: var(--tb); padding: 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--btn-bg); }
-    #v3d-panel .v3-body :is(.v3-chip, .v3-card) > svg { padding: 9px; stroke-width: 1.5; }   /* the glyph is 22 px, like the toolbar icons */
+    #v3d-panel .v3-body :is(.v3-chip, .v3-card) > svg { padding: calc((var(--tb) - 2px - var(--ico, 19.8px)) / 2); stroke-width: 1.8; }   /* the glyph is exactly the toolbar icon size (--ico) and line weight */
     #v3d-panel .v3-body :is(.v3-chip, .v3-card).on > :is(svg, i) { background: var(--active-btn-bg); }
     #v3d-panel .v3-body .v3-mdot { padding: 0; box-shadow: none; }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(span, b) { order: 2; max-width: calc(var(--tb) * 2 + 4px); white-space: normal; text-align: left; line-height: 1.15; font-size: 12px; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -8804,7 +8804,7 @@ function ensureCss() {
     .v3-ord { position: relative; box-sizing: border-box; display: flex; align-items: center; gap: 8px; height: var(--tb); padding: 0 12px 0 14px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: linear-gradient(var(--btn-bg), var(--btn-bg)), var(--bg-color); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
     .v3-onm { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .v3-oflip { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; background: none; color: var(--text-color); cursor: pointer; }
-    .v3-oic { flex: none; width: 22px; height: 22px; fill: none; stroke: var(--text-color); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+    .v3-oic { flex: none; width: var(--ico, 19.8px); height: var(--ico, 19.8px); fill: none; stroke: var(--text-color); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
     .v3-oflip svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .v3-ohint { flex: none; display: inline-flex; opacity: .45; color: var(--text-color); }
     .v3-ohint svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
