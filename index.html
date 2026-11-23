@@ -777,8 +777,8 @@
             --modal-bg: #ececef;
             --glass-edge: rgba(0, 0, 0, 0.13);
             --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.1), 0 10px 28px rgba(0, 0, 0, 0.14);
-            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.14), 0 3px 7px rgba(0, 0, 0, 0.07);
-            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.035));
+            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.035), 0 1px 2px rgba(0, 0, 0, 0.07), 0 3px 7px rgba(0, 0, 0, 0.035);
+            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.018));
             --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%);
             --pressed: inset 0 2px 5px rgba(0, 0, 0, 0.22), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
         }
@@ -789,8 +789,8 @@
             --panel-bg: transparent;
             --glass-edge: rgba(255, 255, 255, 0.12);
             --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.45);
-            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.5), 0 3px 7px rgba(0, 0, 0, 0.25);
-            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.12));
+            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.25), 0 3px 7px rgba(0, 0, 0, 0.12);
+            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.06));
             --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%);
             --pressed: inset 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
         }
@@ -817,8 +817,8 @@
         html body #dashboard { background: var(--tbar-bg); border-right: 1px solid var(--glass-edge); box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.3), 20px 0 50px rgba(0, 0, 0, 0.12); }
         html body #dashboard .dash-btn, html body #dashboard .pl-sel { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body #dashboard .dash-btn:hover, html body #dashboard .dash-btn.active { background: var(--active-btn-bg); }
-        html body #dashboard .project-swipe .project-item { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
-        html body #dashboard .project-swipe .project-item.current { background: var(--active-btn-bg); }
+        html body #dashboard .project-swipe .project-item { background-color: var(--tbar-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }   /* opaque: the red delete layer under it must not show through when the row is swiped */
+        html body #dashboard .project-swipe .project-item.current, html body #dashboard .project-swipe .project-item.tap { background-image: linear-gradient(var(--active-btn-bg), var(--active-btn-bg)), var(--vol); }
 </style>
 </head>
 <body data-theme="light"> 
