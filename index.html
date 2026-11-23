@@ -6240,7 +6240,7 @@ const ORBIT_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/contr
 
 const MATS = {
     steel:     { name: 'Stainless steel', short: 'Steel',     color: '#c9ccd0', metal: 1,   rough: 0.55, brushed: true, density: 7.9 },
-    textured:  { name: 'Textured powder coat', short: 'Textured', color: '#161616', metal: 0.05, rough: 0.7, grain: true, density: 7.9 },   // structured matt powder coat (shagreen): visible ~0.25 mm grain, tiny glints
+    textured:  { name: 'Textured powder coat', short: 'Textured', color: '#161616', metal: 0.05, rough: 0.7, grain: true, density: 7.9 },   // structured matt powder coat (shagreen): visible ~0.1 mm grain, tiny glints
     gloss:     { name: 'Gloss paint', short: 'Gloss',           color: '#161616', metal: 0.0, rough: 0.5, gloss: true, density: 7.9 }   // glossy industrial paint on steel: a dielectric layer, soft broad highlights (not a mirror)
 };
 const MAT_DOT = { steel: 'linear-gradient(135deg, #cfd1d4, #9b9ea3)', textured: '#161616', gloss: '#161616' };
@@ -7076,7 +7076,7 @@ function shapesForRows(mask, r0full, r1full, ext) {
 // drawn at 2048 px (1024 on phones) and repeated evenly in both directions: one tile is 240 mm, so the grain is never stretched.
 // Fine grain of a textured powder coat: soft random speckle (about 0.4 mm), used as bump and roughness
 function makeGrainTexture(lite) {
-    // One texel is 0.25 mm and the tile is 512 mm (256 mm on phones / tablets): a sheet shows it once or twice, so no pattern can repeat in the eye.
+    // One texel is 0.1 mm (a grain about 0.15 mm). The roughness uses the same picture at another scale and angle than the bump, so the two never line up and the tile (205 / 102 mm) does not read as a repeat.
     const N = lite ? 1024 : 2048, c = document.createElement('canvas'); c.width = c.height = N;
     const x = c.getContext('2d'), im = x.createImageData(N, N), d = im.data;
     let seed = 7741, rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -7085,7 +7085,8 @@ function makeGrainTexture(lite) {
     let lo = 1, hi = 0; for (let i = 0; i < a.length; i++) { lo = Math.min(lo, a[i]); hi = Math.max(hi, a[i]); }
     for (let i = 0; i < a.length; i++) { const v = (a[i] - lo) / (hi - lo), g = Math.round(70 + 185 * v); d[4 * i] = d[4 * i + 1] = d[4 * i + 2] = g; d[4 * i + 3] = 255; }
     x.putImageData(im, 0, 0);
-    const tex = new T.CanvasTexture(c); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(1 / (N * 0.25), 1 / (N * 0.25)); tex.anisotropy = 8;   // UVs are millimetres
+    const tex = new T.CanvasTexture(c); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(1 / (N * 0.1), 1 / (N * 0.1)); tex.anisotropy = 8;   // UVs are millimetres
+    const t2 = tex.clone(); t2.repeat.set(0.77 / (N * 0.1), 0.77 / (N * 0.1)); t2.rotation = 0.6; t2.offset.set(0.31, 0.57); t2.needsUpdate = true; tex.second = t2;
     return tex;
 }
 function makeBrushTexture(lite) {
@@ -8171,7 +8172,7 @@ function applyMaterial() {
     mat.metalness = m.metal; mat.roughness = m.rough;
     if (m.grain && !R.grain) { R.grain = makeGrainTexture(R.lite); try { const mx = R.renderer.capabilities.getMaxAnisotropy(); if (mx) R.grain.anisotropy = Math.min(16, mx); } catch (e) {} }
     const tx = m.brushed ? R.brush : (m.grain ? R.grain : null);
-    mat.roughnessMap = tx; mat.bumpMap = tx; mat.bumpScale = m.grain ? 3.2 : 0.35;
+    mat.roughnessMap = m.grain ? R.grain.second : tx; mat.bumpMap = tx; mat.bumpScale = m.grain ? 3.2 : 0.35;
     mat.needsUpdate = true;
     if (R.envGloss !== !!m.gloss && R.envs) applyEnv();     // glossy paint gets its own reflections
     R.light.intensity = m.gloss ? 0.95 : m.grain ? 1.2 : 1.1;   // gloss: the highlights come from the soft-boxes, a strong sun would add a hard white dot
@@ -9494,7 +9495,7 @@ function close3D() {
         cancelAnimationFrame(R.raf);
         disposeModel();
         Object.values(R.envs).forEach(t => t.dispose());
-        R.material.dispose(); if (R.stripMat) R.stripMat.dispose(); R.brush.dispose(); if (R.grain) R.grain.dispose(); R.pmrem.dispose(); R.controls.dispose();
+        R.material.dispose(); if (R.stripMat) R.stripMat.dispose(); R.brush.dispose(); if (R.grain) { R.grain.dispose(); R.grain.second.dispose(); } R.pmrem.dispose(); R.controls.dispose();
         R.renderer.dispose(); R.renderer.forceContextLoss && R.renderer.forceContextLoss();
         R.renderer.domElement.remove();
         R = null;
