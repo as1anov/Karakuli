@@ -7545,7 +7545,7 @@ function makeKeys(seed, ctx) {
     const dep = SHELF_NOTCH_DEPTH, ds = Math.max(0, lip.L - dep);                   // the closed end of a notch, measured up the lip from the bend (0: the slot runs past the bend)
     const qy = lip.P[0] + lip.T[0] * ds, qz = lip.P[1] + lip.T[1] * ds;
     const ry = qy + 1.4 - 10, Rr = 12;                                               // the ring (wire 3.4 mm) hangs in the notches either side of a tooth; the bunch sits 10 mm lower than the closed ends (user's offset)
-    const qzw = qz - dir * 5;                                                        // and 5 mm closer to the wall (the wall is on the side opposite the lip, -dir)
+    const qzw = qz - dir * 3;                                                        // and 3 mm closer to the wall (the wall is on the side opposite the lip, -dir)
     const m = new T.Group(); m.position.set(-0.5, ry, qzw); if (dir < 0) m.rotation.y = Math.PI;
     const mat = objMaterial('#d3d6da', { roughness: 0.34, metalness: 1 }), set = (seed + (ctx.n || 0)) % KEYS_DATA.length;
     // the bunch is posed as in the supplied file: the ring leans (about 73 deg) and the keys hang straight down from the lowest point of the ring, with holes in their heads
