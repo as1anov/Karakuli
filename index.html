@@ -797,7 +797,8 @@
         html body :is(#main-toolbar, #left-nav-group, #v3-rail, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { border-color: var(--glass-edge); box-shadow: var(--glass-hi); }
         html body :is(#main-toolbar, #left-nav-group, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { background-image: var(--vol-panel); }
         /* selected / pressed: sunk into the panel */
-        html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn.active, .on, button.on):not(.mode-header) { box-shadow: var(--pressed); background-image: none; }
+        html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn.active, .on, button.on):not(.mode-header):not(.v3-chip):not(.v3-card) { box-shadow: var(--pressed); background-image: none; }
+        html body #v3d-panel .v3-body :is(.v3-chip, .v3-card).on > :is(svg, i) { box-shadow: var(--pressed); background-image: none; }   /* the pressed look goes on the icon box, not on the square button around it */
         html body :is(.modal-content, .ad-card, #cv-bar) { background: var(--modal-bg, var(--tbar-bg));   /* windows stand over a dimmed picture, so they are almost opaque: they stay light */ -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
         /* Flat / Folded bar and the camera effects */
         html body :is(#v3-fxbtn, #v3-play) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
