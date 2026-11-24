@@ -778,11 +778,13 @@
             --btn-on: rgba(70, 74, 82, 0.22);
             --glass-blur: none;
             --modal-bg: #ececef;
-            --glass-edge: rgba(0, 0, 0, 0.13);
-            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.1), 0 10px 28px rgba(0, 0, 0, 0.14);
-            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.035), 0 1px 2px rgba(0, 0, 0, 0.07), 0 3px 7px rgba(0, 0, 0, 0.035);
-            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.018));
-            --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%);
+            /* Flat: a solid surface, a hairline edge, no highlights, no shade, no gradients. Only the panels that float over the drawing (toolbar, windows, side menu)
+               keep one soft shadow to lift them off the canvas; buttons carry none. */
+            --glass-edge: rgba(0, 0, 0, 0.11);
+            --glass-hi: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.08);
+            --btn-hi: none;
+            --vol: none;
+            --vol-panel: none;
             --pressed: none;   /* selected / pressed buttons are flat and only a little darker (--btn-on), never sunk in */
         }
         [data-theme="dark"] {
@@ -790,11 +792,11 @@
             --modal-bg: #262629;
             --btn-bg: transparent;
             --panel-bg: transparent;
-            --glass-edge: rgba(255, 255, 255, 0.12);
-            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.45);
-            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.25), 0 3px 7px rgba(0, 0, 0, 0.12);
-            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.06));
-            --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%);
+            --glass-edge: rgba(255, 255, 255, 0.10);
+            --glass-hi: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.30);
+            --btn-hi: none;
+            --vol: none;
+            --vol-panel: none;
             --pressed: none;
         }
         html body :is(#main-toolbar, #left-nav-group, #v3-rail, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { border-color: var(--glass-edge); box-shadow: var(--glass-hi); }
@@ -813,14 +815,14 @@
         html body :is(#new-canvas-modal, #share-modal) :is(.preset-icon, .card-hooks, .nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .field input, .chip:not(.active)) { background-color: transparent; }
         html body :is(#new-canvas-modal, #share-modal) :is(.nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .chip:not(.active)):hover { background-color: var(--card-hl); }
         /* product sketch tile: one flat colour, the same as the faces of the sketch, so the inside of the product does not differ from its background */
-        html body #new-canvas-modal .preset-card .preset-icon { background-color: var(--modal-bg); background-image: none; }
+        html body #new-canvas-modal .preset-card .preset-icon { background-color: transparent; background-image: none; border-color: transparent; }   /* flat: the sketch stands on the card itself, no box inside the box */
         /* a button that is only a frame around a boxed icon (Objects, Download, Material) is left alone: the box inside is the visible button */
         html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn, .mode-header, .glass-panel, button:not(.v3-lab):not(.v3-card):not(.v3-chip), #v3-rail > *):not(.active):not(.on) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body #left-nav-group #menu-btn { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         @media (max-width: 700px) { html body #v3-rail.v3-glass :is(button, #v3d-close, #v3d-shop) { background: var(--tbar-bg); } }
         /* the side menu and its buttons */
-        html body #dashboard { background: var(--tbar-bg); border-right: 1px solid var(--glass-edge); box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.3), 20px 0 50px rgba(0, 0, 0, 0.12); }
+        html body #dashboard { background: var(--tbar-bg); border-right: 1px solid var(--glass-edge); box-shadow: 8px 0 32px rgba(0, 0, 0, 0.08); }
         html body #dashboard .dash-btn, html body #dashboard .pl-sel { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body #dashboard .dash-btn:hover, html body #dashboard .dash-btn.active { background: var(--active-btn-bg); }
         html body #dashboard .project-swipe .project-item { background-color: var(--tbar-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }   /* opaque: the red delete layer under it must not show through when the row is swiped */
