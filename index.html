@@ -778,13 +778,13 @@
             --btn-on: rgba(70, 74, 82, 0.22);
             --glass-blur: none;
             --modal-bg: #ececef;
-            /* Flat: a solid surface, a hairline edge, no highlights, no shade, no gradients. Only the panels that float over the drawing (toolbar, windows, side menu)
-               keep one soft shadow to lift them off the canvas; buttons carry none. */
+            /* Very light relief: a solid surface, a hairline edge, a hairline highlight on the top edge and a barely visible fade of light from above. Buttons get a
+               1 px contact shadow only; the panels that float over the drawing keep one soft shadow. No shade at the bottom edge, no wide shadows on buttons. */
             --glass-edge: rgba(0, 0, 0, 0.11);
-            --glass-hi: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.08);
-            --btn-hi: none;
-            --vol: none;
-            --vol-panel: none;
+            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08);
+            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 1.5px rgba(0, 0, 0, 0.05);
+            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%);
+            --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 35%);
             --pressed: none;   /* selected / pressed buttons are flat and only a little darker (--btn-on), never sunk in */
         }
         [data-theme="dark"] {
@@ -793,10 +793,10 @@
             --btn-bg: transparent;
             --panel-bg: transparent;
             --glass-edge: rgba(255, 255, 255, 0.10);
-            --glass-hi: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.30);
-            --btn-hi: none;
-            --vol: none;
-            --vol-panel: none;
+            --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.30);
+            --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 1.5px rgba(0, 0, 0, 0.25);
+            --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 60%);
+            --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 35%);
             --pressed: none;
         }
         html body :is(#main-toolbar, #left-nav-group, #v3-rail, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { border-color: var(--glass-edge); box-shadow: var(--glass-hi); }
@@ -815,7 +815,7 @@
         html body :is(#new-canvas-modal, #share-modal) :is(.preset-icon, .card-hooks, .nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .field input, .chip:not(.active)) { background-color: transparent; }
         html body :is(#new-canvas-modal, #share-modal) :is(.nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .chip:not(.active)):hover { background-color: var(--card-hl); }
         /* product sketch tile: one flat colour, the same as the faces of the sketch, so the inside of the product does not differ from its background */
-        html body #new-canvas-modal .preset-card .preset-icon { background-color: transparent; background-image: none; border-color: transparent; }   /* flat: the sketch stands on the card itself, no box inside the box */
+        html body #new-canvas-modal .preset-card .preset-icon { background-color: transparent; background-image: none; border-color: transparent; box-shadow: none; }   /* the sketch stands on the card itself, no box inside the box */
         /* a button that is only a frame around a boxed icon (Objects, Download, Material) is left alone: the box inside is the visible button */
         html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn, .mode-header, .glass-panel, button:not(.v3-lab):not(.v3-card):not(.v3-chip), #v3-rail > *):not(.active):not(.on) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
