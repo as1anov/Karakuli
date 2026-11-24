@@ -812,6 +812,8 @@
         html body[data-theme="dark"] #new-canvas-modal, html body[data-theme="dark"] #share-modal { --card: transparent; --card-hl: rgba(255, 255, 255, 0.08); }
         html body :is(#new-canvas-modal, #share-modal) :is(.preset-icon, .card-hooks, .nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .field input, .chip:not(.active)) { background-color: transparent; }
         html body :is(#new-canvas-modal, #share-modal) :is(.nc-close, .swap-btn, .tpl-btn, .modal-btn.secondary, .chip:not(.active)):hover { background-color: var(--card-hl); }
+        /* product sketch tile: one flat colour, the same as the faces of the sketch, so the inside of the product does not differ from its background */
+        html body #new-canvas-modal .preset-card .preset-icon { background-color: var(--modal-bg); background-image: none; }
         /* a button that is only a frame around a boxed icon (Objects, Download, Material) is left alone: the box inside is the visible button */
         html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn, .mode-header, .glass-panel, button:not(.v3-lab):not(.v3-card):not(.v3-chip), #v3-rail > *):not(.active):not(.on) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
@@ -2610,7 +2612,8 @@ service cloud.firestore {
             const pts = arr => arr.map(q => { const r = at(q); return r[0].toFixed(1) + ',' + r[1].toFixed(1); }).join(' ');
             let g = '';
             lines.forEach(l => { const a = at(l[0]), b = at(l[1]); g += '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" stroke="currentColor" stroke-opacity="0.55" stroke-width="0.8"/>'; });
-            const sketch = 'style="fill:var(--bg-color);stroke:currentColor;stroke-width:1.1;stroke-linejoin:round"';
+            // opaque fill (it hides the edges behind each face) in the same colour as the tile under the sketch
+            const sketch = 'style="fill:var(--modal-bg, var(--bg-color));stroke:currentColor;stroke-width:1.1;stroke-linejoin:round"';
             polys.filter(p => p.cls === 'foot').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
             polys.filter(p => p.cls === 'flange').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
             polys.filter(p => p.cls === 'face').forEach(p => { g += '<polygon points="' + pts(p.pts) + '" ' + sketch + '/>'; });
