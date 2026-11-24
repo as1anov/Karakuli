@@ -1898,7 +1898,9 @@
             paperWidthMm = project.paperWidthMm || 210; paperHeightMm = project.paperHeightMm || 297;
             isPaperVisible = Boolean(project.isPaperVisible);
             activeProductKey = project.productKey || null;
-            shelfOpts = { hooks: (project.shelfOpts && Array.isArray(project.shelfOpts.hooks)) ? project.shelfOpts.hooks.map(Number).filter(Number.isFinite).slice(0, 5) : [], towel: !!(project.shelfOpts && project.shelfOpts.towel), tx: project.shelfOpts ? (project.shelfOpts.tx != null ? project.shelfOpts.tx : (project.shelfOpts.towel ? paperWidthMm / 2 : null)) : null, tl: project.shelfOpts ? project.shelfOpts.tl : null };
+            // key hooks: always the full row of the current design, kept where the saved row was centred (older projects had 5 slots 24 mm apart)
+            const savedHooks = (project.shelfOpts && Array.isArray(project.shelfOpts.hooks)) ? project.shelfOpts.hooks.map(Number).filter(Number.isFinite) : [];
+            shelfOpts = { hooks: savedHooks.length ? shelfHooksAt((Math.min(...savedHooks) + Math.max(...savedHooks)) / 2) : [], towel: !!(project.shelfOpts && project.shelfOpts.towel), tx: project.shelfOpts ? (project.shelfOpts.tx != null ? project.shelfOpts.tx : (project.shelfOpts.towel ? paperWidthMm / 2 : null)) : null, tl: project.shelfOpts ? project.shelfOpts.tl : null };
             holeOff = new Set(Array.isArray(project.holeOff) ? project.holeOff : []);
             plateHoleOn = new Set(Array.isArray(project.plateHoles) ? project.plateHoles : []); plateBolts = project.plateBolts !== false;
             if (PRODUCTS[activeProductKey]) { const n = normalizeProductSize(activeProductKey, paperWidthMm, paperHeightMm); paperWidthMm = n.w; paperHeightMm = n.h; }
@@ -2727,14 +2729,20 @@ service cloud.firestore {
 
         // Outline of the template on the canvas as an SVG path, in world pixels (+ optional offset).
         // Shelf options: positions (canvas px) of the key-hook notches and of the towel slot
-        const SHELF_NOTCH_DEPTH = PRODUCTS.shelf.profile.lip - 2,   // stops 2 mm short of the bend so the bend strip keeps one solid edge in 3D
-             SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 5, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 24, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
+        // Key hooks (hooks.svg): 6 slots 13 mm wide, 26 mm apart, 25 mm deep. A slot runs through the 15 mm lip and 10 mm on past
+        // the bend line, so the 13 mm fingers between the slots bend out on their own and become the hooks. The closed end of a slot
+        // and the free end of a finger are full half-circles (R 6.5); the outer slots stay 25 mm from the side edges.
+        const SHELF_NOTCH_DEPTH = 25, SHELF_NOTCH_W = 13, SHELF_NOTCH_R = 6.5, SHELF_HOOK_EDGE = 25,
+             SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 6, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 26, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
         // phone, zoomed out (the background dots are not drawn yet): no leaders, arrows or labels, they would pile on each other
         function shelfFar() { return ((window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768) && zoom < 0.395; }
-        function shelfDefaultHooks() {
-            const span = 2 * SHELF_HOOK_PITCH, c = paperWidthMm - SHELF_HOOK_MARGIN - span - 6;   // the last hook's wall lines up with the pocket's right end
-            return [-2, -1, 0, 1, 2].map(k => Math.round(c + k * SHELF_HOOK_PITCH));
+        // slot centres (mm from the left edge) of a full row whose middle is at c, kept SHELF_HOOK_EDGE from both side edges
+        function shelfHooksAt(c, W = paperWidthMm) {
+            const half = (SHELF_HOOK_MAX - 1) / 2 * SHELF_HOOK_PITCH, lo = SHELF_HOOK_EDGE + SHELF_NOTCH_W / 2 + half, hi = W - SHELF_HOOK_EDGE - SHELF_NOTCH_W / 2 - half;
+            const m = Math.max(lo, Math.min(hi, c));
+            return Array.from({ length: SHELF_HOOK_MAX }, (_, k) => +(m + (k - (SHELF_HOOK_MAX - 1) / 2) * SHELF_HOOK_PITCH).toFixed(2));
         }
+        function shelfDefaultHooks() { return shelfHooksAt(Infinity); }   // at the right end: the last slot 25 mm from the right edge
         function shelfTowel() {   // pocket centre / length in mm (defaults: centred, 40 cm)
             const len = Math.max(SHELF_TOWEL_MIN, Math.min(SHELF_TOWEL_MAX, shelfOpts.tl || Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55)));
             const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? paperWidthMm : shelfOpts.tx));
@@ -2744,8 +2752,7 @@ service cloud.firestore {
             if (templateKind() !== 'product' || activeProductKey !== 'shelf') return null;
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM, G = productGeom('shelf', paperWidthMm, paperHeightMm);
             const L = -wPx / 2 + dx, R = wPx / 2 + dx, T = -hPx / 2 + dy, B = hPx / 2 + dy, cx0 = (L + R) / 2;
-            const hk = PRODUCTS.hanger.hooks, rr = Math.min(SHELF_CORNER, hk.armW / 2);
-            const notches = (shelfOpts.hooks.length ? shelfOpts.hooks.slice() : shelfDefaultHooks()).sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: hk.armW / 2 * MM, r: rr * MM, rm: rr * MM, d: SHELF_NOTCH_DEPTH * MM }));
+            const notches = (shelfOpts.hooks.length ? shelfOpts.hooks.slice() : shelfDefaultHooks()).sort((p, q) => p - q).map(x => ({ cx: L + x * MM, hw: SHELF_NOTCH_W / 2 * MM, r: SHELF_NOTCH_R * MM, rm: SHELF_NOTCH_R * MM, d: SHELF_NOTCH_DEPTH * MM }));
             const tw = shelfTowel(), hh = SHELF_SLOT_H / 2 * MM;
             const slot = { cx: L + tw.cx * MM, cy: T + (G.anchor + SHELF_SLOT_Y) * MM, hh, hl: tw.len / 2 * MM, r: SHELF_CORNER * MM };
             return { L, R, T, B, notches, slot, MM };
@@ -2982,8 +2989,8 @@ service cloud.firestore {
             const mm = Math.round(((cx - offsetX) / zoom - F.L) / F.MM), D = shelfDrag, M = SHELF_HOOK_MARGIN;
             const stop = (want, got) => { const hit = Math.abs(want - got) > 0.5; if (hit && !D.hit) { D.bump = performance.now(); D.dir = want > got ? 1 : -1; redraw(); } D.hit = hit; };
             if (D.kind === 'hooks') {
-                const h = shelfOpts.hooks, c0 = (h[0] + h[h.length - 1]) / 2, w = mm - D.grab - c0;
-                const lo = M + 6 - h[0], hi = W - M - 6 - h[h.length - 1];   // the last hook's wall never passes the pocket's right end
+                const h = shelfOpts.hooks, c0 = (h[0] + h[h.length - 1]) / 2, w = mm - D.grab - c0, e = SHELF_HOOK_EDGE + SHELF_NOTCH_W / 2;
+                const lo = e - h[0], hi = W - e - h[h.length - 1];   // the outer slots stay 25 mm from the side edges
                 const d = Math.max(lo, Math.min(hi, w));
                 stop(w, d); shelfOpts.hooks = h.map(x => x + d);
             } else {
@@ -7535,7 +7542,7 @@ function makeKeys(seed, ctx) {
     }
     if (!lip) return { g, w: 30, d: 30 };
     const dir = lip.P[1] >= (sup.z0 + sup.z1) / 2 ? 1 : -1;                        // +1: the lip is at the far end of the foot, away from the wall
-    const dep = PRODUCTS.shelf.profile.lip - 2, ds = Math.max(0, lip.L - dep);       // the closed end of a notch, measured up the lip from the bend
+    const dep = SHELF_NOTCH_DEPTH, ds = Math.max(0, lip.L - dep);                   // the closed end of a notch, measured up the lip from the bend (0: the slot runs past the bend)
     const qy = lip.P[0] + lip.T[0] * ds, qz = lip.P[1] + lip.T[1] * ds;
     const ry = qy + 1.4, Rr = 12;                                                    // the ring (wire 3.4 mm) rests on the closed ends of the two notches either side of a tooth
     const m = new T.Group(); m.position.set(-0.5, ry, qz); if (dir < 0) m.rotation.y = Math.PI;
