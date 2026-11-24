@@ -8776,6 +8776,7 @@ function ensureCss() {
     #v3d-panel .v3-body :is(.v3-chip, .v3-card, .v3-prow) { height: var(--tb); min-width: 0; padding: 0; gap: 8px; border: 0; background: none; border-radius: 0; justify-content: flex-start; }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { box-sizing: border-box; flex: none; width: var(--tb); height: var(--tb); padding: 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--btn-bg); }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card) > svg { padding: calc((var(--tb) - 2px - var(--ico, 16.8px)) / 2); stroke-width: 1.8; }   /* the glyph is exactly the toolbar icon size (--ico) and line weight */
+    #v3d-panel .v3-body :is(.v3-chip, .v3-card).on { background: none; border-color: transparent; box-shadow: none; }   /* only the icon box is filled: a square fill on the button showed in its rounded corners */
     #v3d-panel .v3-body :is(.v3-chip, .v3-card).on > :is(svg, i) { background: var(--active-btn-bg); }
     #v3d-panel .v3-body .v3-mdot { padding: 0; box-shadow: none; }
     #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(span, b) { order: 2; max-width: calc(var(--tb) * 2 + 4px); white-space: normal; text-align: left; line-height: 1.15; font-size: 12px; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
