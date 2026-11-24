@@ -4,7 +4,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=none, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="color-scheme" content="only light">
     <meta name="theme-color" content="#e8e8e8">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300..800&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
     <style>
         @media (inverted-colors: inverted) { html, body, canvas, img, video, svg { filter: none !important; -webkit-filter: none !important; } }   /* Smart Invert must not flip the app's own theme */
         html { color-scheme: only light; }   /* the browser must not darken the page by itself: the theme is the app's own setting */
@@ -137,6 +137,7 @@
             left: 0; right: 0;
             z-index: 500; display: flex; justify-content: space-between;
             align-items: flex-start; padding: 0 20px; pointer-events: none;
+            transition: opacity .3s;
         }
 
         .top-nav-wrapper { 
@@ -189,6 +190,8 @@
         body.v3d-open #main-toolbar #v3d-btn { background: var(--active-btn-bg); }
         body.v3d-open #main-toolbar .tb-act { opacity: .35; pointer-events: none; }
         body.v3d-open .top-nav-container, body.timelapse-active .top-nav-container { display: none; }
+        /* Until the start window is up, the toolbar stays hidden so it does not flash and then show through the fading window */
+        body.booting .top-nav-container, body.booting #edge-tab { opacity: 0; pointer-events: none; }
         body.v3d-open #left-nav-group { visibility: hidden; }
         body.v3d-open #action-indicator { display: none; }
         /* the text on every button is 13 px */
@@ -847,7 +850,7 @@
         html body #mobile-keyboard .v-key .mode-label { color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); }
 </style>
 </head>
-<body data-theme="light"> 
+<body data-theme="light" class="booting">
     
     <div id="dashboard-overlay" onclick="toggleDashboard()"></div>
     <div id="dashboard">
@@ -6227,14 +6230,47 @@ service cloud.firestore {
         // Opened from a share link?
         // First thing a visitor sees: the New Canvas window, with the blank canvas offered first.
         (function openStartWindow() {
-            if (/[?&](e|v|edit|view)=/.test(location.search)) return;
+            // the toolbar is shown once the start window has faded in (or right away when there is no start window)
+            const started = (delay = 0) => setTimeout(() => document.body.classList.remove('booting'), delay);
+            if (/[?&](e|v|edit|view)=/.test(location.search)) { started(); return; }
             let tries = 0, done = false;
-            const open = () => { if (done) return; done = true; clearInterval(timer); if (!document.body.classList.contains('customer-view')) openNewCanvasModal(true); };
+            const open = () => {
+                if (done) return; done = true; clearInterval(timer);
+                if (document.body.classList.contains('customer-view')) { started(); return; }
+                try { openNewCanvasModal(true); } finally { started(300); }
+            };
             // normally as soon as the canvas exists; if the drawing library is slow or fails, still open after ~3 s so the start window never goes missing
             const timer = setInterval(() => {
-                if (typeof showCanvasModal !== 'function') { if (++tries > 100) clearInterval(timer); return; }
+                if (typeof showCanvasModal !== 'function') { if (++tries > 100) { clearInterval(timer); started(); } return; }
                 if ((typeof width === 'number' && width > 0) || ++tries > 30) open();
             }, 100);
+        })();
+
+        // Screen readers: the menu, toolbar and time-lapse controls are <div>s, so they are announced as buttons
+        // and the icon-only ones get their title as a name. They stay out of the Tab order on purpose: the app's
+        // own keyboard model (numpad / arrows, focus held by #kbd-sink) drives them, and a focusable copy would
+        // fire twice on Enter. Re-applied when the DOM changes (projects list, theme switch).
+        (function a11yControls() {
+            const SEL = '.dash-tab, .dash-btn, .theme-opt, .control-btn, .mode-header, #edge-tab, .tl-action-btn';
+            const NAMES = { 'opt-light': 'Light theme', 'opt-dark': 'Dark theme' };
+            const apply = () => {
+                document.querySelectorAll(SEL).forEach(el => {
+                    if (el.tagName === 'BUTTON') return;
+                    if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
+                    if (!el.hasAttribute('aria-label')) {
+                        const name = NAMES[el.id] || (!el.innerText.trim() && el.title);   // innerText: hidden labels do not count
+                        if (name) el.setAttribute('aria-label', name);
+                    }
+                    if (el.classList.contains('theme-opt') || el.classList.contains('dash-tab')) {
+                        const on = String(el.classList.contains('active'));
+                        if (el.getAttribute('aria-pressed') !== on) el.setAttribute('aria-pressed', on);
+                    }
+                });
+            };
+            let queued = false;
+            const schedule = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; apply(); }); };
+            apply();
+            new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         })();
 
         (function initSharedLink() {
