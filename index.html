@@ -820,7 +820,7 @@
         html body #dashboard .project-swipe .project-item { background-color: var(--tbar-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }   /* opaque: the red delete layer under it must not show through when the row is swiped */
         html body #dashboard .project-swipe .project-item.current, html body #dashboard .project-swipe .project-item.tap { background-image: linear-gradient(var(--active-btn-bg), var(--active-btn-bg)), var(--vol); }
         /* virtual keyboard: a panel with outlined, softly raised keys like the rest */
-        html body #mobile-keyboard { background-color: var(--tbar-bg); background-image: var(--vol-panel); border: 1px solid var(--glass-edge); border-bottom: 0; border-radius: 22px 22px 0 0; box-shadow: var(--glass-hi); padding: 0 14px; box-sizing: border-box; }
+        html body #mobile-keyboard #kbd-main-grid { background-color: var(--tbar-bg); background-image: var(--vol-panel); border: 1px solid var(--glass-edge); border-bottom: 0; border-radius: 22px 22px 0 0; box-shadow: var(--glass-hi); padding: 14px 14px 20px; box-sizing: border-box; }   /* the panel holds the keys; the handle that folds the keyboard stays above it, outside */
         html body #mobile-keyboard .v-key { background-color: transparent; background-image: var(--vol); border-color: var(--glass-edge); box-shadow: var(--btn-hi); -webkit-backdrop-filter: none; backdrop-filter: none; }
         html body #mobile-keyboard .v-key:active { box-shadow: var(--pressed); background-image: none; }
         html body #mobile-keyboard .v-key svg { width: max(var(--ico, 16.8px), 22px); height: max(var(--ico, 16.8px), 22px); stroke: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); stroke-width: 1.8; }
