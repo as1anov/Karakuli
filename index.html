@@ -8231,8 +8231,7 @@ function applyMaterial() {
     const tx = m.brushed ? R.brush : (m.grain ? R.grain : null);
     mat.roughnessMap = m.grain ? R.grain.second : tx; mat.bumpMap = tx; mat.bumpScale = m.grain ? 3.2 : 0.35;
     mat.needsUpdate = true;
-    if (R.envGloss !== !!m.gloss && R.envs) applyEnv();     // glossy paint gets its own reflections
-    R.light.intensity = m.gloss ? 0.95 : m.grain ? 1.2 : 1.1;   // gloss: the highlights come from the soft-boxes, a strong sun would add a hard white dot
+    R.light.intensity = 1.1;   // the lighting is the same for every finish: only the surface (colour, roughness, grain) changes
     syncStripMat();
     if (R.mask) R.weightKg = R.mask.count / (R.mask.ppm * R.mask.ppm) * S.t * m.density / 1e6;
     updateInfo();
@@ -8260,7 +8259,7 @@ function applyEnv() {
     if (!R) return;
     R.dirty = true;
     const mk = (k, g) => { if (!R.envs[k]) { const es = makeEnvScene(g); R.envs[k] = R.pmrem.fromScene(es, 0.03).texture; es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); } return R.envs[k]; };
-    const gl = !!MATS[S.mat].gloss; R.envGloss = gl;
+    const gl = false; R.envGloss = gl;   // one environment for all finishes
     R.scene.environment = mk(gl ? S.env + '-g' : S.env, gl);
     R.scene.background = mk(S.env, false);      // the backdrop stays the soft one for every finish
     R.scene.backgroundBlurriness = 0.55;
