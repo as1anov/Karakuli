@@ -7529,23 +7529,45 @@ function keysGeometry(set, part) {
     }
     return R.keyG[ck].clone();
 }
-// Front view, one of the key sets (cached): the x of the middle of the ring, and the roll that makes the bunch hang straight. The keys are flat plates, so their
-// centre of gravity is the area-weighted centre of their surface; hanging from the lowest point of the ring (the origin of the keys), the bunch turns about
-// that point, in the plane of the ring, until the centre of gravity is straight below it.
+// Front view, one of the key sets (cached): the x of the middle of the ring, and the roll that makes the bunch hang straight. The keys are flat plates; they hang
+// from the lowest point of the ring (the origin of the keys) and turn about it, in the plane of the ring. Where they come to rest is judged by the BLADES (the part
+// below KEYS_BLADE_Y, the rest is the heads at the ring): set 0 hangs as the owner approved it (centre of gravity straight below the ring), and every other set
+// is turned until the middle of its blades is on the vertical through the middle of the ring.
+const KEYS_BLADE_Y = -18;
+function keysTris(set) {   // per triangle: x, y of the centre and the area seen from the front (all in the frame of the keys)
+    keysGeometry(set, 'keys');
+    const kg = R.keyG[set + 'keys'], p = kg.attributes.position, ix = kg.index, n = ix.count / 3, cx = new Float32Array(n), cy = new Float32Array(n), w = new Float32Array(n), a3 = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+        const a = ix.getX(3 * i), b = ix.getX(3 * i + 1), c = ix.getX(3 * i + 2);
+        const ux = p.getX(b) - p.getX(a), uy = p.getY(b) - p.getY(a), uz = p.getZ(b) - p.getZ(a), vx = p.getX(c) - p.getX(a), vy = p.getY(c) - p.getY(a), vz = p.getZ(c) - p.getZ(a);
+        cx[i] = (p.getX(a) + p.getX(b) + p.getX(c)) / 3; cy[i] = (p.getY(a) + p.getY(b) + p.getY(c)) / 3;
+        w[i] = 0.5 * Math.abs(ux * vy - uy * vx); a3[i] = 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+    }
+    return { cx, cy, w, a3, n };
+}
+function keysComRoll(t) {   // the turn that brings the centre of gravity (area of the surface) straight below the origin
+    let A = 0, sx = 0, sy = 0;
+    for (let i = 0; i < t.n; i++) { A += t.a3[i]; sx += t.a3[i] * t.cx[i]; sy += t.a3[i] * t.cy[i]; }
+    return A ? Math.atan((sx / A) / (sy / A)) : 0;
+}
+function keysBladeX(t, th) {   // x of the middle of the blades (area seen from the front) when the keys are turned by th about the origin
+    const co = Math.cos(th), si = Math.sin(th); let A = 0, sx = 0;
+    for (let i = 0; i < t.n; i++) { const y = t.cx[i] * si + t.cy[i] * co; if (y < KEYS_BLADE_Y) { A += t.w[i]; sx += t.w[i] * (t.cx[i] * co - t.cy[i] * si); } }
+    return A ? sx / A : 0;
+}
 function keysSetInfo(set) {
     R.keyInfo = R.keyInfo || {};
     if (!R.keyInfo[set]) {
-        keysGeometry(set, 'keys'); keysGeometry(set, 'ring');
-        const kg = R.keyG[set + 'keys'], rgm = R.keyG[set + 'ring'], p = kg.attributes.position, ix = kg.index;
-        let A = 0, sx = 0, sy = 0;
-        for (let i = 0; i < ix.count; i += 3) {
-            const a = ix.getX(i), b = ix.getX(i + 1), c = ix.getX(i + 2);
-            const ux = p.getX(b) - p.getX(a), uy = p.getY(b) - p.getY(a), uz = p.getZ(b) - p.getZ(a), vx = p.getX(c) - p.getX(a), vy = p.getY(c) - p.getY(a), vz = p.getZ(c) - p.getZ(a);
-            const ar = 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
-            A += ar; sx += ar * (p.getX(a) + p.getX(b) + p.getX(c)) / 3; sy += ar * (p.getY(a) + p.getY(b) + p.getY(c)) / 3;
+        keysGeometry(set, 'ring');
+        const rgm = R.keyG[set + 'ring'], t = keysTris(set);
+        let roll = keysComRoll(t);
+        if (set !== 0) {   // bisection: the blades' x grows with the turn (counter-clockwise swings the tips to the right)
+            let lo = roll - 0.5, hi = roll + 0.5;
+            for (let k = 0; k < 40; k++) { const mid = (lo + hi) / 2; if (keysBladeX(t, mid) < 0) lo = mid; else hi = mid; }
+            roll = (lo + hi) / 2;
         }
         rgm.computeBoundingBox();
-        R.keyInfo[set] = { ringCx: (rgm.boundingBox.min.x + rgm.boundingBox.max.x) / 2, roll: A ? Math.atan((sx / A) / (sy / A)) : 0 };
+        R.keyInfo[set] = { ringCx: (rgm.boundingBox.min.x + rgm.boundingBox.max.x) / 2, roll };
     }
     return R.keyInfo[set];
 }
