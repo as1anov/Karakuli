@@ -783,7 +783,7 @@
             --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.035), 0 1px 2px rgba(0, 0, 0, 0.07), 0 3px 7px rgba(0, 0, 0, 0.035);
             --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.018));
             --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%);
-            --pressed: inset 0 2px 5px rgba(0, 0, 0, 0.22), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+            --pressed: none;   /* selected / pressed buttons are flat and only a little darker (--btn-on), never sunk in */
         }
         [data-theme="dark"] {
             --tbar-bg: #232326;
@@ -795,11 +795,11 @@
             --btn-hi: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.25), 0 3px 7px rgba(0, 0, 0, 0.12);
             --vol: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.06));
             --vol-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%);
-            --pressed: inset 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            --pressed: none;
         }
         html body :is(#main-toolbar, #left-nav-group, #v3-rail, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { border-color: var(--glass-edge); box-shadow: var(--glass-hi); }
         html body :is(#main-toolbar, #left-nav-group, #v3d-panel .v3-sec .v3-body, #v3d-bar, #v3-fx, .v3-shop-card, #cv-bar, .modal-content, .ad-card) { background-image: var(--vol-panel); }
-        /* selected / pressed: sunk into the panel */
+        /* selected / pressed: flat, a little darker than the panel */
         html body :is(#main-toolbar, #v3-rail, #v3d-panel .v3-body) :is(.control-btn.active, .on, button.on):not(.mode-header):not(.v3-chip):not(.v3-card) { box-shadow: var(--pressed); background-image: none; }
         html body #v3d-panel .v3-body :is(.v3-chip, .v3-card).on > :is(svg, i) { box-shadow: var(--pressed); background-image: none; }   /* the pressed look goes on the icon box, not on the square button around it */
         html body :is(.modal-content, .ad-card, #cv-bar) { background: var(--modal-bg, var(--tbar-bg));   /* windows stand over a dimmed picture, so they are almost opaque: they stay light */ -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
@@ -826,11 +826,12 @@
         /* virtual keyboard: a panel with outlined, softly raised keys like the rest */
         html body #mobile-keyboard #kbd-main-grid { background-color: var(--tbar-bg); background-image: var(--vol-panel); border: 1px solid var(--glass-edge); border-bottom: 0; border-radius: 22px 22px 0 0; box-shadow: var(--glass-hi); padding: 14px 14px 20px; box-sizing: border-box; }   /* the panel holds the keys; the handle that folds the keyboard stays above it, outside */
         html body #mobile-keyboard .v-key { background-color: transparent; background-image: var(--vol); border-color: var(--glass-edge); box-shadow: var(--btn-hi); -webkit-backdrop-filter: none; backdrop-filter: none; }
-        html body #mobile-keyboard .v-key:active { box-shadow: var(--pressed); background-image: none; }
+        html body #mobile-keyboard .v-key:active { box-shadow: var(--pressed); background-image: none; background-color: var(--btn-on); }
         /* the remaining controls: edge tab (side menu), theme switch, action pill */
         html body #edge-tab { background-color: var(--tbar-bg); background-image: var(--vol-panel); border-color: var(--glass-edge); box-shadow: var(--glass-hi); color: color-mix(in srgb, var(--text-color) 62%, var(--tbar-bg)); }
         html body .theme-container { background-color: var(--btn-bg); background-image: var(--vol-panel); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
         html body .theme-opt { border-radius: 9px; color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); }
+        html body .theme-opt .theme-svg { width: 18px; height: 18px; }   /* same size as the other side-menu icons, not the toolbar's */
         html body .theme-opt.active, html body[data-theme="dark"] .theme-opt.active { background-color: var(--btn-on); background-image: none; box-shadow: var(--pressed); color: var(--text-color); }
         /* time-lapse bar: the same panel, buttons and sizes as the main toolbar; in landscape it stands where the bottom toolbar stands */
         html body #timelapse-toolbar { box-sizing: border-box; padding: var(--tpad); gap: var(--tgap); background-color: var(--tbar-bg); background-image: var(--vol-panel); border: 1px solid var(--glass-edge); border-radius: 16px; box-shadow: var(--glass-hi); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
