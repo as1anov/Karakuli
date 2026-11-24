@@ -8081,7 +8081,7 @@ async function buildModel() {
         catch (e) { console.warn('rounded edges not available', e); geo = new T.ExtrudeGeometry(shapesForRows(mask, pc.r0, pc.r1), { depth: t, bevelEnabled: false, curveSegments: 1, steps: 1 }); geo.translate(0, 0, -t / 2); }
         geo = creaseNormals(geo, 18);       // below the first bevel facet (22 deg): the big flat faces keep one exact normal, so gloss reflections stay clean and undistorted
         const mesh = new T.Mesh(geo, R.material);
-        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.castShadow = true; mesh.receiveShadow = !MATS[S.mat].gloss;
         mesh.matrixAutoUpdate = false;
         model.add(mesh); R.pieces.push(mesh);
     });
@@ -8232,6 +8232,7 @@ function applyMaterial() {
     const tx = m.brushed ? R.brush : (m.grain ? R.grain : null);
     mat.roughnessMap = m.grain ? R.grain.second : tx; mat.bumpMap = tx; mat.bumpScale = m.grain ? 3.2 : 0.35;
     mat.needsUpdate = true;
+    if (R.pieces) R.pieces.forEach(p => { if (p) p.receiveShadow = !m.gloss; });   // a glossy sheet must not shadow itself: the shadow-map depth steps showed as triangles on its flat faces
     R.light.intensity = 1.1;   // the lighting is the same for every finish: only the surface (colour, roughness, grain) changes
     syncStripMat();
     if (R.mask) R.weightKg = R.mask.count / (R.mask.ppm * R.mask.ppm) * S.t * m.density / 1e6;
