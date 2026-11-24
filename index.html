@@ -7529,6 +7529,19 @@ function keysGeometry(set, part) {
     }
     return R.keyG[ck].clone();
 }
+// Front view: how far the keys have to move along the shelf so that their heads (the top 24 mm of the bunch, the keys' bounding box) sit under the
+// centre of the ring and not beside it. The ring itself is not moved.
+function keysHeadShiftX(set) {
+    keysGeometry(set, 'keys'); keysGeometry(set, 'ring');
+    const range = (geo, ymin) => {
+        const p = geo.attributes.position; let lo = Infinity, hi = -Infinity;
+        for (let i = 0; i < p.count; i++) if (p.getY(i) >= ymin) { const x = p.getX(i); if (x < lo) lo = x; if (x > hi) hi = x; }
+        return (lo + hi) / 2;
+    };
+    const kg = R.keyG[set + 'keys'], rgm = R.keyG[set + 'ring'];
+    kg.computeBoundingBox();
+    return range(rgm, -Infinity) - range(kg, kg.boundingBox.max.y - 24);
+}
 function makeKeys(seed, ctx) {
     const g = new T.Group(), lip = ctx.sup && ctx.sup.klip, sup = ctx.sup;
     if (sup && sup.type === 'hooks') {   // hanger: the ring hangs over the arm of a hook, its plane across the arm, the keys below it
@@ -7556,7 +7569,7 @@ function makeKeys(seed, ctx) {
     const kg = new T.Group(); kg.position.set(0, -cr[1] - 2.4, -cr[2] + 2); m.add(kg);   // the top of the ring sits on the notch ends (user's fine offsets: 2.4 mm down, 2 mm forward)
     const bg = new T.Group(); bg.position.set(0, ty, tz); kg.add(bg);
     const rg = new T.Group(); rg.rotation.x = upright; bg.add(rg);
-    [['ring', rg], ['keys', bg]].forEach(([part, par]) => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = part === 'keys'; mesh.receiveShadow = false; par.add(mesh); });
+    [['ring', rg], ['keys', bg]].forEach(([part, par]) => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = part === 'keys'; mesh.receiveShadow = false; if (part === 'keys') mesh.position.x = keysHeadShiftX(set); par.add(mesh); });   // keys: centred under the ring in the front view
     g.add(m);
     g.userData.pivot = { y: ry - 2.4 - cr[1] + ty, z: qzw + dir * (2 - cr[2] + tz) };   // the keys swing about the lowest point of the ring
     return { g, w: 30, d: 30 };
