@@ -8077,9 +8077,9 @@ async function buildModel() {
         const shapes = shapesForRows(mask, pc.r0, pc.r1, { top: i > 0 ? ex : 0, bot: i < layout.pieces.length - 1 ? ex : 0, round: 0.4 });
         if (!shapes.length) { R.pieces.push(null); return; }
         let geo;
-        try { geo = new T.ExtrudeGeometry(shapes, { depth: t - 2 * rr, bevelEnabled: true, bevelThickness: rr, bevelSize: rr, bevelOffset: -rr, bevelSegments: 2, curveSegments: 1, steps: 1 }); geo.translate(0, shapes.dy, rr - t / 2); }
+        try { geo = new T.ExtrudeGeometry(shapes, { depth: t - 2 * rr, bevelEnabled: true, bevelThickness: rr, bevelSize: rr, bevelOffset: -rr, bevelSegments: 4, curveSegments: 1, steps: 1 }); geo.translate(0, shapes.dy, rr - t / 2); }
         catch (e) { console.warn('rounded edges not available', e); geo = new T.ExtrudeGeometry(shapesForRows(mask, pc.r0, pc.r1), { depth: t, bevelEnabled: false, curveSegments: 1, steps: 1 }); geo.translate(0, 0, -t / 2); }
-        geo = creaseNormals(geo, 18);       // below the first bevel facet (22 deg): the big flat faces keep one exact normal, so gloss reflections stay clean and undistorted
+        geo = creaseNormals(geo, 25);       // the 4 bevel facets (22 deg apart) and the side wall blend into one round edge; the big flat faces keep one exact normal (see creaseNormals), so gloss reflections stay clean
         const mesh = new T.Mesh(geo, R.material);
         mesh.castShadow = true; mesh.receiveShadow = !MATS[S.mat].gloss;
         mesh.matrixAutoUpdate = false;
