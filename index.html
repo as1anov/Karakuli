@@ -824,6 +824,25 @@
         html body #mobile-keyboard #kbd-main-grid { background-color: var(--tbar-bg); background-image: var(--vol-panel); border: 1px solid var(--glass-edge); border-bottom: 0; border-radius: 22px 22px 0 0; box-shadow: var(--glass-hi); padding: 14px 14px 20px; box-sizing: border-box; }   /* the panel holds the keys; the handle that folds the keyboard stays above it, outside */
         html body #mobile-keyboard .v-key { background-color: transparent; background-image: var(--vol); border-color: var(--glass-edge); box-shadow: var(--btn-hi); -webkit-backdrop-filter: none; backdrop-filter: none; }
         html body #mobile-keyboard .v-key:active { box-shadow: var(--pressed); background-image: none; }
+        /* the remaining controls: edge tab (side menu), theme switch, action pill */
+        html body #edge-tab { background-color: var(--tbar-bg); background-image: var(--vol-panel); border-color: var(--glass-edge); box-shadow: var(--glass-hi); color: color-mix(in srgb, var(--text-color) 62%, var(--tbar-bg)); }
+        html body .theme-container { background-color: var(--btn-bg); background-image: var(--vol-panel); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
+        html body .theme-opt { border-radius: 9px; color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); }
+        html body .theme-opt.active, html body[data-theme="dark"] .theme-opt.active { background-color: var(--btn-on); background-image: none; box-shadow: var(--pressed); color: var(--text-color); }
+        /* time-lapse bar: the same panel, buttons and sizes as the main toolbar; in landscape it stands where the bottom toolbar stands */
+        html body #timelapse-toolbar { box-sizing: border-box; padding: var(--tpad); gap: var(--tgap); background-color: var(--tbar-bg); background-image: var(--vol-panel); border: 1px solid var(--glass-edge); border-radius: 16px; box-shadow: var(--glass-hi); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+        html body #timelapse-toolbar .tl-row-bottom { gap: var(--tgap); }
+        html body #timelapse-toolbar .tl-left-group, html body #timelapse-toolbar .tl-right-group { gap: var(--tgap); }
+        html body #timelapse-toolbar .tl-action-btn { box-sizing: border-box; width: var(--tb); height: var(--tb); border-radius: 12px; background-color: var(--btn-bg); background-image: var(--vol); border: 1px solid var(--glass-edge); box-shadow: var(--btn-hi); -webkit-backdrop-filter: none; backdrop-filter: none; color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); transition: color .15s, background-color .15s; }
+        html body #timelapse-toolbar .tl-action-btn:hover { background-color: var(--btn-bg); color: var(--text-color); opacity: 1; }
+        html body #timelapse-toolbar .tl-action-btn:active { transform: none; box-shadow: var(--pressed); background-image: none; background-color: var(--btn-on); color: var(--text-color); }
+        html body #timelapse-toolbar #tl-play-btn { background-color: var(--btn-on); background-image: none; box-shadow: var(--pressed); color: var(--text-color); border-color: var(--glass-edge); }   /* the main action reads as the selected button of the main toolbar */
+        html body #timelapse-toolbar #tl-close-btn { color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)) !important; }
+        html body #timelapse-toolbar .tl-action-btn svg { width: var(--ico); height: var(--ico); }
+        html body #timelapse-toolbar .tl-action-btn svg path:not([fill="currentColor"]) { stroke-width: 1.8; }
+        html body #timelapse-toolbar .tl-action-btn.kbd-tl-focus { background-color: var(--active-btn-bg); }
+        html body #timelapse-toolbar .tl-time-display { color: color-mix(in srgb, var(--text-color) 62%, var(--tbar-bg)); font-size: 13px; }
+        @media (orientation: landscape) { html body #timelapse-toolbar { bottom: max(var(--tbot), env(safe-area-inset-bottom)); } }
         html body #mobile-keyboard .v-key svg { width: max(var(--ico, 16.8px), 22px); height: max(var(--ico, 16.8px), 22px); stroke: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); stroke-width: 1.8; }
         html body #mobile-keyboard .v-key .mode-label { color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); }
 </style>
