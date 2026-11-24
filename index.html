@@ -7548,12 +7548,17 @@ function makeKeys(seed, ctx) {
     const qzw = qz - dir * 3;                                                        // and 3 mm closer to the wall (the wall is on the side opposite the lip, -dir)
     const m = new T.Group(); m.position.set(-0.5, ry, qzw); if (dir < 0) m.rotation.y = Math.PI;
     const mat = objMaterial('#d3d6da', { roughness: 0.34, metalness: 1 }), set = (seed + (ctx.n || 0)) % KEYS_DATA.length;
-    // the bunch is posed as in the supplied file: the ring leans (about 73 deg) and the keys hang straight down from the lowest point of the ring, with holes in their heads
-    const cr = KEYS_DATA[set].c;                                                      // ring centre in the bunch frame (origin = the hanging point)
-    const kg = new T.Group(); kg.position.set(0, -cr[1] - 2.4, -cr[2] + 2); m.add(kg);   // the ring centre sits on the notch ends (user's fine offsets: 2.4 mm down, 2 mm forward)
-    ['ring', 'keys'].forEach(part => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = part === 'keys'; mesh.receiveShadow = false; kg.add(mesh); });
+    // the bunch as in the supplied file has a leaning ring (about 73 deg); here the ring hangs straight down (user's reference): it is turned upright about its TOP,
+    // which stays where it was, so the lowest point of the ring and the keys hanging from it move towards the wall
+    const cr = KEYS_DATA[set].c;                                                      // ring centre in the bunch frame (origin = the hanging point = lowest point of the ring)
+    const hr = Math.hypot(cr[1], cr[2]), upright = Math.atan2(-cr[2], cr[1]);        // ring radius, and the turn about x that stands the ring up
+    const ty = 2 * (cr[1] - hr), tz = 2 * cr[2];                                      // where the lowest point goes (the top, 2 * centre, stays)
+    const kg = new T.Group(); kg.position.set(0, -cr[1] - 2.4, -cr[2] + 2); m.add(kg);   // the top of the ring sits on the notch ends (user's fine offsets: 2.4 mm down, 2 mm forward)
+    const bg = new T.Group(); bg.position.set(0, ty, tz); kg.add(bg);
+    const rg = new T.Group(); rg.rotation.x = upright; bg.add(rg);
+    [['ring', rg], ['keys', bg]].forEach(([part, par]) => { const mesh = new T.Mesh(keysGeometry(set, part), mat); mesh.castShadow = part === 'keys'; mesh.receiveShadow = false; par.add(mesh); });
     g.add(m);
-    g.userData.pivot = { y: ry - 2.4 - cr[1], z: qzw + dir * (2 - cr[2]) };             // the keys swing about the lowest point of the ring
+    g.userData.pivot = { y: ry - 2.4 - cr[1] + ty, z: qzw + dir * (2 - cr[2] + tz) };   // the keys swing about the lowest point of the ring
     return { g, w: 30, d: 30 };
 }
 function makeUmbrella(seed, ctx) {
