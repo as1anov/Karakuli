@@ -6929,7 +6929,8 @@ function creaseNormals(geo, deg) {
     const out = new Float32Array(nv * 3);
     for (let t = 0; t < nt; t++) for (let c = 0; c < 3; c++) {
         const vi = 3 * t + c, arr = map.get(key(vi)); let sx = 0, sy = 0, sz = 0;
-        for (const u of arr) { const d = fn[3 * t] * fn[3 * u] + fn[3 * t + 1] * fn[3 * u + 1] + fn[3 * t + 2] * fn[3 * u + 2]; if (d >= cosT) { sx += fn[3 * u]; sy += fn[3 * u + 1]; sz += fn[3 * u + 2]; } }
+        const capT = Math.abs(fn[3 * t + 2]) > 0.9999;   // a big flat face (front/back) keeps its exact normal and takes nothing from its neighbours; nor do they take it
+        for (const u of arr) { if ((Math.abs(fn[3 * u + 2]) > 0.9999) !== capT) continue; const d = fn[3 * t] * fn[3 * u] + fn[3 * t + 1] * fn[3 * u + 1] + fn[3 * t + 2] * fn[3 * u + 2]; if (d >= cosT) { sx += fn[3 * u]; sy += fn[3 * u + 1]; sz += fn[3 * u + 2]; } }
         const l = Math.hypot(sx, sy, sz) || 1; out[3 * vi] = sx / l; out[3 * vi + 1] = sy / l; out[3 * vi + 2] = sz / l;
     }
     geo.setAttribute('normal', new T.BufferAttribute(out, 3));
