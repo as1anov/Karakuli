@@ -2703,7 +2703,7 @@ service cloud.firestore {
                         <button class="mini-btn" onclick="changeHooks(-1, event)" aria-label="Fewer hooks"${hooks <= c.min ? ' disabled' : ''}>−</button>
                     </div>` : '';
                 return `<div class="preset-card${on ? ' active' : ''}" role="button" onclick="selectPreset('${key}')">
-                    <div class="preset-icon">${productIconSVG(key, 120, 78, d)}</div>
+                    <div class="preset-icon">${productIconSVG(key, 132, 86, d)}</div>
                     <div class="preset-text"><span class="preset-name">${p.name}</span><span class="preset-dim">${fmtLen(d.w)} × ${fmtLen(d.h)} ${sizeUnit}${extra}</span></div>${stepper}
                 </div>`;
             }).join('');
