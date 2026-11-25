@@ -8932,6 +8932,9 @@ function ensureCss() {
         #v3d { --rb: calc((100vw - 106px) / 6); }
         #v3d #v3d-panel { --tb: var(--rb); --tgap: 10px; --tpad: 10px; --ico: 24px; }
         #v3d #v3d-panel .v3-sec .v3-body { padding: 10px; gap: 10px; border-radius: 28px; }
+        /* the strip is revealed with a clip-path: its radius must be the plate's 28 px (it was 16, so the corners showed a dark square behind the curve), and the open clip is wider than the plate so its soft shadow is not cut off */
+        #v3d #v3d-panel .v3-sec .v3-body { clip-path: inset(0 100% 0 0 round 28px); }
+        #v3d #v3d-panel.open .v3-sec .v3-body { clip-path: inset(-40px -40px -40px -40px round 28px); }
         #v3d #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-radius: 18px; }
         /* Flat / Folded bar: 10 px on every side (it had 14 px left and right), toolbar-sized buttons, concentric corners */
         #v3d #v3d-bar { --tb: var(--rb); --tpad: 10px; --ico: 24px; height: auto; padding: 10px; gap: 10px; border-radius: 28px; }
