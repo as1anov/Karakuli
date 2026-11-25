@@ -272,6 +272,21 @@
             html body #new-canvas-modal .nc-body > .nc-section:last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
             html body #new-canvas-modal #preset-list { flex: 1 0 auto; }
             html body #new-canvas-modal #preset-list .preset-card { flex: 1 0 auto; }
+            /* one rhythm for the whole window: 10 px between controls in a group, 16 px between groups, 10 px from the window's edge; corners 18 px on every control inside a 28 px window (18 + 10, concentric) */
+            html body #new-canvas-modal .nc-close { display: none; }   /* Cancel already closes the window, so the header is just the title */
+            html body #new-canvas-modal .modal-content { border-radius: 28px; }
+            html body #new-canvas-modal .nc-header { padding: 18px 10px 14px; min-height: 0; }
+            html body #new-canvas-modal .nc-body { padding: 0 10px 16px; }
+            html body #new-canvas-modal .nc-body > .nc-section:first-child { padding: 0 0 16px; }
+            html body #new-canvas-modal .nc-body > .nc-section:last-child { padding: 16px 0 0; }
+            html body #new-canvas-modal .size-row { gap: 10px; }
+            html body #new-canvas-modal .tpl-select { margin-top: 10px; }
+            html body #new-canvas-modal .nc-label-row { margin-bottom: 10px; }
+            html body #new-canvas-modal #preset-list { gap: 10px; }
+            html body #new-canvas-modal :is(.field input, .swap-btn, .tpl-btn, .preset-card) { border-radius: 18px; }
+            html body #new-canvas-modal .preset-card { padding: 10px 14px 10px 10px; }
+            html body #new-canvas-modal :is(.preset-icon, .card-hooks) { border-radius: 12px; }
+            html body #new-canvas-modal .modal-actions { height: auto; padding: 12px 10px 22px; }
             html body #new-canvas-modal .modal-actions .modal-btn { height: var(--bt); border-radius: 18px; }
             /* every floating plate on a phone: 28 px corners around 18 px buttons with 10 px padding - concentric, so the gap is even all round */
             body #main-toolbar { border-radius: 28px; }
