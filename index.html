@@ -253,7 +253,10 @@
             /* the New Canvas window follows the new sizes: 12 px from the edges like the toolbar, controls 52 px high like the side-menu buttons */
             html body #new-canvas-modal { padding: 12px; }
             html body #new-canvas-modal .modal-content { max-width: none; border-radius: 24px; max-height: calc(100% - 4px); }
-            html body #new-canvas-modal .nc-header { padding: 20px 20px 12px; }
+            html body #new-canvas-modal .nc-header { padding: 14px 10px 12px; align-items: center; }   /* title, fields, cards and the bottom buttons all start 10 px from the window's edge; the close button is level with the title */
+            html body #new-canvas-modal .nc-header h2 { padding-left: 1px; }
+            html body #new-canvas-modal .nc-body { padding: 0 10px 8px; }
+            html body #new-canvas-modal .field-unit { bottom: 19px; }   /* 'mm' stays on the number's baseline in the taller field */
             html body #new-canvas-modal .nc-close { width: 44px; height: 44px; border-radius: 14px; }
             html body #new-canvas-modal :is(.field input, .tpl-btn, .modal-btn, .swap-btn) { height: 52px; border-radius: 14px; }
             html body #new-canvas-modal .swap-btn { width: 44px; }
@@ -8909,6 +8912,7 @@ function ensureCss() {
         #v3d #v3d-panel .v3-sec[data-sec="obj"] .v3-body { overflow-x: visible; }
         #v3d #v3d-panel .v3-sec[data-sec="obj"] #v3-cat { display: flex; flex-wrap: nowrap; justify-content: flex-start; gap: 10px; width: 100%; }
         #v3d #v3d-panel .v3-sec[data-sec="obj"] #v3-cat .v3-card { flex: 1 1 0; min-width: 0; max-width: var(--rb); width: auto; height: auto; min-height: 0; align-self: flex-start; aspect-ratio: 1 / 1; }
+        #v3d #v3d-panel .v3-sec[data-sec="obj"] #v3-cat .v3-card > svg { width: 100%; height: 100%; padding: 25%; }   /* the visible box is the icon box: it shrinks with the button, so the gaps stay 10 px */
     }
     /* ---- the strips: same height, spacing, outlines and colours as the toolbar; no section names ---- */
     #v3d-panel .v3-tog { display: none !important; }
