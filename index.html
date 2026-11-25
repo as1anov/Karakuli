@@ -8501,6 +8501,7 @@ function fitCamera() {
     const L = R.light, s = dim * 0.9;
     L.position.set(c.x - dim * 0.5, c.y + dim * 0.9, c.z + dim * 1.1);
     L.target.position.copy(c); R.scene.add(L.target);
+    R.lightBase = L.position.clone(); R.lightC = c.clone();   // the home of the key light (Shadow sweep moves it and brings it back)
     L.shadow.camera.left = -s; L.shadow.camera.right = s; L.shadow.camera.top = s; L.shadow.camera.bottom = -s;
     L.shadow.camera.near = 10; L.shadow.camera.far = dim * 4; L.shadow.camera.updateProjectionMatrix();
     R.wall.position.set(c.x, c.y, -0.5);
@@ -8542,6 +8543,8 @@ const ROT_AMP = 68;   // degrees either side of the front view that the Rotate c
 const FX = {
     reveal: { name: 'Reveal',     period: 14, uses: ['speed', 'range', 'zoom', 'dir'], icon: '<path d="M3 8V4h4M21 8V4h-4M3 16v4h4M21 16v4h-4"/><rect x="9" y="9.5" width="6" height="5" rx=".8"/><path d="M7 7l2.2 2.2M17 7l-2.2 2.2M7 17l2.2-2.2M17 17l-2.2-2.2"/>' },
     pass:   { name: 'Close pass', period: 12, uses: ['speed', 'zoom', 'dir'], icon: '<rect x="8" y="8.5" width="8" height="7" rx="1"/><path d="M3 12h2.5M18.5 12H21M4.5 10.5L3 12l1.5 1.5M19.5 10.5L21 12l-1.5 1.5"/>' },
+    snap:   { name: 'Snap zoom',  period: 8.4, uses: ['speed', 'zoom', 'dir'], icon: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5M8 10.5h5M10.5 8v5"/>' },
+    light:  { name: 'Shadow sweep', period: 10, uses: ['speed', 'range', 'dir'], icon: '<circle cx="6.5" cy="6.5" r="2.4"/><path d="M6.5 2.4v1M2.4 6.5h1M3.6 3.6l.7.7M9.4 3.6l-.7.7"/><rect x="11.5" y="9" width="5" height="10" rx=".6"/><path d="M16.5 19l4-2.2V9.8l-4 2.2"/>' },
     rotate: { name: 'Rotate',     period: 16, uses: ['speed', 'dir'], icon: '<path d="M12 3l4.6 2.5v4.6L12 12.6 7.4 10.1V5.5zM12 8v4.6M7.4 5.5L12 8l4.6-2.5"/><path d="M5 14.3C3.8 14.8 3 15.6 3 16.5c0 2 4 3.5 9 3.5s9-1.5 9-3.5c0-.9-.8-1.7-2-2.2"/>' }
 };
 // Easing the way motion designers do it: a cubic-bezier curve per move, never a flat ease. Slow start, fast middle, long soft landing.
@@ -8561,7 +8564,7 @@ function camPose() {
 // every effect starts from a clean, centred view: the camera first glides to Front (or 3/4 for Rotate), and only then the effect begins
 function fxStart(name) {
     if (!R || !R.fit) return;
-    goCamera(name === 'rotate' ? 'persp' : 'front');         // also stops a running effect and re-centres on the product as it is shown now
+    goCamera(name === 'rotate' || name === 'light' || name === 'snap' ? 'persp' : 'front');   // also stops a running effect and re-centres on the product as it is shown now (shadows and a pattern lying flat read best at 3/4)
     S.fx.name = name; R.fxWait = true; R.fxRun = null;
     syncUI();
 }
@@ -8574,7 +8577,11 @@ function fxBegin() {
     S.cam = null; R.dirty = true; syncUI();
 }
 function fxStop() {
-    if (R) { R.fxRun = null; R.fxHold = false; R.fxWait = false; }
+    if (R) {
+        R.fxRun = null; R.fxHold = false; R.fxWait = false;
+        if (R.camera.view && R.camera.view.enabled) { R.camera.clearViewOffset(); R.dirty = true; }   // Snap zoom: back to the whole frame
+        if (R.lightBase && !R.light.position.equals(R.lightBase)) { R.light.position.copy(R.lightBase); R.dirty = true; }   // Shadow sweep: the light goes back home
+    }
     if (S.fx.name) { S.fx.name = null; syncUI(); }
 }
 // the camera moves in = dolly in, slides sideways along the product (truck) and pulls back; k = how close (0..1), s = where along the pattern (-1..1)
@@ -8618,7 +8625,10 @@ function stepFx(dt) {
         const AMP = ROT_AMP * Math.PI / 180, ph0 = Math.asin(Math.max(-1, Math.min(1, b.th / AMP)));   // the swing continues from where the camera stands now: no jump at the start
         th = AMP * Math.sin(ph0 + fx.dir * 2 * Math.PI * (run.t / def.period));
     }
-    else {
+    else if (fx.name === 'light') {   // Shadow sweep: the camera eases a little closer in the first seconds and then holds still, the light does the work
+        const a = EZ_IN(Math.min(1, run.t / 3)); d = b.d * (1 - 0.22 * a); kz = a;
+    }
+    else if (fx.name === 'reveal' || fx.name === 'pass') {
         const tanV = R.fit.tanV, asp = R.camera.aspect || R.fit.asp, deep = fx.name === 'pass' ? Math.min(0.7, Z * 2.2) : Math.min(0.7, Z * 1.7);
         const dFull = run.H / 2 / (0.92 * tanV) + run.D / 2;                       // the closest the camera may come: the product's whole height still fits
         const d1 = Math.min(b.d, Math.max(b.d * (1 - deep), dFull, 0.3 * b.d));
@@ -8637,8 +8647,62 @@ function stepFx(dt) {
     R.controls.target.set(cx, cy, cz);
     R.camera.position.set(cx + d * cp * Math.sin(th), cy + d * Math.sin(ph), cz + d * cp * Math.cos(th));
     run.lastT = [cx, cy, cz]; run.lastP = [R.camera.position.x, R.camera.position.y, R.camera.position.z];
+    if (fx.name === 'snap') fxSnap(run, u, Z, fx.dir);
+    if (fx.name === 'light') fxLight(run, A, fx.dir, def.period);
     R.dirty = true;
     if (done) fxStop();
+}
+// Snap zoom: a crash zoom of the lens onto three spots of the pattern in turn (left, middle, right). The camera does not move: the picture is cropped
+// round the spot (a view offset of the projection, so it is drawn at full resolution and the perspective stays the same). Each beat: a very fast
+// zoom in, a hold to read the pattern, a quick zoom out, a breath on the whole product.
+const EZ_SNAP = bez(0.15, 0.6, 0.1, 1);
+function fxSnap(run, u, Z, dir) {
+    const cam = R.camera, beat = Math.min(2, Math.floor(u * 3)), v = u * 3 - beat;
+    let k;
+    if (v < 0.1) k = EZ_SNAP(v / 0.1);
+    else if (v < 0.6) k = 1;
+    else if (v < 0.8) k = 1 - EZ_OUT((v - 0.6) / 0.2);
+    else k = 0;
+    if (cam.view && cam.view.enabled) cam.clearViewOffset();
+    if (k <= 0.001) return;
+    cam.updateMatrixWorld();
+    if (!run.snapW) run.snapW = snapSpots(run, cam);
+    const P = run.snapW[dir > 0 ? beat : 2 - beat].clone().project(cam);
+    const el = R.renderer.domElement, Wf = el.clientWidth || 1, Hf = el.clientHeight || 1;
+    const px = (P.x + 1) / 2 * Wf, py = (1 - P.y) / 2 * Hf;
+    const zmax = 1.6 + Z * 6, zf = Math.exp(k * Math.log(zmax)), w = Wf / zf, h = Hf / zf;
+    const ccx = Wf / 2 + (px - Wf / 2) * k, ccy = Hf / 2 + (py - Hf / 2) * k;
+    const x0 = Math.max(0, Math.min(Wf - w, ccx - w / 2)), y0 = Math.max(0, Math.min(Hf - h, ccy - h / 2));
+    cam.setViewOffset(Wf, Hf, x0, y0, w, h);
+}
+// the three spots of Snap zoom: left, middle and right along the product, each ON its surface as the camera sees it (a ray from the camera finds the
+// metal; a ray that goes through a hole of the pattern or past the edge tries a little higher or lower), so the zoom never lands on the wall
+function snapSpots(run, cam) {
+    const rc = new T.Raycaster(), out = [];
+    [-0.55, 0, 0.55].forEach(s => {
+        const P0 = new T.Vector3(run.mc[0] + s * run.W / 2, run.mc[1], run.mc[2]), n = P0.clone().project(cam);
+        let hit = null, any = null;   // the pattern stands upright (the plate on the wall, the face of a holder): a hit on an upright face wins over the flat shelf
+        for (const dy of [0, 0.04, -0.04, 0.08, -0.08, 0.12, -0.12, 0.18, -0.18, 0.25, -0.25]) {
+            rc.setFromCamera(new T.Vector2(n.x, n.y + dy), cam);
+            const h = R.model ? rc.intersectObject(R.model, true)[0] : null;
+            if (!h) continue;
+            if (!any) any = h.point.clone();
+            const nz = h.face ? Math.abs(h.face.normal.clone().transformDirection(h.object.matrixWorld).z) : 1;
+            if (nz > 0.6) { hit = h.point.clone(); break; }
+        }
+        out.push(hit || any || P0);
+    });
+    return out;
+}
+// Shadow sweep: the camera stands still and the key light travels round the product in a slow arc (a boomerang, like Rotate), so the shadows of the
+// pattern slide across the wall. Swing = how far either side of the front the light goes.
+function fxLight(run, A, dir, period) {
+    const L = R.light, base = R.lightBase, c = R.lightC; if (!base || !c) return;
+    const vx = base.x - c.x, vy = base.y - c.y, vz = base.z - c.z, hr = Math.hypot(vx, vz), az0 = Math.atan2(vx, vz);
+    const amp = Math.max(0.17, Math.min(1.4, A)), ph0 = Math.asin(Math.max(-1, Math.min(1, az0 / amp)));   // starts from where the light is: no jump
+    const az = amp * Math.sin(ph0 + dir * 2 * Math.PI * (run.t / period));
+    const low = 1 - 0.38 * EZ_IN(Math.min(1, run.t / 3));   // the light also comes down, gently (from about 37 to about 25 degrees up), so the shadows of the pattern grow long enough to read on the wall
+    L.position.set(c.x + Math.sin(az) * hr, c.y + vy * low, c.z + Math.cos(az) * hr);
 }
 function stepCamera(dt) {
     const a = R.cam; if (!a) return;
