@@ -8537,10 +8537,11 @@ function goCamera(name) {
     fxStop(); S.cam = name; syncUI();
 }
 // ---- camera effects: moves of the camera around the product (one button in the bar opens the list and the settings) ----
+const ROT_AMP = 68;   // degrees either side of the front view that the Rotate camera swings (the wall stays behind it)
 const FX = {
     reveal: { name: 'Reveal',     period: 14, uses: ['speed', 'range', 'zoom', 'dir'], icon: '<path d="M3 8V4h4M21 8V4h-4M3 16v4h4M21 16v4h-4"/><rect x="9" y="9.5" width="6" height="5" rx=".8"/><path d="M7 7l2.2 2.2M17 7l-2.2 2.2M7 17l2.2-2.2M17 17l-2.2-2.2"/>' },
     pass:   { name: 'Close pass', period: 12, uses: ['speed', 'zoom', 'dir'], icon: '<rect x="8" y="8.5" width="8" height="7" rx="1"/><path d="M3 12h2.5M18.5 12H21M4.5 10.5L3 12l1.5 1.5M19.5 10.5L21 12l-1.5 1.5"/>' },
-    rotate: { name: 'Rotate',     period: 22, uses: ['speed', 'dir'], icon: '<path d="M12 3l4.6 2.5v4.6L12 12.6 7.4 10.1V5.5zM12 8v4.6M7.4 5.5L12 8l4.6-2.5"/><path d="M5 14.3C3.8 14.8 3 15.6 3 16.5c0 2 4 3.5 9 3.5s9-1.5 9-3.5c0-.9-.8-1.7-2-2.2"/>' }
+    rotate: { name: 'Rotate',     period: 16, uses: ['speed', 'dir'], icon: '<path d="M12 3l4.6 2.5v4.6L12 12.6 7.4 10.1V5.5zM12 8v4.6M7.4 5.5L12 8l4.6-2.5"/><path d="M5 14.3C3.8 14.8 3 15.6 3 16.5c0 2 4 3.5 9 3.5s9-1.5 9-3.5c0-.9-.8-1.7-2-2.2"/>' }
 };
 // Easing the way motion designers do it: a cubic-bezier curve per move, never a flat ease. Slow start, fast middle, long soft landing.
 const bez = (x1, y1, x2, y2) => t => {
@@ -8597,7 +8598,10 @@ function stepFx(dt) {
     if (fx.loop) u = u % 1;
     const b = run.base, A = fx.range * Math.PI / 180, Z = fx.zoom / 100;
     let th = b.th, ph = b.ph, d = b.d, off = 0, kz = 0;
-    if (fx.name === 'rotate') th = b.th + fx.dir * 2 * Math.PI * (run.t / def.period);
+    if (fx.name === 'rotate') {   // a boomerang: the camera swings out one way, comes back through the front and out the other way - never round to the wall behind; it slows to a stop at each end (a sine) and speeds up through the middle
+        const AMP = ROT_AMP * Math.PI / 180, ph0 = Math.asin(Math.max(-1, Math.min(1, b.th / AMP)));   // the swing continues from where the camera stands now: no jump at the start
+        th = AMP * Math.sin(ph0 + fx.dir * 2 * Math.PI * (run.t / def.period));
+    }
     else {
         const tanV = R.fit.tanV, asp = R.camera.aspect || R.fit.asp, deep = fx.name === 'pass' ? Math.min(0.7, Z * 2.2) : Math.min(0.7, Z * 1.7);
         const dFull = run.H / 2 / (0.92 * tanV) + run.D / 2;                       // the closest the camera may come: the product's whole height still fits
