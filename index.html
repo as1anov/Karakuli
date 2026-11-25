@@ -240,12 +240,15 @@
         @media (min-width: 601px) and (min-height: 600px) { :root { --tb: 57.6px; --ico: 24.5px; } }   /* tablets and desktops: the top and bottom bars and their buttons are 20% larger (phones, also in landscape, stay as they were) */
         @media (max-width: 600px) { :root { --tb: 36px; --tpad: 8px; --tgap: 9px; } #left-nav-group { padding: 4px !important; border-radius: 15px; } }
         @media (max-width: 380px) { :root { --tb: 32px; --ico: 15.3px; } }
+        @media (max-width: 380px) { :root { --tb: 40px !important; --ico: 18.4px !important; } }
         /* phones: the bottom toolbar stretches edge to edge (12 px margins), its buttons spread evenly */
         @media (max-width: 600px) {
             body.tb-bottom .top-nav-wrapper { left: 12px; right: 12px; transform: none; width: auto; align-items: stretch; }
-            body.tb-bottom #main-toolbar { --tb: 44px; --ico: 20.5px; --tpad: 12px; width: 100%; justify-content: space-between; gap: 6px; border-radius: 24px; }   /* the buttons are as tall as the side-menu buttons (44 px) and square; spaced evenly, the divider counts as one item */
+            body.tb-bottom #main-toolbar { --tb: min(52px, calc((100vw - 81px) / 6)); --ico: calc(var(--tb) * 0.46); --tpad: 12px; width: 100%; justify-content: space-between; gap: 6px; border-radius: 24px; }   /* up to 52 px and square (a little smaller on a narrow screen so six fit); spaced evenly, the divider counts as one item */
             body.tb-bottom #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; flex: 0 0 var(--tb); width: var(--tb); height: var(--tb); aspect-ratio: 1 / 1; }   /* always square */
             body.tb-bottom #main-toolbar .tb-sep { margin: 0; height: 33px; }
+            :root { --tb: 44px; --ico: 20.5px; }   /* the top bars and the menu button on the left: taller */
+            html body #dashboard .dash-btn { min-height: 52px; }   /* side-menu buttons */
             html body #mobile-keyboard { width: calc(100% - 24px); max-width: none; }   /* the keyboard is as wide as the toolbar under it */
         }
 
