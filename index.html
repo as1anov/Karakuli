@@ -244,9 +244,9 @@
         /* phones: the bottom toolbar stretches edge to edge (12 px margins), its buttons spread evenly */
         @media (max-width: 600px) {
             body.tb-bottom .top-nav-wrapper { left: 12px; right: 12px; transform: none; width: auto; align-items: stretch; }
-            body.tb-bottom #main-toolbar { --tb: min(52px, calc((100vw - 81px) / 6)); --ico: calc(var(--tb) * 0.46); --tpad: 12px; width: 100%; justify-content: space-between; gap: 6px; border-radius: 24px; }   /* up to 52 px and square (a little smaller on a narrow screen so six fit); spaced evenly, the divider counts as one item */
-            body.tb-bottom #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; flex: 0 0 var(--tb); width: var(--tb); height: var(--tb); aspect-ratio: 1 / 1; }   /* always square */
-            body.tb-bottom #main-toolbar .tb-sep { margin: 0; height: 33px; }
+            body.tb-bottom #main-toolbar { --ico: 24px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px; width: 100%; border-radius: 24px; }   /* the same 12 px between the buttons and at the left, right, top and bottom; the buttons share the width and stay square */
+            body.tb-bottom #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; width: 100%; height: auto; aspect-ratio: 1 / 1; }   /* always square */
+            body.tb-bottom #main-toolbar .tb-sep { display: none !important; }   /* the divider would break the even spacing */
             :root { --tb: 44px; --ico: 20.5px; }   /* the top bars and the menu button on the left: taller */
             html body #dashboard .dash-btn { min-height: 52px; }   /* side-menu buttons */
             html body #mobile-keyboard { width: calc(100% - 24px); max-width: none; }   /* the keyboard is as wide as the toolbar under it */
@@ -847,7 +847,9 @@
         html body .theme-container { background-color: var(--btn-bg); background-image: var(--vol-panel); border-color: var(--glass-edge); box-shadow: var(--btn-hi); }
         html body .theme-opt { border-radius: 9px; color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); }
         html body .theme-opt .theme-svg { width: 18px; height: 18px; }   /* same size as the other side-menu icons, not the toolbar's */
-        html body .theme-opt.active, html body[data-theme="dark"] .theme-opt.active { background-color: var(--btn-on); background-image: none; box-shadow: var(--pressed); color: var(--text-color); }
+        /* the chosen mode is a raised thumb (like a segmented control), not a pressed-in button */
+        html body .theme-opt.active { background-color: #fff; background-image: none; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,.14), 0 3px 8px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.06); }
+        html body[data-theme="dark"] .theme-opt.active { background-color: #5b5e66; background-image: linear-gradient(rgba(255,255,255,.10), rgba(255,255,255,0)); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.5), 0 3px 8px rgba(0,0,0,.4), inset 0 .5px 0 rgba(255,255,255,.18); }
         /* time-lapse bar: the same panel, buttons and sizes as the main toolbar; in landscape it stands where the bottom toolbar stands */
         html body #timelapse-toolbar { box-sizing: border-box; padding: var(--tpad); gap: var(--tgap); background-color: var(--tbar-bg); background-image: var(--vol-panel); border: 1px solid var(--glass-edge); border-radius: 16px; box-shadow: var(--glass-hi); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
         html body #timelapse-toolbar .tl-row-bottom { gap: var(--tgap); }
