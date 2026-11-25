@@ -865,7 +865,8 @@
         html body :is(.modal-content, .ad-card, #cv-bar) { background: var(--modal-bg, var(--tbar-bg));   /* windows stand over a dimmed picture, so they are almost opaque: they stay light */ -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
         /* Flat / Folded bar and the camera effects */
         html body :is(#v3-fxbtn, #v3-play) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
-        html body #v3-fx :is(.v3-chip, .v3-fxc:not(.on)) { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
+        html body #v3-fx .v3-chip.on { background-color: var(--text-color); background-image: none; color: var(--bg-color); }
+        html body #v3-fx :is(.v3-chip:not(.on), .v3-fxc:not(.on)) { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body :is(.modal-content, .ad-card) :is(.field input, .chip:not(.active), .preset-card, .seg, .modal-btn.secondary, .nc-close, .swap-btn, .tpl-btn, .preset-icon, .card-hooks) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         /* New Canvas (and Share): its cards, fields and buttons take the panel colour too */
         html body #new-canvas-modal, html body #share-modal { --card: transparent; --card-hl: rgba(70, 74, 82, 0.14); }
@@ -8845,6 +8846,18 @@ function ensureCss() {
     #v3d-view.picking canvas { cursor: crosshair; }
     .v3-fxr b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
     .v3-fxo { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+    .v3-fxo.col { flex-direction: column; flex-wrap: nowrap; gap: 8px; }
+    /* two-way choice: a segmented switch, the chosen side is a raised thumb (like the theme switch); on / off: a toggle switch */
+    .v3-seg { display: flex; gap: 4px; width: 100%; box-sizing: border-box; padding: 4px; border-radius: 18px; background: color-mix(in srgb, var(--text-color) 8%, transparent); box-shadow: inset 0 1px 3px rgba(0,0,0,.10); }
+    .v3-seg button { flex: 1 1 0; min-width: 0; height: 36px; padding: 0 6px; border: 0; border-radius: 14px; background: transparent; color: color-mix(in srgb, var(--text-color) 55%, var(--bg-color)); font-family: var(--main-font); font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .15s, color .15s, box-shadow .15s; }
+    .v3-seg button.on { background: #fff; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,.07), 0 2px 6px rgba(0,0,0,.06), 0 0 0 .5px rgba(0,0,0,.05); }
+    body[data-theme="dark"] .v3-seg button.on { background: #5b5e66; color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.2); }
+    .v3-sw { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; box-sizing: border-box; min-height: 36px; padding: 0 2px 0 4px; border: 0; background: none; color: var(--text-color); font-family: var(--main-font); font-weight: 600; cursor: pointer; }
+    .v3-sw.nolabel { width: auto; min-height: 0; padding: 0; }
+    .v3-sw i { position: relative; flex: none; display: block; width: 50px; height: 30px; border-radius: 15px; background: color-mix(in srgb, var(--text-color) 20%, transparent); transition: background .2s; }
+    .v3-sw i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--bg-color); box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .2s cubic-bezier(.3,1.4,.5,1); }
+    .v3-sw.on i { background: var(--text-color); }
+    .v3-sw.on i::after { transform: translateX(20px); }
     .v3-end { font-size: 11px; font-weight: 600; color: var(--disabled-color); white-space: nowrap; }
     #v3d-load { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 30px; font-size: 13px; font-weight: 600; background: var(--bg-color); }
     #v3d-load small { display: block; margin-top: 8px; font-weight: 400; color: var(--disabled-color); font-size: 12px; line-height: 1.5; }
@@ -9328,11 +9341,11 @@ function buildFxUI() {
         <div class="v3-fxr" data-u="speed"><span>Speed</span><input class="v3-range" id="v3-fxs" type="range" min="0.25" max="3" step="0.05"><b id="v3-fxsv"></b></div>
         <div class="v3-fxr" data-u="range"><span>Swing</span><input class="v3-range" id="v3-fxr" type="range" min="10" max="120" step="1"><b id="v3-fxrv"></b></div>
         <div class="v3-fxr" data-u="zoom"><span>Zoom</span><input class="v3-range" id="v3-fxz" type="range" min="10" max="60" step="1"><b id="v3-fxzv"></b></div>
-        <div class="v3-fxo"><button class="v3-chip" id="v3-fxd"></button><button class="v3-chip" id="v3-fxl"></button></div></div></section>
-        <section class="v3-fxs" data-k="dof"><div class="v3-fxh"><span><i class="v3-chev"></i>Depth of field</span><button class="v3-chip" id="v3-dof"></button></div><div class="v3-fxb">
+        <div class="v3-fxo col"><div class="v3-seg" id="v3-fxd"><button type="button" data-v="1">Clockwise</button><button type="button" data-v="-1">Counter-clockwise</button></div><button type="button" class="v3-sw" id="v3-fxl" role="switch" aria-checked="false"><span>Loop</span><i></i></button></div></div></section>
+        <section class="v3-fxs" data-k="dof"><div class="v3-fxh"><span><i class="v3-chev"></i>Depth of field</span><button type="button" class="v3-sw nolabel" id="v3-dof" role="switch" aria-checked="false" aria-label="Depth of field"><i></i></button></div><div class="v3-fxb">
         <div class="v3-fxr v3-dr"><span>Blur</span><input class="v3-range" id="v3-dofa" type="range" min="5" max="100" step="1"><b id="v3-dofav"></b></div>
         <div class="v3-fxr v3-dr"><span>Sharp zone</span><input class="v3-range" id="v3-dofz" type="range" min="0" max="100" step="1"><b id="v3-dofzv"></b></div>
-        <div class="v3-fxo v3-dr"><button class="v3-chip" id="v3-dofp">Pick focus point</button><button class="v3-chip" id="v3-dofc">Centre</button></div></div></section>`;
+        <div class="v3-fxo col v3-dr"><div class="v3-seg"><button type="button" id="v3-dofc">Centre</button><button type="button" id="v3-dofp">Pick point</button></div></div></div></section>`;
     // each block folds on its own, so the product can be seen; the choice is remembered
     let closed = []; try { closed = JSON.parse(localStorage.getItem('kk-fx-closed') || '[]'); } catch (e) {}
     box.querySelectorAll('.v3-fxs').forEach(sc => sc.classList.toggle('closed', closed.includes(sc.dataset.k)));
@@ -9351,7 +9364,7 @@ function buildFxUI() {
     const restart = () => { if (S.fx.name) fxStart(S.fx.name); else syncFx(); };   // goes through the clean start view again
     const bind = (id, key) => { document.getElementById(id).oninput = e => { S.fx[key] = +e.target.value; syncFx(); if (key !== 'speed' && S.fx.name) restart(); }; };
     bind('v3-fxs', 'speed'); bind('v3-fxr', 'range'); bind('v3-fxz', 'zoom');
-    document.getElementById('v3-fxd').onclick = () => { S.fx.dir = -S.fx.dir; restart(); };
+    document.querySelectorAll('#v3-fxd button').forEach(b => { b.onclick = () => { const v = +b.dataset.v; if (S.fx.dir !== v) { S.fx.dir = v; restart(); } }; });
     document.getElementById('v3-fxl').onclick = () => { S.fx.loop = !S.fx.loop; restart(); };
     document.getElementById('v3-fxstop').onclick = fxStop;
     const dofChanged = () => { if (R) R.dirty = true; syncFx(); };
@@ -9375,16 +9388,15 @@ function syncFx() {
     $('v3-fxz').value = f.zoom; $('v3-fxzv').textContent = f.zoom + '%';
     document.querySelectorAll('#v3-fx .v3-fxr[data-u]').forEach(r => r.classList.toggle('off', !!def && !def.uses.includes(r.dataset.u)));
     const dd = S.dof;
-    $('v3-dof').textContent = dd.on ? 'On' : 'Off'; $('v3-dof').classList.toggle('on', dd.on);
+    $('v3-dof').classList.toggle('on', dd.on); $('v3-dof').setAttribute('aria-checked', dd.on);
     $('v3-dofa').value = Math.round(dd.amount * 100); $('v3-dofav').textContent = Math.round(dd.amount * 100) + '%';
     $('v3-dofz').value = Math.round(dd.zone * 100); $('v3-dofzv').textContent = Math.round(dd.zone * 100) + '%';
     document.querySelectorAll('#v3-fx .v3-dr').forEach(e => e.classList.toggle('off', !dd.on));
-    $('v3-dofp').textContent = dd.pick ? 'Tap the product…' : (dd.p ? 'Change focus point' : 'Pick focus point'); $('v3-dofp').classList.toggle('on', dd.pick);
-    $('v3-dofc').style.opacity = dd.p ? 1 : 0.35;
+    $('v3-dofp').textContent = dd.pick ? 'Tap the product…' : 'Pick point'; $('v3-dofp').classList.toggle('on', !!(dd.pick || dd.p)); $('v3-dofc').classList.toggle('on', !dd.pick && !dd.p);
     $('v3d-view').classList.toggle('picking', dd.on && dd.pick);
     if (!dd.on && R && R.dof) dofFree();
-    $('v3-fxd').textContent = f.dir > 0 ? 'Clockwise' : 'Counter-clockwise'; $('v3-fxd').style.opacity = !def || def.uses.includes('dir') ? 1 : 0.35;
-    $('v3-fxl').textContent = f.loop ? 'Loop: on' : 'Loop: off'; $('v3-fxl').classList.toggle('on', f.loop);
+    document.querySelectorAll('#v3-fxd button').forEach(b => b.classList.toggle('on', +b.dataset.v === f.dir)); $('v3-fxd').style.opacity = !def || def.uses.includes('dir') ? 1 : 0.35;
+    $('v3-fxl').classList.toggle('on', !!f.loop); $('v3-fxl').setAttribute('aria-checked', !!f.loop);
 }
 
 function syncUI() {
