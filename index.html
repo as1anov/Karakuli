@@ -8569,11 +8569,13 @@ function fxBegin() {
     // where the product really is and how big: the camera always works from this box, so the product never leaves the frame
     let W = R.fit.sx, H = R.fit.sy, D = R.fit.sz, mc = R.fit.c.slice();
     try { if (R.model) { const bx = new T.Box3().setFromObject(R.model), sz = bx.getSize(new T.Vector3()), c = bx.getCenter(new T.Vector3()); if (sz.x > 0 && [sz.x, sz.y, sz.z, c.x, c.y, c.z].every(isFinite)) { W = sz.x; H = sz.y; D = sz.z; mc = [c.x, c.y, c.z]; } } } catch (e) {}
-    R.fxRun = { t: 0, base: camPose(), W, H, D, mc };
+    R.fxRun = { t: 0, base: camPose(), W, H, D, mc, pan: [0, 0, 0], zk: 1 };
+    // while an effect plays the camera's turning belongs to the effect: one finger / the left button slides the view (pan) instead, a pinch / the wheel zooms - the effect carries on under both
+    const c = R.controls; if (c && !R.fxCtl) { R.fxCtl = { ml: c.mouseButtons.LEFT, t1: c.touches.ONE }; c.mouseButtons.LEFT = T.MOUSE.PAN; c.touches.ONE = T.TOUCH.PAN; }
     S.cam = null; R.dirty = true; syncUI();
 }
 function fxStop() {
-    if (R) { R.fxRun = null; R.fxHold = false; R.fxWait = false; }
+    if (R) { R.fxRun = null; R.fxHold = false; R.fxWait = false; if (R.fxCtl) { R.controls.mouseButtons.LEFT = R.fxCtl.ml; R.controls.touches.ONE = R.fxCtl.t1; R.fxCtl = null; } }
     if (S.fx.name) { S.fx.name = null; syncUI(); }
 }
 // the camera moves in = dolly in, slides sideways along the product (truck) and pulls back; k = how close (0..1), s = where along the pattern (-1..1)
@@ -8613,11 +8615,13 @@ function stepFx(dt) {
         else th = b.th + 0.06 * sq.s;
     }
     ph = Math.max(-0.12, Math.min(1.45, ph));
+    d *= run.zk || 1; const pn = run.pan || [0, 0, 0];                              // what the user has zoomed / slid by hand stays on top of the effect
     const cp = Math.cos(ph), rx = Math.cos(th), rz = -Math.sin(th);               // "right" of the view, horizontal
     const m = run.mc, bc = b.c.map((v, i) => v + (m[i] - v) * kz);        // the view centre glides onto the product while the camera comes in
-    const cx = bc[0] + off * rx, cy = bc[1], cz = bc[2] + off * rz;
+    const cx = bc[0] + pn[0] + off * rx, cy = bc[1] + pn[1], cz = bc[2] + pn[2] + off * rz;
     R.controls.target.set(cx, cy, cz);
     R.camera.position.set(cx + d * cp * Math.sin(th), cy + d * Math.sin(ph), cz + d * cp * Math.cos(th));
+    run.lastT = [cx, cy, cz]; run.lastP = [R.camera.position.x, R.camera.position.y, R.camera.position.z];
     R.dirty = true;
     if (done) fxStop();
 }
@@ -9526,8 +9530,8 @@ function initRuntime() {
     });
     controls.addEventListener('change', () => { if (R) R.dirty = true; });
     controls.addEventListener('end', () => { if (R) R.dragging = false; });
-    // Turning or zooming by hand does not stop an effect: it waits while the model is moved and carries on from the new position.
-    controls.addEventListener('start', () => { if (R) { if (R.fxWait) fxStop(); R.cam = null; if (R.fxRun) R.fxHold = true; R.dragging = true; if (S.cam) { S.cam = null; syncUI(); } } });
+    // Zooming or sliding the view by hand does not stop an effect or pause it: it keeps playing, and the change stays on top of its path.
+    controls.addEventListener('start', () => { if (R) { if (R.fxWait) fxStop(); R.cam = null; R.dragging = true; if (S.cam) { S.cam = null; syncUI(); } } });
     const light = new T.DirectionalLight(0xffffff, 1.1);
     light.castShadow = true; light.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048); light.shadow.bias = -0.0004; light.shadow.normalBias = 0.6; light.shadow.radius = 8;
     scene.add(light);
@@ -9722,7 +9726,12 @@ function loop(now) {
     if (R.spawn) stepSpawn(dt);
     if (R.fxRun && !R.fxHold) stepFx(dt);
     const moved = R.controls.update();
-    if (R.fxHold && !moved && !R.dragging) { R.fxHold = false; if (R.fxRun) R.fxRun = { t: 0, base: camPose() }; }   // rebase on the new position
+    if (R.fxRun && R.fxRun.lastP) {   // the effect set the camera, the controls then applied the user's zoom / slide: keep that difference and let the effect go on
+        const r = R.fxRun, t = R.controls.target, p = R.camera.position;
+        const d0 = Math.hypot(r.lastP[0] - r.lastT[0], r.lastP[1] - r.lastT[1], r.lastP[2] - r.lastT[2]), d1 = Math.hypot(p.x - t.x, p.y - t.y, p.z - t.z);
+        r.pan[0] += t.x - r.lastT[0]; r.pan[1] += t.y - r.lastT[1]; r.pan[2] += t.z - r.lastT[2];
+        if (d0 > 1e-6 && d1 > 1e-6) r.zk = Math.max(0.2, Math.min(5, r.zk * d1 / d0));
+    }
     // draw only when something changes (animation, camera, auto-rotate, a new look): an idle view costs no battery
     if (S.playing || R.fxRun || moved || R.dirty) {
         R.dirty = false;
