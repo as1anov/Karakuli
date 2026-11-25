@@ -244,9 +244,9 @@
         /* phones: the bottom toolbar stretches edge to edge (12 px margins), its buttons spread evenly */
         @media (max-width: 600px) {
             body.tb-bottom .top-nav-wrapper { left: 12px; right: 12px; transform: none; width: auto; align-items: stretch; }
-            body.tb-bottom #main-toolbar { --ico: 24px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px; width: 100%; border-radius: 24px; }   /* the same 12 px between the buttons and at the left, right, top and bottom; the buttons share the width and stay square */
-            body.tb-bottom #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; width: 100%; height: auto; aspect-ratio: 1 / 1; }   /* always square */
-            body.tb-bottom #main-toolbar .tb-sep { display: none !important; }   /* the divider would break the even spacing */
+            body.tb-bottom #main-toolbar { --ico: 24px; display: flex; align-items: center; gap: 12px; padding: 12px; width: 100%; border-radius: 24px; }   /* the same 12 px between the buttons and at the left, right, top and bottom; the buttons share the width and stay square */
+            body.tb-bottom #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; flex: 1 1 0; min-width: 0; width: auto; height: auto; aspect-ratio: 1 / 1; }   /* the buttons share the width equally and stay square */
+            body.tb-bottom #main-toolbar .tb-sep { flex: none; width: 1px; height: auto; align-self: stretch; margin: 9px 0; }   /* the divider before 3D stays; 12 px on each side of it */
             :root { --tb: 44px; --ico: 20.5px; }   /* the top bars and the menu button on the left: taller */
             html body #dashboard .dash-btn { min-height: 52px; }   /* side-menu buttons */
             html body #mobile-keyboard { width: calc(100% - 24px); max-width: none; }   /* the keyboard is as wide as the toolbar under it */
