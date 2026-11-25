@@ -266,6 +266,30 @@
             html body #new-canvas-modal .modal-content { max-height: 100%; }
             html body #new-canvas-modal .modal-actions { box-sizing: border-box; height: calc(var(--bt) + 21px); padding: 10px; gap: 10px; align-items: center; }
             html body #new-canvas-modal .modal-actions .modal-btn { height: var(--bt); border-radius: 18px; }
+            /* the window fills the screen from just under the status bar down to the toolbar's level - no empty band above it; larger, easier text */
+            html body #new-canvas-modal { align-items: stretch; padding-top: max(12px, calc(env(safe-area-inset-top) + 8px)); }
+            html body #new-canvas-modal .modal-content { height: auto; max-height: none; border-radius: 28px; }   /* 28 = 18 (button) + 10 (padding): the corners stay concentric, so the gap looks the same all round */
+            html body #new-canvas-modal .nc-header { padding: 10px 10px 6px; }
+            html body #new-canvas-modal .nc-header h2 { font-size: 22px; }
+            html body #new-canvas-modal .nc-close { border-radius: 18px; }
+            html body #new-canvas-modal .nc-section { padding: 14px 0; }
+            html body #new-canvas-modal .nc-section:first-child { padding-top: 4px; }
+            html body #new-canvas-modal .field-label { font-size: 14px; margin-bottom: 8px; }
+            html body #new-canvas-modal .field input { font-size: 20px; }
+            html body #new-canvas-modal .field-unit { font-size: 14px; bottom: 18px; }
+            html body #new-canvas-modal .tpl-btn { font-size: 16px !important; }
+            html body #new-canvas-modal .tpl-btn .tpl-dim { font-size: 14px; }
+            html body #new-canvas-modal .nc-label { font-size: 13px; }
+            html body #new-canvas-modal .preset-name { font-size: 17px; }
+            html body #new-canvas-modal .preset-dim { font-size: 14px; margin-top: 4px; }
+            html body #new-canvas-modal .modal-btn { font-size: 16px !important; }
+            /* the products fill the window: the cards share the free height instead of leaving an empty band above the buttons */
+            html body #new-canvas-modal .nc-body { display: flex; flex-direction: column; }
+            html body #new-canvas-modal .nc-body > .nc-section:last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
+            html body #new-canvas-modal #preset-list { flex: 1 0 auto; gap: 10px; }
+            html body #new-canvas-modal #preset-list .preset-card { flex: 1 0 auto; }
+            /* every floating plate on a phone: 28 px corners around 18 px buttons with 10 px padding - concentric, so the gap is even all round */
+            body #main-toolbar { border-radius: 28px; }
             html body #mobile-keyboard { width: calc(100% - 24px); max-width: none; }   /* the keyboard is as wide as the toolbar under it */
         }
 
@@ -8902,12 +8926,17 @@ function ensureCss() {
     }
     /* phones: the 3D toolbar at the bottom is built like the edit toolbar - 12 px from the edges, 10 px padding and gaps, square buttons of the same size, 24 px icons */
     @media (max-width: 600px) {
-        #v3d #v3-rail, #v3d #v3-rail.hide { --tgap: 10px; --tpad: 10px; --ico: 24px; left: 12px; right: 12px; width: auto; margin: 0; box-sizing: border-box; padding: 10px; gap: 10px; border-radius: 24px; }
+        #v3d #v3-rail, #v3d #v3-rail.hide { --tgap: 10px; --tpad: 10px; --ico: 24px; left: 12px; right: 12px; width: auto; margin: 0; box-sizing: border-box; padding: 10px; gap: 10px; border-radius: 28px; }
         #v3d #v3-rail button, #v3d #v3-rail #v3d-close { flex: 1 1 0; min-width: 0; width: auto; height: auto; aspect-ratio: 1 / 1; border-radius: 18px; }
         /* the strips that open above the toolbar (Objects, Material, ...) use the toolbar's own sizes: its button size, 10 px padding and gaps, 24 px radius */
         #v3d { --rb: calc((100vw - 106px) / 6); }
         #v3d #v3d-panel { --tb: var(--rb); --tgap: 10px; --tpad: 10px; --ico: 24px; }
-        #v3d #v3d-panel .v3-sec .v3-body { padding: 10px; gap: 10px; border-radius: 24px; }
+        #v3d #v3d-panel .v3-sec .v3-body { padding: 10px; gap: 10px; border-radius: 28px; }
+        #v3d #v3d-panel .v3-body :is(.v3-chip, .v3-card) > :is(svg, i) { border-radius: 18px; }
+        /* Flat / Folded bar: 10 px on every side (it had 14 px left and right), toolbar-sized buttons, concentric corners */
+        #v3d #v3d-bar { --tb: var(--rb); --tpad: 10px; --ico: 24px; height: auto; padding: 10px; gap: 10px; border-radius: 28px; }
+        #v3d #v3d-bar :is(#v3-play, #v3-fxbtn) { border-radius: 18px; }
+        #v3d #v3d-bar .v3-sep { margin: 9px 0; }
         /* Objects: every catalogue button is visible - they share the strip's width and shrink together when there are more than fit (never bigger than the toolbar's buttons) */
         #v3d #v3d-panel .v3-sec[data-sec="obj"] .v3-body { overflow-x: visible; }
         #v3d #v3d-panel .v3-sec[data-sec="obj"] #v3-cat { display: flex; flex-wrap: nowrap; justify-content: flex-start; gap: 10px; width: 100%; }
