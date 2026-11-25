@@ -286,7 +286,13 @@
             html body #new-canvas-modal :is(.field input, .swap-btn, .tpl-btn, .preset-card) { border-radius: 18px; }
             html body #new-canvas-modal .preset-card { padding: 10px 14px 10px 10px; }
             html body #new-canvas-modal :is(.preset-icon, .card-hooks) { border-radius: 12px; }
-            html body #new-canvas-modal .modal-actions { height: auto; padding: 12px 10px 22px; }
+            /* no divider lines; one 20 px margin all round the window's content (top, left, right, bottom) and 20 px between the groups, 10 px inside a group */
+            html body #new-canvas-modal :is(.nc-section, .modal-actions) { border-top: 0; }
+            html body #new-canvas-modal .nc-header { padding: 20px 20px 16px; }
+            html body #new-canvas-modal .nc-body { padding: 0 20px 20px; }
+            html body #new-canvas-modal .nc-body > .nc-section:first-child { padding: 0 0 20px; }
+            html body #new-canvas-modal .nc-body > .nc-section:last-child { padding: 0; }
+            html body #new-canvas-modal .modal-actions { height: auto; padding: 0 20px 20px; }
             html body #new-canvas-modal .modal-actions .modal-btn { height: var(--bt); border-radius: 18px; }
             /* every floating plate on a phone: 28 px corners around 18 px buttons with 10 px padding - concentric, so the gap is even all round */
             body #main-toolbar { border-radius: 28px; }
