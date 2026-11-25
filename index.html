@@ -8737,6 +8737,7 @@ function ensureCss() {
     [data-theme="dark"] .v3-range:active { filter: brightness(0.9); }
     #v3d-bar { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 10px 14px; width: min(520px, calc(100% - 40px)); }
     #v3-play { width: var(--tb); height: var(--tb); flex-shrink: 0; border-radius: 12px; border: 1px solid var(--border-color); background: var(--text-color); color: var(--bg-color); display: grid; place-items: center; cursor: pointer; }
+    html body #v3d #v3-play.replay { background: none; background-image: none; border-color: transparent; box-shadow: none; color: var(--text-color); }
     #v3-play svg { width: var(--ico, 16.8px); height: var(--ico, 16.8px); fill: currentColor; }   /* every icon in the bars: one size (--ico) and one line weight (1.8) */
     #v3-fold { flex: 1; min-width: 0; height: 22px; border-radius: 11px; } #v3-fold::-webkit-slider-runnable-track, #v3-fold::-webkit-slider-thumb { height: 22px; }
     .v3-sep { width: 1px; align-self: stretch; margin: 2px 0; background: var(--border-color); flex-shrink: 0; }
@@ -9351,6 +9352,7 @@ function syncUI() {
     const owner = window.karakuliShop && window.karakuliShop.isOwner();
     $('v3-dxf').style.display = owner ? '' : 'none'; $('v3d-shop').classList.toggle('owner', !!owner);
     $('v3-fold').value = S.fold;
+    $('v3-play').classList.toggle('replay', !S.playing && S.fold >= 0.999);   // the replay arrow is a bare icon, not a button plate
     $('v3-play').innerHTML = S.playing ? '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>'
         : S.fold >= 0.999 ? '<svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>'
         : '<svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>';
