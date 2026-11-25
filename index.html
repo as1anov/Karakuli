@@ -243,9 +243,10 @@
         /* phones: the bottom toolbar stretches edge to edge (12 px margins), its buttons spread evenly */
         @media (max-width: 600px) {
             body.tb-bottom .top-nav-wrapper { left: 12px; right: 12px; transform: none; width: auto; align-items: stretch; }
-            body.tb-bottom #main-toolbar { --tb: clamp(38px, calc((100vw - 72px) / 6.3), 54px); --ico: calc(var(--tb) * 0.467); --tpad: 12px; width: 100%; justify-content: space-between; gap: 6px; border-radius: 24px; }   /* 1.5x the phone size; the buttons are spaced evenly (the divider counts as one item) */
-            body.tb-bottom #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; flex: 0 0 var(--tb); width: var(--tb); height: var(--tb); aspect-ratio: 1 / 1; }   /* always square: on a narrow screen the whole set scales down together */
+            body.tb-bottom #main-toolbar { --tb: 44px; --ico: 20.5px; --tpad: 12px; width: 100%; justify-content: space-between; gap: 6px; border-radius: 24px; }   /* the buttons are as tall as the side-menu buttons (44 px) and square; spaced evenly, the divider counts as one item */
+            body.tb-bottom #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; flex: 0 0 var(--tb); width: var(--tb); height: var(--tb); aspect-ratio: 1 / 1; }   /* always square */
             body.tb-bottom #main-toolbar .tb-sep { margin: 0; height: 33px; }
+            html body #mobile-keyboard { width: calc(100% - 24px); max-width: none; }   /* the keyboard is as wide as the toolbar under it */
         }
 
         /* --- BOLT HOLES WINDOW --- */
