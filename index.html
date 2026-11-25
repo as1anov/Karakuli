@@ -249,6 +249,13 @@
             body #main-toolbar .tb-sep { flex: none; width: 1px; height: auto; align-self: stretch; margin: 9px 0; }   /* the divider before 3D stays; 10 px on each side of it */
             :root { --tb: 44px; --ico: 20.5px; }   /* the top bars and the menu button on the left: taller */
             html body #dashboard .dash-btn { min-height: 52px; }   /* side-menu buttons */
+            /* the New Canvas window follows the new sizes: 12 px from the edges like the toolbar, controls 52 px high like the side-menu buttons */
+            html body #new-canvas-modal { padding: 12px; }
+            html body #new-canvas-modal .modal-content { max-width: none; border-radius: 24px; max-height: calc(100% - 4px); }
+            html body #new-canvas-modal .nc-header { padding: 20px 20px 12px; }
+            html body #new-canvas-modal .nc-close { width: 44px; height: 44px; border-radius: 14px; }
+            html body #new-canvas-modal :is(.field input, .tpl-btn, .modal-btn, .swap-btn) { height: 52px; border-radius: 14px; }
+            html body #new-canvas-modal .swap-btn { width: 44px; }
             html body #mobile-keyboard { width: calc(100% - 24px); max-width: none; }   /* the keyboard is as wide as the toolbar under it */
         }
 
@@ -8882,6 +8889,11 @@ function ensureCss() {
         #v3-rail #v3d-close { margin-right: calc(var(--tpad) * 2 - 2px); }
         #v3d-panel.v3-glass { top: calc(var(--rtop) + var(--tb) + 20px); }
         #v3d.menuopen #v3d-title { visibility: hidden; }
+    }
+    /* phones: the 3D toolbar at the bottom is built like the edit toolbar - 12 px from the edges, 10 px padding and gaps, square buttons of the same size, 24 px icons */
+    @media (max-width: 600px) {
+        #v3d #v3-rail, #v3d #v3-rail.hide { --tgap: 10px; --tpad: 10px; --ico: 24px; left: 12px; right: 12px; width: auto; margin: 0; box-sizing: border-box; padding: 10px; gap: 10px; border-radius: 24px; }
+        #v3d #v3-rail button, #v3d #v3-rail #v3d-close { flex: 1 1 0; min-width: 0; width: auto; height: auto; aspect-ratio: 1 / 1; border-radius: 18px; }
     }
     /* ---- the strips: same height, spacing, outlines and colours as the toolbar; no section names ---- */
     #v3d-panel .v3-tog { display: none !important; }
