@@ -266,28 +266,6 @@
             html body #new-canvas-modal .modal-content { max-height: 100%; }
             html body #new-canvas-modal .modal-actions { box-sizing: border-box; height: calc(var(--bt) + 21px); padding: 10px; gap: 10px; align-items: center; }
             html body #new-canvas-modal .modal-actions .modal-btn { height: var(--bt); border-radius: 18px; }
-            /* the window fills the screen from just under the status bar down to the toolbar's level - no empty band above it; larger, easier text */
-            html body #new-canvas-modal { align-items: stretch; padding-top: max(12px, calc(env(safe-area-inset-top) + 8px)); }
-            html body #new-canvas-modal .modal-content { height: auto; max-height: none; border-radius: 28px; }   /* 28 = 18 (button) + 10 (padding): the corners stay concentric, so the gap looks the same all round */
-            html body #new-canvas-modal .nc-header { padding: 10px 10px 6px; }
-            html body #new-canvas-modal .nc-header h2 { font-size: 22px; }
-            html body #new-canvas-modal .nc-close { border-radius: 18px; }
-            html body #new-canvas-modal .nc-section { padding: 14px 0; }
-            html body #new-canvas-modal .nc-section:first-child { padding-top: 4px; }
-            html body #new-canvas-modal .field-label { font-size: 14px; margin-bottom: 8px; }
-            html body #new-canvas-modal .field input { font-size: 20px; }
-            html body #new-canvas-modal .field-unit { font-size: 14px; bottom: 18px; }
-            html body #new-canvas-modal .tpl-btn { font-size: 16px !important; }
-            html body #new-canvas-modal .tpl-btn .tpl-dim { font-size: 14px; }
-            html body #new-canvas-modal .nc-label { font-size: 13px; }
-            html body #new-canvas-modal .preset-name { font-size: 17px; }
-            html body #new-canvas-modal .preset-dim { font-size: 14px; margin-top: 4px; }
-            html body #new-canvas-modal .modal-btn { font-size: 16px !important; }
-            /* the products fill the window: the cards share the free height instead of leaving an empty band above the buttons */
-            html body #new-canvas-modal .nc-body { display: flex; flex-direction: column; }
-            html body #new-canvas-modal .nc-body > .nc-section:last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
-            html body #new-canvas-modal #preset-list { flex: 1 0 auto; gap: 10px; }
-            html body #new-canvas-modal #preset-list .preset-card { flex: 1 0 auto; }
             /* every floating plate on a phone: 28 px corners around 18 px buttons with 10 px padding - concentric, so the gap is even all round */
             body #main-toolbar { border-radius: 28px; }
             html body #mobile-keyboard { width: calc(100% - 24px); max-width: none; }   /* the keyboard is as wide as the toolbar under it */
