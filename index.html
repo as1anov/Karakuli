@@ -6487,7 +6487,7 @@ const K_FACTOR = 0.4;                       // neutral-axis position of the bend
 const BEND_ANGLES = { shelf: [90, 75], hanger: [90, 75], magazine: [-90] };
 
 const shopCfg = () => (window.karakuliShop && window.karakuliShop.get()) || null;
-const S = { mat: 'textured', color: null, t: 2, env: 'soft', cam: 'persp', objs: [], objKey: null, fold: 0, playing: false, auto: false, fx: { name: null, speed: 1, range: 60, zoom: 35, dir: 1, loop: true }, dof: { on: false, amount: 0.5, zone: 0.25, p: null, pick: false } };
+const S = { mat: 'textured', color: null, t: 2, env: 'soft', cam: 'persp', objs: [], objKey: null, fold: 0, playing: false, auto: false, fx: { name: null, last: null, speed: 1, range: 60, zoom: 35, dir: 1, loop: true }, rec: { fmt: '16:9' }, dof: { on: false, amount: 0.5, zone: 0.25, p: null, pick: false } };
 let T = null, OrbitControlsCls = null, R = null, building = false;
 // what colour the product has now: { code, name } for powder coat in a RAL shade, { text } for plain steel
 window.ralInfo = () => { if (MATS[S.mat].brushed) return { text: 'Brushed stainless steel' }; const c = ralOfHex(S.color || MATS[S.mat].color); return c ? Object.assign({ text: `RAL ${c.code} ${c.name}` }, c) : null; };
@@ -8565,7 +8565,7 @@ function camPose() {
 function fxStart(name) {
     if (!R || !R.fit) return;
     goCamera(name === 'rotate' || name === 'light' || name === 'snap' ? 'persp' : 'front');   // also stops a running effect and re-centres on the product as it is shown now (shadows and a pattern lying flat read best at 3/4)
-    S.fx.name = name; R.fxWait = true; R.fxRun = null;
+    S.fx.name = name; S.fx.last = name; R.fxWait = true; R.fxRun = null;
     syncUI();
 }
 function fxBegin() {
@@ -8748,6 +8748,95 @@ async function exportPNG() {
     }
 }
 
+// ---------------------------------------------------------------- video of a camera effect
+// One take of the chosen effect, recorded frame by frame (not from the screen): the effect is stepped by exactly 1/30 s, each frame is drawn at the
+// chosen size and handed to the browser's video encoder, so the video is smooth on any computer and may be made faster than real time.
+// MP4 (H.264) through WebCodecs + mp4-muxer; a browser without WebCodecs records in real time with MediaRecorder instead.
+const MP4MUX_URL = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/+esm';
+const REC_FPS = 30, REC_SIZES = { '16:9': [1920, 1080], '1:1': [1080, 1080], '9:16': [1080, 1920] };
+function recOverlay(onCancel) {
+    let el = document.getElementById('v3-recov');
+    if (!el) {
+        el = document.createElement('div'); el.id = 'v3-recov';
+        el.innerHTML = '<div class="v3-recc"><b id="v3-recl">Recording video…</b><div class="v3-recbar"><i id="v3-recp"></i></div><button type="button" class="v3-chip" id="v3-recx">Cancel</button></div>';
+        document.getElementById('v3d').appendChild(el);
+    }
+    document.getElementById('v3-recx').onclick = onCancel;
+    return { set: (p, label) => { document.getElementById('v3-recp').style.width = Math.round(p * 100) + '%'; if (label) document.getElementById('v3-recl').textContent = label; }, done: () => el.remove() };
+}
+async function recordVideo() {
+    const name = S.fx.name || S.fx.last;
+    if (!R || !R.model || R.recording) return;
+    if (!name || !FX[name]) { note('Choose an effect first.'); return; }
+    const [W, H] = REC_SIZES[S.rec.fmt] || REC_SIZES['16:9'];
+    const r = R.renderer, cam = R.camera, def = FX[name];
+    const frames = Math.max(REC_FPS, Math.round(def.period / S.fx.speed * REC_FPS));
+    // what has to come back afterwards
+    const keep = { pr: r.getPixelRatio(), pos: cam.position.clone(), tgt: R.controls.target.clone(), loop: S.fx.loop, wasOn: S.fx.name };
+    let cancel = false;
+    const ov = recOverlay(() => { cancel = true; });
+    R.recording = true;
+    let enc = null;
+    try {
+        r.setPixelRatio(1); r.setSize(W, H, false); cam.aspect = W / H; cam.updateProjectionMatrix();
+        // the clean start of the effect, at once (no glide on the video): start view, then the effect's first frame
+        S.fx.loop = true; fxStart(name); if (R.cam) stepCamera(1e3); if (!R.fxRun) fxBegin();
+        const frame = i => { stepFx(i ? 1 / REC_FPS : 0); R.controls.update(); fxAbsorb(); drawScene(); };
+        const useWC = typeof VideoEncoder === 'function' && typeof VideoFrame === 'function';
+        let blob, ext;
+        if (useWC) {
+            const { Muxer, ArrayBufferTarget } = await import(MP4MUX_URL);
+            const codec = 'avc1.640028', cfg = { codec, width: W, height: H, bitrate: 12_000_000, framerate: REC_FPS };
+            if (!(await VideoEncoder.isConfigSupported(cfg)).supported) throw new Error('this browser cannot encode H.264 video');
+            const target = new ArrayBufferTarget(), mux = new Muxer({ target, video: { codec: 'avc', width: W, height: H }, fastStart: 'in-memory' });
+            let encErr = null;
+            enc = new VideoEncoder({ output: (chunk, meta) => mux.addVideoChunk(chunk, meta), error: e => { encErr = e; } });
+            enc.configure(cfg);
+            for (let i = 0; i < frames && !cancel; i++) {
+                if (encErr) throw encErr;
+                frame(i);
+                const vf = new VideoFrame(r.domElement, { timestamp: Math.round(i * 1e6 / REC_FPS), duration: Math.round(1e6 / REC_FPS) });
+                enc.encode(vf, { keyFrame: i % (REC_FPS * 2) === 0 }); vf.close();
+                while (enc.encodeQueueSize > 3) await new Promise(res => setTimeout(res, 0));
+                if (i % 3 === 0) { ov.set(i / frames); await new Promise(res => setTimeout(res, 0)); }
+            }
+            if (!cancel) { await enc.flush(); if (encErr) throw encErr; mux.finalize(); blob = new Blob([target.buffer], { type: 'video/mp4' }); ext = 'mp4'; }
+            enc.close(); enc = null;
+        } else {   // real time: the frames are drawn on a 1/30 s clock and the browser records the canvas
+            const type = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+            if (!type) throw new Error('this browser cannot record video');
+            const stream = r.domElement.captureStream(0), track = stream.getVideoTracks()[0], rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 12_000_000 }), chunks = [];
+            rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+            const stopped = new Promise(res => { rec.onstop = res; });
+            rec.start();
+            const t0 = performance.now();
+            for (let i = 0; i < frames && !cancel; i++) {
+                frame(i); track.requestFrame && track.requestFrame();
+                ov.set(i / frames);
+                const wait = t0 + (i + 1) * 1000 / REC_FPS - performance.now(); await new Promise(res => setTimeout(res, Math.max(0, wait)));
+            }
+            rec.stop(); await stopped;
+            if (!cancel) { blob = new Blob(chunks, { type: type.split(';')[0] }); ext = type.includes('mp4') ? 'mp4' : 'webm'; }
+        }
+        if (cancel || !blob) return;
+        ov.set(1, 'Saving…');
+        const fname = exportName(ext).replace(/\.\w+$/, `-${def.name.toLowerCase().replace(/\s+/g, '-')}-${S.rec.fmt.replace(':', 'x')}.${ext}`);
+        const file = new File([blob], fname, { type: blob.type });
+        const phone = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768;
+        if (phone && navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file] }); } catch (e) { if (e && e.name !== 'AbortError') download(blob, fname); } }
+        else download(blob, fname);
+    } catch (err) {
+        console.error(err); note('The video could not be made: ' + (err && err.message || err));
+    } finally {
+        if (enc && enc.state !== 'closed') { try { enc.close(); } catch (e) {} }
+        fxStop(); S.fx.loop = keep.loop;
+        R.recording = false;
+        r.setPixelRatio(keep.pr); resize();
+        cam.position.copy(keep.pos); R.controls.target.copy(keep.tgt); R.controls.update(); R.dirty = true;
+        ov.done(); syncUI();
+    }
+}
+
 // ---------------------------------------------------------------- UI
 let ui = null;
 function ensureCss() {
@@ -8893,6 +8982,15 @@ function ensureCss() {
     .v3-fxs.closed .v3-fxh { margin-bottom: 0 !important; }
     .v3-fxh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--disabled-color); }
     .v3-fxg { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 2px; margin-bottom: 12px; }
+    .v3-rec { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+    .v3-rec .v3-seg { flex: 1; min-width: 0; }
+    #v3-rec { flex: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    #v3-rec svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; color: #d9443a; }
+    #v3-rec:disabled { opacity: 0.4; cursor: not-allowed; }
+    #v3-recov { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--bg-color) 72%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+    .v3-recc { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 240px; padding: 18px 20px; border-radius: 16px; background: var(--modal-bg, var(--bg-color)); border: 1px solid var(--glass-edge, var(--border-color)); box-shadow: var(--glass-hi, none); color: var(--text-color); font-family: var(--main-font); font-size: 13px; }
+    .v3-recbar { width: 100%; height: 4px; border-radius: 2px; background: var(--border-color); overflow: hidden; }
+    .v3-recbar i { display: block; height: 100%; width: 0; background: var(--text-color); transition: width .15s linear; }
     .v3-fxg .v3-fxc { padding: 8px 2px 6px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     .v3-fxc { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     @media (max-width: 700px) { .v3-fxg .v3-fxc { font-size: 9.5px; gap: 4px; } .v3-fxg .v3-fxc svg { width: 24px; height: 24px; } }
@@ -9406,7 +9504,8 @@ function buildFxUI() {
         <div class="v3-fxr" data-u="speed"><span>Speed</span><input class="v3-range" id="v3-fxs" type="range" min="0.25" max="3" step="0.05"><b id="v3-fxsv"></b></div>
         <div class="v3-fxr" data-u="range"><span>Swing</span><input class="v3-range" id="v3-fxr" type="range" min="10" max="120" step="1"><b id="v3-fxrv"></b></div>
         <div class="v3-fxr" data-u="zoom"><span>Zoom</span><input class="v3-range" id="v3-fxz" type="range" min="10" max="60" step="1"><b id="v3-fxzv"></b></div>
-        <div class="v3-fxo col"><div class="v3-seg" id="v3-fxd"><button type="button" data-v="1">Clockwise</button><button type="button" data-v="-1">Counter-clockwise</button></div><button type="button" class="v3-sw" id="v3-fxl" role="switch" aria-checked="false"><span>Loop</span><i></i></button></div></div></section>
+        <div class="v3-fxo col"><div class="v3-seg" id="v3-fxd"><button type="button" data-v="1">Clockwise</button><button type="button" data-v="-1">Counter-clockwise</button></div><button type="button" class="v3-sw" id="v3-fxl" role="switch" aria-checked="false"><span>Loop</span><i></i></button></div>
+        <div class="v3-rec"><div class="v3-seg" id="v3-recf"><button type="button" data-f="16:9">16:9</button><button type="button" data-f="1:1">1:1</button><button type="button" data-f="9:16">9:16</button></div><button type="button" class="v3-chip" id="v3-rec"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.6" fill="currentColor" stroke="none"/></svg>Record video</button></div></div></section>
         <section class="v3-fxs" data-k="dof"><div class="v3-fxh"><span><i class="v3-chev"></i>Depth of field</span><button type="button" class="v3-sw nolabel" id="v3-dof" role="switch" aria-checked="false" aria-label="Depth of field"><i></i></button></div><div class="v3-fxb">
         <div class="v3-fxr v3-dr"><span>Blur</span><input class="v3-range" id="v3-dofa" type="range" min="5" max="100" step="1"><b id="v3-dofav"></b></div>
         <div class="v3-fxr v3-dr"><span>Sharp zone</span><input class="v3-range" id="v3-dofz" type="range" min="0" max="100" step="1"><b id="v3-dofzv"></b></div>
@@ -9432,6 +9531,8 @@ function buildFxUI() {
     document.querySelectorAll('#v3-fxd button').forEach(b => { b.onclick = () => { const v = +b.dataset.v; if (S.fx.dir !== v) { S.fx.dir = v; restart(); } }; });
     document.getElementById('v3-fxl').onclick = () => { S.fx.loop = !S.fx.loop; restart(); };
     document.getElementById('v3-fxstop').onclick = fxStop;
+    document.querySelectorAll('#v3-recf button').forEach(b => { b.onclick = () => { S.rec.fmt = b.dataset.f; syncFx(); }; });
+    document.getElementById('v3-rec').onclick = recordVideo;
     const dofChanged = () => { if (R) R.dirty = true; syncFx(); };
     document.getElementById('v3-dof').onclick = () => { S.dof.on = !S.dof.on; S.dof.pick = S.dof.on && !S.dof.p; if (S.dof.on) R.dofShowUntil = performance.now() + 1200; dofChanged(); };
     document.getElementById('v3-dofa').oninput = e => { S.dof.amount = e.target.value / 100; dofChanged(); };
@@ -9460,9 +9561,11 @@ function syncFx() {
     $('v3-dofp').textContent = dd.pick ? 'Tap the product…' : 'Pick point'; $('v3-dofp').classList.toggle('on', !!(dd.pick || dd.p)); $('v3-dofc').classList.toggle('on', !dd.pick && !dd.p);
     $('v3d-view').classList.toggle('picking', dd.on && dd.pick);
     if (!dd.on && R && R.dof) dofFree();
-    const slide = f.name && f.name !== 'rotate';   // a slide has a direction along the product, a turn a sense of rotation
+    const fn = f.name || f.last, slide = fn && fn !== 'rotate';   // a slide has a direction along the product, a turn a sense of rotation (the stopped effect's settings stay its own)
     document.querySelectorAll('#v3-fxd button').forEach(b => { b.classList.toggle('on', +b.dataset.v === f.dir); b.textContent = +b.dataset.v > 0 ? (slide ? 'Left → right' : 'Clockwise') : (slide ? 'Right → left' : 'Counter-clockwise'); }); $('v3-fxd').style.opacity = !def || def.uses.includes('dir') ? 1 : 0.35;
     $('v3-fxl').classList.toggle('on', !!f.loop); $('v3-fxl').setAttribute('aria-checked', !!f.loop);
+    document.querySelectorAll('#v3-recf button').forEach(b => b.classList.toggle('on', b.dataset.f === S.rec.fmt));
+    const rn = f.name || f.last; $('v3-rec').disabled = !rn; $('v3-rec').title = rn ? `Record one take of ${FX[rn].name} as a video` : 'Choose an effect first';
 }
 
 function syncUI() {
@@ -9804,6 +9907,7 @@ function loop(now) {
     paintRanges();
     R.raf = requestAnimationFrame(loop);
     const dt = Math.min(0.05, (now - (R.last || now)) / 1000); R.last = now;
+    if (R.recording) return;   // a video is being recorded: it steps and draws the frames itself, at an exact frame rate
     if (S.playing) {
         R.prog = Math.min(1, (R.prog == null ? invEase(S.fold) : R.prog) + dt / 3.8);
         S.fold = ease(R.prog);
