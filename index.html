@@ -8553,7 +8553,7 @@ const bez = (x1, y1, x2, y2) => t => {
     }
     return 3 * (1 - u) * (1 - u) * u * y1 + 3 * (1 - u) * u * u * y2 + u * u * u;
 };
-const EZ_IN = bez(0.55, 0, 0.15, 1), EZ_SIDE = bez(0.3, 0, 0.2, 1), EZ_TRACK = bez(0.45, 0, 0.3, 1), EZ_OUT = bez(0.4, 0, 0.2, 1);
+const EZ_IN = bez(0.55, 0, 0.15, 1), EZ_SIDE = bez(0.3, 0, 0.2, 1), EZ_TRACK = bez(0.45, 0, 0.3, 1), EZ_OUT = bez(0.4, 0, 0.2, 1), EZ_GLIDE = bez(0.25, 0, 0.75, 1);   // glide: soft start and stop, even speed between
 function camPose() {
     const t = R.controls.target, p = R.camera.position, x = p.x - t.x, y = p.y - t.y, z = p.z - t.z, d = Math.hypot(x, y, z) || 1;
     return { th: Math.atan2(x, z), ph: Math.asin(Math.max(-1, Math.min(1, y / d))), d, c: [t.x, t.y, t.z] };
@@ -8586,10 +8586,11 @@ function fxSeq(name, u, dir) {
         if (u < 0.82) return { k: 1, s: dir };                                                            // a beat at the end
         const a = EZ_OUT((u - 0.82) / 0.18); return { k: 1 - a, s: dir * (1 - a) };                       // pull back to the start frame
     }
-    if (u < 0.12) { const a = u / 0.12; return { k: EZ_IN(a), s: -dir * EZ_SIDE(a) }; }                   // close pass: in, there, and back, without stopping
-    if (u < 0.5) return { k: 1, s: -dir + 2 * dir * EZ_TRACK((u - 0.12) / 0.38) };
-    if (u < 0.88) return { k: 1, s: dir - 2 * dir * EZ_TRACK((u - 0.5) / 0.38) };
-    const a = EZ_OUT((u - 0.88) / 0.12); return { k: 1 - a, s: -dir * (1 - a) };
+    // close pass: a dolly shot on a track. The camera comes in at one end, travels once along the whole product at an even speed, parallel to it
+    // (it never turns), and pulls back at the other end
+    if (u < 0.16) { const a = u / 0.16; return { k: EZ_IN(a), s: -dir * EZ_SIDE(a) }; }
+    if (u < 0.86) return { k: 1, s: -dir + 2 * dir * EZ_GLIDE((u - 0.16) / 0.7) };
+    const a = EZ_OUT((u - 0.86) / 0.14); return { k: 1 - a, s: dir * (1 - a) };
 }
 // OrbitControls moves the camera at once, inside the event (wheel, drag, pinch), and again in update(): so before the effect puts the camera back on its path,
 // and after update(), whatever the user changed since the effect last placed it (zoom, slide, turn) is added to the effect's own state and the effect goes on from there
@@ -8625,7 +8626,7 @@ function stepFx(dt) {
         const L = Math.max(0, run.W / 2 - 0.9 * d1 * tanV * asp);                 // how far the view can slide until it reaches the product's edges
         d = b.d + (d1 - b.d) * sq.k; off = L * sq.s; kz = sq.k;
         if (fx.name === 'reveal') th = b.th + A * 0.12 * sq.s;                    // a touch of parallax while it slides
-        else th = b.th + 0.06 * sq.s;
+        // close pass: th stays b.th, the camera keeps looking straight at the product and only slides along it
     }
     th += run.dth || 0; ph += run.dph || 0;                                         // what the user has turned, zoomed and slid by hand stays on top of the effect
     ph = Math.max(-0.12, Math.min(1.45, ph));
@@ -9395,7 +9396,8 @@ function syncFx() {
     $('v3-dofp').textContent = dd.pick ? 'Tap the product…' : 'Pick point'; $('v3-dofp').classList.toggle('on', !!(dd.pick || dd.p)); $('v3-dofc').classList.toggle('on', !dd.pick && !dd.p);
     $('v3d-view').classList.toggle('picking', dd.on && dd.pick);
     if (!dd.on && R && R.dof) dofFree();
-    document.querySelectorAll('#v3-fxd button').forEach(b => b.classList.toggle('on', +b.dataset.v === f.dir)); $('v3-fxd').style.opacity = !def || def.uses.includes('dir') ? 1 : 0.35;
+    const slide = f.name && f.name !== 'rotate';   // a slide has a direction along the product, a turn a sense of rotation
+    document.querySelectorAll('#v3-fxd button').forEach(b => { b.classList.toggle('on', +b.dataset.v === f.dir); b.textContent = +b.dataset.v > 0 ? (slide ? 'Left → right' : 'Clockwise') : (slide ? 'Right → left' : 'Counter-clockwise'); }); $('v3-fxd').style.opacity = !def || def.uses.includes('dir') ? 1 : 0.35;
     $('v3-fxl').classList.toggle('on', !!f.loop); $('v3-fxl').setAttribute('aria-checked', !!f.loop);
 }
 
