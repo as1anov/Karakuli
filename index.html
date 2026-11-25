@@ -257,6 +257,12 @@
             html body #new-canvas-modal .nc-close { width: 44px; height: 44px; border-radius: 14px; }
             html body #new-canvas-modal :is(.field input, .tpl-btn, .modal-btn, .swap-btn) { height: 52px; border-radius: 14px; }
             html body #new-canvas-modal .swap-btn { width: 44px; }
+            /* the bottom part of the window stands exactly where the bottom toolbar stands: the same distance from the bottom edge, the same height, 10 px padding and gaps, buttons of the toolbar's size and rounding */
+            :root { --bt: calc((100vw - 97px) / 5); }
+            html body #new-canvas-modal { align-items: flex-end; box-sizing: border-box; padding: 12px 12px max(var(--tbot, 34px), env(safe-area-inset-bottom)); }
+            html body #new-canvas-modal .modal-content { max-height: 100%; }
+            html body #new-canvas-modal .modal-actions { box-sizing: border-box; height: calc(var(--bt) + 21px); padding: 10px; gap: 10px; align-items: center; }
+            html body #new-canvas-modal .modal-actions .modal-btn { height: var(--bt); border-radius: 18px; }
             html body #mobile-keyboard { width: calc(100% - 24px); max-width: none; }   /* the keyboard is as wide as the toolbar under it */
         }
 
