@@ -229,6 +229,7 @@
         #edge-tab { position: fixed; left: 0; top: 50%; width: 18px; height: 60px; margin-top: -30px; z-index: 3550; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--tbar-bg); border: 1px solid var(--border-color); border-left: 0; border-radius: 0 12px 12px 0; backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); color: var(--text-color); transition: width .2s, opacity .3s; }
         #edge-tab:hover { width: 24px; }
         #edge-tab svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: .7; }
+        body:has(#new-canvas-modal.show) .top-nav-container { opacity: 0; pointer-events: none; }   /* the toolbar does not show through under the New Canvas window */
         body:has(#new-canvas-modal.show) #edge-tab, body.dashboard-open #edge-tab, body.game-active #edge-tab, body.timelapse-active #edge-tab, body.customer-view #edge-tab { opacity: 0; pointer-events: none; }
 
         body.game-active #main-toolbar .tb-act:not(#eraser-btn), body.game-active #tb-sep, body.game-active #v3d-btn { display: none !important; }
