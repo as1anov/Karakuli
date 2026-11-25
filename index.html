@@ -8905,6 +8905,10 @@ function ensureCss() {
         #v3d { --rb: calc((100vw - 106px) / 6); }
         #v3d #v3d-panel { --tb: var(--rb); --tgap: 10px; --tpad: 10px; --ico: 24px; }
         #v3d #v3d-panel .v3-sec .v3-body { padding: 10px; gap: 10px; border-radius: 24px; }
+        /* Objects: every catalogue button is visible - they share the strip's width and shrink together when there are more than fit (never bigger than the toolbar's buttons) */
+        #v3d #v3d-panel .v3-sec[data-sec="obj"] .v3-body { overflow-x: visible; }
+        #v3d #v3d-panel .v3-sec[data-sec="obj"] #v3-cat { display: flex; flex-wrap: nowrap; justify-content: flex-start; gap: 10px; width: 100%; }
+        #v3d #v3d-panel .v3-sec[data-sec="obj"] #v3-cat .v3-card { flex: 1 1 0; min-width: 0; max-width: var(--rb); width: auto; height: auto; min-height: 0; align-self: flex-start; aspect-ratio: 1 / 1; }
     }
     /* ---- the strips: same height, spacing, outlines and colours as the toolbar; no section names ---- */
     #v3d-panel .v3-tog { display: none !important; }
