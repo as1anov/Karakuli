@@ -8901,6 +8901,10 @@ function ensureCss() {
     @media (max-width: 600px) {
         #v3d #v3-rail, #v3d #v3-rail.hide { --tgap: 10px; --tpad: 10px; --ico: 24px; left: 12px; right: 12px; width: auto; margin: 0; box-sizing: border-box; padding: 10px; gap: 10px; border-radius: 24px; }
         #v3d #v3-rail button, #v3d #v3-rail #v3d-close { flex: 1 1 0; min-width: 0; width: auto; height: auto; aspect-ratio: 1 / 1; border-radius: 18px; }
+        /* the strips that open above the toolbar (Objects, Material, ...) use the toolbar's own sizes: its button size, 10 px padding and gaps, 24 px radius */
+        #v3d { --rb: calc((100vw - 106px) / 6); }
+        #v3d #v3d-panel { --tb: var(--rb); --tgap: 10px; --tpad: 10px; --ico: 24px; }
+        #v3d #v3d-panel .v3-sec .v3-body { padding: 10px; gap: 10px; border-radius: 24px; }
     }
     /* ---- the strips: same height, spacing, outlines and colours as the toolbar; no section names ---- */
     #v3d-panel .v3-tog { display: none !important; }
