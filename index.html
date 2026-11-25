@@ -2805,10 +2805,21 @@ service cloud.firestore {
             return Array.from({ length: SHELF_HOOK_MAX }, (_, k) => +(m + (k - (SHELF_HOOK_MAX - 1) / 2) * SHELF_HOOK_PITCH).toFixed(2));
         }
         function shelfDefaultHooks() { return shelfHooksAt(Infinity); }   // at the right end: the last slot 25 mm from the right edge
+        // With the key hooks on, the towel pocket may not share their stretch of the shelf: it keeps to the part of the sheet left or right of the
+        // hook row (SHELF_HOOK_MARGIN clear of the outer slots), on the side its centre is on; when that side is too short for it, the other side.
+        function shelfTowelZone(cxWant) {
+            const W = paperWidthMm, M = SHELF_HOOK_MARGIN, h = shelfOpts.hooks;
+            if (!h.length) return { lo: M, hi: W - M };
+            const a = Math.min(...h) - SHELF_NOTCH_W / 2 - M, b = Math.max(...h) + SHELF_NOTCH_W / 2 + M, mid = (a + b) / 2;
+            const left = { lo: M, hi: a }, right = { lo: b, hi: W - M }, room = z => z.hi - z.lo;
+            const pref = cxWant < mid ? left : right, other = pref === left ? right : left;
+            return room(pref) >= SHELF_TOWEL_MIN ? pref : room(other) >= SHELF_TOWEL_MIN ? other : (room(pref) >= room(other) ? pref : other);
+        }
         function shelfTowel() {   // pocket centre / length in mm (defaults: centred, 40 cm)
-            const len = Math.max(SHELF_TOWEL_MIN, Math.min(SHELF_TOWEL_MAX, shelfOpts.tl || Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55)));
-            const cx = Math.max(SHELF_HOOK_MARGIN + len / 2, Math.min(paperWidthMm - SHELF_HOOK_MARGIN - len / 2, shelfOpts.tx == null ? paperWidthMm : shelfOpts.tx));
-            return { cx, len };
+            const want = shelfOpts.tx == null ? paperWidthMm : shelfOpts.tx, Z = shelfTowelZone(want);
+            const len = Math.max(SHELF_TOWEL_MIN, Math.min(SHELF_TOWEL_MAX, Z.hi - Z.lo, shelfOpts.tl || Math.min(SHELF_TOWEL_MAX, paperWidthMm * 0.55)));   // never shorter than the minimum (a sheet too narrow for both keeps a minimum pocket)
+            const M = SHELF_HOOK_MARGIN, cx = Math.max(M + len / 2, Math.min(paperWidthMm - M - len / 2, Math.max(Z.lo + len / 2, Math.min(Z.hi - len / 2, want))));
+            return { cx, len, Z };
         }
         function shelfFeat(dx = 0, dy = 0) {
             if (templateKind() !== 'product' || activeProductKey !== 'shelf') return null;
@@ -3040,6 +3051,7 @@ service cloud.firestore {
             if (key === 'hooks') {
                 shelfOpts.hooks = shelfOpts.hooks.length ? [] : shelfDefaultHooks();
             } else { if (!shelfOpts.towel) shelfOpts.tx = shelfTowel().cx; else shelfOpts.tx = null; shelfOpts.towel = !shelfOpts.towel; }
+            if (shelfOpts.towel && shelfOpts.hooks.length) { const T = shelfTowel(); shelfOpts.tx = T.cx; shelfOpts.tl = T.len; }   // both on: the pocket moves off the hooks' stretch
             shelfAnim = { key, t0: performance.now() };
             const nowOn = key === 'hooks' ? shelfOpts.hooks.length > 0 : shelfOpts.towel;
             shelfHint = nowOn ? { key, t0: performance.now() } : null;
@@ -3052,16 +3064,20 @@ service cloud.firestore {
             const stop = (want, got) => { const hit = Math.abs(want - got) > 0.5; if (hit && !D.hit) { D.bump = performance.now(); D.dir = want > got ? 1 : -1; redraw(); } D.hit = hit; };
             if (D.kind === 'hooks') {
                 const h = shelfOpts.hooks, c0 = (h[0] + h[h.length - 1]) / 2, w = mm - D.grab - c0, e = SHELF_HOOK_EDGE + SHELF_NOTCH_W / 2;
-                const lo = e - h[0], hi = W - e - h[h.length - 1];   // the outer slots stay 25 mm from the side edges
+                let lo = e - h[0], hi = W - e - h[h.length - 1];   // the outer slots stay 25 mm from the side edges
+                if (shelfOpts.towel) {   // ... and SHELF_HOOK_MARGIN clear of the towel pocket: the row cannot slide onto its stretch
+                    const T = shelfTowel(), g = SHELF_NOTCH_W / 2 + M;
+                    if (T.cx < c0) lo = Math.max(lo, T.cx + T.len / 2 + g - h[0]); else hi = Math.min(hi, T.cx - T.len / 2 - g - h[h.length - 1]);
+                }
                 const d = Math.max(lo, Math.min(hi, w));
                 stop(w, d); shelfOpts.hooks = h.map(x => x + d);
             } else {
-                const T = shelfTowel();
-                if (D.kind === 'towelM') { const want = mm - D.grab, got = Math.max(M + T.len / 2, Math.min(W - M - T.len / 2, want)); stop(want, got); shelfOpts.tx = got; }
+                const T = shelfTowel(), Z = T.Z;   // the pocket stays inside its zone: the whole sheet, or the side of the hook row it is on
+                if (D.kind === 'towelM') { const want = mm - D.grab, got = Math.max(Z.lo + T.len / 2, Math.min(Z.hi - T.len / 2, want)); stop(want, got); shelfOpts.tx = got; }
                 else {
                     const l0 = T.cx - T.len / 2, r0 = T.cx + T.len / 2;
-                    if (D.kind === 'towelL') { const l = Math.max(M, r0 - SHELF_TOWEL_MAX, Math.min(r0 - SHELF_TOWEL_MIN, mm)); shelfOpts.tx = (l + r0) / 2; shelfOpts.tl = r0 - l; }
-                    else { const r = Math.min(W - M, l0 + SHELF_TOWEL_MAX, Math.max(l0 + SHELF_TOWEL_MIN, mm)); shelfOpts.tx = (l0 + r) / 2; shelfOpts.tl = r - l0; }
+                    if (D.kind === 'towelL') { const l = Math.max(Z.lo, r0 - SHELF_TOWEL_MAX, Math.min(r0 - SHELF_TOWEL_MIN, mm)); stop(mm, l); shelfOpts.tx = (l + r0) / 2; shelfOpts.tl = r0 - l; }
+                    else { const r = Math.min(Z.hi, l0 + SHELF_TOWEL_MAX, Math.max(l0 + SHELF_TOWEL_MIN, mm)); stop(mm, r); shelfOpts.tx = (l0 + r) / 2; shelfOpts.tl = r - l0; }
                 }
             }
         }
