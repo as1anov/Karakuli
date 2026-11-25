@@ -243,8 +243,9 @@
         /* phones: the bottom toolbar stretches edge to edge (12 px margins), its buttons spread evenly */
         @media (max-width: 600px) {
             body.tb-bottom .top-nav-wrapper { left: 12px; right: 12px; transform: none; width: auto; align-items: stretch; }
-            body.tb-bottom #main-toolbar { width: 100%; justify-content: space-between; gap: 0; }
-            body.tb-bottom #main-toolbar .tb-sep { margin: 0; }
+            body.tb-bottom #main-toolbar { --tb: 54px; --ico: 25.2px; --tpad: 12px; width: 100%; justify-content: space-between; gap: 6px; border-radius: 24px; }   /* 1.5x the phone size; the buttons are spaced evenly (the divider counts as one item) */
+            body.tb-bottom #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; flex: 0 1 var(--tb); min-width: 0; }
+            body.tb-bottom #main-toolbar .tb-sep { margin: 0; height: 33px; }
         }
 
         /* --- BOLT HOLES WINDOW --- */
