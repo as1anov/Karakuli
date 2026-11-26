@@ -4445,13 +4445,20 @@ service cloud.firestore {
             start() { this.seq([392, 523, 659], 0.07, 'sine', 0.05); }
         };
 
+        // For the hanger only the plate is played: its hooks (everything below the anchor line) are left out
+        function bwCutY() {
+            if (templateKind() !== 'product' || !PRODUCTS[activeProductKey] || !PRODUCTS[activeProductKey].hooks) return Infinity;
+            const MM = LINE_WEIGHT / 12, G = productGeom(activeProductKey, paperWidthMm, paperHeightMm);
+            return -paperHeightMm * MM / 2 + G.anchor * MM + LINE_WEIGHT / 2;
+        }
         // ---------- layout: a field that fills the screen under the toolbar; a pattern too wide (or too tall) for it is cropped ----------
         function bwLayout() {
             const lw = LINE_WEIGHT, Rout = BASE_STEP_VAL + lw / 2;
             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
             const grow = (x0, y0, x1, y1) => { minX = Math.min(minX, x0); maxX = Math.max(maxX, x1); minY = Math.min(minY, y0); maxY = Math.max(maxY, y1); };
-            segments.forEach(s => { const ax = s.p1.x * STEP, ay = s.p1.y * STEP, bx = s.p2.x * STEP, by = s.p2.y * STEP; grow(Math.min(ax, bx) - lw / 2, Math.min(ay, by) - lw / 2, Math.max(ax, bx) + lw / 2, Math.max(ay, by) + lw / 2); });
-            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; const r = el.isNode ? Rout : lw; if (el.isNode || el.isDiamond) grow(i * STEP - r, j * STEP - r, i * STEP + r, j * STEP + r + (el.isDiamond ? lw / 2 : 0)); }
+            const cut = bwCutY();
+            segments.forEach(s => { const ax = s.p1.x * STEP, ay = Math.min(cut, s.p1.y * STEP), bx = s.p2.x * STEP, by = Math.min(cut, s.p2.y * STEP); if (s.p1.y * STEP > cut && s.p2.y * STEP > cut) return; grow(Math.min(ax, bx) - lw / 2, Math.min(ay, by) - lw / 2, Math.max(ax, bx) + lw / 2, Math.max(ay, by) + lw / 2); });
+            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; const r = el.isNode ? Rout : lw; if ((el.isNode || el.isDiamond) && j * STEP < cut) grow(i * STEP - r, j * STEP - r, i * STEP + r, j * STEP + r + (el.isDiamond ? lw / 2 : 0)); }
             if (minX === Infinity) { minX = 0; maxX = 1000; minY = 0; maxY = 600; }
             const nav = document.querySelector('.top-nav-wrapper'), nr = nav && nav.getBoundingClientRect();
             const top = nr && nr.height && nr.top < height / 2 ? Math.round(nr.bottom + 10) : 16, side = 10, bottom = 14;
@@ -4459,7 +4466,7 @@ service cloud.firestore {
             BW.U = Math.max(2.5, Math.min(7, Math.min(width, height) / 130));
             const pad = lw * 1.4;
             const pw = maxX - minX + 2 * pad, ph = maxY - minY + 2 * pad;
-            const zMin = 13 / lw, zMax = 9 * BW.U / lw;               // a line is 13 px .. 9 units thick on the screen
+            const md = Math.min(width, height), zMin = md / 26 / lw, zMax = md / 15 / lw;   // a line is 1/26 .. 1/15 of the short side: on a phone the pattern stays big and is cropped
             let z = Math.min(uW / pw, uH * 0.55 / ph);               // the pattern takes at most 55% of the height; the rest is room to play
             z = Math.max(zMin, Math.min(Math.max(zMin, zMax), z));
             const fw = uW / z, fh = uH / z;
@@ -4498,7 +4505,7 @@ service cloud.firestore {
         // the pattern's parts: lines (grouped into straight runs), rings and rhombi - exactly where the editor draws them
         function buildGameBricks() {
             const lw = LINE_WEIGHT, Rout = BASE_STEP_VAL + lw / 2, I = BW.inner;
-            const box = { x0: I.minX + lw / 2, x1: I.maxX - lw / 2, y0: I.minY + lw / 2, y1: BW.cropY };
+            const box = { x0: I.minX + lw / 2, x1: I.maxX - lw / 2, y0: I.minY + lw / 2, y1: Math.min(BW.cropY, bwCutY()) };
             gameBricks = { lines: [], nodes: [], diamonds: [] };
             BW.holes = []; BW.els = []; BW.runs = [];
             const addEl = e => { e.alive = true; BW.els.push(e); return BW.els.length - 1; };
@@ -4506,7 +4513,7 @@ service cloud.firestore {
                 const [i, j] = id.split(',').map(Number), el = specialElements[id], x = i * STEP, y = j * STEP;
                 if (el.isNode) {
                     BW.holes.push({ x, y });   // every ring leaves a clean round gap: no line shows inside it, even after the ring is broken
-                    if (x - Rout > I.minX && x + Rout < I.maxX && y - Rout > I.minY && y < BW.cropY) gameBricks.nodes.push({ id, x, y, el: addEl({ t: 'ring', x, y }) });
+                    if (x - Rout > I.minX && x + Rout < I.maxX && y - Rout > I.minY && y < box.y1) gameBricks.nodes.push({ id, x, y, el: addEl({ t: 'ring', x, y }) });
                 }
                 // the editor draws a rhombus centred half a line below its grid point, its half-diagonal = line width / sqrt 2
                 if (el.isDiamond && x > box.x0 && x < box.x1 && y > box.y0 && y < box.y1) gameBricks.diamonds.push({ id, x, y: y + lw / 2, el: addEl({ t: 'dia', x, y: y + lw / 2 }) });
@@ -4567,9 +4574,9 @@ service cloud.firestore {
             if (wasPlaying) { zoom = targetZoom; offsetX = targetOffsetX; offsetY = targetOffsetY; }
             buildGameBricks(); bwBricksInit();
             const z = L.z, I = BW.inner, fh = L.field.maxY - L.field.minY, U = BW.U / z;
-            paddle = { w: Math.max(30 * U, (I.maxX - I.minX) * 0.24), h: 4.2 * U, x: (I.minX + I.maxX) / 2, y: L.field.maxY - 10 * U, base: 0 };
+            paddle = { w: Math.max(30 * U, (I.maxX - I.minX) * 0.24), h: Math.max(3.4 * U, LINE_WEIGHT * 0.55), x: (I.minX + I.maxX) / 2, y: L.field.maxY - 10 * U, base: 0 };
             paddle.base = paddle.w;
-            ball = { r: 2.6 * U, x: paddle.x, y: 0, vx: 0, vy: 0, speed: fh / 105, base: fh / 105 };
+            ball = { r: LINE_WEIGHT * 0.44, x: paddle.x, y: 0, vx: 0, vy: 0, speed: fh / 105, base: fh / 105 };
             ball.y = paddle.y - paddle.h / 2 - ball.r;
             BW.score = 0; BW.combo = 0; BW.hits = 0; BW.parts = []; BW.bparts = []; BW.pops = []; BW.caps = []; BW.trail = []; BW.fx = { W: 0, S: 0 }; BW.fireworks = 0;
             BW.arena = null; BW.sw = 0;
@@ -4697,47 +4704,23 @@ service cloud.firestore {
             if (state === 'victory') { BWS.win(); BW.fireworks = 1; }
         }
 
-        // ---------- the masonry layer ----------
-        // Drawn once at the final camera at about 40 cells across a line (a cell is a device pixel or two), then only the broken bricks are
-        // taken out. Every brick is a raised block: a rounded bevel lit from the top left, a slightly uneven face, recessed mortar joints.
-        const BW_LIGHT = [-0.55, -0.83];
+        // ---------- the pattern layer: one piece of cast, polished metal ----------
+        // Drawn once at the final camera (about 44 cells across a line). Its relief comes from a distance field: every edge of the shape -
+        // line ends, joints, rings, rhombi, broken edges - gets the same rounded bevel, lit from the top left, with a thin cyan rim.
+        // Internally the metal is cut into invisible chunks (two along the width, ~0.8 line long), which fly off as shards when broken.
         function bwHash(a, b) { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return (h ^ (h >>> 16)) >>> 0; }
         function bwRGB(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
-        function bwBrickColour(e, px, py) {   // -> [[r, g, b], brick key] for a world point inside element e
-            const lw = LINE_WEIGHT, rowH = lw / 4, mw = Math.max(BW.cw * 1.2, rowH * 0.15), bev = rowH * 0.26;
-            let u, v, Lb, ud, vd, rows = 4, half = lw / 2;
-            if (e.t === 'seg') {
-                u = px * e.ux + py * e.uy; v = -e.uy * (px - e.a.x) + e.ux * (py - e.a.y);
-                ud = [e.ux, e.uy]; vd = [-e.uy, e.ux]; Lb = lw / 2;
-            } else if (e.t === 'ring') {
-                const rx = px - e.x, ry = py - e.y, d = Math.hypot(rx, ry) || 1e-6;
-                v = d - BASE_STEP_VAL; vd = [rx / d, ry / d]; ud = [-ry / d, rx / d];
-                const C = 2 * Math.PI * BASE_STEP_VAL, n = Math.max(6, Math.round(C / (lw / 2)));
-                Lb = C / n; u = (Math.atan2(ry, rx) + Math.PI) * BASE_STEP_VAL;
-            } else {   // rhombus: a 2 x 2 block turned 45 deg
-                const rx = px - e.x, ry = py - e.y;
-                u = (rx + ry) / Math.SQRT2; v = (ry - rx) / Math.SQRT2;
-                ud = [Math.SQRT1_2, Math.SQRT1_2]; vd = [-Math.SQRT1_2, Math.SQRT1_2];
-                rows = 2; half = lw / 2; Lb = half; u += half;
-            }
-            const rh = 2 * half / rows, vv = v + half, row = Math.max(0, Math.min(rows - 1, Math.floor(vv / rh))), fv = vv - row * rh;
-            const uu = u / Lb + (rows === 4 && (row & 1) ? 0.5 : 0), col = Math.floor(uu), fu = (uu - col) * Lb;
-            const key = (row * 7919 + col * 104729) | 0;
-            const cx = (px / BW.cw) | 0, cy = (py / BW.cw) | 0;
-            if ((fv < mw && row > 0) || fu < mw) {   // mortar, a little darker where it is shaded by the brick above
-                const m = BW.morB, n = 0.86 + (bwHash(cx, cy) % 100) / 100 * 0.12;
-                return [[m[0] * n | 0, m[1] * n | 0, m[2] * n | 0], key];
-            }
-            // distances to the four edges of this brick, and the tilt of its rounded bevel there
-            const e0 = fv - (row > 0 ? mw : 0), e1 = rh - fv, f0 = fu - mw, f1 = Lb - fu;
-            const tV = (e1 < bev ? 1 - e1 / bev : 0) - (e0 < bev ? 1 - e0 / bev : 0), tU = (f1 < bev ? 1 - f1 / bev : 0) - (f0 < bev ? 1 - f0 / bev : 0);
-            const sV = vd[0] * BW_LIGHT[0] + vd[1] * BW_LIGHT[1], sU = ud[0] * BW_LIGHT[0] + ud[1] * BW_LIGHT[1];
-            const h = bwHash(row * 31 + col, (e.seed || 0) + 7), base = BW.palB[h % BW.palB.length], tone = 0.9 + ((h >> 8) % 100) / 100 * 0.18;
-            const grain = 1 + ((bwHash(cx, cy) % 100) / 100 - 0.5) * 0.1 + ((bwHash(cx >> 2, cy >> 2) % 100) / 100 - 0.5) * 0.08;
-            const light = 1 + 0.55 * (tV * sV + tU * sU) * (Math.max(tV * tV, tU * tU) > 0 ? 1 : 0);
-            const pit = bwHash(cx * 3 + 1, cy * 5 + 2) % 47 === 0 ? 0.72 : 1;
-            const f = tone * grain * light * pit;
-            return [[Math.min(255, base[0] * f) | 0, Math.min(255, base[1] * f) | 0, Math.min(255, base[2] * f) | 0], key];
+        function bwChunk(e, px, py) {   // -> [chunk key, grain coordinate across the brushing]
+            const lw = LINE_WEIGHT;
+            let u, v, Lb, rows = 2, half = lw / 2;
+            if (e.t === 'seg') { u = px * e.ux + py * e.uy; v = -e.uy * (px - e.a.x) + e.ux * (py - e.a.y); Lb = lw * 0.8; }
+            else if (e.t === 'ring') {
+                const rx = px - e.x, ry = py - e.y, d = Math.hypot(rx, ry) || 1e-6, C = 2 * Math.PI * BASE_STEP_VAL, n = Math.max(6, Math.round(C / (lw * 0.8)));
+                v = d - BASE_STEP_VAL; Lb = C / n; u = (Math.atan2(ry, rx) + Math.PI) * BASE_STEP_VAL;
+            } else { const rx = px - e.x, ry = py - e.y; u = (rx + ry) / Math.SQRT2 + half; v = (ry - rx) / Math.SQRT2; Lb = half; }
+            const rh = 2 * half / rows, vv = v + half, row = Math.max(0, Math.min(rows - 1, Math.floor(vv / rh)));
+            const col = Math.floor(u / Lb + (row & 1 ? 0.5 : 0));
+            return [(row * 7919 + col * 104729) | 0, v, u];
         }
 
         function bwOwnerAt(px, py, list) {   // the element a world point belongs to: inside its band, nearest to its middle
@@ -4771,7 +4754,6 @@ service cloud.firestore {
             const lw = LINE_WEIGHT, D = (typeof pixelDensity === 'function' ? pixelDensity() : 1) || 1, z = targetZoom;
             BW.D = D; BW.bc = Math.max(1, Math.round(lw * z * D / 44));   // device pixels per cell
             const cssPerCell = BW.bc / D; BW.cw = cssPerCell / z;          // world units per cell
-            BW.palB = BW_COL.brick.map(bwRGB); BW.morB = bwRGB(BW_COL.mortar);
             BW.els.forEach((e, i) => { e.seed = bwHash(i, 3) % 97; });
             let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
             const R = BASE_STEP_VAL + lw;
@@ -4792,6 +4774,8 @@ service cloud.firestore {
             });
             BW.bkt = bk; BW.B = B;
             BW.own = new Int32Array(gw * gh).fill(-1); BW.key = new Int32Array(gw * gh); BW.rgb = new Uint32Array(gw * gh);
+            BW.gv = new Float32Array(gw * gh); BW.gu = new Float32Array(gw * gh); BW.dt = new Float32Array(gw * gh);
+            BW.bev = Math.max(3, LINE_WEIGHT * 0.2 / BW.cw);   // bevel width, cells
             BW.layer = document.createElement('canvas'); BW.layer.width = gw; BW.layer.height = gh; BW.lx = BW.layer.getContext('2d');
             BW.img = BW.lx.createImageData(gw, gh);
             for (let yy = 0; yy < gh; yy++) for (let xx = 0; xx < gw; xx++) bwBrickCell(xx, yy);
@@ -4809,8 +4793,41 @@ service cloud.firestore {
                 const [wx, wy] = bwWorldOfCell(b.cx, b.cy), e = BW.els[b.el];
                 if (e.t === 'seg') b.u = wx * e.ux + wy * e.uy; else if (e.t === 'ring') b.ang = Math.atan2(wy - e.y, wx - e.x);
             });
+            bwShade(0, 0, gw, gh);
             bwBricksPaint(0, 0, gw, gh);
             BW.dirty = false;
+        }
+        // distance to the nearest empty cell (chamfer 1 / 1.41, capped a little past the bevel), then the metal's colour from it
+        function bwShade(x0, y0, x1, y1) {
+            const g = BW.g, W = g.w, H = g.h, dt = BW.dt, own = BW.own, BV = BW.bev, cap = BV + 2, m = Math.ceil(cap) + 2;
+            const X0 = Math.max(0, x0 - m), Y0 = Math.max(0, y0 - m), X1 = Math.min(W, x1 + m), Y1 = Math.min(H, y1 + m);
+            for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) { const i = yy * W + xx; dt[i] = own[i] < 0 ? 0 : cap; }
+            const at = (xx, yy) => (xx < 0 || yy < 0 || xx >= W || yy >= H) ? 0 : dt[yy * W + xx];
+            for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) {
+                const i = yy * W + xx; if (!dt[i]) continue;
+                dt[i] = Math.min(dt[i], at(xx - 1, yy) + 1, at(xx, yy - 1) + 1, at(xx - 1, yy - 1) + 1.414, at(xx + 1, yy - 1) + 1.414);
+            }
+            for (let yy = Y1 - 1; yy >= Y0; yy--) for (let xx = X1 - 1; xx >= X0; xx--) {
+                const i = yy * W + xx; if (!dt[i]) continue;
+                dt[i] = Math.min(dt[i], at(xx + 1, yy) + 1, at(xx, yy + 1) + 1, at(xx + 1, yy + 1) + 1.414, at(xx - 1, yy + 1) + 1.414);
+            }
+            // light from the top left and the viewer; a polished, slightly blue titanium with a brushed grain along the lines
+            const L = [-0.45, -0.62, 0.64], Hh = [-0.3, -0.42, 1.0], hl = Math.hypot(...Hh), H3 = Hh.map(v => v / hl);
+            const hgt = (xx, yy) => { const d = at(xx, yy); return d >= BV ? 1 : Math.sin(d / BV * Math.PI / 2); };
+            const cw = BW.cw;
+            for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) {
+                const i = yy * W + xx; if (own[i] < 0) continue;
+                const gx = hgt(xx + 1, yy) - hgt(xx - 1, yy), gy = hgt(xx, yy + 1) - hgt(xx, yy - 1), sl = BV * 0.75;
+                let nx = -gx * sl, ny = -gy * sl, nz = 1; const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
+                const dif = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]), sp = Math.pow(Math.max(0, nx * H3[0] + ny * H3[1] + nz * H3[2]), 36);
+                const grain = 1 + ((bwHash(Math.round(BW.gv[i] / cw * 1.3), 11) % 100) / 100 - 0.5) * 0.1 + ((bwHash(Math.round(BW.gv[i] / cw * 0.4), (BW.gu[i] / (cw * 30)) | 0) % 100) / 100 - 0.5) * 0.06;
+                const env = 0.82 + 0.3 * (1 - yy / H);            // a sky-like reflection, lighter at the top
+                const k = (0.3 + 0.85 * dif) * env * grain;
+                let r = 112 * k + 255 * sp * 0.85, gg = 124 * k + 255 * sp * 0.85, b = 146 * k + 255 * sp * 0.9;
+                const d = dt[i];
+                if (d < 1.7) { const t = (1.7 - d) / 1.7 * 0.65; r += (120 - r) * t; gg += (215 - gg) * t; b += (255 - b) * t; }   // a thin cyan rim
+                BW.rgb[i] = (Math.min(255, r) << 16) | (Math.min(255, gg) << 8) | Math.min(255, b);
+            }
         }
         function bwWorldOfCell(xx, yy) { const g = BW.g; return [((g.x + xx + 0.5) * g.css - targetOffsetX) / targetZoom, ((g.y + yy + 0.5) * g.css - targetOffsetY) / targetZoom]; }
         function bwBrickCell(xx, yy) {
@@ -4819,8 +4836,8 @@ service cloud.firestore {
             const o = list ? bwOwnerAt(px, py, list) : -1;
             BW.own[i] = o;
             if (o < 0) return;
-            const [c, key] = bwBrickColour(BW.els[o], px, py);
-            BW.rgb[i] = (c[0] << 16) | (c[1] << 8) | c[2]; BW.key[i] = key ^ (o * 2654435761);
+            const [key, v, u] = bwChunk(BW.els[o], px, py);
+            BW.key[i] = key ^ (o * 2654435761); BW.gv[i] = v; BW.gu[i] = u;
         }
         function bwBricksPaint(x0, y0, x1, y1) {
             const g = BW.g, d = BW.img.data, W = g.w, H = g.h;
@@ -4862,12 +4879,12 @@ service cloud.firestore {
                     const px = (g.x + bx0) * g.css, py = (g.y + by0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
                     const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (0.6 + Math.random() * 1.6) * U;
                     BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.8, vy: dy / dl * spd - (0.6 + Math.random() * 1.4) * U, life: 70 + Math.random() * 50, r: 0, vr: (Math.random() - 0.5) * 0.18 });
-                    if (Math.random() < 0.5) BW.parts.push({ x: mx, y: my, vx: (Math.random() - 0.5) * U * 0.5, vy: -Math.random() * U * 0.4, life: 40 + Math.random() * 30, r: U * (1.5 + Math.random() * 2.5), c: 'rgba(196, 170, 150, ', dust: true });
+                    if (Math.random() < 0.6) { const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random() * 1.6) * U; BW.parts.push({ x: mx, y: my, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5 * U, life: 20 + Math.random() * 25, r: U * (0.25 + Math.random() * 0.35), col: Math.random() < 0.5 ? '#9fe3ff' : '#ffffff', spark: true }); }
                 }
                 b.cells.forEach(i => { BW.own[i] = -1; BW.bid[i] = -1; });
                 if (bx0 < x0) x0 = bx0; if (by0 < y0) y0 = by0; if (bx1 > x1) x1 = bx1; if (by1 > y1) y1 = by1;
             });
-            if (x1 >= x0) bwBricksPaint(x0, y0, x1 + 1, y1 + 1);
+            if (x1 >= x0) { bwShade(x0, y0, x1 + 1, y1 + 1); const m = Math.ceil(BW.bev) + 4; bwBricksPaint(x0 - m, y0 - m, x1 + 1 + m, y1 + 1 + m); }
             elsHit.forEach(el => { if (!BW.bricks.some(b => b.alive && b.el === el)) BW.els[el].alive = false; });
         }
         // the ball against the masonry, cell by cell: -> the brick it touches and the way out (from the touched cells to the ball's centre)
