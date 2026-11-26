@@ -68,6 +68,8 @@ button { font: inherit; color: inherit; }
 .back:hover { color: var(--ink); }
 .info h1 { margin: 0 0 6px; font-weight: 500; font-size: clamp(36px, 4vw, 56px); line-height: 1.04; letter-spacing: -0.02em; }
 .info .lede { margin: 0; color: var(--graphite); font-size: 18px; }
+.price { display: inline-block; margin-top: 14px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); font-size: 14px; font-weight: 500; }
+.price-note { margin: -12px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
 .opt h2 { margin: 0 0 10px; font-size: 12px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; }
 .opt h2 span { text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 14px; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -152,7 +154,7 @@ button { font: inherit; color: inherit; }
 
   <section class="info" aria-labelledby="pd-name">
     <a class="back" href="/#shop"><svg viewBox="0 0 16 16"><path d="M13 8H3M7 4L3 8l4 4"/></svg>All pieces</a>
-    <header><h1 id="pd-name"></h1><p class="lede" id="pd-lede"></p></header>
+    <header><h1 id="pd-name"></h1><p class="lede" id="pd-lede"></p><span class="price">Price on request</span></header>
     <div class="opt"><h2>Finish <span id="pd-finish-v"></span></h2><div class="seg" id="pd-finish"></div></div>
     <div class="opt"><h2>Colour <span id="pd-colour-v"></span></h2><div class="swatches" id="pd-colours"></div></div>
     <div class="opt" id="pd-extra-wrap"><h2 id="pd-extra-h"></h2><div class="seg" id="pd-extra"></div></div>
@@ -164,6 +166,7 @@ button { font: inherit; color: inherit; }
       <div><strong>AZ</strong><span>delivery across Azerbaijan</span></div>
     </div>
     <button class="cta" type="button" id="pd-pre">Pre-order</button>
+    <p class="price-note" id="pd-price-note">Every piece is drawn for you, so its price follows its size and finish. We reply with the price before you pay anything.</p>
     <form class="order" id="pd-order">
       <h2>Your details</h2>
       <input name="name" required autocomplete="name" placeholder="Your name">
@@ -266,20 +269,20 @@ sync();
 shown = JSON.stringify(look()); frame.src = '/editor?' + first();
 
 // ------------------------------------------------------------------ pre-order: the order goes out by WhatsApp (or e-mail)
-$('pd-pre').onclick = () => { $('pd-pre').style.display = 'none'; $('pd-order').classList.add('show'); $('pd-order').elements.name.focus(); };
+$('pd-pre').onclick = () => { $('pd-pre').style.display = 'none'; $('pd-price-note').style.display = 'none'; $('pd-order').classList.add('show'); $('pd-order').elements.name.focus(); };
 $('pd-order').onsubmit = e => {
   e.preventDefault();
   const f = e.target.elements, steel = cur.finish === 'steel', c = RAL.find(r => r[0] === cur.colour);
   const w = p.key === 'hanger' ? hangerWidth(cur.hooks) : cur.w;
   const lines = [
-    `Pre-order: ${p.name}`,
+    `Pre-order: ${p.name} (please send me the price)`,
     `Finish: ${FINISHES.find(x => x[0] === cur.finish)[1]}${steel ? '' : `, RAL ${c[0]} ${c[1]}`}`,
     `Size: ${w} × ${cur.h} mm, ${cur.thick} mm steel`,
     p.key === 'hanger' ? `Hooks: ${cur.hooks}` : (cur.extras.size ? `Extras: ${[...cur.extras].map(v => p.extra.items.find(i => i[0] === v)[1]).join(', ')}` : ''),
     `Name: ${f.name.value}`, `Phone: ${f.phone.value}`, f.email.value ? `E-mail: ${f.email.value}` : '', f.note.value ? `Note: ${f.note.value}` : '', '', location.origin + '/shop/' + p.key
   ].filter((l, i, a) => l || a[i + 1]).join('\n');
   const done = $('pd-done');
-  if (CONTACT.whatsapp) { window.open(`https://wa.me/${CONTACT.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(lines)}`, '_blank', 'noopener'); done.innerHTML = 'Your pre-order is ready in WhatsApp: press send there and we will reply.' + (CONTACT.email ? ` No WhatsApp? <a href="mailto:${CONTACT.email}?subject=${encodeURIComponent('Pre-order: ' + p.name)}&body=${encodeURIComponent(lines)}">Send it by e-mail</a>.` : ''); }
+  if (CONTACT.whatsapp) { window.open(`https://wa.me/${CONTACT.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(lines)}`, '_blank', 'noopener'); done.innerHTML = 'Your pre-order is ready in WhatsApp: press send there, and we will reply with the price.' + (CONTACT.email ? ` No WhatsApp? <a href="mailto:${CONTACT.email}?subject=${encodeURIComponent('Pre-order: ' + p.name)}&body=${encodeURIComponent(lines)}">Send it by e-mail</a>.` : ''); }
   else if (CONTACT.email) { location.href = `mailto:${CONTACT.email}?subject=${encodeURIComponent('Pre-order: ' + p.name)}&body=${encodeURIComponent(lines)}`; done.textContent = 'Your pre-order is ready in your mail app: press send there and we will reply.'; }
   else done.textContent = 'Online pre-orders open very soon. Here is your order, ready to send us:\n\n' + lines;
   done.classList.add('show');
