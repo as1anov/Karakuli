@@ -249,35 +249,29 @@ if (document.body.classList.contains('no-gl')) {
 }
 
 // ------------------------------------------------------------------ steel, light, and a drawing cut into parts
-function steelMats(bend) {
+function steelMats(shine) {
   const face = new T.MeshStandardMaterial({ color: 0xe9e7e1, roughness: 0.42, metalness: 0.38 });
   const side = face.clone(); side.color.set(0xaeaca5);   // the cut edges are a tone darker than the face
   // front faces win the depth test where another part's side wall ends flush with them, so no specks show along the joints
   Object.assign(face, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
-  if (bend) [face, side].forEach(m => bendable(m, bend, m === face));
+  if (shine) glinting(face, shine);
   return { box: [side, side, side, side, face, face], ext: [face, side] };   // BoxGeometry: +z, -z are groups 4, 5; ExtrudeGeometry: caps, sides
 }
-// The whole pattern bends as one sheet, its left and right wings swinging a little like a boomerang's: every vertex moves by the same
-// curve (z grows with the square of its distance from the middle), so the joints stay closed. The normals tilt with it, and a soft
-// reflection slides across the front faces as the wings move.
-function bendable(mat, U, glint) {
+// A straight bar of reflected light on the front faces: it crosses the pattern, slightly slanted, as the pattern turns.
+function glinting(mat, U) {
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = 'uniform float uBend, uHalf;\nvarying float vU, vFront;\n' + sh.vertexShader
-      .replace('#include <defaultnormal_vertex>', `#include <defaultnormal_vertex>
-        vec4 bentW = modelMatrix * vec4(position, 1.0);
-        vU = bentW.x / uHalf; vFront = step(0.5, normal.z);
-        transformedNormal.x -= 2.0 * uBend * vU / uHalf * transformedNormal.z;
-        transformedNormal = normalize(transformedNormal);`)
-      .replace('#include <project_vertex>', `bentW.z += uBend * vU * vU;
-        vec4 mvPosition = viewMatrix * bentW;
-        gl_Position = projectionMatrix * mvPosition;`);
-    if (glint) sh.fragmentShader = 'uniform float uGlint, uGlintX;\nvarying float vU, vFront;\n' + sh.fragmentShader
+    sh.vertexShader = 'uniform float uHalf, uMidY;\nvarying vec2 vSheet;\nvarying float vFront;\n' + sh.vertexShader
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vec4 sheetW = modelMatrix * vec4(transformed, 1.0);
+        vSheet = vec2(sheetW.x, sheetW.y - uMidY) / uHalf; vFront = step(0.5, normal.z);`);
+    sh.fragmentShader = 'uniform float uGlint, uGlintX;\nvarying vec2 vSheet;\nvarying float vFront;\n' + sh.fragmentShader
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        float gd = (vU - uGlintX) / 0.3;
-        totalEmissiveRadiance += vec3(1.0, 0.97, 0.9) * uGlint * vFront * exp(-gd * gd);`);
+        float gd = vSheet.x - 0.45 * vSheet.y - uGlintX;
+        float band = exp(-pow(gd / 0.07, 2.0)) + 0.45 * exp(-pow(gd / 0.26, 2.0));   // a bright line inside a soft halo
+        totalEmissiveRadiance += vec3(1.0, 0.97, 0.9) * uGlint * vFront * band;`);
   };
-  mat.customProgramCacheKey = () => 'bend' + (glint ? '-glint' : '');
+  mat.customProgramCacheKey = () => 'glint';
 }
 function lightUp(scene) {
   scene.add(new T.HemisphereLight(0xf4f3ef, 0x111111, 0.55));
@@ -321,7 +315,7 @@ function buildPattern(text, mats, scene) {
   });
   const parts = [], Z = new T.Vector3(0, 0, 1);
   const add = (geo, mat, kind, cx, cy, ang, len) => {
-    const m = new T.Mesh(geo, mat); m.frustumCulled = false; scene.add(m);
+    const m = new T.Mesh(geo, mat); scene.add(m);
     const [x, y] = toW(cx, cy);
     parts.push({ m, kind, len, home: new T.Vector3(x, y, 0), qHome: new T.Quaternion().setFromAxisAngle(Z, ang) });
   };
@@ -344,7 +338,7 @@ function buildPattern(text, mats, scene) {
     const ea = endExt(A, [-u[0], -u[1]]), eb = endExt(B, u), len = (L0 + ea + eb) * S;
     const sh = (eb - ea) / 2, cx = (A[0] + B[0]) / 2 + u[0] * sh, cy = (A[1] + B[1]) / 2 + u[1] * sh;
     // every part has exactly the same depth: overlapping faces then shade identically, and no hairline step shows at a joint
-    add(new T.BoxGeometry(len, w, D, Math.max(1, Math.ceil(len / 0.3))), mats.box, 'bar', cx, cy, -Math.atan2(u[1], u[0]), len);
+    add(new T.BoxGeometry(len, w, D), mats.box, 'bar', cx, cy, -Math.atan2(u[1], u[0]), len);
   });
   rings.forEach(r => {
     const sh = new T.Shape(); sh.absarc(0, 0, (r.r + sw / 2) * S, 0, Math.PI * 2);
@@ -368,8 +362,8 @@ function startScene() {
   renderer.outputColorSpace = T.SRGBColorSpace;
   const scene = new T.Scene(), camera = new T.PerspectiveCamera(26, 1, 0.1, 400);
   lightUp(scene);
-  const wing = { uBend: { value: 0 }, uHalf: { value: 10 }, uGlint: { value: 0 }, uGlintX: { value: 0 } };
-  const mats = steelMats(wing);
+  const shine = { uHalf: { value: 10 }, uMidY: { value: 0 }, uGlint: { value: 0 }, uGlintX: { value: 0 } };
+  const mats = steelMats(shine);
   const A = buildPattern(svg10, mats, scene);    // the whole pattern of the first screen
   const B = buildPattern(svg11, mats, scene);    // the pattern its pieces build beside the story
 
@@ -428,12 +422,11 @@ function startScene() {
     const p = pv, time = now / 1000;
     textAt(p); navTone();
     const morph = seg(p, ...P.morph), s3 = seg(p, ...P.fall), hs = heroScale;
-    // the boomerang: only while the pattern is whole (it fades as the pieces come apart); about one swing in seven seconds
-    const whole = reduce ? 0 : 1 - smooth(clamp01(morph / 0.12)), swing = Math.sin(time * 0.9);
-    wing.uHalf.value = A.W * hs / 2;
-    wing.uBend.value = swing * 0.055 * wing.uHalf.value * whole;
-    wing.uGlintX.value = Math.sin(time * 0.9 - 0.9) * 0.95;                       // the reflection trails the swing
-    wing.uGlint.value = (0.05 + 0.09 * Math.abs(swing)) * whole;
+    // while the pattern is whole it turns gently, 5 degrees to either side, as one rigid sheet; the turn draws a line of light across it
+    const whole = reduce ? 0 : 1 - smooth(clamp01(morph / 0.12)), swing = Math.sin(time * 0.7);
+    shine.uHalf.value = A.W * hs / 2; shine.uMidY.value = heroY;
+    shine.uGlintX.value = swing * 1.35;                         // from one edge of the pattern to the other, in step with the turn
+    shine.uGlint.value = 0.2 * whole;
     // the pieces that do not go on to drawing 11 loosen, sail after the others and melt into the dark
     A.parts.forEach(pt => {
       const m = pt.m;
@@ -463,8 +456,8 @@ function startScene() {
       m.position.copy(vA); m.quaternion.copy(qA); m.scale.set(sc * stretch, sc, sc); m.visible = true;
     });
     // a slow turn of the whole stage keeps the parts reading as solid steel
-    scene.rotation.y = (reduce ? 0 : Math.sin(time * 0.15) * 0.05) + 0.1 + smooth(morph) * (1 - s3) * -0.12;
-    scene.rotation.x = (reduce ? 0 : Math.cos(time * 0.12) * 0.03) - 0.22;
+    scene.rotation.y = swing * T.MathUtils.degToRad(5) * whole + (reduce ? 0 : Math.sin(time * 0.15) * 0.05) * (1 - whole) + 0.1 * (1 - whole) + smooth(morph) * (1 - s3) * -0.12;
+    scene.rotation.x = (reduce ? 0 : Math.cos(time * 0.12) * 0.03) * (1 - whole) - 0.22 + 0.1 * whole;   // whole, it faces the viewer more squarely
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
