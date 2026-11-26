@@ -129,15 +129,15 @@
         /* the way back to the site (the editor is opened from the site's "Create"): a small X in the top right corner, drawn like the
            toolbar's buttons, with no plate under it */
         #site-x-frame { position: fixed; right: max(20px, env(safe-area-inset-right)); top: max(20px, env(safe-area-inset-top)); z-index: 3100; display: flex; }
-        html body #site-x { position: relative; width: calc(var(--tb) / 2); height: calc(var(--tb) / 2); box-sizing: border-box; border-radius: 8px; text-decoration: none; backdrop-filter: none; -webkit-backdrop-filter: none; background-color: var(--btn-bg); background-image: var(--vol); border: 1px solid var(--glass-edge); box-shadow: var(--btn-hi); color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); transition: color .15s; }
+        html body #site-x { position: relative; width: calc(var(--tb) * 0.625); height: calc(var(--tb) * 0.625); box-sizing: border-box; border-radius: 10px; text-decoration: none; backdrop-filter: none; -webkit-backdrop-filter: none; background-color: var(--tbar-bg); background-image: var(--vol); border: 1px solid var(--border-color); box-shadow: var(--btn-hi), 0 4px 12px rgba(0,0,0,0.08); color: color-mix(in srgb, var(--text-color) 70%, var(--bg-color)); transition: color .15s; }   /* a solid button: nothing shows through it */
         html body #site-x:hover { color: var(--text-color); }
-        html body #site-x svg { width: 14px; height: 14px; }
-        html body #site-x::after { content: ''; position: absolute; inset: -9px; }   /* small to the eye, still easy to hit with a finger */
+        html body #site-x svg { width: 18px; height: 18px; }
+        html body #site-x::after { content: ''; position: absolute; inset: -5px; }   /* small to the eye, still easy to hit with a finger */
         @media (max-width: 600px) {
             #site-x-frame { right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); }
-            html body #site-x { width: 24px; height: 24px; }
-            html body #site-x svg { width: 12px; height: 12px; }
-            html body #site-x::after { inset: -10px; }
+            html body #site-x { width: 30px; height: 30px; }
+            html body #site-x svg { width: 15px; height: 15px; }
+            html body #site-x::after { inset: -7px; }
         }
         /* the New Canvas window has no X of its own: Cancel (or a tap beside it) closes it */
         html body #new-canvas-modal .nc-close { display: none; }
