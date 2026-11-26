@@ -1631,6 +1631,7 @@
                     projectCreationPromise = (async () => {
                         currentProjectTitle = await nextProjectTitle();
                         activeProjectId = await window.karakuliProjects.create(projectSnapshot());
+                        try { if (activeProjectId) localStorage.setItem('kk-last-project', activeProjectId); } catch (e) {}
                         updateCurrentProjectUI();
                     })().finally(() => { projectCreationPromise = null; });
                 }
@@ -2020,6 +2021,7 @@
             if (!project) return;
             leaveSharedSession();
             activeProjectId = id; currentProjectTitle = project.title || 'Karakuli #0000';
+            try { localStorage.setItem('kk-last-project', id); } catch (e) {}
             projectShare = { edit: project.shareEditToken || null, view: project.shareViewToken || null };
             let data = project;
             // a project with an editable link: take the latest version (others may have changed it)
@@ -4467,8 +4469,8 @@ service cloud.firestore {
             BW.U = Math.max(2.5, Math.min(7, Math.min(width, height) / 130));
             const pad = lw * 1.4;
             const pw = maxX - minX + 2 * pad, ph = maxY - minY + 2 * pad;
-            const md = Math.min(width, height), zMin = md / 26 / lw, zMax = md / 15 / lw;   // a line is 1/26 .. 1/15 of the short side: on a phone the pattern stays big and is cropped
-            let z = Math.min(uW / pw, uH * 0.55 / ph);               // the pattern takes at most 55% of the height; the rest is room to play
+            const md = Math.min(width, height), zMin = md / 30 / lw, zMax = md / 17.5 / lw;   // a line is 1/26 .. 1/15 of the short side: on a phone the pattern stays big and is cropped
+            let z = Math.min(uW / pw, uH * 0.45 / ph);               // the pattern takes at most 45% of the height; the rest is room to play
             z = Math.max(zMin, Math.min(Math.max(zMin, zMax), z));
             const fw = uW / z, fh = uH / z;
             // horizontal window: centred, or - when the pattern is wider than the field - the stretch holding the most of it
@@ -4487,7 +4489,7 @@ service cloud.firestore {
             const field = { minX: x0, maxX: x0 + fw, minY: minY - pad - hud, maxY: minY - pad - hud + fh };
             const f = 2 * BW.U / z;      // inner margin of the arena
             BW.inner = { minX: field.minX + f, maxX: field.maxX - f, minY: field.minY + f, maxY: field.maxY };
-            BW.cropY = field.minY + fh * 0.62;
+            BW.cropY = field.minY + fh * 0.5;
             return { field, z, ox: side - field.minX * z, oy: top - field.minY * z };
         }
 
@@ -4547,7 +4549,19 @@ service cloud.firestore {
             BW.runs.forEach(r => { r.len = r.u1 - r.u0 + lw; });
         }
 
+        // The game plays the last opened project: when no project is open in the editor (a fresh start), that project is opened first.
+        async function bwOpenLastProject() {
+            let id = null;
+            try { id = localStorage.getItem('kk-last-project'); } catch (e) {}
+            try {
+                if (!id && window.karakuliProjects) { const l = await window.karakuliProjects.list(); id = l[0] && l[0].id; }
+                if (id) await openProject(id);
+            } catch (e) { console.warn('Last project not opened', e); }
+            BW.lastTried = true; startBreakMaze();
+        }
         function startBreakMaze() {
+            if (!isGameMode && !activeProjectId && !BW.lastTried && window.karakuliProjects && window.karakuliProjects.isSignedIn && window.karakuliProjects.isSignedIn()) { bwOpenLastProject(); return; }
+            BW.lastTried = false;
             // The game always starts from the complete drawing, not from an intermediate Time-lapse frame or its overlay controls.
             if (isTimelapseUIOpen) toggleTimelapseUI();
             if (segments.length === 0 && Object.keys(specialElements).length === 0) { showActionHint("Draw something first!", false); return; }
