@@ -201,6 +201,13 @@ $('cards').innerHTML = PRODUCTS.map(p => `
 // ------------------------------------------------------------------ contact
 $('ways').innerHTML = contactLinks();
 
+// the shop is in sight: fetch the 3D viewer ahead, so a product page opens straight into its model
+const warm = () => {
+  ['/editor', 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js', 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js/+esm']
+    .forEach(href => { const l = document.createElement('link'); l.rel = 'prefetch'; l.href = href; if (href.startsWith('http')) l.crossOrigin = 'anonymous'; document.head.appendChild(l); });
+};
+new IntersectionObserver((es, o) => { if (es.some(e => e.isIntersecting)) { o.disconnect(); warm(); } }, { rootMargin: '600px 0px' }).observe($('shop'));
+
 // ------------------------------------------------------------------ nav colour: paper on the ink stage, ink on the paper shop
 const nav = $('nav'), shop = $('shop'), contact = $('contact');
 function navTone() {

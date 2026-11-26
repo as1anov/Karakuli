@@ -45,6 +45,9 @@ button { font: inherit; color: inherit; }
 .stage { position: relative; flex: 1; min-height: 0; border-radius: var(--r-lg); overflow: hidden; background: var(--wall); }
 .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; opacity: 0; transition: opacity .8s var(--ease-out); }
 .stage.live iframe { opacity: 1; }
+/* until the model stands, a picture of the piece holds its place in the main view (no empty frame) */
+.stage .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #d9dadc; transition: opacity .8s var(--ease-out); }
+.stage.live .poster { opacity: 0; }
 .stage .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #d9dadc; opacity: 0; pointer-events: none; transition: opacity .4s var(--ease-out); }
 .stage .photo.dark { background: #201f20; }
 .stage.show-photo .photo { opacity: 1; pointer-events: auto; }
@@ -144,6 +147,7 @@ button { font: inherit; color: inherit; }
 <main class="pp">
   <section class="view" aria-label="The piece">
     <div class="stage" id="stage">
+      <img class="poster" id="poster" src="/assets/products/shelf-1.jpg" alt="" width="1600" height="874">
       <iframe id="v3d" title="The piece in 3D: drag to turn it" allow="fullscreen"></iframe>
       <img class="photo dark" id="photo" src="/assets/products/shelf-0.jpg" alt="" width="1600" height="1200">
       <div class="pill" id="pill" role="status"><i></i><span id="pill-t">Loading 3D…</span></div>
@@ -199,6 +203,7 @@ if (!p) location.replace('/#shop');
 
 const cur = { finish: 'textured', colour: p.colour, thick: 2, w: p.w, h: p.h, hooks: p.hooks || 0, extras: new Set(), view: '3d' };
 document.title = `${p.name} — Karakuli`;
+$('poster').src = img(p.key, p.poster || 1); $('poster').alt = `${p.name} with a Karakuli pattern`;
 $('pd-name').textContent = p.name; $('pd-lede').textContent = p.lede;
 $('ways').innerHTML = contactLinks();
 

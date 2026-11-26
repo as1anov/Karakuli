@@ -9143,7 +9143,8 @@ function fitCamera() {
     const dim = Math.max(size.x, size.y, size.z);
     R.controls.target.copy(c);
     const tanV = Math.tan(R.camera.fov * Math.PI / 360), asp = R.camera.aspect || 1.6;
-    const dist = Math.max((size.x / 0.6 / 2) / (tanV * asp), (size.y / 0.55 / 2) / tanV) + size.z;
+    const emb = document.documentElement.classList.contains('embed');   // in the shop the piece fills its frame: no toolbar to leave room for
+    const dist = Math.max((size.x / (emb ? 0.86 : 0.6) / 2) / (tanV * asp), (size.y / (emb ? 0.78 : 0.55) / 2) / tanV) + size.z;
     R.fit = { c: [c.x, c.y, c.z], dist, dim, sx: size.x, sy: size.y, sz: size.z, tanV, asp };
     R.cam = null; S.cam = 'persp';
     const dirv = new T.Vector3(0.42, 0.22, 1).normalize();
@@ -10568,7 +10569,7 @@ async function open3D() {
         showLoad('Lighting the room…', '', 92); await nextFrame();
         applyEnv(); applyMaterial(); fitCamera(); updatePose(); updateInfo();
         hideLoad();
-        if (modelInfo().key === 'plate') { S.fold = 1; S.playing = false; updatePose(); }   // a plain sheet has no bends: nothing to fold
+        if (modelInfo().key === 'plate' || document.documentElement.classList.contains('embed')) { S.fold = 1; S.playing = false; updatePose(); }   // a plain sheet has no bends: nothing to fold; the shop shows the piece finished at once
         else S.playing = true;
         syncUI();
         R.last = 0; R.raf = requestAnimationFrame(loop);
@@ -10698,7 +10699,7 @@ setInterval(() => {
     css.textContent = `
         html.embed body { background: #dcdee1 !important; }
         html.embed :is(#cv-head, #v3d-title, #v3-rail, #v3d-panel, #v3d-bar, #v3-fx, #v3-ral, #share-badge, #action-indicator, .top-nav-container, .handle-arrow, #mobile-keyboard, #dashboard, #edge-tab, #prod-info) { display: none !important; }
-        html.embed #v3d-load .v3-lbox { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+        html.embed #v3d-load { display: none !important; }   /* the shop page shows its own loading note */
         html.embed #v3-loadsub, html.embed #v3-retry { display: none !important; }`;
     document.head.appendChild(css);
     const V = () => window.__v3dEmbed;
