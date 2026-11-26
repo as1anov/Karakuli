@@ -44,7 +44,7 @@ button { font: inherit; color: inherit; }
 .nav a.link:hover { background-size: 100% 1px; }
 
 /* ---------- the pattern story: a pinned stage ---------- */
-.scrolly { position: relative; height: 560vh; background: var(--ink); color: var(--paper); }
+.scrolly { position: relative; height: 470vh; background: var(--ink); color: var(--paper); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .fallback { position: absolute; inset: 0; display: none; place-items: center; padding: 12vh var(--pad); }
@@ -92,7 +92,7 @@ button { font: inherit; color: inherit; }
 .contact-gl canvas { width: 100%; height: 100%; display: block; }
 /* a dark veil over the pattern: it is felt more than seen, and the words on the left stay clear */
 .contact-gl::after { content: ''; position: absolute; inset: 0; background:
-  linear-gradient(90deg, var(--ink) 0%, var(--ink) 34%, rgba(17,17,17,.78) 62%, rgba(17,17,17,.66) 100%),
+  linear-gradient(90deg, rgba(17,17,17,.82) 0%, rgba(17,17,17,.82) 40%, rgba(17,17,17,.72) 66%, rgba(17,17,17,.62) 100%),
   linear-gradient(0deg, var(--ink) 0%, rgba(17,17,17,0) 30%, rgba(17,17,17,0) 80%, var(--ink) 100%); }
 .contact h2 { margin: 0 0 16px; font-weight: 500; font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: -0.025em; max-width: 14em; }
 .contact .sub { margin: 0 0 32px; color: var(--ink-2); font-size: 18px; }
@@ -113,7 +113,7 @@ button { font: inherit; color: inherit; }
   .chapter h2 { font-size: 28px; margin-bottom: 12px; }
   .chapter p { font-size: 15px; }
   .cards { grid-template-columns: 1fr; }
-  .contact .ways { margin-bottom: 200px; }
+  .contact .ways { margin-bottom: 230px; }
   .contact-gl::after { background: linear-gradient(180deg, var(--ink) 0%, rgba(17,17,17,.82) 45%, rgba(17,17,17,.62) 100%); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -208,10 +208,11 @@ function navTone() {
 // ------------------------------------------------------------------ the pattern scene
 const scrolly = document.querySelector('.scrolly'), stage = $('stage'), canvas = $('gl');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-// hero: drawing 10 whole · scatter: it comes apart · gather: its pieces build drawing 11 beside the story · fall: drawing 11 lets go
-const P = { hero: [0.03, 0.12], scatter: [0.06, 0.28], gather: [0.28, 0.52], text: [0.44, 0.79], fall: [0.76, 0.94] };
+// morph: the pieces of drawing 10 flow, without stopping, into drawing 11 beside the story · fall: drawing 11 lets go
+const P = { hero: [0.02, 0.11], morph: [0.03, 0.56], text: [0.46, 0.72], fall: [0.68, 0.94] };
 const clamp01 = v => Math.max(0, Math.min(1, v)), seg = (v, a, b) => clamp01((v - a) / (b - a));
 const smooth = t => t * t * (3 - 2 * t);
+const soft = t => t * t * t * (t * (t * 6 - 15) + 10);   // starts and ends with no jolt
 const progress = () => { const r = scrolly.getBoundingClientRect(), span = scrolly.offsetHeight - innerHeight; return clamp01(-r.top / span); };
 
 // About: jump to the story
@@ -234,8 +235,6 @@ function textAt(p) {
 
 const S = 1 / 100, D = 0.36;   // 100 px of the drawing = 1 unit; parts are 36 px thick
 const seeded = s => { let seed = s; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647; return { rnd, rr: (a, b) => a + (b - a) * rnd() }; };
-const snap = t => { if (t <= 0) return 0; if (t >= 1) return 1; const a = t / 0.82; if (a < 1) return a * a * a * 1.04; const b = (t - 0.82) / 0.18; return 1.04 - 0.04 * Math.sin(b * Math.PI / 2); };   // a magnet pulls hard at the end (ease in) and the part settles with a little overshoot
-const loose = t => 1 - Math.pow(1 - t, 3);
 let T;
 try { T = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/+esm'); } catch (e) { document.body.classList.add('no-gl'); }
 
@@ -287,19 +286,19 @@ function lightUp(scene) {
 }
 // The drawing is cut into long straight bars (plus its rings and diamonds). Every part is built round its own centre, lying along x;
 // `home` and `qHome` put it in its place in the drawing (centred on the drawing's middle, in world units).
-function buildPattern(text, mats, scene) {
+function buildPattern(text, mats, scene, cropX = 0) {
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
   const vb = doc.querySelector('svg').getAttribute('viewBox').split(/\s+/).map(Number), W0 = vb[2], H0 = vb[3];
   const path = doc.querySelector('path'), sw = +(path.getAttribute('stroke-width') || 58), w = sw * S, h = sw / 2;
-  const rings = [...doc.querySelectorAll('circle')].filter(c => c.getAttribute('fill') === 'none').map(c => ({ x: +c.getAttribute('cx'), y: +c.getAttribute('cy'), r: +c.getAttribute('r') }));
-  const toW = (x, y) => [(x - W0 / 2) * S, -(y - H0 / 2) * S];
+  const rings = [...doc.querySelectorAll('circle')].filter(c => c.getAttribute('fill') === 'none').map(c => ({ x: +c.getAttribute('cx'), y: +c.getAttribute('cy'), r: +c.getAttribute('r') })).filter(r => r.x - r.r >= cropX);
+  const toW = (x, y) => [(x - (cropX + W0) / 2) * S, -(y - H0 / 2) * S];
   // every unit step of the drawing, once: the drawing repeats steps where its strokes overlap
   const steps = new Map(), at = new Map(), nk = q => q[0] + ',' + q[1];
   path.getAttribute('d').trim().split(/(?=M)/).forEach(sp => {
     const nums = sp.match(/-?\d+(\.\d+)?/g); if (!nums) return;
     const pts = []; for (let i = 0; i + 1 < nums.length; i += 2) pts.push([+nums[i], +nums[i + 1]]);
     for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1], b = pts[i], k = [nk(a), nk(b)].sort().join('|'); if (steps.has(k) || nk(a) === nk(b)) continue;
+      const a = pts[i - 1], b = pts[i], k = [nk(a), nk(b)].sort().join('|'); if (steps.has(k) || nk(a) === nk(b) || a[0] < cropX || b[0] < cropX) continue;
       steps.set(k, { a, b, used: false });
       [a, b].forEach(q => { const n = nk(q); if (!at.has(n)) at.set(n, []); at.get(n).push(k); });
     }
@@ -354,11 +353,11 @@ function buildPattern(text, mats, scene) {
     add(g, mats.ext, 'ring', r.x, r.y, 0, 0);
   });
   doc.querySelectorAll('rect').forEach(rc => {
-    const t = (rc.getAttribute('transform') || '').match(/rotate\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/); if (!t) return;
+    const t = (rc.getAttribute('transform') || '').match(/rotate\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/); if (!t || +t[2] < cropX) return;
     const s = +rc.getAttribute('width') * S;
     add(new T.BoxGeometry(s, s, D), mats.box, 'dia', +t[2], +t[3], Math.PI / 4, 0);
   });
-  return { parts, W: W0 * S, H: H0 * S, w };
+  return { parts, W: (W0 - cropX) * S, fullW: W0 * S, H: H0 * S, w };
 }
 
 function startScene() {
@@ -378,9 +377,9 @@ function startScene() {
   const { rnd, rr } = seeded(7);
   const randQuat = amp => new T.Quaternion().setFromEuler(new T.Euler(rr(-amp, amp), rr(-amp, amp), rr(-amp, amp)));
   A.parts.forEach(pt => {
-    pt.scat = new T.Vector3(pt.home.x * 1.25 + rr(-6, 6), pt.home.y * 1.6 + rr(-3.5, 3.5), rr(-7, 3.5));
-    pt.qScat = randQuat(2.4).multiply(pt.qHome);
-    pt.d1 = rnd() * 0.45; pt.dOut = rnd() * 0.3; pt.ph = rnd() * Math.PI * 2;
+    pt.bow = new T.Vector3(rr(-3.5, 3.5), rr(-3, 3), rr(-5, 2.5));     // how far its path bows out on the way
+    pt.qScat = randQuat(1.5).multiply(pt.qHome);
+    pt.d1 = rnd() * 0.34; pt.ph = rnd() * Math.PI * 2;
   });
   // every piece of drawing 11 is one of the loose pieces of drawing 10, of the same kind and of a like length: it takes that piece's place
   // in the air (stretched to its length) and turns into its own as the magnet pulls it home
@@ -391,7 +390,7 @@ function startScene() {
   const ringB = B.parts.find(p => p.kind === 'ring') || B.parts[0];
   const maxR = Math.max(...B.parts.map(p => p.home.distanceTo(ringB.home)));
   B.parts.forEach(pt => {
-    pt.d2 = 0.05 + 0.5 * (pt.home.distanceTo(ringB.home) / maxR);   // the cluster grows outward from its ring
+    pt.d2 = 0.26 * (pt.home.distanceTo(ringB.home) / maxR) + 0.08 * rnd();   // the cluster grows outward from its ring
     pt.qFall = randQuat(3.2); pt.fall = new T.Vector3(rr(-9, 9), rr(-16, -11), rr(-6, 4));
     pt.d3 = rnd() * 0.5; pt.ph = rnd() * Math.PI * 2;
   });
@@ -412,47 +411,50 @@ function startScene() {
   }
   layout(); addEventListener('resize', layout);
 
-  const vA = new T.Vector3(), vB = new T.Vector3(), qA = new T.Quaternion();
+  const vA = new T.Vector3(), vB = new T.Vector3(), vC = new T.Vector3(), qA = new T.Quaternion();
   let pv = reduce ? progress() : 0, last = performance.now();
-  // where a piece of drawing 10 is at this point of the scroll (whole -> loose)
-  function poseA(pt, s1, hs, time) {
-    const k1 = loose(clamp01((s1 - pt.d1 * 0.6) / 0.6));
-    vA.copy(pt.home).multiplyScalar(hs); vA.y += heroY; vA.lerp(pt.scat, k1);
-    qA.copy(pt.qHome).slerp(pt.qScat, k1);
-    if (!reduce && k1 > 0) { vA.x += Math.sin(time * 0.6 + pt.ph) * 0.06 * k1; vA.y += Math.cos(time * 0.5 + pt.ph) * 0.08 * k1; }   // loose, they float a little
-    return hs * (1 - 0.1 * k1);
+  // a point on a bowed path: vA is the start on entry and the point at t on return
+  function arc(to, bow, t) {
+    vC.copy(vA).lerp(to, 0.5).add(bow);
+    const u = 1 - t;
+    vA.multiplyScalar(u * u).addScaledVector(vC, 2 * u * t).addScaledVector(to, t * t);
   }
+  const drift = (pt, time, k) => { if (!reduce && k > 0) { vA.x += Math.sin(time * 0.6 + pt.ph) * 0.12 * k; vA.y += Math.cos(time * 0.5 + pt.ph) * 0.14 * k; } };
+  const goal = new T.Vector3();
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     const target = progress();
-    pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 9));
+    pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 5));
     const p = pv, time = now / 1000;
     textAt(p); navTone();
-    const s1 = seg(p, ...P.scatter), s2 = seg(p, ...P.gather), s3 = seg(p, ...P.fall), hs = heroScale;
+    const morph = seg(p, ...P.morph), s3 = seg(p, ...P.fall), hs = heroScale;
     // the boomerang: only while the pattern is whole (it fades as the pieces come apart); about one swing in seven seconds
-    const whole = reduce ? 0 : 1 - smooth(clamp01(s1 / 0.3)), swing = Math.sin(time * 0.9);
+    const whole = reduce ? 0 : 1 - smooth(clamp01(morph / 0.12)), swing = Math.sin(time * 0.9);
     wing.uHalf.value = A.W * hs / 2;
     wing.uBend.value = swing * 0.055 * wing.uHalf.value * whole;
     wing.uGlintX.value = Math.sin(time * 0.9 - 0.9) * 0.95;                       // the reflection trails the swing
     wing.uGlint.value = (0.05 + 0.09 * Math.abs(swing)) * whole;
+    // the pieces that do not go on to drawing 11 loosen, sail after the others and melt into the dark
     A.parts.forEach(pt => {
       const m = pt.m;
-      let sc = poseA(pt, s1, hs, time);
-      if (s2 > 0) {
-        if (pt.used) { m.visible = false; return; }                              // its twin in drawing 11 has taken over
-        const k = smooth(clamp01((s2 - pt.dOut) / 0.45));
-        vA.lerp(vB.set(pt.scat.x * 1.6, pt.scat.y * 1.6, -40), k); sc *= 1 - k;  // the rest drifts away into the dark
-      }
+      if (pt.used) { m.visible = false; return; }                                  // its twin in drawing 11 draws it from the start
+      const t = soft(clamp01((morph - pt.d1) / 0.62)), loft = Math.sin(Math.PI * Math.min(1, t * 1.15));
+      vA.copy(pt.home).multiplyScalar(hs); vA.y += heroY;
+      goal.set(L.x + pt.home.x * 0.5, pt.home.y * 0.9, -26);
+      arc(goal, pt.bow, t); drift(pt, time, loft);
+      qA.copy(pt.qHome).slerp(pt.qScat, soft(clamp01(t * 1.4)));
+      const sc = hs * (1 - soft(clamp01((t - 0.3) / 0.6)));
       m.position.copy(vA); m.quaternion.copy(qA); m.scale.setScalar(Math.max(0.0001, sc)); m.visible = sc > 0.002;
     });
+    // each piece of drawing 11 leaves its place in drawing 10, tumbles gently along its arc and settles into the new one
     B.parts.forEach(pt => {
-      const m = pt.m;
-      if (s2 <= 0) { m.visible = false; return; }
-      const sc0 = poseA(pt.src, s1, hs, time);
-      const k2 = clamp01((s2 - pt.d2) / 0.45), k = reduce ? (k2 > 0.5 ? 1 : 0) : snap(k2), kc = Math.min(1, k);
-      vB.set(L.x + pt.home.x * L.s, L.y + pt.home.y * L.s, 0);
-      vA.lerp(vB, k); qA.slerp(pt.qHome, kc);
-      const sc = sc0 + (L.s - sc0) * kc, stretch = pt.kind === 'bar' ? (pt.src.len * sc0 / (pt.len * sc)) * (1 - kc) + kc : 1;
+      const m = pt.m, src = pt.src;
+      const raw = clamp01((morph - pt.d2) / 0.66), t = reduce ? (raw > 0.5 ? 1 : 0) : soft(raw), loft = Math.sin(Math.PI * t);
+      vA.copy(src.home).multiplyScalar(hs); vA.y += heroY;
+      goal.set(L.x + pt.home.x * L.s, L.y + pt.home.y * L.s, 0);
+      arc(goal, src.bow, t); drift(pt, time, loft);
+      qA.copy(src.qHome).slerp(pt.qHome, t).slerp(src.qScat, loft * 0.6);
+      const sc = hs + (L.s - hs) * t, stretch = pt.kind === 'bar' ? (src.len * hs * (1 - t) + pt.len * L.s * t) / (pt.len * sc) : 1;
       if (s3 > 0) {
         const k3 = clamp01((s3 - pt.d3 * 0.6) / 0.55), kf = k3 * k3;            // they let go and fall
         vA.lerp(vB.set(L.x + pt.home.x * L.s * 1.4 + pt.fall.x, pt.fall.y, pt.fall.z), kf);
@@ -461,7 +463,7 @@ function startScene() {
       m.position.copy(vA); m.quaternion.copy(qA); m.scale.set(sc * stretch, sc, sc); m.visible = true;
     });
     // a slow turn of the whole stage keeps the parts reading as solid steel
-    scene.rotation.y = (reduce ? 0 : Math.sin(time * 0.15) * 0.05) + 0.1 + (s2 - s3) * -0.12;
+    scene.rotation.y = (reduce ? 0 : Math.sin(time * 0.15) * 0.05) + 0.1 + smooth(morph) * (1 - s3) * -0.12;
     scene.rotation.x = (reduce ? 0 : Math.cos(time * 0.12) * 0.03) - 0.22;
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
@@ -478,36 +480,41 @@ function startFooter() {
   renderer.outputColorSpace = T.SRGBColorSpace;
   const scene = new T.Scene(), camera = new T.PerspectiveCamera(26, 1, 0.1, 400);
   lightUp(scene);
-  const C = buildPattern(svg10, steelMats(), scene);
+  const C = buildPattern(svg10, steelMats(), scene, 870);   // the right-hand 60 % of drawing 10 (870 of its 2176 px are cut away)
   const { rnd, rr } = seeded(11);
   C.parts.forEach(pt => {
-    pt.from = new T.Vector3(pt.home.x * 1.6 + rr(-5, 5), pt.home.y * 1.6 + rr(-6, 2), rr(-10, 4));
-    pt.qFrom = new T.Quaternion().setFromEuler(new T.Euler(rr(-2.4, 2.4), rr(-2.4, 2.4), rr(-2.4, 2.4))).multiply(pt.qHome);
-    pt.d = 0.4 * (Math.abs(pt.home.x) / (C.W / 2)) + 0.12 * rnd();   // from the middle outwards
+    // it starts on the left, where the small pattern gathered beside the story
+    pt.fx = rr(-0.42, -0.16); pt.fy = rr(-0.38, 0.38); pt.fz = rr(-5, 3);
+    pt.bow = new T.Vector3(rr(-2, 2), rr(-3, 3), rr(-3, 3));
+    pt.qFrom = new T.Quaternion().setFromEuler(new T.Euler(rr(-1.6, 1.6), rr(-1.6, 1.6), rr(-1.6, 1.6))).multiply(pt.qHome);
+    pt.d = 0.3 * (0.5 - pt.home.x / C.W) + 0.1 * rnd();   // the far side of the pattern is built first
   });
-  let s = 1, ox = 0, oy = 0, on = false, pv = 0, last = 0;
+  let s = 1, ox = 0, oy = 0, vw = 1, vh = 1, on = false, pv = 0, last = 0;
   function layout() {
     const wpx = box.clientWidth, hpx = box.clientHeight; if (!wpx || !hpx) return;
     renderer.setSize(wpx, hpx, false); camera.aspect = wpx / hpx;
     camera.position.set(0, 0, 30); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
-    const vh = 2 * 30 * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect, narrow = wpx < 820;
-    s = 0.6 * (narrow ? vw * 1.15 / C.W : Math.max(vw * 0.62 / C.W, vh * 0.7 / C.H));
-    ox = narrow ? 0 : vw * 0.25; oy = narrow ? -vh * (0.5 - 190 / hpx) : -vh * 0.04;   // on a phone it has its own room between the buttons and the foot line
+    vh = 2 * 30 * Math.tan(camera.fov * Math.PI / 360); vw = vh * camera.aspect;
+    const narrow = wpx < 820;
+    s = narrow ? vw * 1.15 / C.fullW : Math.max(vw * 0.62 / C.fullW, vh * 0.7 / C.H);
+    ox = narrow ? 0 : vw * 0.24; oy = narrow ? -vh * (0.5 - 205 / hpx) : -vh * 0.04;   // on a phone it has its own room between the buttons and the foot line
   }
   layout(); addEventListener('resize', layout);
   // 0 when the section comes into view, 1 at the very bottom of the page
   const prog = () => { const r = box.getBoundingClientRect(); return clamp01((innerHeight - r.top) / Math.max(1, Math.min(r.height, innerHeight) * 0.95)); };
-  const v = new T.Vector3(), q = new T.Quaternion();
+  const v = new T.Vector3(), c = new T.Vector3(), to = new T.Vector3(), q = new T.Quaternion();
   function frame(now) {
     if (!on) return;
     const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
-    const target = prog(); pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 7));
+    const target = prog(); pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 4));
     const time = now / 1000;
     C.parts.forEach(pt => {
-      const k = reduce ? 1 : snap(clamp01((pv - pt.d) / 0.48)), kc = Math.min(1, k);
-      v.copy(pt.from).lerp(new T.Vector3(ox + pt.home.x * s, oy + pt.home.y * s, 0), k);
-      q.copy(pt.qFrom).slerp(pt.qHome, kc);
-      pt.m.position.copy(v); pt.m.quaternion.copy(q); pt.m.scale.setScalar(s * (0.85 + 0.15 * kc));
+      const t = reduce ? 1 : soft(clamp01((pv - pt.d) / 0.58)), u = 1 - t;
+      v.set(pt.fx * vw, pt.fy * vh, pt.fz); to.set(ox + pt.home.x * s, oy + pt.home.y * s, 0);
+      c.copy(v).lerp(to, 0.5).add(pt.bow);
+      v.multiplyScalar(u * u).addScaledVector(c, 2 * u * t).addScaledVector(to, t * t);
+      q.copy(pt.qFrom).slerp(pt.qHome, t);
+      pt.m.position.copy(v); pt.m.quaternion.copy(q); pt.m.scale.setScalar(s * (0.8 + 0.2 * t));
     });
     scene.rotation.y = (reduce ? 0 : Math.sin(time * 0.15) * 0.04) - 0.12;
     scene.rotation.x = -0.18;
