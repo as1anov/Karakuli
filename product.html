@@ -41,31 +41,19 @@ button { font: inherit; color: inherit; }
 
 /* ---------- the page: the piece on the left (it stays while the options scroll), the choices on the right ---------- */
 .pp { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr); gap: clamp(24px, 3vw, 48px); padding: 0 var(--pad) 72px; }
-.view { position: sticky; top: var(--nav-h); align-self: start; height: calc(100vh - var(--nav-h) - 24px); height: calc(100svh - var(--nav-h) - 24px); display: flex; flex-direction: column; gap: 12px; }
+.view { position: sticky; top: var(--nav-h); align-self: start; height: calc(100vh - var(--nav-h)); height: calc(100svh - var(--nav-h)); display: flex; flex-direction: column; padding-bottom: 24px; }
 .stage { position: relative; flex: 1; min-height: 0; border-radius: var(--r-lg); overflow: hidden; background: var(--wall); }
 .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; opacity: 0; transition: opacity .8s var(--ease-out); }
 .stage.live iframe { opacity: 1; }
 /* until the model stands, a picture of the piece holds its place in the main view (no empty frame) */
 .stage .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #d9dadc; transition: opacity .8s var(--ease-out); }
 .stage.live .poster { opacity: 0; }
-.stage .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #d9dadc; opacity: 0; pointer-events: none; transition: opacity .4s var(--ease-out); }
-.stage .photo.dark { background: #201f20; }
-.stage.show-photo .photo { opacity: 1; pointer-events: auto; }
-.stage.show-photo iframe { visibility: hidden; }
 .pill { position: absolute; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; background: rgba(244, 243, 239, .86); backdrop-filter: blur(6px); font-size: 13px; color: var(--graphite); pointer-events: none; transition: opacity .3s; }
 .pill i { width: 8px; height: 8px; background: var(--saffron); transform: rotate(45deg); animation: turn 1.2s var(--ease-out) infinite; }
 .pill.off { opacity: 0; }
 .how { position: absolute; right: 16px; bottom: 16px; font-size: 12px; color: var(--muted); pointer-events: none; transition: opacity .3s; }
-.stage:not(.live) .how, .stage.show-photo .how { opacity: 0; }
+.stage:not(.live) .how { opacity: 0; }
 @keyframes turn { to { transform: rotate(225deg); } }
-.views { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-.views button { position: relative; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; cursor: pointer; aspect-ratio: 4 / 3; background: #d9dadc; }
-.views button.dark { background: #201f20; }
-.views button.on { border-color: var(--ink); }
-.views img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.views .is3d { background: var(--wall); display: grid; place-items: center; font-weight: 500; font-size: 15px; letter-spacing: .02em; }
-.views .is3d svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; margin-bottom: 2px; }
-.views .is3d span { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 
 .info { display: flex; flex-direction: column; gap: 24px; padding-top: 8px; }
 .back { align-self: start; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--graphite); text-decoration: none; }
@@ -125,12 +113,11 @@ button { font: inherit; color: inherit; }
   .pp { grid-template-columns: 1fr; }
   .view { position: static; height: auto; }
   .stage { flex: none; aspect-ratio: 4 / 3.4; }
-  .views { gap: 8px; }
   .how { display: none; }
   .terms strong { font-size: 20px; }
 }
 @media (max-width: 420px) { .nav ul { gap: 14px; } .terms { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .pill i { animation: none; } .stage iframe, .stage .photo { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pill i { animation: none; } .stage iframe, .stage .poster { transition: none; } }
 </style>
 </head>
 <body>
@@ -149,11 +136,9 @@ button { font: inherit; color: inherit; }
     <div class="stage" id="stage">
       <img class="poster" id="poster" src="/assets/products/shelf-1.jpg" alt="" width="1600" height="874">
       <iframe id="v3d" title="The piece in 3D: drag to turn it" allow="fullscreen"></iframe>
-      <img class="photo dark" id="photo" src="/assets/products/shelf-0.jpg" alt="" width="1600" height="1200">
       <div class="pill" id="pill" role="status"><i></i><span id="pill-t">Loading 3D…</span></div>
       <div class="how">Drag to turn · scroll to zoom</div>
     </div>
-    <div class="views" id="views" role="group" aria-label="Views"></div>
   </section>
 
   <section class="info" aria-labelledby="pd-name">
@@ -162,7 +147,6 @@ button { font: inherit; color: inherit; }
     <div class="opt"><h2>Finish <span id="pd-finish-v"></span></h2><div class="seg" id="pd-finish"></div></div>
     <div class="opt"><h2>Colour <span id="pd-colour-v"></span></h2><div class="swatches" id="pd-colours"></div></div>
     <div class="opt" id="pd-extra-wrap"><h2 id="pd-extra-h"></h2><div class="seg" id="pd-extra"></div></div>
-    <div class="opt"><h2>Metal thickness</h2><div class="seg" id="pd-thick"></div></div>
     <div class="opt"><h2>Size</h2><div class="size" id="pd-size"></div><p class="hint" id="pd-size-hint"></p></div>
     <div class="unique"><b></b><p>Your piece gets a pattern of its own. We draw it once, only for you, and never repeat it.<small>Before we cut, we send you a link to your piece: turn it in 3D and watch its pattern being drawn, line by line.</small></p></div>
     <div class="terms">
@@ -201,23 +185,11 @@ const key = (location.pathname.match(/\/shop\/([a-z]+)/) || [])[1] || new URLSea
 const p = PRODUCTS.find(x => x.key === key);
 if (!p) location.replace('/#shop');
 
-const cur = { finish: 'textured', colour: p.colour, thick: 2, w: p.w, h: p.h, hooks: p.hooks || 0, extras: new Set(), view: '3d' };
+const cur = { finish: 'textured', colour: p.colour, thick: THICK, w: p.w, h: p.h, hooks: p.hooks || 0, extras: new Set() };
 document.title = `${p.name} — Karakuli`;
 $('poster').src = img(p.key, p.poster || 1); $('poster').alt = `${p.name} with a Karakuli pattern`;
 $('pd-name').textContent = p.name; $('pd-lede').textContent = p.lede;
 $('ways').innerHTML = contactLinks();
-
-// ------------------------------------------------------------------ the views: the live 3D model first, then the photos
-$('views').innerHTML = `<button type="button" class="is3d" data-v="3d" aria-label="3D view"><span><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>3D</span></button>`
-  + [0, 1, 2, 3].map(n => `<button type="button" data-v="${n}"${n === 0 ? ' class="dark"' : ''} aria-label="Photo ${n + 1}"><img src="${img(p.key, n)}" alt="" loading="lazy"></button>`).join('');
-$('views').onclick = e => { const b = e.target.closest('button'); if (b) { cur.view = b.dataset.v; syncView(); } };
-function syncView() {
-  const photo = cur.view !== '3d';
-  $('stage').classList.toggle('show-photo', photo);
-  if (photo) { const n = +cur.view; $('photo').src = img(p.key, n); $('photo').alt = `${p.name} with a Karakuli pattern, photo ${n + 1}`; $('photo').classList.toggle('dark', n === 0); }
-  document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.v === cur.view));
-  $('pill').classList.toggle('off', photo || !busy);
-}
 
 // ------------------------------------------------------------------ the 3D model: the editor's own 3D view, embedded; every choice is sent to it
 const frame = $('v3d');
@@ -226,22 +198,21 @@ frame.src = `/editor?embed=1&v=${encodeURIComponent(p.view)}`;
 const look = () => ({ k3d: 'set', mat: cur.finish, color: cur.finish === 'steel' ? null : RAL.find(r => r[0] === cur.colour)[2], t: cur.thick,
   hooks: cur.extras.has('hooks'), towel: cur.extras.has('towel') });
 const send = () => { if (live) frame.contentWindow.postMessage(look(), location.origin); };
-function setBusy(on, text) { busy = on; if (text) $('pill-t').textContent = text; $('pill').classList.toggle('off', !on || cur.view !== '3d'); }
+function setBusy(on, text) { busy = on; if (text) $('pill-t').textContent = text; $('pill').classList.toggle('off', !on); }
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.source !== frame.contentWindow || !e.data || !e.data.k3d) return;
   const m = e.data.k3d;
   if (m === 'ready') { live = true; $('stage').classList.add('live'); setBusy(false); send(); }
   else if (m === 'busy') setBusy(true, 'Updating the model…');
   else if (m === 'idle') setBusy(false);
-  else if (m === 'error') { setBusy(false); cur.view = '0'; syncView(); }
+  else if (m === 'error') setBusy(false);
 });
-// the 3D view could not start (no WebGL, offline): the photos take its place
-setTimeout(() => { if (!live) { setBusy(false); if (cur.view === '3d') { cur.view = '0'; syncView(); } } }, 45000);
+// the 3D view could not start (no WebGL, offline): the photo stays in its place
+setTimeout(() => { if (!live) setBusy(false); }, 45000);
 
 // ------------------------------------------------------------------ the choices
 $('pd-finish').innerHTML = FINISHES.map(([k, , short]) => `<button type="button" data-k="${k}">${short}</button>`).join('');
 $('pd-colours').innerHTML = RAL.map(([code, n, hex]) => `<button type="button" data-c="${code}" style="background:${hex}" title="RAL ${code} ${n}" aria-label="RAL ${code} ${n}"></button>`).join('');
-$('pd-thick').innerHTML = THICK.map(t => `<button type="button" data-t="${t}">${t} mm</button>`).join('');
 $('pd-size').innerHTML = (p.key === 'hanger'
   ? `<label>Width<input readonly id="pd-w" aria-label="Width in mm (follows the hooks)"><em>mm</em></label>`
   : `<label>Width<input id="pd-w" inputmode="numeric" aria-label="Width in mm"><em>mm</em></label>`)
@@ -255,7 +226,6 @@ if (p.key !== 'hanger') $('pd-w').onchange = e => { cur.w = clamp(Math.round(+e.
 $('pd-h').onchange = e => { cur.h = clamp(Math.round(+e.target.value || p.h), p.minH, p.maxH); sync(); };
 $('pd-finish').onclick = e => { const b = e.target.closest('button'); if (b) { cur.finish = b.dataset.k; sync(true); } };
 $('pd-colours').onclick = e => { const b = e.target.closest('button'); if (!b) return; cur.colour = b.dataset.c; if (cur.finish === 'steel') cur.finish = 'textured'; sync(true); };
-$('pd-thick').onclick = e => { const b = e.target.closest('button'); if (b) { cur.thick = +b.dataset.t; sync(true); } };
 $('pd-extra').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   if (p.extra.multi) { const v = b.dataset.v; cur.extras.has(v) ? cur.extras.delete(v) : cur.extras.add(v); } else cur.hooks = +b.dataset.v;
@@ -269,12 +239,11 @@ function sync(to3d) {
   document.querySelectorAll('#pd-colours button').forEach(b => { const on = !steel && b.dataset.c === cur.colour; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   $('pd-colours').classList.toggle('off', steel);
   $('pd-colour-v').textContent = steel ? 'Bare brushed steel' : `RAL ${c[0]} ${c[1]}`;
-  document.querySelectorAll('#pd-thick button').forEach(b => b.classList.toggle('on', +b.dataset.t === cur.thick));
   $('pd-w').value = p.key === 'hanger' ? hangerWidth(cur.hooks) : cur.w; $('pd-h').value = cur.h;
   if (p.extra) document.querySelectorAll('#pd-extra button').forEach(b => b.classList.toggle('on', p.extra.multi ? cur.extras.has(b.dataset.v) : +b.dataset.v === cur.hooks));
-  if (to3d) { if (cur.view !== '3d' && live) { cur.view = '3d'; syncView(); } send(); }
+  if (to3d) send();
 }
-sync(); syncView();
+sync();
 
 // ------------------------------------------------------------------ pre-order: the order goes out by WhatsApp (or e-mail)
 $('pd-pre').onclick = () => { $('pd-pre').style.display = 'none'; $('pd-order').classList.add('show'); $('pd-order').elements.name.focus(); };
@@ -285,7 +254,7 @@ $('pd-order').onsubmit = e => {
   const lines = [
     `Pre-order: ${p.name}`,
     `Finish: ${FINISHES.find(x => x[0] === cur.finish)[1]}${steel ? '' : `, RAL ${c[0]} ${c[1]}`}`,
-    `Size: ${w} × ${cur.h} mm, ${cur.thick} mm steel`,
+    `Size: ${w} × ${cur.h} mm`,
     p.key === 'hanger' ? `Hooks: ${cur.hooks}` : (cur.extras.size ? `Extras: ${[...cur.extras].map(v => p.extra.items.find(i => i[0] === v)[1]).join(', ')}` : ''),
     `Name: ${f.name.value}`, `Phone: ${f.phone.value}`, f.email.value ? `E-mail: ${f.email.value}` : '', f.note.value ? `Note: ${f.note.value}` : ''
   ].filter(Boolean).join('\n');
