@@ -4743,7 +4743,7 @@ service cloud.firestore {
                 if (hit) {
                     ball.x -= ball.vx * k / steps; ball.y -= ball.vy * k / steps;   // back out of the wall, then bounce
                     const nl = Math.hypot(hit.nx, hit.ny) || 1, nx = hit.nx / nl, ny = hit.ny / nl; bwReflect(nx, ny); ball.vx += (Math.random() - 0.5) * ball.speed * 0.04; bwNormSpeed();
-                    bwBreak(hit);
+                    bwCarve(hit);
                     for (let t = 0; t < 8 && bwCellHit(); t++) { ball.x += nx * ball.r * 0.25; ball.y += ny * ball.r * 0.25; }   // never left inside the metal
                     bwHit(); return;
                 }
@@ -4773,6 +4773,74 @@ service cloud.firestore {
                 if (r.len / 3 > LINE_WEIGHT * 3) fragOf = id => (BW.bricks[id].u < uh ? 0 : 1);
             }
             bwRemoveBricks([...new Set(ids)], ball.x, ball.y, fragOf);
+        }
+        // One hit carves a bite out of the merged pattern: a flat-sided block about two lines wide, cut square to the way the ball came in. The bite flies off as whole pieces,
+        // and any scrap left behind that is smaller than a line's width falls with it. A corner where a straight line meets a 45 degree one breaks like any other part.
+        function bwCarve(hit) {
+            const g = BW.g, W = g.w, H = g.h, lc = LINE_WEIGHT / BW.cw, nl = Math.hypot(hit.nx, hit.ny) || 1, nx = hit.nx / nl, ny = hit.ny / nl;   // n: from the metal to the ball
+            const hu = lc * 1.1, d0 = -lc * 0.35, d1 = lc * 1.5, R = Math.ceil(Math.hypot(hu, d1)) + 2;
+            const cx = hit.ccx, cy = hit.ccy, xa = Math.max(0, Math.floor(cx - R)), xb = Math.min(W - 1, Math.ceil(cx + R)), ya = Math.max(0, Math.floor(cy - R)), yb = Math.min(H - 1, Math.ceil(cy + R));
+            let cut = [];
+            for (let yy = ya; yy <= yb; yy++) for (let xx = xa; xx <= xb; xx++) {
+                const i = yy * W + xx; if (BW.own[i] < 0) continue;
+                const dx = xx + 0.5 - cx, dy = yy + 0.5 - cy, u = -dx * ny + dy * nx, v = -(dx * nx + dy * ny);
+                if (Math.abs(u) <= hu && v >= d0 && v <= d1) cut.push(i);
+            }
+            if (!cut.length) { for (let yy = ya; yy <= yb; yy++) for (let xx = xa; xx <= xb; xx++) { const i = yy * W + xx; if (BW.own[i] >= 0 && Math.hypot(xx + 0.5 - cx, yy + 0.5 - cy) <= lc * 0.6) cut.push(i); } }
+            if (!cut.length) return;
+            const mark = (i) => { BW.st[i] = BW.stN; };
+            BW.stN++; const rmStamp = BW.stN;
+            cut.forEach(mark);
+            // scraps left behind: remaining metal next to the bite that is smaller than a line's square falls too
+            const lim = Math.round(lc * lc * 1.0), scraps = [];
+            BW.stN++; const seen = BW.stN;
+            let bx0 = W, by0 = H, bx1 = 0, by1 = 0; cut.forEach(i => { const x = i % W, y = (i / W) | 0; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; });
+            const around = [];
+            for (let yy = Math.max(0, by0 - 2); yy <= Math.min(H - 1, by1 + 2); yy++) for (let xx = Math.max(0, bx0 - 2); xx <= Math.min(W - 1, bx1 + 2); xx++) {
+                const i = yy * W + xx; if (BW.own[i] < 0 || BW.st[i] === rmStamp) continue;
+                let nb = false; for (let dy = -1; dy <= 1 && !nb; dy++) for (let dx = -1; dx <= 1; dx++) { const X = xx + dx, Y = yy + dy; if (X >= 0 && Y >= 0 && X < W && Y < H && BW.st[Y * W + X] === rmStamp) { nb = true; break; } }
+                if (nb) around.push(i);
+            }
+            around.forEach(seed => {
+                if (BW.st[seed] === seen || BW.st[seed] === rmStamp) return;
+                const comp = [seed]; BW.st[seed] = seen; let big = false;
+                for (let h = 0; h < comp.length; h++) {
+                    if (comp.length > lim) { big = true; break; }
+                    const i = comp[h], xx = i % W, yy = (i / W) | 0;
+                    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const X = xx + dx, Y = yy + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) return; const n2 = Y * W + X; if (BW.own[n2] < 0 || BW.st[n2] === rmStamp || BW.st[n2] === seen) return; BW.st[n2] = seen; comp.push(n2); });
+                }
+                if (!big && comp.length <= lim) scraps.push(comp);
+            });
+            const all = cut.slice(); scraps.forEach(c => c.forEach(i => all.push(i)));
+            // split into connected pieces and send each off
+            BW.stN++; const lab = BW.stN, pieces = [], set = new Set(all);
+            all.forEach(i0 => {
+                if (BW.st[i0] === lab) return; const comp = [i0]; BW.st[i0] = lab;
+                for (let h = 0; h < comp.length; h++) { const i = comp[h], xx = i % W, yy = (i / W) | 0;
+                    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const X = xx + dx, Y = yy + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) return; const n2 = Y * W + X; if (!set.has(n2) || BW.st[n2] === lab) return; BW.st[n2] = lab; comp.push(n2); }); }
+                pieces.push(comp);
+            });
+            const [sx, sy] = [targetOffsetX + ball.x * targetZoom, targetOffsetY + ball.y * targetZoom], U = BW.U;
+            let x0 = W, y0 = H, x1 = 0, y1 = 0;
+            pieces.sort((a, b) => b.length - a.length).forEach((comp, pi) => {
+                let fx0 = W, fy0 = H, fx1 = 0, fy1 = 0; comp.forEach(i => { const x = i % W, y = (i / W) | 0; if (x < fx0) fx0 = x; if (x > fx1) fx1 = x; if (y < fy0) fy0 = y; if (y > fy1) fy1 = y; });
+                if (pi < 5 && comp.length > 30) {
+                    const w = fx1 - fx0 + 1, h = fy1 - fy0 + 1, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+                    const cxt = cv.getContext('2d'), im = cxt.createImageData(w, h);
+                    comp.forEach(i => { const x = i % W - fx0, y = ((i / W) | 0) - fy0, q = (y * w + x) * 4, c = BW.rgb[i]; im.data[q] = c >> 16; im.data[q + 1] = (c >> 8) & 255; im.data[q + 2] = c & 255; im.data[q + 3] = BW.alpha[i]; });
+                    cxt.putImageData(im, 0, 0);
+                    const sdc = document.createElement('canvas'); sdc.width = w; sdc.height = h; const sdx = sdc.getContext('2d'); sdx.drawImage(cv, 0, 0); sdx.globalCompositeOperation = 'source-in'; sdx.fillStyle = '#1e2633'; sdx.fillRect(0, 0, w, h);
+                    const px = (g.x + fx0) * g.css, py = (g.y + fy0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2, dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (1.2 + Math.random() * 1.2) * U;
+                    BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.4, vy: dy / dl * spd - (1 + Math.random() * 1) * U, life: 40 + Math.random() * 15, r: 0, vr: (Math.random() - 0.5) * 0.16, dep: LINE_WEIGHT * 0.12 * targetZoom, sd: sdc });
+                }
+                if (fx0 < x0) x0 = fx0; if (fy0 < y0) y0 = fy0; if (fx1 > x1) x1 = fx1; if (fy1 > y1) y1 = fy1;
+            });
+            let gone = 0; all.forEach(i => { if (BW.alpha[i] >= 128) gone++; BW.own[i] = -1; BW.bid[i] = -1; BW.alpha[i] = 0; });
+            BW.live -= gone;
+            for (let j = 0; j < 3; j++) { const a = Math.random() * Math.PI * 2, s2 = (0.6 + Math.random() * 1.8) * U; BW.parts.push({ x: sx, y: sy, vx: Math.cos(a) * s2, vy: Math.sin(a) * s2 - 0.5 * U, life: 10 + Math.random() * 10, r: U * (0.15 + Math.random() * 0.2), col: Math.random() < 0.5 ? '#9fe3ff' : '#ffffff', spark: true }); }
+            if (x1 >= x0) { const m = 4; bwBricksPaint(x0 - m, y0 - m, x1 + 1 + m, y1 + 1 + m); }
+            bwScore(30, ball.x, ball.y); BWS.brick(); BW.shake = Math.max(BW.shake, 5);
+            if (Math.random() < 0.09) bwDropCap(ball.x, ball.y);
         }
         function bwHit() {
             BW.hits++; ball.speed = Math.min(ball.base * 1.15, ball.base * (1 + BW.hits * 0.006));   // a barely noticeable speed-up over the game
@@ -4903,21 +4971,9 @@ service cloud.firestore {
                 for (let i = 0; i < gw * gh; i++) if (A[i] && BW.own[i] < 0) A[i] = 0;
                 BW.alpha = A;
             }
-            // every brick on its own: its cells, its centre, where it sits along its line / round its ring
-            BW.bid = new Int32Array(gw * gh).fill(-1); BW.bricks = []; BW.live = 0;
-            const map = new Map();
-            for (let i = 0; i < gw * gh; i++) {
-                const o = BW.own[i]; if (o < 0) continue;
-                const kk = BW.key[i]; let b = map.get(kk);
-                if (b === undefined) { b = BW.bricks.length; map.set(kk, b); BW.bricks.push({ el: o, cells: [], sx: 0, sy: 0, alive: true }); BW.live++; }
-                const br = BW.bricks[b]; BW.bid[i] = b; br.cells.push(i); br.sx += i % gw; br.sy += (i / gw) | 0;
-            }
-            BW.keyMap = map;
-            BW.bricks.forEach(b => {
-                b.cx = b.sx / b.cells.length; b.cy = b.sy / b.cells.length;
-                const [wx, wy] = bwWorldOfCell(b.cx, b.cy), e = BW.els[b.el];
-                if (e.t === 'seg') b.u = wx * e.ux + wy * e.uy; else if (e.t === 'ring') b.ang = Math.atan2(wy - e.y, wx - e.x);
-            });
+            // The pattern is one merged piece of metal: a cell is simply solid or not. A hit carves a bite out of it (bwCarve).
+            BW.bid = new Int32Array(gw * gh).fill(-1); BW.bricks = []; BW.live = 0; BW.keyMap = new Map(); BW.st = new Int32Array(gw * gh); BW.stN = 0;
+            for (let i = 0; i < gw * gh; i++) if (BW.own[i] >= 0) { BW.bid[i] = 0; if (BW.alpha[i] >= 128) BW.live++; }
             bwShade(0, 0, gw, gh);
             bwBricksPaint(0, 0, gw, gh);
             BW.dirty = false;
@@ -5025,7 +5081,7 @@ service cloud.firestore {
                 const dx = xx + 0.5 - bcx, dy = yy + 0.5 - bcy, d2 = dx * dx + dy * dy; if (d2 > rb * rb) continue;
                 sx += dx; sy += dy; n++; if (d2 < bd) { bd = d2; best = BW.bid[i]; }
             }
-            return n ? { bid: best, nx: -sx, ny: -sy } : null;
+            void best; return n ? { bid: 0, nx: -sx, ny: -sy, ccx: bcx + sx / n, ccy: bcy + sy / n } : null;   // ccx, ccy: where the ball touches the metal, in cells
         }
 
         function bwSpark(wx, wy, cols, n) {
