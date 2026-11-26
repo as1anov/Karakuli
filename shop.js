@@ -8,7 +8,7 @@ export const RAL = [
   ['9005', 'Jet black', '#161616'], ['9003', 'Signal white', '#f4f4f4'], ['1015', 'Light ivory', '#e6d2b5'], ['6005', 'Moss green', '#2f4538'],
   ['2004', 'Pure orange', '#e75b12'], ['1037', 'Sun yellow', '#f29200'], ['3020', 'Traffic red', '#cc0605'], ['3004', 'Purple red', '#6b1c23'], ['5014', 'Pigeon blue', '#6c7c98']
 ];
-export const FINISHES = [['textured', 'Textured powder coat', 'Textured'], ['gloss', 'Gloss paint', 'Gloss'], ['steel', 'Stainless steel', 'Stainless steel']];
+export const FINISHES = [['textured', 'Textured powder coat', 'Textured'], ['gloss', 'Gloss paint', 'Gloss'], ['steel', 'Brushed stainless steel', 'Brushed steel']];
 export const THICK = 2;   // mm: every piece is cut from 2 mm sheet
 export const HOOK_PITCH = 24 * 30 * 12 / 58;   // mm between hanger hooks, as in the editor
 export const hangerWidth = n => Math.round(12 + (n - 1) * HOOK_PITCH);
