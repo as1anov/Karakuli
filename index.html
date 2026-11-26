@@ -236,6 +236,8 @@
         #mode-text { display: none !important; }
         body.game-active #main-toolbar .mode-header { width: 96px; }
         html body.game-active #main-toolbar, html body.game-active #main-toolbar *, html body.game-active .top-nav-wrapper { pointer-events: none !important; } html body.game-active #left-nav-group, html body.game-active #left-nav-group * { pointer-events: auto !important; }   /* the hearts' bar spans the top and lay over the X: it takes no taps */
+        body.game-active #left-nav-group { padding: 3px !important; border-radius: 13px; } body.game-active #left-nav-group #menu-btn { width: 34px !important; height: 34px !important; border-radius: 10px; } body.game-active #left-nav-group #menu-btn svg { width: 16px; height: 16px; }   /* a smaller X in the game */
+        @media (max-width: 600px) { html body.game-active #main-toolbar { padding: 0 !important; width: auto; } html body.game-active #main-toolbar .mode-header { height: 40px; } }   /* the hearts on the X's line */
         html body.game-active #main-toolbar, html body.game-active #main-toolbar .mode-header { background: none !important; border-color: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }   /* in the game: three hearts on their own, no plate */
         html body.game-active #main-toolbar .mode-header.x-old { background-color: #0f1529; background-image: linear-gradient(#141c36, #0b1022); border-color: rgba(140, 180, 255, 0.25); box-shadow: inset 0 0 0 1px rgba(140, 180, 255, 0.18), 0 0 12px rgba(90, 160, 255, 0.18); }   /* the hearts sit on a piece of the game's dark arena */
         body.game-active #mode-ico { display: none; }
@@ -4465,8 +4467,12 @@ service cloud.firestore {
             for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; const r = el.isNode ? Rout : lw; if ((el.isNode || el.isDiamond) && j * STEP < cut) grow(i * STEP - r, j * STEP - r, i * STEP + r, j * STEP + r + (el.isDiamond ? lw / 2 : 0)); }
             if (minX === Infinity) { minX = 0; maxX = 1000; minY = 0; maxY = 600; }
             const nav = document.querySelector('.top-nav-wrapper'), nr = nav && nav.getBoundingClientRect();
-            const top = nr && nr.height && nr.top < height / 2 ? Math.round(nr.bottom + 10) : 16, side = 10, bottom = 14;
-            const uW = width - 2 * side, uH = height - top - bottom;
+            const gx = document.querySelector('#left-nav-group'), gh = document.querySelector('#game-hearts'), gr = gx && gx.getBoundingClientRect(), hr = gh && gh.getBoundingClientRect();
+            const barB = Math.max(gr && gr.height ? gr.bottom : 0, hr && hr.height ? hr.bottom : 0);   // the field starts right under the X and the hearts, not under the (taller) invisible bar
+            const phoneUI = Math.min(width, height) <= 600;
+            const top = barB ? Math.round(barB + 8) : (nr && nr.height && nr.top < height / 2 ? Math.round(nr.bottom + 10) : 16), side = 10, bottom = phoneUI ? 36 : 14;   // a phone: room below the paddle for the home bar / browser bar
+            const vv = window.visualViewport, viewH = Math.min(height, vv && vv.height ? vv.height + (vv.offsetTop || 0) : height);   // only the visible part of the screen
+            const uW = width - 2 * side, uH = viewH - top - bottom;
             BW.U = Math.max(2.5, Math.min(7, Math.min(width, height) / 130));
             const pad = lw * 1.4;
             const pw = maxX - minX + 2 * pad, ph = maxY - minY + 2 * pad;
