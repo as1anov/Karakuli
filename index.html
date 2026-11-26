@@ -4578,7 +4578,7 @@ service cloud.firestore {
             const z = L.z, I = BW.inner, fh = L.field.maxY - L.field.minY;
             paddle = { w: Math.max(16 * BW.PX / z, (I.maxX - I.minX) * 0.22), h: 3 * BW.PX / z, x: (I.minX + I.maxX) / 2, y: L.field.maxY - 7 * BW.PX / z, base: 0 };
             paddle.base = paddle.w;
-            ball = { r: 1.9 * BW.PX / z, x: paddle.x, y: 0, vx: 0, vy: 0, speed: fh / 105, base: fh / 105 };
+            ball = { r: 2.4 * BW.PX / z, x: paddle.x, y: 0, vx: 0, vy: 0, speed: fh / 105, base: fh / 105 };
             ball.y = paddle.y - paddle.h / 2 - ball.r;
             BW.score = 0; BW.combo = 0; BW.hits = 0; BW.parts = []; BW.bparts = []; BW.pops = []; BW.caps = []; BW.trail = []; BW.fx = { W: 0, S: 0, F: 0 }; BW.fireworks = 0;
             BW.prevA = null; BW.frame = null; BW.sky = null; BW.W = 0;
@@ -4656,7 +4656,7 @@ service cloud.firestore {
             BW.pops.push({ x, y, s: '+' + v + (mult > 1 ? ' x' + mult : ''), t: 0 });
         }
         function bwDropCap(x, y) {
-            const r = Math.random(), k = r < 0.35 ? 'W' : r < 0.6 ? 'S' : r < 0.85 ? 'F' : 'L';
+            const r = Math.random(), k = r < 0.45 ? 'W' : r < 0.8 ? 'S' : 'L';
             BW.caps.push({ k, x, y, vy: (BW.field.maxY - BW.field.minY) / 320 });
         }
 
@@ -4692,45 +4692,34 @@ service cloud.firestore {
                     BW.combo = 0; BWS.paddle();
                 }
                 if (ball.y - ball.r > BW.field.maxY) { bwLoseLife(); return; }
-                // rings: one hit breaks them
-                for (let i = gameBricks.nodes.length - 1; i >= 0; i--) {
-                    const n = gameBricks.nodes[i], d = Math.hypot(ball.x - n.x, ball.y - n.y) || 1e-6, inR = BASE_STEP_VAL - lw / 2, outR = BASE_STEP_VAL + lw / 2;
-                    if (d > inR - ball.r && d < outR + ball.r) {
-                        let nx = (ball.x - n.x) / d, ny = (ball.y - n.y) / d;
-                        if (!fire) { if (d < BASE_STEP_VAL) { nx = -nx; ny = -ny; } bwReflect(nx, ny); bwNormSpeed(); }
-                        gameBricks.nodes.splice(i, 1); BW.els[n.el].alive = false;
-                        bwScore(50, n.x, n.y); BW.dirty = true; BW.spawnAt = [ball.x, ball.y]; BWS.ring(); BW.shake = 6;
-                        if (Math.random() < 0.25) bwDropCap(n.x, n.y);
-                        bwHit(); if (!fire) return; break;
+                // the masonry
+                const hit = bwCellHit();
+                if (hit) {
+                    const e = BW.els[BW.bricks[hit.bid].el];
+                    if (e.t === 'gem') {   // a gold block: the ball takes it on the way and a power-up drops
+                        e.alive = false; BW.spawnAt = [e.x, e.y]; bwBricksUpdate();
+                        gameBricks.diamonds = gameBricks.diamonds.filter(d => BW.els[d.el].alive);
+                        bwScore(100, e.x, e.y); bwDropCap(e.x, e.y); BWS.gem(); bwSpark(e.x, e.y, ['#fff0a8', '#ffc94a', '#ffffff'], 18);
+                        continue;
                     }
-                }
-                // gems: the ball collects them on the way - each drops a power-up
-                for (let i = gameBricks.diamonds.length - 1; i >= 0; i--) {
-                    const g = gameBricks.diamonds[i];
-                    if (Math.hypot(ball.x - g.x, ball.y - g.y) < ball.r + lw * 0.6) {
-                        gameBricks.diamonds.splice(i, 1); BW.els[g.el].alive = false; BW.dirty = true; BW.spawnAt = [g.x, g.y]; bwScore(100, g.x, g.y); bwDropCap(g.x, g.y); BWS.gem();
-                        bwSpark(g.x, g.y, BW_COL.gem, 18);
+                    ball.x -= ball.vx * k / steps; ball.y -= ball.vy * k / steps;   // back out of the wall, then bounce
+                    const nl = Math.hypot(hit.nx, hit.ny) || 1; bwReflect(hit.nx / nl, hit.ny / nl); ball.vx += (Math.random() - 0.5) * ball.speed * 0.06; bwNormSpeed();
+                    if (e.t === 'ring') {   // a ring breaks whole at one hit
+                        e.alive = false; BW.spawnAt = [ball.x, ball.y]; bwBricksUpdate();
+                        bwScore(50, e.x, e.y); BWS.ring(); BW.shake = 6; if (Math.random() < 0.25) bwDropCap(e.x, e.y);
+                    } else {               // a line loses 3-4 bricks
+                        const ids = bwBreakAround(hit);
+                        bwRemoveBricks(ids, ball.x, ball.y);
+                        bwScore(5 * ids.length, ball.x, ball.y); BWS.brick(); BW.shake = Math.max(BW.shake, 2.5);
+                        if (Math.random() < 0.06) bwDropCap(ball.x, ball.y);
                     }
-                }
-                // brick lines
-                const ls = gameBricks.lines, rr = ball.r + lw / 2;
-                for (let i = ls.length - 1; i >= 0; i--) {
-                    let hit = null;
-                    for (const s of ls[i].subs) {
-                        const res = distToSegmentSquared(ball, { x: s[0], y: s[1] }, { x: s[2], y: s[3] });
-                        if (res.distSq < rr * rr) { hit = res; break; }
-                    }
-                    if (!hit) continue;
-                    const dist = Math.sqrt(hit.distSq) || 1e-6, nx = (ball.x - hit.proj.x) / dist, ny = (ball.y - hit.proj.y) / dist;
-                    if (!fire) { ball.x = hit.proj.x + nx * rr; ball.y = hit.proj.y + ny * rr; bwReflect(nx, ny); ball.vx += (Math.random() - 0.5) * ball.speed * 0.08; bwNormSpeed(); }
-                    destroyLineChain(i, hit.proj.x, hit.proj.y);
-                    bwHit(); if (!fire) return; break;
+                    bwHit(); return;
                 }
             }
         }
         function bwHit() {
             BW.hits++; ball.speed = Math.min(ball.base * 1.45, ball.base * (1 + BW.hits * 0.012));
-            if (!gameBricks.lines.length && !gameBricks.nodes.length) {
+            if (BW.live <= 0) {
                 BW.score += gameBricks.diamonds.length * 100; gameBricks.diamonds.forEach(g => { BW.els[g.el].alive = false; }); gameBricks.diamonds = []; BW.dirty = true;
                 bwEnd('victory');
             }
@@ -4775,7 +4764,7 @@ service cloud.firestore {
         // at the final camera, at about 32 cells across a line, and only the cells of broken parts are redone; those bricks fly off.
         const BW_LIGHT = [-0.55, -0.83];
         function bwBrickColour(e, px, py) {   // -> [r, g, b, brick key] for a world point inside element e
-            const lw = LINE_WEIGHT, rowH = lw / 4, mw = Math.max(BW.cw * 1.0, rowH * 0.13), bev = Math.max(BW.cw, rowH * 0.17);
+            const lw = LINE_WEIGHT, rowH = lw / 4, mw = Math.max(BW.cw * 1.0, rowH * 0.13), bev = Math.max(BW.cw, rowH * 0.1);
             let u, v, Lb, ud, vd, pal = BW.palB, hi = BW.hiB, lo = BW.loB, rows = 4, half = lw / 2;
             if (e.t === 'seg') {
                 u = px * e.ux + py * e.uy; v = -e.uy * (px - e.a.x) + e.ux * (py - e.a.y);
@@ -4798,10 +4787,13 @@ service cloud.firestore {
             if ((fv < mw && row > 0) || fu < mw) return [BW.morB, key];
             const sV = vd[0] * BW_LIGHT[0] + vd[1] * BW_LIGHT[1], sU = ud[0] * BW_LIGHT[0] + ud[1] * BW_LIGHT[1];
             const vHi = rh - fv, vLo = fv - (row > 0 ? mw : 0), uHi = Lb - fu, uLo = fu - mw;
-            const lit = (sV > 0 ? vHi : vLo) < bev || (sU > 0 ? uHi : uLo) < bev * 0.8;
-            const dark = (sV > 0 ? vLo : vHi) < bev || (sU > 0 ? uLo : uHi) < bev * 0.8;
-            const base = pal[bwHash(row * 31 + col, (e.seed || 0) + 7) % pal.length];
-            return [lit ? hi : dark ? lo : base, key];
+            // a raised brick: two steps of bevel - bright on the edges facing the light, dark on the others - and a speckled face
+            const dL = Math.min(sV > 0 ? vHi : vLo, (sU > 0 ? uHi : uLo) * 1.3), dD = Math.min(sV > 0 ? vLo : vHi, (sU > 0 ? uLo : uHi) * 1.3);
+            const base = pal[bwHash(row * 31 + col, (e.seed || 0) + 7) % pal.length], mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t | 0, a[1] + (b[1] - a[1]) * t | 0, a[2] + (b[2] - a[2]) * t | 0];
+            let c = dL < bev ? hi : dD < bev ? lo : dL < bev * 2.3 ? mix(base, hi, 0.42) : dD < bev * 2.3 ? mix(base, lo, 0.5) : base;
+            const sp = bwHash((px / BW.cw) | 0, (py / BW.cw) | 0) % 11;
+            if (sp === 0) c = mix(c, lo, 0.3); else if (sp === 1) c = mix(c, hi, 0.25);
+            return [c, key];
         }
 
         function bwOwnerAt(px, py, list) {   // the element a world point belongs to: inside the band, nearest to its middle
@@ -4862,6 +4854,16 @@ service cloud.firestore {
             BW.layer = document.createElement('canvas'); BW.layer.width = gw; BW.layer.height = gh; BW.lx = BW.layer.getContext('2d');
             BW.img = BW.lx.createImageData(gw, gh);
             for (let yy = 0; yy < gh; yy++) for (let xx = 0; xx < gw; xx++) bwBrickCell(xx, yy);
+            // every brick on its own: its cells, centre and element - the ball breaks them a few at a time
+            BW.bid = new Int32Array(gw * gh).fill(-1); BW.bricks = []; BW.live = 0;
+            const map = new Map();
+            for (let i = 0; i < gw * gh; i++) {
+                const o = BW.own[i]; if (o < 0) continue;
+                const kk = BW.key[i]; let b = map.get(kk);
+                if (b === undefined) { b = BW.bricks.length; map.set(kk, b); BW.bricks.push({ el: o, cells: [], sx: 0, sy: 0, alive: true }); if (BW.els[o].t !== 'gem') BW.live++; }
+                const br = BW.bricks[b]; BW.bid[i] = b; br.cells.push(i); br.sx += i % gw; br.sy += (i / gw) | 0;
+            }
+            BW.bricks.forEach(b => { b.cx = b.sx / b.cells.length; b.cy = b.sy / b.cells.length; });
             bwBricksPaint(0, 0, gw, gh);
             BW.dirty = false;
         }
@@ -4890,47 +4892,67 @@ service cloud.firestore {
                 if (edge) { d[q] = ol[0]; d[q + 1] = ol[1]; d[q + 2] = ol[2]; d[q + 3] = 255; } else d[q + 3] = 0;
             }
             BW.lx.putImageData(BW.img, 0, 0);
+            // the wall's shadow on the sky: its silhouette, drawn a little down and right
+            if (!BW.shadow || BW.shadow.width !== W || BW.shadow.height !== H) { BW.shadow = document.createElement('canvas'); BW.shadow.width = W; BW.shadow.height = H; }
+            const sx = BW.shadow.getContext('2d'); sx.globalCompositeOperation = 'source-over'; sx.clearRect(0, 0, W, H); sx.drawImage(BW.layer, 0, 0);
+            sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgba(6, 3, 20, 0.55)'; sx.fillRect(0, 0, W, H); sx.globalCompositeOperation = 'source-over';
         }
-        // after a hit: the cells of dead elements are given to a living neighbour (at a joint) or emptied; emptied bricks fly off
+        // bricks of elements that have died as a whole (a collected gem, a ring, the leftovers at the end) go too
         function bwBricksUpdate() {
-            if (!BW.g) return;
-            const g = BW.g, W = g.w, groups = new Map(), lw = LINE_WEIGHT, R = BASE_STEP_VAL + lw;
-            // only the cells round the parts that have just died are looked at
-            let rx0 = Infinity, ry0 = Infinity, rx1 = -Infinity, ry1 = -Infinity;
-            BW.els.forEach(e => {
-                if (e.alive || e.gone) return; e.gone = true;
-                const ex0 = e.t === 'seg' ? Math.min(e.a.x, e.b.x) - lw : e.x - R, ex1 = e.t === 'seg' ? Math.max(e.a.x, e.b.x) + lw : e.x + R;
-                const ey0 = e.t === 'seg' ? Math.min(e.a.y, e.b.y) - lw : e.y - R, ey1 = e.t === 'seg' ? Math.max(e.a.y, e.b.y) + lw : e.y + R;
-                rx0 = Math.min(rx0, ex0); ry0 = Math.min(ry0, ey0); rx1 = Math.max(rx1, ex1); ry1 = Math.max(ry1, ey1);
-            });
-            if (rx0 === Infinity) { BW.spawnAt = null; BW.dirty = false; return; }
-            const cX = wx => Math.floor((targetOffsetX + wx * targetZoom) / g.css) - g.x, cY = wy => Math.floor((targetOffsetY + wy * targetZoom) / g.css) - g.y;
-            const sx0 = Math.max(0, cX(rx0)), sy0 = Math.max(0, cY(ry0)), sx1 = Math.min(W - 1, cX(rx1) + 1), sy1 = Math.min(g.h - 1, cY(ry1) + 1);
-            let x0 = W, y0 = g.h, x1 = 0, y1 = 0;
-            for (let yy = sy0; yy <= sy1; yy++) for (let xx = sx0; xx <= sx1; xx++) {
-                const i = yy * W + xx, o = BW.own[i]; if (o < 0 || BW.els[o].alive) continue;
-                const key = BW.key[i], c = BW.rgb[i];
-                bwBrickCell(xx, yy);
-                if (BW.own[i] < 0) { let gr = groups.get(key); if (!gr) groups.set(key, gr = { px: [], x0: xx, y0: yy, x1: xx, y1: yy }); gr.px.push([xx, yy, c]); if (xx < gr.x0) gr.x0 = xx; if (yy < gr.y0) gr.y0 = yy; if (xx > gr.x1) gr.x1 = xx; if (yy > gr.y1) gr.y1 = yy; }
-                if (xx < x0) x0 = xx; if (yy < y0) y0 = yy; if (xx > x1) x1 = xx; if (yy > y1) y1 = yy;
-            }
-            if (x1 >= x0) bwBricksPaint(x0, y0, x1 + 1, y1 + 1);
-            // flying bricks: each brick becomes a little sprite, thrown away from the hit
-            const [sx, sy] = BW.spawnAt ? [targetOffsetX + BW.spawnAt[0] * targetZoom, targetOffsetY + BW.spawnAt[1] * targetZoom] : [width / 2, height / 3];
-            let n = 0;
-            for (const gr of groups.values()) {
-                if (gr.px.length < 3) continue;
-                if (++n > 160) break;
-                const w = gr.x1 - gr.x0 + 1, h = gr.y1 - gr.y0 + 1, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-                const cx = cv.getContext('2d'), im = cx.createImageData(w, h);
-                gr.px.forEach(([xx, yy, c]) => { const q = ((yy - gr.y0) * w + (xx - gr.x0)) * 4; im.data[q] = c >> 16; im.data[q + 1] = (c >> 8) & 255; im.data[q + 2] = c & 255; im.data[q + 3] = 255; });
-                cx.putImageData(im, 0, 0);
-                const px = (g.x + gr.x0) * g.css, py = (g.y + gr.y0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
-                const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, sp = (1.2 + Math.random() * 2.6) * BW.PX * 0.5;
-                BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * sp + (Math.random() - 0.5) * BW.PX, vy: dy / dl * sp - (1 + Math.random() * 2) * BW.PX * 0.6, life: 60 + Math.random() * 50, r: 0, vr: (Math.random() - 0.5) * 0.25 });
-            }
+            if (!BW.g) { BW.dirty = false; return; }
+            const ids = []; BW.bricks.forEach((b, i) => { if (b.alive && !BW.els[b.el].alive) ids.push(i); });
+            if (ids.length) bwRemoveBricks(ids, BW.spawnAt ? BW.spawnAt[0] : null, BW.spawnAt ? BW.spawnAt[1] : null);
             BW.spawnAt = null; BW.dirty = false;
         }
+        // take bricks out of the wall; each flies off as a little sprite, away from the hit
+        function bwRemoveBricks(ids, hx, hy) {
+            const g = BW.g, W = g.w; let x0 = W, y0 = g.h, x1 = 0, y1 = 0;
+            const [sx, sy] = hx != null ? [targetOffsetX + hx * targetZoom, targetOffsetY + hy * targetZoom] : [width / 2, height / 3];
+            const elsHit = new Set();
+            ids.forEach((id, n) => {
+                const b = BW.bricks[id]; if (!b || !b.alive) return;
+                b.alive = false; elsHit.add(b.el); if (BW.els[b.el].t !== 'gem') BW.live--;
+                let bx0 = W, by0 = g.h, bx1 = 0, by1 = 0;
+                b.cells.forEach(i => { const xx = i % W, yy = (i / W) | 0; if (xx < bx0) bx0 = xx; if (yy < by0) by0 = yy; if (xx > bx1) bx1 = xx; if (yy > by1) by1 = yy; });
+                if (n < 160 && b.cells.length > 2) {
+                    const w = bx1 - bx0 + 1, h = by1 - by0 + 1, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+                    const cx = cv.getContext('2d'), im = cx.createImageData(w, h);
+                    b.cells.forEach(i => { if (BW.own[i] < 0) return; const c = BW.rgb[i], q = (((i / W) | 0) - by0) * w * 4 + ((i % W) - bx0) * 4; im.data[q] = c >> 16; im.data[q + 1] = (c >> 8) & 255; im.data[q + 2] = c & 255; im.data[q + 3] = 255; });
+                    cx.putImageData(im, 0, 0);
+                    const px = (g.x + bx0) * g.css, py = (g.y + by0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
+                    const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (1.2 + Math.random() * 2.4) * BW.PX * 0.5;
+                    BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * BW.PX, vy: dy / dl * spd - (1 + Math.random() * 2) * BW.PX * 0.6, life: 60 + Math.random() * 50, r: 0, vr: (Math.random() - 0.5) * 0.25 });
+                }
+                b.cells.forEach(i => { BW.own[i] = -1; BW.bid[i] = -1; });
+                if (bx0 < x0) x0 = bx0; if (by0 < y0) y0 = by0; if (bx1 > x1) x1 = bx1; if (by1 > y1) y1 = by1;
+            });
+            if (x1 >= x0) bwBricksPaint(x0, y0, x1 + 1, y1 + 1);
+            elsHit.forEach(el => { if (!BW.bricks.some(b => b.alive && b.el === el)) BW.els[el].alive = false; });
+        }
+        // the ball against the masonry, cell by cell: -> the brick it touches and the way out (from the touched cells to the ball's centre)
+        function bwCellHit() {
+            const g = BW.g; if (!g) return null;
+            const z = targetZoom, bcx = (targetOffsetX + ball.x * z) / g.css - g.x, bcy = (targetOffsetY + ball.y * z) / g.css - g.y, rb = ball.r * z / g.css;
+            const st = Math.max(1, Math.floor(rb / 10));
+            const xa = Math.max(0, Math.floor(bcx - rb)), xb = Math.min(g.w - 1, Math.ceil(bcx + rb)), ya = Math.max(0, Math.floor(bcy - rb)), yb = Math.min(g.h - 1, Math.ceil(bcy + rb));
+            let sx = 0, sy = 0, n = 0, best = -1, bd = Infinity;
+            for (let yy = ya; yy <= yb; yy += st) for (let xx = xa; xx <= xb; xx += st) {
+                const i = yy * g.w + xx; if (BW.bid[i] < 0) continue;
+                const dx = xx + 0.5 - bcx, dy = yy + 0.5 - bcy, d2 = dx * dx + dy * dy; if (d2 > rb * rb) continue;
+                sx += dx; sy += dy; n++; if (d2 < bd) { bd = d2; best = BW.bid[i]; }
+            }
+            return n ? { bid: best, nx: -sx, ny: -sy, cx: bcx, cy: bcy } : null;
+        }
+        // the hit brick and its 2-3 nearest neighbours on the lines (3-4 bricks a hit)
+        function bwBreakAround(hit) {
+            const g = BW.g, b0 = BW.bricks[hit.bid], R = LINE_WEIGHT * targetZoom / g.css * 1.1, cand = new Set();
+            const xa = Math.max(0, Math.floor(b0.cx - R)), xb = Math.min(g.w - 1, Math.ceil(b0.cx + R)), ya = Math.max(0, Math.floor(b0.cy - R)), yb = Math.min(g.h - 1, Math.ceil(b0.cy + R));
+            for (let yy = ya; yy <= yb; yy += 2) for (let xx = xa; xx <= xb; xx += 2) { const id = BW.bid[yy * g.w + xx]; if (id >= 0 && id !== hit.bid && BW.els[BW.bricks[id].el].t === 'seg') cand.add(id); }
+            const near = [...cand].map(id => [id, Math.hypot(BW.bricks[id].cx - hit.cx, BW.bricks[id].cy - hit.cy)]).sort((a, b) => a[1] - b[1]);
+            const extra = 2 + (Math.random() < 0.5 ? 1 : 0);
+            return [hit.bid, ...near.slice(0, extra).map(a => a[0])];
+        }
+
 
         function bwSpark(wx, wy, cols, n) {
             const [x, y] = bwCell(wx, wy);
@@ -4996,6 +5018,21 @@ service cloud.firestore {
             BW.frame = c; BW.fr = { X0, Y0, X1, Y1 };
         }
 
+        function bwBallSprite() {   // shaded with 6 tones from a light at the top left, a dark rim and a white glint
+            if (BW.ballCv) return BW.ballCv;
+            const N = 16, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
+            const tones = ['#5e4a2c', '#a8834a', '#d9b56a', '#f3dc98', '#fff3cf', '#ffffff'], L = [-0.48, -0.58, 0.66], R = N / 2 - 0.5;
+            for (let yy = 0; yy < N; yy++) for (let xx = 0; xx < N; xx++) {
+                const dx = (xx + 0.5 - N / 2) / R, dy = (yy + 0.5 - N / 2) / R, q = dx * dx + dy * dy;
+                if (q > 1) continue;
+                let col;
+                if (q > 0.78) col = BW_COL.outline;
+                else { const nz = Math.sqrt(1 - q), it = Math.max(0, dx * L[0] + dy * L[1] + nz * L[2]); col = tones[Math.min(5, Math.floor(it * 5.2))]; }
+                x.fillStyle = col; x.fillRect(xx, yy, 1, 1);
+            }
+            x.fillStyle = '#ffffff'; x.fillRect(5, 4, 2, 2); x.fillRect(4, 5, 1, 1);
+            return (BW.ballCv = c);
+        }
         function bwSprite(cx, cy, r, cols) {   // a pixel disc: light core, rim, dark outline
             const c = BW.cx, R = Math.max(1.5, r), X = Math.round(cx), Y = Math.round(cy), n = Math.ceil(R) + 1;
             for (let yy = -n; yy <= n; yy++) for (let xx = -n; xx <= n; xx++) {
@@ -5051,7 +5088,9 @@ service cloud.firestore {
             ctx.drawImage(BW.cv, 0, 0, BW.W * BW.PX, BW.H * BW.PX);
             if (BW.g) {   // the layer was made for the final camera: during the fly-in it is scaled to the current one
                 const f = zoom / targetZoom, g = BW.g;
-                ctx.drawImage(BW.layer, offsetX + (g.x * g.css - targetOffsetX) * f, offsetY + (g.y * g.css - targetOffsetY) * f, g.w * g.css * f, g.h * g.css * f);
+                const lx = offsetX + (g.x * g.css - targetOffsetX) * f, ly = offsetY + (g.y * g.css - targetOffsetY) * f, so = LINE_WEIGHT * zoom * 0.14;
+                if (BW.shadow) ctx.drawImage(BW.shadow, lx + so, ly + so * 1.3, g.w * g.css * f, g.h * g.css * f);
+                ctx.drawImage(BW.layer, lx, ly, g.w * g.css * f, g.h * g.css * f);
             }
             BW.bparts = BW.bparts.filter(p => {
                 p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.22 * BW.PX * 0.5 * k; p.r += p.vr * k; p.life -= k;
@@ -5118,7 +5157,7 @@ service cloud.firestore {
                     const [bx, by] = bwCell(ball.x, ball.y), r = ball.r * zoom / BW.PX, fire = BW.fx.F > 0;
                     if (gameState === 'playing') { BW.trail.push([bx, by]); if (BW.trail.length > 6) BW.trail.shift(); } else BW.trail = [];
                     if (fire) BW.trail.forEach(([tx, ty], i) => { c.fillStyle = i % 2 ? '#ff5a1f' : '#ffb43b'; const s = Math.max(1, Math.round(r * (i + 1) / 7)); c.fillRect(Math.round(tx) - (s >> 1), Math.round(ty) - (s >> 1), s, s); });
-                    bwSprite(bx, by, r, fire ? BW_COL.fire : BW_COL.ball);
+                    BW.ballAt = [offsetX + ball.x * zoom, offsetY + ball.y * zoom, ball.r * zoom];   // drawn hi-res on top, at the end
                 }
             }
 
@@ -5179,9 +5218,10 @@ service cloud.firestore {
                 if (blink && BW.t - BW.endT > 45) bwText('TAP TO PLAY', cxm, Y + 37, BW_COL.text, 1, 'center');
             }
 
-            // the pixel sprites on top
+            // the pixel sprites on top, then the ball (16-bit: a round 16 x 16 sprite)
             ctx.save(); ctx.imageSmoothingEnabled = false;
             ctx.drawImage(BW.sp, sh, sh * 0.5, BW.W * BW.PX, BW.H * BW.PX);
+            if (BW.ballAt && gameState !== 'loading' && gameState !== 'gameover') { const [bx, by, br] = BW.ballAt, sz = Math.round(br * 2 * 1.08); ctx.drawImage(bwBallSprite(), Math.round(bx - sz / 2 + sh), Math.round(by - sz / 2 + sh * 0.5), sz, sz); }
             ctx.restore();
         }
 
