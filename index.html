@@ -126,10 +126,19 @@
             border: 1px solid var(--border-color);
         }
 
-        /* the way back to the site (the editor is opened from the site's "Create"): an X in the top right corner */
-        #site-x { position: fixed; right: max(16px, env(safe-area-inset-right)); top: max(20px, env(safe-area-inset-top)); width: 44px; height: 44px; box-sizing: border-box; z-index: 3100; text-decoration: none; }
-        body.v3d-open #site-x, body.timelapse-active #site-x, body.game-active #site-x, body.customer-view #site-x, body.dashboard-open #site-x, html.embed #site-x { display: none !important; }
-        @media (max-width: 600px) { body:has(#new-canvas-modal.show) #site-x { top: max(28px, calc(env(safe-area-inset-top) + 22px)); right: 24px; } }
+        /* the way back to the site (the editor is opened from the site's "Create"): an X in the top right corner, framed and drawn exactly like
+           the toolbar and its buttons (same padding, size, corners, light and icon colour) */
+        #site-x-frame { position: fixed; right: max(20px, env(safe-area-inset-right)); top: max(20px, env(safe-area-inset-top)); z-index: 3100; display: flex; box-sizing: border-box; padding: var(--tpad); border-radius: 16px; background-color: var(--tbar-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--border-color); }
+        html body #site-x-frame { border-color: var(--glass-edge); background-image: var(--vol-panel); box-shadow: var(--glass-hi); }
+        html body #site-x { width: var(--tb); height: var(--tb); box-sizing: border-box; border-radius: 12px; text-decoration: none; backdrop-filter: none; -webkit-backdrop-filter: none; background-color: var(--btn-bg); background-image: var(--vol); border: 1px solid var(--glass-edge); box-shadow: var(--btn-hi); color: color-mix(in srgb, var(--text-color) 44%, var(--bg-color)); transition: color .15s; }
+        html body #site-x:hover { color: var(--text-color); }
+        /* phones: the same 45 px rounded button and frame as the bottom toolbar, the same distance from the screen's edge */
+        @media (max-width: 600px) {
+            #site-x-frame { right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); padding: 10px; border-radius: 28px; }
+            html body #site-x { width: 45px; height: 45px; border-radius: 18px; }
+        }
+        /* not in the New Canvas window, not while the editor is starting, not in 3D; and never where a view has a close button of its own */
+        body:has(#new-canvas-modal.show) #site-x-frame, body.booting #site-x-frame, body.v3d-open #site-x-frame, body.timelapse-active #site-x-frame, body.game-active #site-x-frame, body.customer-view #site-x-frame, body.dashboard-open #site-x-frame, html.embed #site-x-frame { display: none !important; }
 
         /* --- TOP NAV --- */
         .top-nav-container {
@@ -1029,7 +1038,7 @@
     <input id="kbd-sink" type="text" autofocus readonly inputmode="none" autocomplete="off" aria-hidden="true" tabindex="-1">
 
     <div id="share-badge"></div>
-    <a id="site-x" class="control-btn glass-panel" href="/" title="Back to the site" aria-label="Back to the Karakuli site"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6 6 18M6 6l12 12"/></svg></a>
+    <div id="site-x-frame"><a id="site-x" class="control-btn" href="/" title="Back to the site" aria-label="Back to the Karakuli site"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6 6 18M6 6l12 12"/></svg></a></div>
 
     <!-- Share Modal -->
     <div id="share-modal" onpointerdown="if (event.target === this) closeShareModal()">
