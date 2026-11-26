@@ -52,7 +52,7 @@ button { font: inherit; color: inherit; }
 .no-gl .fallback { display: grid; }
 
 .hero { position: absolute; left: var(--pad); bottom: clamp(28px, 7vh, 72px); max-width: 760px; will-change: opacity, transform; }
-.hero h1 { margin: 0 0 18px; font-weight: 500; font-size: clamp(40px, 7.2vw, 96px); line-height: 1.02; letter-spacing: -0.025em; }
+.hero h1 { margin: 0 0 18px; font-weight: 700; font-size: clamp(40px, 7.2vw, 96px); line-height: 1.02; letter-spacing: -0.025em; }
 .hero p { margin: 0; max-width: 30em; font-size: clamp(15px, 1.3vw, 18px); color: var(--ink-2); }
 .cue { position: absolute; right: var(--pad); bottom: clamp(28px, 7vh, 72px); display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
 .cue i { width: 1px; height: 40px; background: linear-gradient(var(--saffron), transparent); animation: cue 2.2s var(--ease-out) infinite; transform-origin: top; }
@@ -397,7 +397,7 @@ function startScene() {
     const dist = 30; camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
     const vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
     const narrow = wpx < 820;
-    heroScale = Math.min(vw * (narrow ? 0.94 : 0.8) / A.W, vh * (narrow ? 0.34 : 0.46) / A.H);   // the pattern sits in the upper part, the headline has the lower part
+    heroScale = 1.1 * Math.min(vw * (narrow ? 0.94 : 0.8) / A.W, vh * (narrow ? 0.34 : 0.46) / A.H);   // the pattern sits in the upper part, the headline has the lower part
     heroY = vh * (narrow ? 0.16 : 0.13);
     const cw = B.W + B.w, ch = B.H + B.w;
     if (narrow) { L.s = Math.min(vw * 0.8 / cw, vh * 0.34 / ch); L.x = 0; L.y = vh * 0.21; }
