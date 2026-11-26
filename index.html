@@ -235,6 +235,7 @@
         body.game-active #main-toolbar .tb-act:not(#eraser-btn), body.game-active #tb-sep, body.game-active #v3d-btn { display: none !important; }
         #mode-text { display: none !important; }
         body.game-active #main-toolbar .mode-header { width: 96px; }
+        html body.game-active #main-toolbar, html body.game-active #main-toolbar *, html body.game-active .top-nav-wrapper { pointer-events: none !important; } html body.game-active #left-nav-group, html body.game-active #left-nav-group * { pointer-events: auto !important; }   /* the hearts' bar spans the top and lay over the X: it takes no taps */
         html body.game-active #main-toolbar, html body.game-active #main-toolbar .mode-header { background: none !important; border-color: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }   /* in the game: three hearts on their own, no plate */
         html body.game-active #main-toolbar .mode-header.x-old { background-color: #0f1529; background-image: linear-gradient(#141c36, #0b1022); border-color: rgba(140, 180, 255, 0.25); box-shadow: inset 0 0 0 1px rgba(140, 180, 255, 0.18), 0 0 12px rgba(90, 160, 255, 0.18); }   /* the hearts sit on a piece of the game's dark arena */
         body.game-active #mode-ico { display: none; }
@@ -4472,7 +4473,8 @@ service cloud.firestore {
             const md = Math.min(width, height), zMin = md / (md > 600 ? 40 : 30) / lw, zMax = md / (md > 600 ? 24 : 17.5) / lw;   // a line is 1/26 .. 1/15 of the short side: on a phone the pattern stays big and is cropped
             const big = Math.min(width, height) > 600;                // a tablet or a computer: the camera further back, more room to play
             let z = Math.min(uW / pw, uH * (big ? 0.34 : 0.45) / ph);   // the pattern takes at most 45% (34%) of the height; the rest is room to play
-            z = Math.min(zMax, z); void zMin;   // the whole drawing is played: it is fitted, never cropped
+            const phone = md <= 600;
+            if (phone) z = Math.max(md / 26 / lw, Math.min(md / 15 / lw, z)); else z = Math.min(zMax, z); void zMin;   // a phone plays a close-up of a part; a bigger screen the whole drawing
             const fw = uW / z, fh = uH / z;
             // horizontal window: centred, or - when the pattern is wider than the field - the stretch holding the most of it
             let x0 = (minX + maxX) / 2 - fw / 2;
@@ -4485,12 +4487,17 @@ service cloud.firestore {
                     sc -= Math.abs(x0c + fw / 2 - (minX + maxX) / 2) * 0.05;
                     if (sc > best) { best = sc; x0 = x0c; }
                 }
+                // on a phone: a random stretch (that still holds pattern), a new one every game
+                const lo = minX - pad, hi = maxX + pad - fw;
+                for (let t = 0; t < 12; t++) { const c = lo + Math.random() * (hi - lo); let sc = 0; segments.forEach(s => { const a = Math.min(s.p1.x, s.p2.x) * STEP, b = Math.max(s.p1.x, s.p2.x) * STEP; sc += Math.max(0, Math.min(b, c + fw) - Math.max(a, c)) + (a === b && a > c && a < c + fw ? STEP : 0); }); if (sc > best * 0.6) { x0 = c; break; } }
             }
+            let yTop = minY;   // and, when the drawing is taller than its half of the screen, a random height too
+            if (phone && maxY - minY > fh * 0.5) yTop = minY + Math.random() * (maxY - minY - fh * 0.5);
             const hud = 16 * BW.U / z;   // a row for the score above the pattern
-            const field = { minX: x0, maxX: x0 + fw, minY: minY - pad - hud, maxY: minY - pad - hud + fh };
+            const field = { minX: x0, maxX: x0 + fw, minY: yTop - pad - hud, maxY: yTop - pad - hud + fh };
             const f = 2 * BW.U / z;      // inner margin of the arena
             BW.inner = { minX: field.minX + f, maxX: field.maxX - f, minY: field.minY + f, maxY: field.maxY };
-            BW.cropY = maxY + lw;   // nothing of the drawing is cut off at the bottom either
+            BW.cropY = phone ? field.minY + fh * 0.55 : maxY + lw;   // a bigger screen keeps all of the drawing; a phone its close-up
             return { field, z, ox: side - field.minX * z, oy: top - field.minY * z };
         }
 
@@ -4596,7 +4603,7 @@ service cloud.firestore {
             paddle.base = paddle.w;
             ball = { r: LINE_WEIGHT * 0.44, x: paddle.x, y: 0, vx: 0, vy: 0, speed: fh / 105, base: fh / 105 };
             ball.y = paddle.y - paddle.h / 2 - ball.r;
-            BW.score = 0; BW.combo = 0; BW.hits = 0; BW.parts = []; BW.bparts = []; BW.pops = []; BW.caps = []; BW.trail = []; BW.fx = { W: 0, S: 0 }; BW.fireworks = 0;
+            BW.score = 0; BW.combo = 0; BW.hits = 0; BW.parts = []; BW.bparts = []; BW.pops = []; BW.caps = []; BW.trail = []; BW.fx = { W: 0, S: 0 }; BW.fireworks = 0; BW.spdF = 1; BW.acc = 0;
             BW.arena = null; BW.sw = 0;
             gameState = wasPlaying ? 'start' : 'loading';
             loadingProgress = 0;
@@ -4653,14 +4660,16 @@ service cloud.firestore {
         }
 
         function bwReflect(nx, ny) { const d = ball.vx * nx + ball.vy * ny; if (d < 0) { ball.vx -= 2 * d * nx; ball.vy -= 2 * d * ny; } }
+        function bwSpeed() { return ball.speed * (BW.spdF || 1); }
         function bwNormSpeed() {
-            const sp = ball.speed * (BW.fx.S > 0 ? 0.62 : 1), s = Math.hypot(ball.vx, ball.vy) || 1;
+            const sp = bwSpeed(), s = Math.hypot(ball.vx, ball.vy) || 1;
             ball.vx = ball.vx / s * sp; ball.vy = ball.vy / s * sp;
             if (Math.abs(ball.vy) < sp * 0.22) { ball.vy = Math.sign(ball.vy || -1) * sp * 0.22; ball.vx = Math.sign(ball.vx || 1) * Math.sqrt(sp * sp - ball.vy * ball.vy); }   // never a near-horizontal ball
         }
 
         function physicsStep(k) {
             const I = BW.inner;
+            BW.spdF = (BW.spdF || 1) + ((BW.fx.S > 0 ? 0.65 : 1) - (BW.spdF || 1)) * 0.04; bwNormSpeed();   // the slow ball eases in and out
             const sp = Math.hypot(ball.vx, ball.vy), steps = Math.max(1, Math.ceil(sp * k / (ball.r * 0.6)));
             for (let st = 0; st < steps; st++) {
                 ball.x += ball.vx * k / steps; ball.y += ball.vy * k / steps;
@@ -4670,7 +4679,7 @@ service cloud.firestore {
                 if (ball.y - ball.r < I.minY) { ball.y = I.minY + ball.r; bwReflect(0, 1); BWS.wall(); }
                 // paddle: the bounce angle follows where it hits (up to 62 deg from vertical)
                 if (ball.vy > 0 && ball.y + ball.r >= paddle.y - paddle.h / 2 && ball.y - ball.r <= paddle.y + paddle.h / 2 && ball.x >= paddle.x - paddle.w / 2 - ball.r && ball.x <= paddle.x + paddle.w / 2 + ball.r) {
-                    const rel = Math.max(-1, Math.min(1, (ball.x - paddle.x) / (paddle.w / 2))), a = rel * 1.08, s = ball.speed * (BW.fx.S > 0 ? 0.62 : 1);
+                    const rel = Math.max(-1, Math.min(1, (ball.x - paddle.x) / (paddle.w / 2))), a = rel * 1.08, s = bwSpeed();
                     ball.vx = Math.sin(a) * s; ball.vy = -Math.cos(a) * s; ball.y = paddle.y - paddle.h / 2 - ball.r;
                     BW.combo = 0; BWS.paddle(); BW.padFlash = 1;
                 }
@@ -4679,8 +4688,9 @@ service cloud.firestore {
                 const hit = bwCellHit();
                 if (hit) {
                     ball.x -= ball.vx * k / steps; ball.y -= ball.vy * k / steps;   // back out of the wall, then bounce
-                    const nl = Math.hypot(hit.nx, hit.ny) || 1; bwReflect(hit.nx / nl, hit.ny / nl); ball.vx += (Math.random() - 0.5) * ball.speed * 0.06; bwNormSpeed();
+                    const nl = Math.hypot(hit.nx, hit.ny) || 1, nx = hit.nx / nl, ny = hit.ny / nl; bwReflect(nx, ny); ball.vx += (Math.random() - 0.5) * ball.speed * 0.04; bwNormSpeed();
                     bwBreak(hit);
+                    for (let t = 0; t < 8 && bwCellHit(); t++) { ball.x += nx * ball.r * 0.25; ball.y += ny * ball.r * 0.25; }   // never left inside the metal
                     bwHit(); return;
                 }
             }
@@ -4689,7 +4699,7 @@ service cloud.firestore {
         function bwBreak(hit) {
             const b0 = BW.bricks[hit.bid], e = BW.els[b0.el], ids = [hit.bid];
             if (e.t === 'seg') {
-                const r = BW.runs[e.run], Lw = Math.max(LINE_WEIGHT, r.len / 3), uh = ball.x * e.ux + ball.y * e.uy;
+                const r = BW.runs[e.run], Lw = r.len < LINE_WEIGHT * 4 ? r.len + LINE_WEIGHT : Math.max(LINE_WEIGHT * 1.5, r.len / 3), uh = ball.x * e.ux + ball.y * e.uy;
                 const w0 = Math.max(r.u0 - LINE_WEIGHT / 2, Math.min(r.u1 + LINE_WEIGHT / 2 - Lw, uh - Lw / 2)), set = new Set(r.els);
                 BW.bricks.forEach((b, i) => { if (b.alive && set.has(b.el) && b.u >= w0 && b.u <= w0 + Lw) ids.push(i); });
                 bwScore(30, ball.x, ball.y); BWS.brick(); BW.shake = Math.max(BW.shake, 5);
@@ -4711,7 +4721,7 @@ service cloud.firestore {
             bwRemoveBricks([...new Set(ids)], ball.x, ball.y, fragOf);
         }
         function bwHit() {
-            BW.hits++; ball.speed = Math.min(ball.base * 1.4, ball.base * (1 + BW.hits * 0.025));
+            BW.hits++; ball.speed = Math.min(ball.base * 1.15, ball.base * (1 + BW.hits * 0.006));   // a barely noticeable speed-up over the game
             if (BW.live <= 0) bwEnd('victory');
         }
         function bwLoseLife() {
@@ -4879,8 +4889,7 @@ service cloud.firestore {
                 const grain = 1 + ((bwHash(yy + BW.g.y, 11) % 100) / 100 - 0.5) * 0.06 + ((bwHash(yy + BW.g.y, ((xx + BW.g.x) / 40) | 0) % 100) / 100 - 0.5) * 0.04;
                 const t = (xx + yy) / (W + H), sheen = 0.78 + 0.3 * (1 - t) + 0.16 * Math.exp(-Math.pow((t - 0.38) * 7, 2));
                 let k = sheen * grain, r = 128 * k, gg = 140 * k, b = 160 * k;
-                if (dark > 0) { const t = dark * (1 - lit); r *= 1 - 0.55 * t; gg *= 1 - 0.55 * t; b *= 1 - 0.5 * t; }
-                if (lit > 0) { r += (225 - r) * lit; gg += (238 - gg) * lit; b += (252 - b) * lit; }
+                void lit; void dark;   // no contour: the edges are left as the face
                 BW.rgb[i] = (Math.min(255, r) << 16) | (Math.min(255, gg) << 8) | Math.min(255, b);
             }
         }
@@ -4932,8 +4941,8 @@ service cloud.firestore {
                 const sdc = document.createElement('canvas'); sdc.width = w; sdc.height = h; const sdx = sdc.getContext('2d');   // its side: the same shape in dark steel
                 sdx.drawImage(cv, 0, 0); sdx.globalCompositeOperation = 'source-in'; sdx.fillStyle = '#1e2633'; sdx.fillRect(0, 0, w, h);
                 const px = (g.x + fr.x0) * g.css, py = (g.y + fr.y0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
-                const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (0.5 + Math.random() * 0.8) * U;
-                BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.4, vy: dy / dl * spd - (0.8 + Math.random() * 0.8) * U, life: 90 + Math.random() * 30, r: 0, vr: (Math.random() - 0.5) * 0.07, dep: LINE_WEIGHT * 0.12 * targetZoom, sd: sdc });
+                const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (1.2 + Math.random() * 1.2) * U;
+                BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.4, vy: dy / dl * spd - (1 + Math.random() * 1) * U, life: 40 + Math.random() * 15, r: 0, vr: (Math.random() - 0.5) * 0.16, dep: LINE_WEIGHT * 0.12 * targetZoom, sd: sdc });
                 for (let j = 0; j < 10; j++) { const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random() * 1.8) * U; BW.parts.push({ x: sx + (mx - sx) * 0.3, y: sy + (my - sy) * 0.3, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5 * U, life: 18 + Math.random() * 22, r: U * (0.2 + Math.random() * 0.3), col: Math.random() < 0.5 ? '#9fe3ff' : '#ffffff', spark: true }); }
                 if (fr.x0 < x0) x0 = fr.x0; if (fr.y0 < y0) y0 = fr.y0; if (fr.x1 > x1) x1 = fr.x1; if (fr.y1 > y1) y1 = fr.y1;
             });
@@ -5047,7 +5056,7 @@ service cloud.firestore {
                     paddle.x = constrain(paddle.x, I.minX + paddle.w / 2, I.maxX - paddle.w / 2);
                     if (gameState === 'start') { ball.x = paddle.x; ball.y = paddle.y - paddle.h / 2 - ball.r; }
                 }
-                if (gameState === 'playing') physicsStep(k);
+                if (gameState === 'playing') { BW.acc = Math.min(4, (BW.acc || 0) + k); let n = 0; while (BW.acc >= 1 && n++ < 4 && gameState === 'playing') { physicsStep(1); BW.acc -= 1; } }
                 BW.caps = BW.caps.filter(cp => {
                     if (gameState === 'playing') cp.y += cp.vy * k;
                     if (cp.y > paddle.y - paddle.h && cp.y < paddle.y + paddle.h && Math.abs(cp.x - paddle.x) < paddle.w / 2 + LINE_WEIGHT * 0.4) {
@@ -5079,9 +5088,9 @@ service cloud.firestore {
             }
             // flying bricks
             BW.bparts = BW.bparts.filter(p => {
-                p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.11 * U * k; p.vx *= Math.pow(0.995, k); p.r += p.vr * k; p.life -= k;
+                p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.2 * U * k; p.vx *= Math.pow(0.995, k); p.r += p.vr * k; p.life -= k;
                 if (p.life <= 0 || p.y > height + 60) return false;
-                ctx.save(); ctx.globalAlpha = Math.min(1, p.life / 18); ctx.translate(p.x + p.w / 2, p.y + p.h / 2); ctx.rotate(p.r);
+                ctx.save(); ctx.globalAlpha = Math.min(1, p.life / 12); ctx.translate(p.x + p.w / 2, p.y + p.h / 2); ctx.rotate(p.r);
                 ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
 
                 ctx.drawImage(p.cv, -p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
