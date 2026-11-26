@@ -7,7 +7,7 @@
   if (/[?&](e|v|edit|view)=/.test(location.search)) location.replace('/editor' + location.search + location.hash);
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Karakuli — ornament, inspired by the East</title>
+<title>Karakuli — tradition, read anew</title>
 <meta name="description" content="Steel shelves, hangers and magazine holders, each cut with a pattern drawn once and never repeated.">
 <meta name="theme-color" content="#111111">
 <link rel="icon" href="/icon-192.png">
@@ -44,7 +44,7 @@ button { font: inherit; color: inherit; }
 .nav a.link:hover { background-size: 100% 1px; }
 
 /* ---------- the pattern story: a pinned stage ---------- */
-.scrolly { position: relative; height: 820vh; background: var(--ink); color: var(--paper); }
+.scrolly { position: relative; height: 560vh; background: var(--ink); color: var(--paper); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .fallback { position: absolute; inset: 0; display: none; place-items: center; padding: 12vh var(--pad); }
@@ -85,7 +85,14 @@ button { font: inherit; color: inherit; }
 .go svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; }
 
 /* ---------- contact ---------- */
-.contact { background: var(--ink); color: var(--paper); padding: clamp(80px, 12vh, 140px) var(--pad) 40px; }
+.contact { position: relative; overflow: hidden; background: var(--ink); color: var(--paper); padding: clamp(80px, 12vh, 140px) var(--pad) 40px; }
+.contact > :not(.contact-gl) { position: relative; z-index: 1; }
+.contact-gl { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.contact-gl canvas { width: 100%; height: 100%; display: block; }
+/* a dark veil over the pattern: it is felt more than seen, and the words on the left stay clear */
+.contact-gl::after { content: ''; position: absolute; inset: 0; background:
+  linear-gradient(90deg, var(--ink) 0%, var(--ink) 34%, rgba(17,17,17,.78) 62%, rgba(17,17,17,.66) 100%),
+  linear-gradient(0deg, var(--ink) 0%, rgba(17,17,17,0) 30%, rgba(17,17,17,0) 80%, var(--ink) 100%); }
 .contact h2 { margin: 0 0 16px; font-weight: 500; font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: -0.025em; max-width: 14em; }
 .contact .sub { margin: 0 0 32px; color: var(--ink-2); font-size: 18px; }
 .contact .ways { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 clamp(64px, 10vh, 120px); padding: 0; list-style: none; }
@@ -105,6 +112,7 @@ button { font: inherit; color: inherit; }
   .chapter h2 { font-size: 28px; margin-bottom: 12px; }
   .chapter p { font-size: 15px; }
   .cards { grid-template-columns: 1fr; }
+  .contact-gl::after { background: linear-gradient(180deg, var(--ink) 0%, rgba(17,17,17,.82) 45%, rgba(17,17,17,.62) 100%); }
 }
 @media (prefers-reduced-motion: reduce) {
   .cue i { animation: none; }
@@ -130,37 +138,16 @@ button { font: inherit; color: inherit; }
       <div class="fallback"><img src="assets/pattern.svg" alt="A Karakuli pattern: straight lines at 90 and 45 degrees, two circles and small diamonds"></div>
 
       <div class="hero" id="hero">
-        <h1>Ornament,<br>inspired by the East.</h1>
+        <h1>Tradition,<br>read anew.</h1>
         <p>Hangers, shelves and magazine holders in steel. From ink on paper to metal: a path from the light to the lasting.</p>
       </div>
       <div class="cue" id="cue"><i></i>Scroll</div>
 
       <div class="chapters" id="about">
-        <section class="chapter" data-ch="0">
-          <h2>Stone remembers. Geometry carved to last for centuries.</h2>
-          <p>In the old buildings of Azerbaijan, geometry is carved right into the stone. Nameless masters left patterns on the walls that have outlived the centuries. There are no random lines in them: every turn is measured, every rhythm thought through.</p>
-          <p>Standing before such a wall, you understand that ornament can be eternal. This stone geometry became my first school of strictness and beauty.</p>
-        </section>
-        <section class="chapter" data-ch="1">
-          <h2>The carpet: ornament that keeps the warmth of the hearth.</h2>
-          <p>If stone speaks of eternity, the carpet speaks of the hearth. Azerbaijani carpets keep ornament in warm threads: diamonds, medallions, a rhythm with no beginning and no end.</p>
-          <p>You can look at a carpet for hours and find a new detail every time. That is what I wanted to learn: to make a pattern you want to come back to.</p>
-        </section>
-        <section class="chapter" data-ch="2">
-          <h2>Shebeke: light gathered into a pattern.</h2>
-          <p>Thousands of tiny wooden pieces lock into a lattice, and coloured glass flares between them. By day the window draws coloured ornaments on the floor, and the room comes alive.</p>
-          <p>What amazes me in shebeke is the master's patience, and how a strict structure gives birth to real magic.</p>
-        </section>
-        <section class="chapter" data-ch="3">
-          <h2>From a free line to an ornament of my own.</h2>
-          <p>At first the lines were born freely, by hand, alive and uneven. Then I began to look for their order. Out of scattered strokes came a form, out of the form came a rhythm.</p>
-          <p>Page by page, chaos gave way to harmony, but never vanished: it stayed in the pattern's character, in its liveliness. That is how the ornament I call Karakuli was born.</p>
-        </section>
-        <section class="chapter" data-ch="4">
+        <section class="chapter" id="story">
           <h2>The geometry of choice.</h2>
-          <p class="lead">A diamond is a sign. A line is movement. A circle is the sun, and a choice.</p>
-          <p>The circle is the sun, and eight directions, eight possible paths, lead out of it. The sun lights each of them, but does not decide where to go. The choice stays with you.</p>
-          <p>Karakuli is a geometry of choice, where every element has its meaning and every path stays open.</p>
+          <p>Geometry carved into the stone of old Azerbaijani walls. Carpets with a rhythm that has no beginning and no end. Shebeke, where a strict lattice turns light into a pattern. This is where Karakuli comes from.</p>
+          <p>It began as free lines drawn by hand. Page by page they found their order, but kept their liveliness. A diamond is a sign, a line is movement, a circle is the sun with eight paths leading out of it. The sun lights each of them, but does not decide where to go: the choice stays with you.</p>
         </section>
       </div>
 
@@ -177,11 +164,12 @@ button { font: inherit; color: inherit; }
   </section>
 
   <section class="contact" id="contact" aria-labelledby="contact-h">
+    <div class="contact-gl" id="contact-gl" aria-hidden="true"><canvas></canvas></div>
     <h2 id="contact-h">A pattern can be drawn, or you can live in it.</h2>
     <p class="sub">I invite you to find your own path in it.</p>
     <ul class="ways" id="ways"></ul>
     <div class="foot">
-      <span>KARAKULI — ornament, inspired by the East.</span>
+      <span>KARAKULI — tradition, read anew.</span>
       <a href="/editor">Studio</a>
     </div>
   </section>
@@ -218,67 +206,70 @@ function navTone() {
 // ------------------------------------------------------------------ the pattern scene
 const scrolly = document.querySelector('.scrolly'), stage = $('stage'), canvas = $('gl');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const P = { hero: [0.025, 0.09], scatter: [0.05, 0.2], gather: [0.2, 0.36], ch: [[0.36, 0.45], [0.45, 0.54], [0.54, 0.63], [0.63, 0.72], [0.72, 0.82]], fall: [0.82, 0.96] };
+// hero: drawing 10 whole · scatter: it comes apart · gather: its pieces build drawing 11 beside the story · fall: drawing 11 lets go
+const P = { hero: [0.03, 0.12], scatter: [0.06, 0.28], gather: [0.28, 0.52], text: [0.44, 0.8], fall: [0.78, 0.96] };
 const clamp01 = v => Math.max(0, Math.min(1, v)), seg = (v, a, b) => clamp01((v - a) / (b - a));
 const smooth = t => t * t * (3 - 2 * t);
 const progress = () => { const r = scrolly.getBoundingClientRect(), span = scrolly.offsetHeight - innerHeight; return clamp01(-r.top / span); };
 
-// About: jump to the first chapter
+// About: jump to the story
 document.querySelector('[data-jump="about"]').addEventListener('click', e => {
   e.preventDefault();
   const span = scrolly.offsetHeight - innerHeight;
-  scrollTo({ top: scrolly.offsetTop + span * (P.ch[0][0] + 0.03), behavior: reduce ? 'auto' : 'smooth' });
+  scrollTo({ top: scrolly.offsetTop + span * (P.text[0] + 0.08), behavior: reduce ? 'auto' : 'smooth' });
 });
 
 // the text on the stage follows the scroll (it is there even when 3D fails)
-const hero = $('hero'), cue = $('cue'), prog = $('prog'), chapters = [...document.querySelectorAll('.chapter')];
+const hero = $('hero'), cue = $('cue'), prog = $('prog'), story = $('story');
 function textAt(p) {
   const h = 1 - seg(p, P.hero[0], P.hero[1]);
   hero.style.opacity = h; hero.style.transform = `translateY(${(1 - h) * -24}px)`; cue.style.opacity = h;
-  chapters.forEach((el, i) => {
-    const [a, b] = P.ch[i], fin = seg(p, a, a + 0.03), fout = i === P.ch.length - 1 ? 1 - seg(p, P.fall[0], P.fall[0] + 0.04) : 1 - seg(p, b - 0.02, b + 0.01);
-    const o = Math.min(fin, fout);
-    el.style.opacity = o; el.style.visibility = o > 0.01 ? 'visible' : 'hidden';
-    const dy = (1 - fin) * 28 - (1 - fout) * 28;
-    el.style.translate = `0 ${dy}px`;
-  });
+  const fin = seg(p, P.text[0], P.text[0] + 0.05), fout = 1 - seg(p, P.text[1] - 0.03, P.text[1] + 0.02), o = Math.min(fin, fout);
+  story.style.opacity = o; story.style.visibility = o > 0.01 ? 'visible' : 'hidden';
+  story.style.translate = `0 ${(1 - fin) * 28 - (1 - fout) * 28}px`;
   prog.style.width = (p * 100).toFixed(2) + '%';
 }
 
+const S = 1 / 100, D = 0.36;   // 100 px of the drawing = 1 unit; parts are 36 px thick
+const seeded = s => { let seed = s; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647; return { rnd, rr: (a, b) => a + (b - a) * rnd() }; };
+const snap = t => { if (t <= 0) return 0; if (t >= 1) return 1; const a = t / 0.82; if (a < 1) return a * a * a * 1.04; const b = (t - 0.82) / 0.18; return 1.04 - 0.04 * Math.sin(b * Math.PI / 2); };   // a magnet pulls hard at the end (ease in) and the part settles with a little overshoot
+const loose = t => 1 - Math.pow(1 - t, 3);
 let T;
 try { T = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/+esm'); } catch (e) { document.body.classList.add('no-gl'); }
 
-const svgText = await fetch('assets/pattern.svg').then(r => r.text()).catch(() => null);
-if (!T || !svgText) { document.body.classList.add('no-gl'); }
+const [svg10, svg11] = await Promise.all(['assets/pattern.svg', 'assets/pattern-11.svg'].map(u => fetch(u).then(r => r.text()).catch(() => null)));
+if (!T || !svg10 || !svg11) { document.body.classList.add('no-gl'); }
 else {
   try { startScene(); } catch (e) { console.error(e); document.body.classList.add('no-gl'); }
+  try { startFooter(); } catch (e) { console.error(e); }
 }
 if (document.body.classList.contains('no-gl')) {
   const tick = () => { textAt(progress()); navTone(); }; addEventListener('scroll', tick, { passive: true }); tick();
 }
 
-function startScene() {
-  const renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  const mobile = matchMedia('(pointer: coarse)').matches || innerWidth < 820;
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2));
-  renderer.setClearColor(0x111111, 1);
-  renderer.outputColorSpace = T.SRGBColorSpace;
-  const scene = new T.Scene();
-  const camera = new T.PerspectiveCamera(26, 1, 0.1, 400);
+// ------------------------------------------------------------------ steel, light, and a drawing cut into parts
+function steelMats() {
+  const steel = new T.MeshStandardMaterial({ color: 0xe9e7e1, roughness: 0.42, metalness: 0.38 });
+  // front faces win the depth test where another part's side wall ends flush with them, so no specks show along the joints
+  const face = steel.clone(); Object.assign(face, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+  return { box: [steel, steel, steel, steel, face, face], ext: [face, steel] };   // BoxGeometry: +z, -z are groups 4, 5; ExtrudeGeometry: caps, sides
+}
+function lightUp(scene) {
   scene.add(new T.HemisphereLight(0xf4f3ef, 0x111111, 0.55));
   const key = new T.DirectionalLight(0xffffff, 2.8); key.position.set(-9, 11, 7); scene.add(key);    // grazing light from the upper left: the tops shine, the sides fall into shade
   const rim = new T.DirectionalLight(0xfff1cc, 0.7); rim.position.set(10, -5, 4); scene.add(rim);
-
-  // ---- read the pattern: the drawing is cut into long straight bars, plus the two rings and the diamonds
-  const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
-  const svg = doc.querySelector('svg'), vb = svg.getAttribute('viewBox').split(/\s+/).map(Number);
-  const W0 = vb[2], H0 = vb[3], S = 1 / 100, D = 0.36;          // 100 px of the drawing = 1 unit; parts are 36 px thick
-  const sw = +(doc.querySelector('path').getAttribute('stroke-width') || 58), w = sw * S;
+}
+// The drawing is cut into long straight bars (plus its rings and diamonds). Every part is built round its own centre, lying along x;
+// `home` and `qHome` put it in its place in the drawing (centred on the drawing's middle, in world units).
+function buildPattern(text, mats, scene) {
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const vb = doc.querySelector('svg').getAttribute('viewBox').split(/\s+/).map(Number), W0 = vb[2], H0 = vb[3];
+  const path = doc.querySelector('path'), sw = +(path.getAttribute('stroke-width') || 58), w = sw * S, h = sw / 2;
   const rings = [...doc.querySelectorAll('circle')].filter(c => c.getAttribute('fill') === 'none').map(c => ({ x: +c.getAttribute('cx'), y: +c.getAttribute('cy'), r: +c.getAttribute('r') }));
   const toW = (x, y) => [(x - W0 / 2) * S, -(y - H0 / 2) * S];
   // every unit step of the drawing, once: the drawing repeats steps where its strokes overlap
   const steps = new Map(), at = new Map(), nk = q => q[0] + ',' + q[1];
-  doc.querySelector('path').getAttribute('d').trim().split(/(?=M)/).forEach(sp => {
+  path.getAttribute('d').trim().split(/(?=M)/).forEach(sp => {
     const nums = sp.match(/-?\d+(\.\d+)?/g); if (!nums) return;
     const pts = []; for (let i = 0; i + 1 < nums.length; i += 2) pts.push([+nums[i], +nums[i + 1]]);
     for (let i = 1; i < pts.length; i++) {
@@ -291,7 +282,7 @@ function startScene() {
   // a bar is the longest straight line the steps make: it runs on through crossings and junctions, as one piece of steel,
   // and stops only where the line turns, ends, or reaches the eye of a ring
   const bars = [];
-  steps.forEach((s0, k0) => {
+  steps.forEach(s0 => {
     if (s0.used) return; s0.used = true;
     const v = [s0.b[0] - s0.a[0], s0.b[1] - s0.a[1]];
     const walk = (q, dx, dy) => {
@@ -303,20 +294,14 @@ function startScene() {
     };
     bars.push([walk(s0.a, -v[0], -v[1]), walk(s0.b, v[0], v[1])]);
   });
-
-  const steel = new T.MeshStandardMaterial({ color: 0xe9e7e1, roughness: 0.42, metalness: 0.38 });
-  // front faces win the depth test where another part's side wall ends flush with them, so no specks show along the joints
-  const face = steel.clone(); Object.assign(face, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
-  const boxMats = [steel, steel, steel, steel, face, face], extrudeMats = [face, steel];   // BoxGeometry: +z, -z are groups 4, 5; ExtrudeGeometry: caps, sides
-  const parts = [];
-  const addPart = (geo, mat, cx, cy, isRing) => {
-    geo.computeBoundingBox(); const c = new T.Vector3(); geo.boundingBox.getCenter(c); geo.translate(-c.x, -c.y, -c.z);
+  const parts = [], Z = new T.Vector3(0, 0, 1);
+  const add = (geo, mat, kind, cx, cy, ang, len) => {
     const m = new T.Mesh(geo, mat); scene.add(m);
-    parts.push({ m, home: new T.Vector3(c.x, c.y, 0), ring: !!isRing, px: cx, py: cy });
+    const [x, y] = toW(cx, cy);
+    parts.push({ m, kind, len, home: new T.Vector3(x, y, 0), qHome: new T.Quaternion().setFromAxisAngle(Z, ang) });
   };
   // each bar is a straight steel strip with square ends. Where it meets other lines, its end runs on just far enough to fill the outer corner of
   // the joint (half the width at a right angle, less at an open angle), so every joint is closed and no corner sticks out past the strip it meets
-  const h = sw / 2;
   bars.forEach(([A, B]) => {
     const L0 = Math.hypot(B[0] - A[0], B[1] - A[1]), u = [(B[0] - A[0]) / L0, (B[1] - A[1]) / L0];
     const endExt = (q, out) => {
@@ -331,108 +316,116 @@ function startScene() {
       });
       return Math.min(e, h);
     };
-    const ea = endExt(A, [-u[0], -u[1]]), eb = endExt(B, u);
-    const len = (L0 + ea + eb) * S;
+    const ea = endExt(A, [-u[0], -u[1]]), eb = endExt(B, u), len = (L0 + ea + eb) * S;
+    const sh = (eb - ea) / 2, cx = (A[0] + B[0]) / 2 + u[0] * sh, cy = (A[1] + B[1]) / 2 + u[1] * sh;
     // every part has exactly the same depth: overlapping faces then shade identically, and no hairline step shows at a joint
-    const g = new T.BoxGeometry(len, w, D);
-    g.translate((eb - ea) / 2 * S, 0, 0); g.rotateZ(-Math.atan2(u[1], u[0]));
-    const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2, [x, y] = toW(mx, my); g.translate(x, y, 0);
-    addPart(g, boxMats, mx, my);
+    add(new T.BoxGeometry(len, w, D), mats.box, 'bar', cx, cy, -Math.atan2(u[1], u[0]), len);
   });
   rings.forEach(r => {
     const sh = new T.Shape(); sh.absarc(0, 0, (r.r + sw / 2) * S, 0, Math.PI * 2);
     const hole = new T.Path(); hole.absarc(0, 0, (r.r - sw / 2) * S, 0, Math.PI * 2, true); sh.holes.push(hole);
     const g = new T.ExtrudeGeometry(sh, { depth: D, bevelEnabled: false, curveSegments: 48 }); g.translate(0, 0, -D / 2);
-    const [x, y] = toW(r.x, r.y); g.translate(x, y, 0);
-    addPart(g, extrudeMats, r.x, r.y, true);
+    add(g, mats.ext, 'ring', r.x, r.y, 0, 0);
   });
   doc.querySelectorAll('rect').forEach(rc => {
     const t = (rc.getAttribute('transform') || '').match(/rotate\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/); if (!t) return;
-    const s = +rc.getAttribute('width') * S, g = new T.BoxGeometry(s, s, D); g.rotateZ(Math.PI / 4);
-    const [x, y] = toW(+t[2], +t[3]); g.translate(x, y, 0);
-    addPart(g, boxMats, +t[2], +t[3]);
+    const s = +rc.getAttribute('width') * S;
+    add(new T.BoxGeometry(s, s, D), mats.box, 'dia', +t[2], +t[3], Math.PI / 4, 0);
   });
+  return { parts, W: W0 * S, H: H0 * S, w };
+}
+
+function startScene() {
+  const renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  const mobile = matchMedia('(pointer: coarse)').matches || innerWidth < 820;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, mobile ? 1.5 : 2));
+  renderer.setClearColor(0x111111, 1);
+  renderer.outputColorSpace = T.SRGBColorSpace;
+  const scene = new T.Scene(), camera = new T.PerspectiveCamera(26, 1, 0.1, 400);
+  lightUp(scene);
+  const mats = steelMats();
+  const A = buildPattern(svg10, mats, scene);    // the whole pattern of the first screen
+  const B = buildPattern(svg11, mats, scene);    // the pattern its pieces build beside the story
 
   // ---- where every part goes. A seeded random keeps the choreography the same on every visit.
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647, rr = (a, b) => a + (b - a) * rnd();
+  const { rnd, rr } = seeded(7);
   const randQuat = amp => new T.Quaternion().setFromEuler(new T.Euler(rr(-amp, amp), rr(-amp, amp), rr(-amp, amp)));
-  // the part of the pattern that gathers again beside the story: the right-hand cluster round the second ring
-  const keep = { x0: 1430, x1: W0, y0: 0, y1: H0 };
-  parts.forEach(pt => {
-    pt.keep = pt.px >= keep.x0 && pt.px <= keep.x1 && pt.py >= keep.y0 && pt.py <= keep.y1;
+  A.parts.forEach(pt => {
     pt.scat = new T.Vector3(pt.home.x * 1.25 + rr(-6, 6), pt.home.y * 1.6 + rr(-3.5, 3.5), rr(-7, 3.5));
-    pt.qScat = randQuat(2.4); pt.qFall = randQuat(3.2);
-    pt.fall = new T.Vector3(rr(-9, 9), rr(-16, -11), rr(-6, 4));
-    pt.d1 = rnd() * 0.45; pt.d3 = rnd() * 0.5;
-    pt.ph = rnd() * Math.PI * 2;
-    pt.m.position.copy(pt.home);
+    pt.qScat = randQuat(2.4).multiply(pt.qHome);
+    pt.d1 = rnd() * 0.45; pt.dOut = rnd() * 0.3; pt.ph = rnd() * Math.PI * 2;
   });
-  const kept = parts.filter(p => p.keep);
-  const kc = new T.Vector3(); kept.forEach(p => kc.add(p.home)); kc.divideScalar(kept.length);
-  const kx = [Math.min(...kept.map(p => p.home.x)), Math.max(...kept.map(p => p.home.x))], ky = [Math.min(...kept.map(p => p.home.y)), Math.max(...kept.map(p => p.home.y))];
-  // the magnet pulls the nearest parts first: the cluster grows outward from its ring
-  const ringK = kept.find(p => p.ring) || kept[0];
-  const maxR = Math.max(...kept.map(p => p.home.distanceTo(ringK.home)));
-  kept.forEach(p => { p.d2 = 0.05 + 0.5 * (p.home.distanceTo(ringK.home) / maxR); });
-  parts.forEach(p => { if (!p.keep) p.d2 = rnd() * 0.3; });
+  // every piece of drawing 11 is one of the loose pieces of drawing 10, of the same kind and of a like length: it takes that piece's place
+  // in the air (stretched to its length) and turns into its own as the magnet pulls it home
+  ['bar', 'ring', 'dia'].forEach(kind => {
+    const src = A.parts.filter(p => p.kind === kind).sort((a, b) => a.len - b.len), dst = B.parts.filter(p => p.kind === kind).sort((a, b) => a.len - b.len);
+    dst.forEach((p, j) => { const s = src[dst.length < 2 ? Math.floor(src.length / 2) : Math.round(j * (src.length - 1) / (dst.length - 1))]; p.src = s; s.used = true; });
+  });
+  const ringB = B.parts.find(p => p.kind === 'ring') || B.parts[0];
+  const maxR = Math.max(...B.parts.map(p => p.home.distanceTo(ringB.home)));
+  B.parts.forEach(pt => {
+    pt.d2 = 0.05 + 0.5 * (pt.home.distanceTo(ringB.home) / maxR);   // the cluster grows outward from its ring
+    pt.qFall = randQuat(3.2); pt.fall = new T.Vector3(rr(-9, 9), rr(-16, -11), rr(-6, 4));
+    pt.d3 = rnd() * 0.5; pt.ph = rnd() * Math.PI * 2;
+  });
 
   // ---- layout: how big the pattern and the gathered cluster are on this screen
-  let view = { w: 1, h: 1 }, L = { s: 1, x: 0, y: 0 }, heroScale = 1, heroY = 0;
+  let L = { s: 1, x: 0, y: 0 }, heroScale = 1, heroY = 0;
   function layout() {
     const wpx = stage.clientWidth, hpx = stage.clientHeight;
     renderer.setSize(wpx, hpx, false); camera.aspect = wpx / hpx;
     const dist = 30; camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
-    const vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect; view = { w: vw, h: vh };
+    const vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
     const narrow = wpx < 820;
-    heroScale = Math.min(vw * (narrow ? 0.94 : 0.8) / (W0 * S), vh * (narrow ? 0.34 : 0.46) / (H0 * S));   // the pattern sits in the upper part, the headline has the lower part
+    heroScale = Math.min(vw * (narrow ? 0.94 : 0.8) / A.W, vh * (narrow ? 0.34 : 0.46) / A.H);   // the pattern sits in the upper part, the headline has the lower part
     heroY = vh * (narrow ? 0.16 : 0.13);
-    const cw = kx[1] - kx[0] + w, ch = ky[1] - ky[0] + w;
-    if (narrow) { L.s = Math.min(vw * 0.8 / cw, vh * 0.34 / ch); L.x = 0; L.y = vh * 0.19; }
-    else { L.s = Math.min(vw * 0.32 / cw, vh * 0.66 / ch); L.x = -vw * 0.21; L.y = -vh * 0.01; }
+    const cw = B.W + B.w, ch = B.H + B.w;
+    if (narrow) { L.s = Math.min(vw * 0.8 / cw, vh * 0.34 / ch); L.x = 0; L.y = vh * 0.21; }
+    else { L.s = Math.min(vw * 0.32 / cw, vh * 0.7 / ch); L.x = -vw * 0.21; L.y = -vh * 0.01; }
   }
   layout(); addEventListener('resize', layout);
 
-  // ---- the motion: a magnet pulls hard at the end (ease in) and the part settles with a little overshoot
-  const snap = t => { if (t <= 0) return 0; if (t >= 1) return 1; const a = t / 0.82; if (a < 1) return a * a * a * 1.04; const b = (t - 0.82) / 0.18; return 1.04 - 0.04 * Math.sin(b * Math.PI / 2) ; };
-  const loose = t => 1 - Math.pow(1 - t, 3);
-  const vA = new T.Vector3(), vB = new T.Vector3(), qA = new T.Quaternion(), qI = new T.Quaternion();
+  const vA = new T.Vector3(), vB = new T.Vector3(), qA = new T.Quaternion();
   let pv = reduce ? progress() : 0, last = performance.now();
+  // where a piece of drawing 10 is at this point of the scroll (whole -> loose)
+  function poseA(pt, s1, hs, time) {
+    const k1 = loose(clamp01((s1 - pt.d1 * 0.6) / 0.6));
+    vA.copy(pt.home).multiplyScalar(hs); vA.y += heroY; vA.lerp(pt.scat, k1);
+    qA.copy(pt.qHome).slerp(pt.qScat, k1);
+    if (!reduce && k1 > 0) { vA.x += Math.sin(time * 0.6 + pt.ph) * 0.06 * k1; vA.y += Math.cos(time * 0.5 + pt.ph) * 0.08 * k1; }   // loose, they float a little
+    return hs * (1 - 0.1 * k1);
+  }
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     const target = progress();
     pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 9));
     const p = pv, time = now / 1000;
     textAt(p); navTone();
-    const s1 = seg(p, ...P.scatter), s2 = seg(p, ...P.gather), s3 = seg(p, ...P.fall);
-    const hs = heroScale;
-    parts.forEach(pt => {
+    const s1 = seg(p, ...P.scatter), s2 = seg(p, ...P.gather), s3 = seg(p, ...P.fall), hs = heroScale;
+    A.parts.forEach(pt => {
       const m = pt.m;
-      const a = pt.home.clone().multiplyScalar(hs); a.y += heroY;                // assembled, full pattern
-      const k1 = loose(clamp01((s1 - pt.d1 * 0.6) / 0.6));
-      vA.copy(a).lerp(pt.scat, k1);
-      qA.copy(qI).slerp(pt.qScat, k1);
-      let scale = hs * (1 - k1) + hs * 0.9 * k1;
+      let sc = poseA(pt, s1, hs, time);
       if (s2 > 0) {
-        const k2 = clamp01((s2 - pt.d2) / 0.45);
-        if (pt.keep) {
-          const k = reduce ? (k2 > 0.5 ? 1 : 0) : snap(k2);
-          vB.set(L.x + (pt.home.x - kc.x) * L.s, L.y + (pt.home.y - kc.y) * L.s, 0);
-          vA.lerp(vB, k); qA.slerp(qI, Math.min(1, k)); scale = scale + (L.s - scale) * Math.min(1, k);
-        } else {
-          const k = smooth(k2);
-          vA.lerp(vB.set(pt.scat.x * 1.6, pt.scat.y * 1.6, -40), k); scale *= 1 - k;   // the rest drifts away into the dark
-        }
+        if (pt.used) { m.visible = false; return; }                              // its twin in drawing 11 has taken over
+        const k = smooth(clamp01((s2 - pt.dOut) / 0.45));
+        vA.lerp(vB.set(pt.scat.x * 1.6, pt.scat.y * 1.6, -40), k); sc *= 1 - k;  // the rest drifts away into the dark
       }
-      if (s3 > 0 && pt.keep) {
-        const k3 = clamp01((s3 - pt.d3 * 0.6) / 0.55), k = k3 * k3;               // they let go and fall
-        vA.lerp(vB.set(L.x + (pt.home.x - kc.x) * L.s * 1.4 + pt.fall.x, pt.fall.y, pt.fall.z), k);
-        qA.slerp(pt.qFall, k);
+      m.position.copy(vA); m.quaternion.copy(qA); m.scale.setScalar(Math.max(0.0001, sc)); m.visible = sc > 0.002;
+    });
+    B.parts.forEach(pt => {
+      const m = pt.m;
+      if (s2 <= 0) { m.visible = false; return; }
+      const sc0 = poseA(pt.src, s1, hs, time);
+      const k2 = clamp01((s2 - pt.d2) / 0.45), k = reduce ? (k2 > 0.5 ? 1 : 0) : snap(k2), kc = Math.min(1, k);
+      vB.set(L.x + pt.home.x * L.s, L.y + pt.home.y * L.s, 0);
+      vA.lerp(vB, k); qA.slerp(pt.qHome, kc);
+      const sc = sc0 + (L.s - sc0) * kc, stretch = pt.kind === 'bar' ? (pt.src.len * sc0 / (pt.len * sc)) * (1 - kc) + kc : 1;
+      if (s3 > 0) {
+        const k3 = clamp01((s3 - pt.d3 * 0.6) / 0.55), kf = k3 * k3;            // they let go and fall
+        vA.lerp(vB.set(L.x + pt.home.x * L.s * 1.4 + pt.fall.x, pt.fall.y, pt.fall.z), kf);
+        qA.slerp(pt.qFall, kf);
       }
-      // while loose, the parts float a little
-      const lz = (k1 - (pt.keep ? Math.min(1, s2 * 1.8) : 0)) * (1 - s3);
-      if (!reduce && lz > 0) { vA.x += Math.sin(time * 0.6 + pt.ph) * 0.06 * lz; vA.y += Math.cos(time * 0.5 + pt.ph) * 0.08 * lz; }
-      m.position.copy(vA); m.quaternion.copy(qA); m.scale.setScalar(Math.max(0.0001, scale));
-      m.visible = scale > 0.002;
+      m.position.copy(vA); m.quaternion.copy(qA); m.scale.set(sc * stretch, sc, sc); m.visible = true;
     });
     // a slow turn of the whole stage keeps the parts reading as solid steel
     scene.rotation.y = (reduce ? 0 : Math.sin(time * 0.15) * 0.05) + 0.1 + (s2 - s3) * -0.12;
@@ -441,6 +434,54 @@ function startScene() {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+}
+
+// ------------------------------------------------------------------ the foot of the page: the pattern gathers once more, quietly, under a dark veil
+function startFooter() {
+  const box = $('contact-gl'), cv = box.querySelector('canvas');
+  const renderer = new T.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+  renderer.setClearColor(0x111111, 0);
+  renderer.outputColorSpace = T.SRGBColorSpace;
+  const scene = new T.Scene(), camera = new T.PerspectiveCamera(26, 1, 0.1, 400);
+  lightUp(scene);
+  const C = buildPattern(svg10, steelMats(), scene);
+  const { rnd, rr } = seeded(11);
+  C.parts.forEach(pt => {
+    pt.from = new T.Vector3(pt.home.x * 1.6 + rr(-5, 5), pt.home.y * 1.6 + rr(-6, 2), rr(-10, 4));
+    pt.qFrom = new T.Quaternion().setFromEuler(new T.Euler(rr(-2.4, 2.4), rr(-2.4, 2.4), rr(-2.4, 2.4))).multiply(pt.qHome);
+    pt.d = 0.4 * (Math.abs(pt.home.x) / (C.W / 2)) + 0.12 * rnd();   // from the middle outwards
+  });
+  let s = 1, ox = 0, oy = 0, on = false, pv = 0, last = 0;
+  function layout() {
+    const wpx = box.clientWidth, hpx = box.clientHeight; if (!wpx || !hpx) return;
+    renderer.setSize(wpx, hpx, false); camera.aspect = wpx / hpx;
+    camera.position.set(0, 0, 30); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
+    const vh = 2 * 30 * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect, narrow = wpx < 820;
+    s = narrow ? vw * 1.15 / C.W : Math.max(vw * 0.62 / C.W, vh * 0.7 / C.H);
+    ox = narrow ? 0 : vw * 0.2; oy = narrow ? -vh * 0.18 : -vh * 0.04;
+  }
+  layout(); addEventListener('resize', layout);
+  // 0 when the section comes into view, 1 at the very bottom of the page
+  const prog = () => { const r = box.getBoundingClientRect(); return clamp01((innerHeight - r.top) / Math.max(1, Math.min(r.height, innerHeight) * 0.95)); };
+  const v = new T.Vector3(), q = new T.Quaternion();
+  function frame(now) {
+    if (!on) return;
+    const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+    const target = prog(); pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 7));
+    const time = now / 1000;
+    C.parts.forEach(pt => {
+      const k = reduce ? 1 : snap(clamp01((pv - pt.d) / 0.48)), kc = Math.min(1, k);
+      v.copy(pt.from).lerp(new T.Vector3(ox + pt.home.x * s, oy + pt.home.y * s, 0), k);
+      q.copy(pt.qFrom).slerp(pt.qHome, kc);
+      pt.m.position.copy(v); pt.m.quaternion.copy(q); pt.m.scale.setScalar(s * (0.85 + 0.15 * kc));
+    });
+    scene.rotation.y = (reduce ? 0 : Math.sin(time * 0.15) * 0.04) - 0.12;
+    scene.rotation.x = -0.18;
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  new IntersectionObserver(es => { const was = on; on = es.some(e => e.isIntersecting); if (on && !was) { layout(); last = 0; requestAnimationFrame(frame); } }).observe(box);
 }
 </script>
 </body>
