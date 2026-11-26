@@ -4463,8 +4463,11 @@ service cloud.firestore {
             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
             const grow = (x0, y0, x1, y1) => { minX = Math.min(minX, x0); maxX = Math.max(maxX, x1); minY = Math.min(minY, y0); maxY = Math.max(maxY, y1); };
             const cut = bwCutY();
-            segments.forEach(s => { const ax = s.p1.x * STEP, ay = Math.min(cut, s.p1.y * STEP), bx = s.p2.x * STEP, by = Math.min(cut, s.p2.y * STEP); if (s.p1.y * STEP > cut && s.p2.y * STEP > cut) return; grow(Math.min(ax, bx) - lw / 2, Math.min(ay, by) - lw / 2, Math.max(ax, bx) + lw / 2, Math.max(ay, by) + lw / 2); });
-            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; const r = el.isNode ? Rout : lw; if ((el.isNode || el.isDiamond) && j * STEP < cut) grow(i * STEP - r, j * STEP - r, i * STEP + r, j * STEP + r + (el.isDiamond ? lw / 2 : 0)); }
+            segments.forEach(s => { const ax = s.p1.x * STEP, ay = Math.min(cut, s.p1.y * STEP), bx = s.p2.x * STEP, by = Math.min(cut, s.p2.y * STEP); if (s.p1.y * STEP > cut && s.p2.y * STEP > cut) return;
+                // the stroke's true outline: the ends are square (butt), so a line ends exactly at its point, not half a line beyond it
+                const ddx = bx - ax, ddy = by - ay, ln = Math.hypot(ddx, ddy) || 1, nx = -ddy / ln * lw / 2, ny = ddx / ln * lw / 2;
+                grow(Math.min(ax - Math.abs(nx), bx - Math.abs(nx)), Math.min(ay - Math.abs(ny), by - Math.abs(ny)), Math.max(ax + Math.abs(nx), bx + Math.abs(nx)), Math.max(ay + Math.abs(ny), by + Math.abs(ny))); });
+            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; const r = el.isNode ? Rout : lw; if (el.isNode && j * STEP < cut) grow(i * STEP - r, j * STEP - r, i * STEP + r, j * STEP + r); else if (el.isDiamond && j * STEP < cut) { const dd = lw / Math.SQRT2; grow(i * STEP - dd, j * STEP + lw / 2 - dd, i * STEP + dd, j * STEP + lw / 2 + dd); } }
             if (minX === Infinity) { minX = 0; maxX = 1000; minY = 0; maxY = 600; }
             const nav = document.querySelector('.top-nav-wrapper'), nr = nav && nav.getBoundingClientRect();
             const gx = document.querySelector('#left-nav-group'), gh = document.querySelector('#game-hearts'), gr = gx && gx.getBoundingClientRect(), hr = gh && gh.getBoundingClientRect();
@@ -4871,8 +4874,7 @@ service cloud.firestore {
                 const clipBox = () => {
                     m.beginPath(); m.rect(bx.x0 - lw / 2, bx.y0 - lw / 2, bx.x1 - bx.x0 + lw, BW.clipY + lw * 3 - bx.y0 + lw / 2); m.clip();   // no cut at the bottom: the lines already end where they should
                     if (isPaperVisible && templateKind() !== 'product') { try { m.clip(sheetPath()); } catch (e) {} }   // paper, square, circle: cut at the sheet's edge, as on the canvas
-                    const bh = (typeof getBoltHolesPx === 'function') ? getBoltHolesPx() : [];                          // and the bolt holes go through the pattern
-                    if (bh.length) { m.beginPath(); m.rect(-1e6, -1e6, 2e6, 2e6); bh.forEach(h => { m.moveTo(h.x + h.r, h.y); m.arc(h.x, h.y, h.r, 0, Math.PI * 2, true); }); m.clip(); }
+                    // the bolt holes are not shown in the game
                 };
                 m.save(); clipBox();
                 const Rin = Rout - 2 * BW.cw;   // the lines run a little under the ring, so the joint has no seam
