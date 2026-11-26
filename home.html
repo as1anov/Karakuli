@@ -116,12 +116,20 @@ button { font: inherit; color: inherit; }
   .nav ul { gap: 12px; }
   .nav a.link { font-size: 12px; letter-spacing: 0.02em; }
 }
-@media (max-width: 820px) {
-  .cue { display: none; }
+/* an upright screen (phones, and iPads held upright): the gathered pattern stands above, the story under it */
+@media (max-width: 820px), (orientation: portrait) {
   .chapters { width: 100%; top: auto; bottom: 0; height: 54%; }
-  .chapter { left: var(--pad); right: var(--pad); top: 8%; transform: none; }
+  .chapter { left: var(--pad); right: var(--pad); top: 8%; transform: none; max-width: 640px; }
   .chapter h2 { font-size: 28px; margin-bottom: 12px; }
   .chapter p { font-size: 15px; }
+}
+@media (min-width: 600px) and (orientation: portrait) {
+  .chapter { left: 0; right: 0; margin: 0 auto; width: calc(100% - 2 * var(--pad)); }
+  .chapter h2 { font-size: 36px; }
+  .chapter p { font-size: 17px; }
+}
+@media (max-width: 820px) {
+  .cue { display: none; }
   .cards { grid-template-columns: 1fr; }
   .contact .ways { margin-bottom: 250px; }
   .contact-gl canvas { -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 62%, rgba(0,0,0,.4) 82%, transparent 96%); mask-image: linear-gradient(180deg, #000 0%, #000 62%, rgba(0,0,0,.4) 82%, transparent 96%); }   /* on a phone the pieces sit low: the fade starts at their band */
@@ -217,12 +225,13 @@ const P = { hero: [0.02, 0.11], morph: [0.03, 0.56], text: [0.46, 0.72], fall: [
 const clamp01 = v => Math.max(0, Math.min(1, v)), seg = (v, a, b) => clamp01((v - a) / (b - a));
 const smooth = t => t * t * (3 - 2 * t);
 const soft = t => t * t * t * (t * (t * 6 - 15) + 10);   // starts and ends with no jolt
-const progress = () => { const r = scrolly.getBoundingClientRect(), span = scrolly.offsetHeight - innerHeight; return clamp01(-r.top / span); };
+// measured against the pinned stage, not the window: on iPad and iPhone the window grows and shrinks as Safari's bars move
+const progress = () => { const r = scrolly.getBoundingClientRect(), span = scrolly.offsetHeight - $('stage').offsetHeight; return clamp01(-r.top / Math.max(1, span)); };
 
 // About: jump to the story
 document.querySelector('[data-jump="about"]').addEventListener('click', e => {
   e.preventDefault();
-  const span = scrolly.offsetHeight - innerHeight;
+  const span = scrolly.offsetHeight - $('stage').offsetHeight;
   scrollTo({ top: scrolly.offsetTop + span * (P.text[0] + 0.08), behavior: reduce ? 'auto' : 'smooth' });
 });
 
@@ -272,7 +281,8 @@ function glinting(mat, U) {
     sh.fragmentShader = 'uniform float uGlint, uGlintX;\nvarying vec2 vSheet;\nvarying float vFront;\n' + sh.fragmentShader
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         float gd = vSheet.x - 0.45 * vSheet.y - uGlintX;
-        float band = exp(-pow(gd / 0.07, 2.0)) + 0.45 * exp(-pow(gd / 0.26, 2.0));   // a bright line inside a soft halo
+        float thin = gd / 0.07, wide = gd / 0.26;                                     // squared by hand: pow() of a negative number is undefined, and Apple GPUs show it
+        float band = exp(-thin * thin) + 0.45 * exp(-wide * wide);                    // a bright line inside a soft halo
         totalEmissiveRadiance += vec3(1.0, 0.97, 0.9) * uGlint * vFront * band;`);
   };
   mat.customProgramCacheKey = () => 'glint';
@@ -400,8 +410,8 @@ function startScene() {
     renderer.setSize(wpx, hpx, false); camera.aspect = wpx / hpx;
     const dist = 30; camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
     const vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
-    const narrow = wpx < 820;
-    heroScale = 1.1 * Math.min(vw * (narrow ? 0.94 : 0.8) / A.W, vh * (narrow ? 0.34 : 0.46) / A.H);   // the pattern sits in the upper part, the headline has the lower part
+    const narrow = wpx < 820 || hpx > wpx;      // the same rule as the stylesheet: stacked on any upright screen
+    heroScale = 1.1 * Math.min(vw * (narrow ? (wpx >= 600 ? 0.86 : 0.94) : 0.8) / A.W, vh * (narrow ? 0.34 : 0.46) / A.H);   // the pattern sits in the upper part, the headline has the lower part
     heroY = vh * (narrow ? 0.1 : 0.13);
     const cw = B.W + B.w, ch = B.H + B.w;
     if (narrow) { L.s = Math.min(vw * 0.8 / cw, vh * 0.34 / ch); L.x = 0; L.y = vh * 0.21; }
@@ -446,7 +456,7 @@ function startScene() {
     // each piece of drawing 11 leaves its place in drawing 10, tumbles gently along its arc and settles into the new one
     B.parts.forEach(pt => {
       const m = pt.m, src = pt.src;
-      const raw = clamp01((morph - pt.d2) / 0.66), t = reduce ? (raw > 0.5 ? 1 : 0) : soft(raw), loft = Math.sin(Math.PI * t);
+      const t = soft(clamp01((morph - pt.d2) / 0.66)), loft = Math.sin(Math.PI * t);   // follows the scroll, also with reduced motion
       vA.copy(src.home).multiplyScalar(hs); vA.y += heroY;
       goal.set(L.x + pt.home.x * L.s, L.y + pt.home.y * L.s, 0);
       arc(goal, src.bow, t); drift(pt, time, loft);
