@@ -4970,7 +4970,7 @@ service cloud.firestore {
                 const px = (g.x + fr.x0) * g.css, py = (g.y + fr.y0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
                 const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (1.2 + Math.random() * 1.2) * U;
                 BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.4, vy: dy / dl * spd - (1 + Math.random() * 1) * U, life: 40 + Math.random() * 15, r: 0, vr: (Math.random() - 0.5) * 0.16, dep: LINE_WEIGHT * 0.12 * targetZoom, sd: sdc });
-                for (let j = 0; j < 10; j++) { const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random() * 1.8) * U; BW.parts.push({ x: sx + (mx - sx) * 0.3, y: sy + (my - sy) * 0.3, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5 * U, life: 18 + Math.random() * 22, r: U * (0.2 + Math.random() * 0.3), col: Math.random() < 0.5 ? '#9fe3ff' : '#ffffff', spark: true }); }
+                for (let j = 0; j < 3; j++) { const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random() * 1.8) * U; BW.parts.push({ x: sx + (mx - sx) * 0.3, y: sy + (my - sy) * 0.3, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5 * U, life: 10 + Math.random() * 10, r: U * (0.15 + Math.random() * 0.2), col: Math.random() < 0.5 ? '#9fe3ff' : '#ffffff', spark: true }); }
                 if (fr.x0 < x0) x0 = fr.x0; if (fr.y0 < y0) y0 = fr.y0; if (fr.x1 > x1) x1 = fr.x1; if (fr.y1 > y1) y1 = fr.y1;
             });
             if (x1 >= x0) { bwShade(x0, y0, x1 + 1, y1 + 1); const m = Math.ceil(BW.bev) + 4; bwBricksPaint(x0 - m, y0 - m, x1 + 1 + m, y1 + 1 + m); }
@@ -5004,7 +5004,7 @@ service cloud.firestore {
 
         function bwSpark(wx, wy, cols, n) {
             const x = offsetX + wx * zoom, y = offsetY + wy * zoom, U = BW.U;
-            for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = (0.4 + Math.random() * 1.4) * U; BW.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.4 * U, life: 30 + Math.random() * 30, r: U * (0.35 + Math.random() * 0.5), col: cols[i % cols.length], spark: true }); }
+            for (let i = 0; i < Math.ceil(n * 0.4); i++) { const a = Math.random() * Math.PI * 2, s = (0.4 + Math.random() * 1.4) * U; BW.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.4 * U, life: 16 + Math.random() * 14, r: U * (0.2 + Math.random() * 0.25), col: cols[i % cols.length], spark: true }); }
         }
 
         // ---------- the scene ----------
@@ -5117,8 +5117,7 @@ service cloud.firestore {
             BW.bparts = BW.bparts.filter(p => {
                 p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.2 * U * k; p.vx *= Math.pow(0.995, k); p.r += p.vr * k; p.life -= k;
                 if (p.life <= 0 || p.y > height + 60) return false;
-                ctx.save(); ctx.globalAlpha = Math.min(1, p.life / 12); ctx.translate(p.x + p.w / 2, p.y + p.h / 2); ctx.rotate(p.r);
-                ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
+                ctx.save(); ctx.globalAlpha = Math.min(0.55, p.life / 20); ctx.translate(p.x + p.w / 2, p.y + p.h / 2); ctx.rotate(p.r);
 
                 ctx.drawImage(p.cv, -p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
                 return true;
@@ -5130,7 +5129,7 @@ service cloud.firestore {
                 if (p.life <= 0) return false;
                 const a = Math.min(1, p.life / 25);
                 if (p.dust) { ctx.fillStyle = p.c + (0.22 * a) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
-                else { ctx.save(); ctx.globalAlpha = a; ctx.shadowColor = p.col; ctx.shadowBlur = p.r * 4; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+                else { ctx.save(); ctx.globalAlpha = a * 0.45; ctx.shadowColor = p.col; ctx.shadowBlur = p.r * 1.5; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
                 return true;
             });
 
@@ -5161,15 +5160,19 @@ service cloud.firestore {
                 if (gameState !== 'gameover') {
                     const r = ball.r * zoom, bx = offsetX + ball.x * zoom, by = offsetY + ball.y * zoom;
                     BW.trail.forEach(([tx, ty], i) => { const a = (i + 1) / BW.trail.length; ctx.fillStyle = `rgba(130, 200, 255, ${0.16 * a})`; ctx.beginPath(); ctx.arc(tx, ty, r * (0.45 + 0.55 * a), 0, Math.PI * 2); ctx.fill(); });
+                    { const hg = ctx.createRadialGradient(bx, by, r * 0.8, bx, by, r * 3.2); hg.addColorStop(0, 'rgba(160, 225, 255, 0.45)'); hg.addColorStop(1, 'rgba(160, 225, 255, 0)'); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(bx, by, r * 3.2, 0, Math.PI * 2); ctx.fill(); }   // a soft halo: the ball stays easy to follow
                     bwBall(ctx, bx, by, r);
                 }
             }
-            // score pop-ups
+            // score pop-ups: not over the field (they hid the ball) but in the HUD - the points beside the score, the bonus messages in the middle of its row
             BW.pops = BW.pops.filter(pp => {
-                pp.t += k; if (pp.t > 55) return false;
-                const x = offsetX + pp.x * zoom, y = offsetY + pp.y * zoom - U * 4 - pp.t * U * 0.12;
-                ctx.save(); ctx.globalAlpha = Math.min(1, (55 - pp.t) / 18); ctx.font = `700 ${Math.round(U * (pp.big ? 5 : 4.2))}px ${BW_FONT_FACE}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6; ctx.fillStyle = pp.big ? BW_COL.accent : '#fff'; ctx.fillText(pp.s, x, y); ctx.restore();
+                pp.t += k; if (pp.t > 60) return false;
+                const X0 = offsetX + BW.inner.minX * zoom, X1 = offsetX + BW.inner.maxX * zoom, Y0 = offsetY + BW.inner.minY * zoom, hp = U * 4, hty = Y0 + hp + U * 3;
+                const q = pp.t / 60, inn = Math.min(1, pp.t / 8), al = q < 0.6 ? 1 : (1 - q) / 0.4, sc = 0.7 + 0.3 * inn;
+                ctx.save(); ctx.globalAlpha = Math.max(0, al); ctx.textBaseline = 'middle'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4;
+                if (pp.big) { ctx.font = `700 ${Math.round(U * 3.8 * sc)}px ${BW_FONT_FACE}`; ctx.textAlign = 'center'; ctx.fillStyle = BW_COL.accent; ctx.fillText(pp.s, (X0 + X1) / 2, hty + U * 1.5 - q * U * 1.5); }
+                else { ctx.font = `700 ${Math.round(U * 5.6)}px ${BW_FONT_FACE}`; const sw = ctx.measureText(String(BW.score)).width; ctx.font = `700 ${Math.round(U * 3.6 * sc)}px ${BW_FONT_FACE}`; ctx.textAlign = 'left'; ctx.fillStyle = '#9fe3ff'; ctx.fillText(pp.s, X0 + hp + sw + U * 2.5, hty + U * 2.6 - q * U * 1.2); }
+                ctx.restore();
                 return true;
             });
             ctx.restore();
