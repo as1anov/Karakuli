@@ -96,6 +96,8 @@ button { font: inherit; color: inherit; }
 .contact-gl canvas { width: 100%; height: 100%; display: block; }
 /* the pieces are kept quiet by dimming them, not by laying a gradient over them: the ground stays one flat colour, as at the top of the page */
 .contact-gl canvas { opacity: .55; }
+/* the pieces sink into the black towards the end of the page. The fade is a mask on the pieces alone: the ground under them is not painted, so it cannot band */
+.contact-gl canvas { -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.72) 35%, rgba(0,0,0,.3) 68%, transparent 92%); mask-image: linear-gradient(180deg, #000 0%, rgba(0,0,0,.72) 35%, rgba(0,0,0,.3) 68%, transparent 92%); }
 .contact h2 { margin: 0 0 16px; font-weight: 500; font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: -0.025em; max-width: 14em; }
 .contact .sub { margin: 0 0 32px; color: var(--ink-2); font-size: 18px; }
 .contact .ways { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 clamp(64px, 10vh, 120px); padding: 0; list-style: none; }
@@ -122,6 +124,7 @@ button { font: inherit; color: inherit; }
   .chapter p { font-size: 15px; }
   .cards { grid-template-columns: 1fr; }
   .contact .ways { margin-bottom: 250px; }
+  .contact-gl canvas { -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 62%, rgba(0,0,0,.4) 82%, transparent 96%); mask-image: linear-gradient(180deg, #000 0%, #000 62%, rgba(0,0,0,.4) 82%, transparent 96%); }   /* on a phone the pieces sit low: the fade starts at their band */
 }
 @media (prefers-reduced-motion: reduce) {
   .cue i { animation: none; }
