@@ -4500,6 +4500,7 @@ service cloud.firestore {
             let yTop = minY;   // and, when the drawing is taller than its half of the screen, a random height too
             if (phone && maxY - minY > fh * 0.5) yTop = minY + Math.random() * (maxY - minY - fh * 0.5);
             const hud = 16 * BW.U / z;   // a row for the score above the pattern
+            BW.cropFrac = 0.55;
             if (phone) {
                 // pick a zone where no ring is cut by the window's edges or by the crop line (a cut ring would be lost)
                 const rings = []; for (const id in specialElements) if (specialElements[id].isNode) { const [i, j] = id.split(',').map(Number); if (j * STEP < cut) rings.push({ x: i * STEP, y: j * STEP }); }
@@ -4517,13 +4518,24 @@ service cloud.firestore {
                     let sc = 0; segments.forEach(sg => { const mx = (sg.p1.x + sg.p2.x) * STEP / 2, my = (sg.p1.y + sg.p2.y) * STEP / 2; if (mx > cx && mx < cx + fw && my > ty && my < ty + fh * 0.5) sc++; });
                     cands.push({ cx, ty, sc, b: bad(cx, ty) }); if (sc > best) best = sc;
                 }));
+                // a cut through a diagonal line leaves a sharp wedge, a cut along a horizontal one a thin sliver: such edges cost points
+                const cc = (isY, v) => { let n = 0; segments.forEach(sg => { const ax = sg.p1.x * STEP, ay = sg.p1.y * STEP, bx2 = sg.p2.x * STEP, by2 = sg.p2.y * STEP; const a = isY ? ay : ax, b2 = isY ? by2 : bx2, o1 = isY ? ax : ay, o2 = isY ? bx2 : by2;
+                    if (o1 !== o2 && a !== b2) { if (Math.min(a, b2) - lw * 0.36 < v && Math.max(a, b2) + lw * 0.36 > v) n += 3; } else if (a === b2 && o1 !== o2 && Math.abs(a - v) < lw / 2) n += 3; }); return n; };
                 const ok = cands.filter(c => c.sc >= best * 0.55), minBad = Math.min(...ok.map(c => c.b)), pool = ok.filter(c => c.b === minBad);
-                if (pool.length) { const c = pool[Math.floor(Math.random() * pool.length)]; if (pw > fw) x0 = c.cx; yTop = c.ty; }
+                pool.forEach(c => { c.cc = cc(false, c.cx + f0) + cc(false, c.cx + fw - f0) + cc(true, c.ty - pad - hud + f0); });
+                const minCC = Math.min(...pool.map(c => c.cc)), pool2 = pool.filter(c => c.cc <= minCC + 1);
+                if (pool2.length) {
+                    const c = pool2[Math.floor(Math.random() * pool2.length)]; if (pw > fw) x0 = c.cx; yTop = c.ty;
+                    // the crop line too: where it crosses no diagonal, no horizontal stroke and no ring
+                    const fy = yTop - pad - hud; let bestF = 0.55, bestC = Infinity;
+                    for (let fr = 0.42; fr <= 0.68; fr += 0.01) { const yc = fy + fh * fr; let cost = cc(true, yc) + Math.abs(fr - 0.55) * 4; rings.forEach(r => { if (r.y + Ro > yc && r.y - Ro < yc) cost += 20; }); if (cost < bestC) { bestC = cost; bestF = fr; } }
+                    BW.cropFrac = bestF;
+                }
             }
             const field = { minX: x0, maxX: x0 + fw, minY: yTop - pad - hud, maxY: yTop - pad - hud + fh };
             const f = 2 * BW.U / z;      // inner margin of the arena
             BW.inner = { minX: field.minX + f, maxX: field.maxX - f, minY: field.minY + f, maxY: field.maxY };
-            BW.cropY = phone ? field.minY + fh * 0.55 : maxY + lw;   // a bigger screen keeps all of the drawing; a phone its close-up
+            BW.cropY = phone ? field.minY + fh * (BW.cropFrac || 0.55) : maxY + lw;   // a bigger screen keeps all of the drawing; a phone its close-up
             return { field, z, ox: side - field.minX * z, oy: top - field.minY * z };
         }
 
