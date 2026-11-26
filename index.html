@@ -4500,6 +4500,26 @@ service cloud.firestore {
             let yTop = minY;   // and, when the drawing is taller than its half of the screen, a random height too
             if (phone && maxY - minY > fh * 0.5) yTop = minY + Math.random() * (maxY - minY - fh * 0.5);
             const hud = 16 * BW.U / z;   // a row for the score above the pattern
+            if (phone) {
+                // pick a zone where no ring is cut by the window's edges or by the crop line (a cut ring would be lost)
+                const rings = []; for (const id in specialElements) if (specialElements[id].isNode) { const [i, j] = id.split(',').map(Number); if (j * STEP < cut) rings.push({ x: i * STEP, y: j * STEP }); }
+                const f0 = 2 * BW.U / z, Ro = BASE_STEP_VAL + lw / 2;
+                const bad = (cx, ty) => {
+                    const fy = ty - pad - hud, L0 = cx + f0 + lw / 2, R0 = cx + fw - f0 - lw / 2, T0 = fy + f0 + lw / 2, B0 = Math.min(fy + fh * 0.55, cut);
+                    let n = 0; rings.forEach(r => { const inX = r.x + Ro > L0 && r.x - Ro < R0, inY = r.y + Ro > T0 && r.y - Ro < B0; if (!inX || !inY) return; if (r.x - Ro < L0 || r.x + Ro > R0 || r.y - Ro < T0 || r.y + Ro > B0) n++; }); return n;
+                };
+                const cands = [], xs = [], ys = [];
+                const xlo = minX - pad, xhi = Math.max(xlo, maxX + pad - fw), ylo = minY, yhi = Math.max(ylo, maxY - fh * 0.5);
+                for (let v = xlo; v <= xhi + 1e-6; v += lw / 2) xs.push(v); if (!xs.length) xs.push(xlo);
+                for (let v = ylo; v <= yhi + 1e-6; v += lw / 2) ys.push(v); if (!ys.length) ys.push(ylo);
+                let best = 0;
+                xs.forEach(cx => ys.forEach(ty => {
+                    let sc = 0; segments.forEach(sg => { const mx = (sg.p1.x + sg.p2.x) * STEP / 2, my = (sg.p1.y + sg.p2.y) * STEP / 2; if (mx > cx && mx < cx + fw && my > ty && my < ty + fh * 0.5) sc++; });
+                    cands.push({ cx, ty, sc, b: bad(cx, ty) }); if (sc > best) best = sc;
+                }));
+                const ok = cands.filter(c => c.sc >= best * 0.55), minBad = Math.min(...ok.map(c => c.b)), pool = ok.filter(c => c.b === minBad);
+                if (pool.length) { const c = pool[Math.floor(Math.random() * pool.length)]; if (pw > fw) x0 = c.cx; yTop = c.ty; }
+            }
             const field = { minX: x0, maxX: x0 + fw, minY: yTop - pad - hud, maxY: yTop - pad - hud + fh };
             const f = 2 * BW.U / z;      // inner margin of the arena
             BW.inner = { minX: field.minX + f, maxX: field.maxX - f, minY: field.minY + f, maxY: field.maxY };
@@ -4605,7 +4625,8 @@ service cloud.firestore {
             if (wasPlaying) { zoom = targetZoom; offsetX = targetOffsetX; offsetY = targetOffsetY; }
             buildGameBricks(); bwBricksInit();
             const z = L.z, I = BW.inner, fh = L.field.maxY - L.field.minY, U = BW.U / z;
-            paddle = { w: Math.max(30 * U, (I.maxX - I.minX) * 0.24), h: Math.max(3.4 * U, LINE_WEIGHT * 0.55), x: (I.minX + I.maxX) / 2, y: L.field.maxY - 10 * U, base: 0 };
+            paddle = { w: Math.max(30 * U, (I.maxX - I.minX) * 0.24), h: Math.max(3.4 * U, LINE_WEIGHT * 0.55), x: (I.minX + I.maxX) / 2, y: L.field.maxY - (Math.min(width, height) <= 600 ? 100 : 36) / z, base: 0 };   // above the finger: raised on a phone
+
             paddle.base = paddle.w;
             ball = { r: LINE_WEIGHT * 0.25, x: paddle.x, y: 0, vx: 0, vy: 0, speed: fh / 105, base: fh / 105 };
             ball.y = paddle.y - paddle.h / 2 - ball.r;
@@ -4705,14 +4726,14 @@ service cloud.firestore {
         function bwBreak(hit) {
             const b0 = BW.bricks[hit.bid], e = BW.els[b0.el], ids = [hit.bid];
             if (e.t === 'seg') {
-                const r = BW.runs[e.run], Lw = r.len < LINE_WEIGHT * 4 ? r.len + LINE_WEIGHT : Math.max(LINE_WEIGHT * 1.5, r.len / 3), uh = ball.x * e.ux + ball.y * e.uy;
+                const r = BW.runs[e.run], Lw = r.len < LINE_WEIGHT * 6 ? r.len + LINE_WEIGHT : Math.max(LINE_WEIGHT * 2.2, r.len / 2), uh = ball.x * e.ux + ball.y * e.uy;
                 const w0 = Math.max(r.u0 - LINE_WEIGHT / 2, Math.min(r.u1 + LINE_WEIGHT / 2 - Lw, uh - Lw / 2)), set = new Set(r.els);
                 BW.bricks.forEach((b, i) => { if (b.alive && set.has(b.el) && b.u >= w0 && b.u <= w0 + Lw) ids.push(i); });
                 bwScore(30, ball.x, ball.y); BWS.brick(); BW.shake = Math.max(BW.shake, 5);
                 if (Math.random() < 0.09) bwDropCap(ball.x, ball.y);
             } else if (e.t === 'ring') {
                 const ah = Math.atan2(ball.y - e.y, ball.x - e.x);
-                BW.bricks.forEach((b, i) => { if (!b.alive || b.el !== b0.el) return; let d = b.ang - ah; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) <= Math.PI / 4) ids.push(i); });
+                BW.bricks.forEach((b, i) => { if (!b.alive || b.el !== b0.el) return; let d = b.ang - ah; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) <= Math.PI / 3) ids.push(i); });
                 bwScore(25, ball.x, ball.y); BWS.ring(); BW.shake = Math.max(BW.shake, 6);
                 if (Math.random() < 0.12) bwDropCap(e.x, e.y);
             } else {
