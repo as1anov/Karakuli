@@ -4810,7 +4810,7 @@ service cloud.firestore {
             }
             if (el0 < 0) return;
             const e0 = BW.els[el0], allowed = new Set(e0.t === 'seg' && e0.run != null && BW.runs[e0.run] ? BW.runs[e0.run].els : [el0]); allowed.add(el0);
-            const hu = lc * 1.1, d0 = -lc * 0.35, d1 = depth + 1, R = Math.ceil(Math.hypot(hu, d1)) + 2;
+            const hu = lc * 1.35, d0 = -lc * 0.35, d1 = depth + 1, R = Math.ceil(Math.hypot(hu, d1)) + 2;
             const xa = Math.max(0, Math.floor(cx - R)), xb = Math.min(W - 1, Math.ceil(cx + R)), ya = Math.max(0, Math.floor(cy - R)), yb = Math.min(H - 1, Math.ceil(cy + R));
             let cut = [];
             for (let yy = ya; yy <= yb; yy++) for (let xx = xa; xx <= xb; xx++) {
@@ -4832,12 +4832,12 @@ service cloud.firestore {
             BW.stN++; const rmStamp = BW.stN;
             cut.forEach(mark);
             // scraps left behind: remaining metal next to the bite that is smaller than a line's square falls too
-            const lim = Math.round(lc * lc * 1.0), scraps = [];
+            const lim = Math.round(lc * lc * 5), scraps = [];   // a leftover piece smaller than about two lines' squares falls with the bite: nothing is left that is hard to hit
             BW.stN++; const seen = BW.stN;
             let bx0 = W, by0 = H, bx1 = 0, by1 = 0; cut.forEach(i => { const x = i % W, y = (i / W) | 0; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; });
             const around = [];
             for (let yy = Math.max(0, by0 - 2); yy <= Math.min(H - 1, by1 + 2); yy++) for (let xx = Math.max(0, bx0 - 2); xx <= Math.min(W - 1, bx1 + 2); xx++) {
-                const i = yy * W + xx; if (BW.own[i] < 0 || !allowed.has(BW.own[i]) || BW.st[i] === rmStamp) continue;
+                const i = yy * W + xx; if (BW.own[i] < 0 || BW.st[i] === rmStamp) continue;
                 let nb = false; for (let dy = -1; dy <= 1 && !nb; dy++) for (let dx = -1; dx <= 1; dx++) { const X = xx + dx, Y = yy + dy; if (X >= 0 && Y >= 0 && X < W && Y < H && BW.st[Y * W + X] === rmStamp) { nb = true; break; } }
                 if (nb) around.push(i);
             }
@@ -4847,11 +4847,14 @@ service cloud.firestore {
                 for (let h = 0; h < comp.length; h++) {
                     if (comp.length > lim) { big = true; break; }
                     const i = comp[h], xx = i % W, yy = (i / W) | 0;
-                    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const X = xx + dx, Y = yy + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) return; const n2 = Y * W + X; if (BW.own[n2] < 0 || !allowed.has(BW.own[n2]) || BW.st[n2] === rmStamp || BW.st[n2] === seen) return; BW.st[n2] = seen; comp.push(n2); });
+                    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const X = xx + dx, Y = yy + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) return; const n2 = Y * W + X; if (BW.own[n2] < 0 || BW.st[n2] === rmStamp || BW.st[n2] === seen) return; BW.st[n2] = seen; comp.push(n2); });
                 }
                 if (!big && comp.length <= lim) scraps.push(comp);
             });
             const all = cut.slice(); scraps.forEach(c => c.forEach(i => all.push(i)));
+            // the very end: when only a few shards are left, they all go (a victory), so the last ones are never a chore to hunt
+            { let g0 = 0; all.forEach(i => { if (BW.alpha[i] >= 128) g0++; });
+              if (BW.live - g0 < 12 * lc * lc) { const inAll = new Set(all); for (let i = 0; i < W * H; i++) if (BW.own[i] >= 0 && !inAll.has(i)) all.push(i); } }
             // split into connected pieces and send each off
             BW.stN++; const lab = BW.stN, pieces = [], set = new Set(all);
             all.forEach(i0 => {
