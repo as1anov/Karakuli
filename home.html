@@ -90,9 +90,9 @@ button { font: inherit; color: inherit; }
 .contact > :not(.contact-gl) { position: relative; z-index: 1; }
 .contact-gl { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .contact-gl canvas { width: 100%; height: 100%; display: block; }
-/* a dark veil over the pattern: it is felt more than seen, and the words on the left stay clear */
+/* a soft dark veil over the floating pieces: they stay quiet, and the words on the left stay clear */
 .contact-gl::after { content: ''; position: absolute; inset: 0; background:
-  linear-gradient(90deg, rgba(17,17,17,.82) 0%, rgba(17,17,17,.82) 40%, rgba(17,17,17,.72) 66%, rgba(17,17,17,.62) 100%),
+  linear-gradient(90deg, rgba(17,17,17,.74) 0%, rgba(17,17,17,.66) 40%, rgba(17,17,17,.4) 70%, rgba(17,17,17,.32) 100%),
   linear-gradient(0deg, var(--ink) 0%, rgba(17,17,17,0) 30%, rgba(17,17,17,0) 80%, var(--ink) 100%); }
 .contact h2 { margin: 0 0 16px; font-weight: 500; font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: -0.025em; max-width: 14em; }
 .contact .sub { margin: 0 0 32px; color: var(--ink-2); font-size: 18px; }
@@ -113,8 +113,8 @@ button { font: inherit; color: inherit; }
   .chapter h2 { font-size: 28px; margin-bottom: 12px; }
   .chapter p { font-size: 15px; }
   .cards { grid-template-columns: 1fr; }
-  .contact .ways { margin-bottom: 230px; }
-  .contact-gl::after { background: linear-gradient(180deg, var(--ink) 0%, rgba(17,17,17,.82) 45%, rgba(17,17,17,.62) 100%); }
+  .contact .ways { margin-bottom: 210px; }
+  .contact-gl::after { background: linear-gradient(180deg, var(--ink) 0%, rgba(17,17,17,.7) 45%, rgba(17,17,17,.34) 100%); }
 }
 @media (prefers-reduced-motion: reduce) {
   .cue i { animation: none; }
@@ -286,19 +286,19 @@ function lightUp(scene) {
 }
 // The drawing is cut into long straight bars (plus its rings and diamonds). Every part is built round its own centre, lying along x;
 // `home` and `qHome` put it in its place in the drawing (centred on the drawing's middle, in world units).
-function buildPattern(text, mats, scene, cropX = 0) {
+function buildPattern(text, mats, scene) {
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
   const vb = doc.querySelector('svg').getAttribute('viewBox').split(/\s+/).map(Number), W0 = vb[2], H0 = vb[3];
   const path = doc.querySelector('path'), sw = +(path.getAttribute('stroke-width') || 58), w = sw * S, h = sw / 2;
-  const rings = [...doc.querySelectorAll('circle')].filter(c => c.getAttribute('fill') === 'none').map(c => ({ x: +c.getAttribute('cx'), y: +c.getAttribute('cy'), r: +c.getAttribute('r') })).filter(r => r.x - r.r >= cropX);
-  const toW = (x, y) => [(x - (cropX + W0) / 2) * S, -(y - H0 / 2) * S];
+  const rings = [...doc.querySelectorAll('circle')].filter(c => c.getAttribute('fill') === 'none').map(c => ({ x: +c.getAttribute('cx'), y: +c.getAttribute('cy'), r: +c.getAttribute('r') }));
+  const toW = (x, y) => [(x - W0 / 2) * S, -(y - H0 / 2) * S];
   // every unit step of the drawing, once: the drawing repeats steps where its strokes overlap
   const steps = new Map(), at = new Map(), nk = q => q[0] + ',' + q[1];
   path.getAttribute('d').trim().split(/(?=M)/).forEach(sp => {
     const nums = sp.match(/-?\d+(\.\d+)?/g); if (!nums) return;
     const pts = []; for (let i = 0; i + 1 < nums.length; i += 2) pts.push([+nums[i], +nums[i + 1]]);
     for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1], b = pts[i], k = [nk(a), nk(b)].sort().join('|'); if (steps.has(k) || nk(a) === nk(b) || a[0] < cropX || b[0] < cropX) continue;
+      const a = pts[i - 1], b = pts[i], k = [nk(a), nk(b)].sort().join('|'); if (steps.has(k) || nk(a) === nk(b)) continue;
       steps.set(k, { a, b, used: false });
       [a, b].forEach(q => { const n = nk(q); if (!at.has(n)) at.set(n, []); at.get(n).push(k); });
     }
@@ -353,11 +353,11 @@ function buildPattern(text, mats, scene, cropX = 0) {
     add(g, mats.ext, 'ring', r.x, r.y, 0, 0);
   });
   doc.querySelectorAll('rect').forEach(rc => {
-    const t = (rc.getAttribute('transform') || '').match(/rotate\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/); if (!t || +t[2] < cropX) return;
+    const t = (rc.getAttribute('transform') || '').match(/rotate\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/); if (!t) return;
     const s = +rc.getAttribute('width') * S;
     add(new T.BoxGeometry(s, s, D), mats.box, 'dia', +t[2], +t[3], Math.PI / 4, 0);
   });
-  return { parts, W: (W0 - cropX) * S, fullW: W0 * S, H: H0 * S, w };
+  return { parts, W: W0 * S, H: H0 * S, w };
 }
 
 function startScene() {
@@ -471,7 +471,7 @@ function startScene() {
   requestAnimationFrame(frame);
 }
 
-// ------------------------------------------------------------------ the foot of the page: the pattern gathers once more, quietly, under a dark veil
+// ------------------------------------------------------------------ the foot of the page: a few lines, rings and diamonds adrift, weightless
 function startFooter() {
   const box = $('contact-gl'), cv = box.querySelector('canvas');
   const renderer = new T.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
@@ -480,44 +480,60 @@ function startFooter() {
   renderer.outputColorSpace = T.SRGBColorSpace;
   const scene = new T.Scene(), camera = new T.PerspectiveCamera(26, 1, 0.1, 400);
   lightUp(scene);
-  const C = buildPattern(svg10, steelMats(), scene, 870);   // the right-hand 60 % of drawing 10 (870 of its 2176 px are cut away)
-  const { rnd, rr } = seeded(11);
-  C.parts.forEach(pt => {
-    // it starts on the left, where the small pattern gathered beside the story
-    pt.fx = rr(-0.42, -0.16); pt.fy = rr(-0.38, 0.38); pt.fz = rr(-5, 3);
-    pt.bow = new T.Vector3(rr(-2, 2), rr(-3, 3), rr(-3, 3));
-    pt.qFrom = new T.Quaternion().setFromEuler(new T.Euler(rr(-1.6, 1.6), rr(-1.6, 1.6), rr(-1.6, 1.6))).multiply(pt.qHome);
-    pt.d = 0.3 * (0.5 - pt.home.x / C.W) + 0.1 * rnd();   // the far side of the pattern is built first
+  const mats = steelMats(), W = 0.58;   // the width of a drawn line
+  const bar = len => () => new T.Mesh(new T.BoxGeometry(len, W, D), mats.box);
+  const dia = () => new T.Mesh(new T.BoxGeometry(W, W, D), mats.box);
+  const ring = () => {
+    const sh = new T.Shape(); sh.absarc(0, 0, 0.96, 0, Math.PI * 2);
+    const hole = new T.Path(); hole.absarc(0, 0, 0.38, 0, Math.PI * 2, true); sh.holes.push(hole);
+    const g = new T.ExtrudeGeometry(sh, { depth: D, bevelEnabled: false, curveSegments: 48 }); g.translate(0, 0, -D / 2);
+    return new T.Mesh(g, mats.ext);
+  };
+  // what floats, and where: [shape, x, y (shares of the view, from its middle), depth, turn in the plane]. Most keep to the right, clear of the words
+  const wide = [
+    [ring, 0.27, 0.17, 0.6, 0], [ring, 0.43, -0.2, -3, 0],
+    [bar(3.4), 0.18, 0.41, -2, 0], [bar(2.2), 0.40, 0.30, -1, Math.PI / 2], [bar(1.5), 0.19, -0.03, 1.2, Math.PI / 4],
+    [bar(2.8), 0.35, -0.01, -4, -Math.PI / 4], [bar(1.8), 0.46, 0.08, 0.4, 0], [bar(3.0), 0.24, -0.27, -1.5, 0],
+    [bar(1.3), 0.09, -0.16, -3.5, Math.PI / 2], [bar(1.2), -0.06, 0.43, -5, Math.PI / 4],
+    [dia, 0.34, 0.22, -2.5, Math.PI / 4], [dia, 0.14, -0.03, -1, Math.PI / 4], [dia, 0.36, -0.30, 1, Math.PI / 4], [dia, 0.01, -0.24, -4, Math.PI / 4]
+  ];
+  // on a phone they have their own band between the buttons and the foot line: y is counted in that band
+  const phone = [
+    [ring, 0.22, 0.2, 0, 0], [bar(2.2), -0.24, 0.55, -1, 0], [bar(1.5), 0.36, -0.5, -2, Math.PI / 2], [bar(1.8), -0.05, -0.3, -1.5, -Math.PI / 4],
+    [bar(1.2), 0.06, 0.65, -3, Math.PI / 4], [dia, -0.36, -0.45, 0, Math.PI / 4], [dia, 0.02, 0.15, -3, Math.PI / 4], [dia, 0.40, 0.6, -1, Math.PI / 4]
+  ];
+  const { rr } = seeded(23);
+  const make = list => list.map(([shape, x, y, z, turn]) => {
+    const m = shape(); scene.add(m);
+    return { m, x, y, z, q: new T.Quaternion().setFromEuler(new T.Euler(rr(-0.45, 0.45), rr(-0.6, 0.6), turn)),
+      axis: new T.Vector3(rr(-1, 1), rr(-1, 1), rr(-0.5, 0.5)).normalize(), spin: rr(0.05, 0.12) * (rr(0, 1) < 0.5 ? -1 : 1),
+      ph: rr(0, Math.PI * 2), sp: rr(0.28, 0.48), amp: rr(0.2, 0.42) };
   });
-  let s = 1, ox = 0, oy = 0, vw = 1, vh = 1, on = false, pv = 0, last = 0;
+  const sets = { wide: make(wide), phone: make(phone) };
+  let vw = 1, vh = 1, narrow = false, hp = 1, on = false, pv = 0, last = 0;
   function layout() {
     const wpx = box.clientWidth, hpx = box.clientHeight; if (!wpx || !hpx) return;
     renderer.setSize(wpx, hpx, false); camera.aspect = wpx / hpx;
     camera.position.set(0, 0, 30); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
-    vh = 2 * 30 * Math.tan(camera.fov * Math.PI / 360); vw = vh * camera.aspect;
-    const narrow = wpx < 820;
-    s = narrow ? vw * 1.15 / C.fullW : Math.max(vw * 0.62 / C.fullW, vh * 0.7 / C.H);
-    ox = narrow ? 0 : vw * 0.24; oy = narrow ? -vh * (0.5 - 205 / hpx) : -vh * 0.04;   // on a phone it has its own room between the buttons and the foot line
+    vh = 2 * 30 * Math.tan(camera.fov * Math.PI / 360); vw = vh * camera.aspect; narrow = wpx < 820; hp = hpx;
+    sets.wide.forEach(p => { p.m.visible = !narrow; }); sets.phone.forEach(p => { p.m.visible = narrow; });
   }
   layout(); addEventListener('resize', layout);
   // 0 when the section comes into view, 1 at the very bottom of the page
   const prog = () => { const r = box.getBoundingClientRect(); return clamp01((innerHeight - r.top) / Math.max(1, Math.min(r.height, innerHeight) * 0.95)); };
-  const v = new T.Vector3(), c = new T.Vector3(), to = new T.Vector3(), q = new T.Quaternion();
+  const spun = new T.Quaternion();
   function frame(now) {
     if (!on) return;
     const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
     const target = prog(); pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 4));
-    const time = now / 1000;
-    C.parts.forEach(pt => {
-      const t = reduce ? 1 : soft(clamp01((pv - pt.d) / 0.58)), u = 1 - t;
-      v.set(pt.fx * vw, pt.fy * vh, pt.fz); to.set(ox + pt.home.x * s, oy + pt.home.y * s, 0);
-      c.copy(v).lerp(to, 0.5).add(pt.bow);
-      v.multiplyScalar(u * u).addScaledVector(c, 2 * u * t).addScaledVector(to, t * t);
-      q.copy(pt.qFrom).slerp(pt.qHome, t);
-      pt.m.position.copy(v); pt.m.quaternion.copy(q); pt.m.scale.setScalar(s * (0.8 + 0.2 * t));
+    const time = reduce ? 0 : now / 1000, rise = reduce ? 0 : 1 - smooth(pv);   // they float up into place as the page ends
+    const size = narrow ? Math.min(vw / 11.5, vh / 20) : Math.min(vh / 15, vw / 30);
+    (narrow ? sets.phone : sets.wide).forEach(p => {
+      const x = p.x * vw, y = narrow ? -vh * (0.5 - 175 / hp) + p.y * vh * (70 / hp) : p.y * vh;
+      p.m.position.set(x + Math.cos(time * p.sp * 0.7 + p.ph) * p.amp * 0.6, y + Math.sin(time * p.sp + p.ph) * p.amp - rise * (2.5 + p.amp * 6), p.z);
+      p.m.quaternion.copy(spun.setFromAxisAngle(p.axis, Math.sin(time * p.spin * 2 + p.ph) * 0.7)).multiply(p.q);
+      p.m.scale.setScalar(size);
     });
-    scene.rotation.y = (reduce ? 0 : Math.sin(time * 0.15) * 0.04) - 0.12;
-    scene.rotation.x = -0.18;
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
