@@ -219,7 +219,9 @@ new IntersectionObserver((es, o) => { if (es.some(e => e.isIntersecting)) { o.di
 
 // ------------------------------------------------------------------ the pattern scene
 const scrolly = document.querySelector('.scrolly'), stage = $('stage'), canvas = $('gl');
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// The pattern's motion is small and slow, and plays for everyone (the owner's choice, also with "Reduce Motion" on).
+// Only the menu's long smooth scroll still respects that setting.
+const calmScroll = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // morph: the pieces of drawing 10 flow, without stopping, into drawing 11 beside the story · fall: drawing 11 lets go
 const P = { hero: [0.02, 0.11], morph: [0.03, 0.56], text: [0.46, 0.72], fall: [0.68, 0.94] };
 const clamp01 = v => Math.max(0, Math.min(1, v)), seg = (v, a, b) => clamp01((v - a) / (b - a));
@@ -232,7 +234,7 @@ const progress = () => { const r = scrolly.getBoundingClientRect(), span = scrol
 document.querySelector('[data-jump="about"]').addEventListener('click', e => {
   e.preventDefault();
   const span = scrolly.offsetHeight - $('stage').offsetHeight;
-  scrollTo({ top: scrolly.offsetTop + span * (P.text[0] + 0.08), behavior: reduce ? 'auto' : 'smooth' });
+  scrollTo({ top: scrolly.offsetTop + span * (P.text[0] + 0.08), behavior: calmScroll ? 'auto' : 'smooth' });
 });
 
 // the text on the stage follows the scroll (it is there even when 3D fails)
@@ -420,24 +422,24 @@ function startScene() {
   layout(); addEventListener('resize', layout);
 
   const vA = new T.Vector3(), vB = new T.Vector3(), vC = new T.Vector3(), qA = new T.Quaternion();
-  let pv = reduce ? progress() : 0, last = performance.now();
+  let pv = 0, last = performance.now();
   // a point on a bowed path: vA is the start on entry and the point at t on return
   function arc(to, bow, t) {
     vC.copy(vA).lerp(to, 0.5).add(bow);
     const u = 1 - t;
     vA.multiplyScalar(u * u).addScaledVector(vC, 2 * u * t).addScaledVector(to, t * t);
   }
-  const drift = (pt, time, k) => { if (!reduce && k > 0) { vA.x += Math.sin(time * 0.6 + pt.ph) * 0.12 * k; vA.y += Math.cos(time * 0.5 + pt.ph) * 0.14 * k; } };
+  const drift = (pt, time, k) => { if (k > 0) { vA.x += Math.sin(time * 0.6 + pt.ph) * 0.12 * k; vA.y += Math.cos(time * 0.5 + pt.ph) * 0.14 * k; } };
   const goal = new T.Vector3();
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     const target = progress();
-    pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 5));
+    pv += (target - pv) * (1 - Math.exp(-dt * 5));
     const p = pv, time = now / 1000;
     textAt(p);
     const morph = seg(p, ...P.morph), s3 = seg(p, ...P.fall), hs = heroScale;
     // while the pattern is whole it turns gently, 5 degrees to either side, as one rigid sheet; the turn draws a line of light across it
-    const whole = reduce ? 0 : 1 - smooth(clamp01(morph / 0.12)), swing = Math.sin(time * 0.7);
+    const whole = 1 - smooth(clamp01(morph / 0.12)), swing = Math.sin(time * 0.7);
     shine.uHalf.value = A.W * hs / 2; shine.uMidY.value = heroY;
     shine.uGlintX.value = swing * 1.35;                         // from one edge of the pattern to the other, in step with the turn
     shine.uGlint.value = 0.2 * whole;
@@ -470,8 +472,8 @@ function startScene() {
       m.position.copy(vA); m.quaternion.copy(qA); m.scale.set(sc * stretch, sc, sc); m.visible = true;
     });
     // a slow turn of the whole stage keeps the parts reading as solid steel
-    scene.rotation.y = swing * T.MathUtils.degToRad(5) * whole + (reduce ? 0 : Math.sin(time * 0.15) * 0.05) * (1 - whole) + 0.1 * (1 - whole) + smooth(morph) * (1 - s3) * -0.12;
-    scene.rotation.x = (reduce ? 0 : Math.cos(time * 0.12) * 0.03) * (1 - whole) - 0.22 + 0.1 * whole;   // whole, it faces the viewer more squarely
+    scene.rotation.y = swing * T.MathUtils.degToRad(5) * whole + Math.sin(time * 0.15) * 0.05 * (1 - whole) + 0.1 * (1 - whole) + smooth(morph) * (1 - s3) * -0.12;
+    scene.rotation.x = Math.cos(time * 0.12) * 0.03 * (1 - whole) - 0.22 + 0.1 * whole;   // whole, it faces the viewer more squarely
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -531,8 +533,8 @@ function startFooter() {
   function frame(now) {
     if (!on) return;
     const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
-    const target = prog(); pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 4));
-    const time = reduce ? 0 : now / 1000, rise = reduce ? 0 : 1 - smooth(pv);   // they float up into place as the page ends
+    const target = prog(); pv += (target - pv) * (1 - Math.exp(-dt * 4));
+    const time = now / 1000, rise = 1 - smooth(pv);   // they float up into place as the page ends
     const size = narrow ? 0.7 * Math.min(vw / 11.5, vh / 20) : Math.min(vh / 15, vw / 30);   // on a phone they are 30 % smaller
     (narrow ? sets.phone : sets.wide).forEach(p => {
       const x = p.x * vw, y = narrow ? -vh * (0.5 - 195 / hp) + p.y * vh * (100 / hp) : p.y * vh;
