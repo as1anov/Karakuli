@@ -126,6 +126,11 @@
             border: 1px solid var(--border-color);
         }
 
+        /* the way back to the site (the editor is opened from the site's "Create"): an X in the top right corner */
+        #site-x { position: fixed; right: max(16px, env(safe-area-inset-right)); top: max(20px, env(safe-area-inset-top)); width: 44px; height: 44px; box-sizing: border-box; z-index: 3100; text-decoration: none; }
+        body.v3d-open #site-x, body.timelapse-active #site-x, body.game-active #site-x, body.customer-view #site-x, body.dashboard-open #site-x, html.embed #site-x { display: none !important; }
+        @media (max-width: 600px) { body:has(#new-canvas-modal.show) #site-x { top: max(28px, calc(env(safe-area-inset-top) + 22px)); right: 24px; } }
+
         /* --- TOP NAV --- */
         .top-nav-container {
             position: fixed; 
@@ -1024,6 +1029,7 @@
     <input id="kbd-sink" type="text" autofocus readonly inputmode="none" autocomplete="off" aria-hidden="true" tabindex="-1">
 
     <div id="share-badge"></div>
+    <a id="site-x" class="control-btn glass-panel" href="/" title="Back to the site" aria-label="Back to the Karakuli site"><svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6 6 18M6 6l12 12"/></svg></a>
 
     <!-- Share Modal -->
     <div id="share-modal" onpointerdown="if (event.target === this) closeShareModal()">
@@ -1676,6 +1682,9 @@
         }
         document.addEventListener('visibilitychange', () => { if (document.hidden) flushProjectSave(); });
         window.addEventListener('pagehide', flushProjectSave);
+        document.getElementById('site-x')?.addEventListener('click', e => {
+            if (!shareSession && !window.karakuliProjects?.isSignedIn() && drawingHasContent() && !confirm('You are not signed in, so this drawing will not be saved. Leave the editor?')) e.preventDefault();
+        });
 
         // Icons of the project cards (one family: 24 px grid, 1.8 stroke, round caps)
         const PROJECT_ICONS = {
