@@ -1,7 +1,8 @@
 {
   "name": "Karakuli",
   "short_name": "Karakuli",
-  "start_url": "/",
+  "start_url": "/editor",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#e8e8e8",
   "theme_color": "#e8e8e8",
