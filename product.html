@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Karakuli — shop</title>
 <meta name="description" content="A steel piece cut with a pattern drawn once and never repeated. Turn it in 3D, choose its finish, colour and size, and pre-order.">
-<meta name="theme-color" content="#F4F3EF">
+<meta name="theme-color" content="#111111">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Karakuli">
+<meta property="og:title" content="Karakuli — shop">
+<meta property="og:description" content="A steel piece cut with a pattern drawn once and never repeated. Turn it in 3D, choose its finish, colour and size, and pre-order.">
+<meta property="og:image" content="https://karakuli.vercel.app/assets/products/shelf-0.jpg">
+<meta property="og:url" content="https://karakuli.vercel.app/#shop">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -78,6 +85,7 @@ button { font: inherit; color: inherit; }
 .size label:focus-within { border-color: var(--ink); }
 .size em { font-style: normal; }
 .hint { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.hint.warn { color: #9a3b12; }
 .unique { display: flex; gap: 14px; align-items: start; padding: 18px 20px; border-radius: var(--r-md); background: var(--ink); color: var(--paper); }
 .unique b { flex: none; width: 10px; height: 10px; margin-top: 8px; background: var(--saffron); transform: rotate(45deg); }
 .unique p { margin: 0; font-size: 15px; }
@@ -172,8 +180,8 @@ button { font: inherit; color: inherit; }
   <h2 id="contact-h">Questions before you order? Write to us.</h2>
   <ul class="ways" id="ways"></ul>
   <div class="foot">
-    <span>KARAKULI — ornament, inspired by the East.</span>
-    <a href="/editor">Studio</a>
+    <span>KARAKULI — tradition, read anew.</span>
+    <a href="/">Home</a>
   </div>
 </section>
 
@@ -195,15 +203,16 @@ $('ways').innerHTML = contactLinks();
 // ------------------------------------------------------------------ the 3D model: the editor's own 3D view, embedded; every choice is sent to it
 const frame = $('v3d');
 let live = false, busy = true;
-frame.src = `/editor?embed=1&v=${encodeURIComponent(p.view)}`;
+const first = () => { const l = look(); return new URLSearchParams({ embed: 1, v: p.view, mat: l.mat, color: l.color || '', t: l.t, hooks: +l.hooks, towel: +l.towel }).toString(); };
 const look = () => ({ k3d: 'set', mat: cur.finish, color: cur.finish === 'steel' ? null : RAL.find(r => r[0] === cur.colour)[2], t: cur.thick,
   hooks: cur.extras.has('hooks'), towel: cur.extras.has('towel') });
-const send = () => { if (live) frame.contentWindow.postMessage(look(), location.origin); };
+let shown = '';   // the look the 3D view has now
+const send = () => { const l = look(), k = JSON.stringify(l); if (!live || k === shown) return; shown = k; frame.contentWindow.postMessage(l, location.origin); };
 function setBusy(on, text) { busy = on; if (text) $('pill-t').textContent = text; $('pill').classList.toggle('off', !on); }
 window.addEventListener('message', e => {
   if (e.origin !== location.origin || e.source !== frame.contentWindow || !e.data || !e.data.k3d) return;
   const m = e.data.k3d;
-  if (m === 'ready') { live = true; $('stage').classList.add('live'); setBusy(false); send(); }
+  if (m === 'ready') { live = true; $('stage').classList.add('live'); setBusy(false); send(); }   // send() does nothing unless a choice changed while it loaded
   else if (m === 'busy') setBusy(true, 'Updating the model…');
   else if (m === 'idle') setBusy(false);
   else if (m === 'error') setBusy(false);
@@ -223,8 +232,17 @@ $('pd-extra-wrap').style.display = p.extra ? '' : 'none';
 if (p.extra) { $('pd-extra-h').textContent = p.extra.title; $('pd-extra').innerHTML = p.extra.items.map(([v, n]) => `<button type="button" data-v="${v}">${n}</button>`).join(''); }
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-if (p.key !== 'hanger') $('pd-w').onchange = e => { cur.w = clamp(Math.round(+e.target.value || p.w), p.minW, p.maxW); sync(); };
-$('pd-h').onchange = e => { cur.h = clamp(Math.round(+e.target.value || p.h), p.minH, p.maxH); sync(); };
+const sizeHint = $('pd-size-hint').textContent;
+function setSize(key, v, min, max, fallback) {
+  const n = Math.round(+String(v).replace(',', '.')), ok = Number.isFinite(n) && n > 0;
+  cur[key] = clamp(ok ? n : fallback, min, max);
+  const changed = !ok || n !== cur[key];
+  $('pd-size-hint').textContent = changed ? `${ok ? n + ' mm is outside the range' : 'Please enter a number'}: set to ${cur[key]} mm. ` + sizeHint : sizeHint;
+  $('pd-size-hint').classList.toggle('warn', changed);
+  sync();
+}
+if (p.key !== 'hanger') $('pd-w').onchange = e => setSize('w', e.target.value, p.minW, p.maxW, p.w);
+$('pd-h').onchange = e => setSize('h', e.target.value, p.minH, p.maxH, p.h);
 $('pd-finish').onclick = e => { const b = e.target.closest('button'); if (b) { cur.finish = b.dataset.k; sync(true); } };
 $('pd-colours').onclick = e => { const b = e.target.closest('button'); if (!b) return; cur.colour = b.dataset.c; if (cur.finish === 'steel') cur.finish = 'textured'; sync(true); };
 $('pd-extra').onclick = e => {
@@ -235,16 +253,17 @@ $('pd-extra').onclick = e => {
 
 function sync(to3d) {
   const steel = cur.finish === 'steel', c = RAL.find(r => r[0] === cur.colour);
-  document.querySelectorAll('#pd-finish button').forEach(b => b.classList.toggle('on', b.dataset.k === cur.finish));
+  document.querySelectorAll('#pd-finish button').forEach(b => { b.classList.toggle('on', b.dataset.k === cur.finish); b.setAttribute('aria-pressed', b.dataset.k === cur.finish); });
   $('pd-finish-v').textContent = FINISHES.find(f => f[0] === cur.finish)[1];
   document.querySelectorAll('#pd-colours button').forEach(b => { const on = !steel && b.dataset.c === cur.colour; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   $('pd-colours').classList.toggle('off', steel);
   $('pd-colour-v').textContent = steel ? 'Bare brushed steel' : `RAL ${c[0]} ${c[1]}`;
   $('pd-w').value = p.key === 'hanger' ? hangerWidth(cur.hooks) : cur.w; $('pd-h').value = cur.h;
-  if (p.extra) document.querySelectorAll('#pd-extra button').forEach(b => b.classList.toggle('on', p.extra.multi ? cur.extras.has(b.dataset.v) : +b.dataset.v === cur.hooks));
+  if (p.extra) document.querySelectorAll('#pd-extra button').forEach(b => { const on = p.extra.multi ? cur.extras.has(b.dataset.v) : +b.dataset.v === cur.hooks; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   if (to3d) send();
 }
 sync();
+shown = JSON.stringify(look()); frame.src = '/editor?' + first();
 
 // ------------------------------------------------------------------ pre-order: the order goes out by WhatsApp (or e-mail)
 $('pd-pre').onclick = () => { $('pd-pre').style.display = 'none'; $('pd-order').classList.add('show'); $('pd-order').elements.name.focus(); };
@@ -255,12 +274,12 @@ $('pd-order').onsubmit = e => {
   const lines = [
     `Pre-order: ${p.name}`,
     `Finish: ${FINISHES.find(x => x[0] === cur.finish)[1]}${steel ? '' : `, RAL ${c[0]} ${c[1]}`}`,
-    `Size: ${w} × ${cur.h} mm`,
+    `Size: ${w} × ${cur.h} mm, ${cur.thick} mm steel`,
     p.key === 'hanger' ? `Hooks: ${cur.hooks}` : (cur.extras.size ? `Extras: ${[...cur.extras].map(v => p.extra.items.find(i => i[0] === v)[1]).join(', ')}` : ''),
-    `Name: ${f.name.value}`, `Phone: ${f.phone.value}`, f.email.value ? `E-mail: ${f.email.value}` : '', f.note.value ? `Note: ${f.note.value}` : ''
-  ].filter(Boolean).join('\n');
+    `Name: ${f.name.value}`, `Phone: ${f.phone.value}`, f.email.value ? `E-mail: ${f.email.value}` : '', f.note.value ? `Note: ${f.note.value}` : '', '', location.origin + '/shop/' + p.key
+  ].filter((l, i, a) => l || a[i + 1]).join('\n');
   const done = $('pd-done');
-  if (CONTACT.whatsapp) { window.open(`https://wa.me/${CONTACT.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(lines)}`, '_blank', 'noopener'); done.textContent = 'Your pre-order is ready in WhatsApp: press send there and we will reply.'; }
+  if (CONTACT.whatsapp) { window.open(`https://wa.me/${CONTACT.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(lines)}`, '_blank', 'noopener'); done.innerHTML = 'Your pre-order is ready in WhatsApp: press send there and we will reply.' + (CONTACT.email ? ` No WhatsApp? <a href="mailto:${CONTACT.email}?subject=${encodeURIComponent('Pre-order: ' + p.name)}&body=${encodeURIComponent(lines)}">Send it by e-mail</a>.` : ''); }
   else if (CONTACT.email) { location.href = `mailto:${CONTACT.email}?subject=${encodeURIComponent('Pre-order: ' + p.name)}&body=${encodeURIComponent(lines)}`; done.textContent = 'Your pre-order is ready in your mail app: press send there and we will reply.'; }
   else done.textContent = 'Online pre-orders open very soon. Here is your order, ready to send us:\n\n' + lines;
   done.classList.add('show');

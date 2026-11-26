@@ -10750,6 +10750,8 @@ setInterval(() => {
             // a view link: initSharedLink opens it; wait until the drawing is on the canvas
             for (let i = 0; i < 200 && !(shareSession && segments.length); i++) await new Promise(r => setTimeout(r, 100));
         }
+        // the first look comes with the address, so the model is built once, already as the buyer chose it
+        if (q.has('mat')) setState({ mat: q.get('mat'), color: q.get('color') || null, t: +q.get('t') || undefined, hooks: q.get('hooks') === '1', towel: q.get('towel') === '1' });
         await window.open3D();
         for (let i = 0; i < 300 && !(V() && V().R && V().R.model); i++) await new Promise(r => setTimeout(r, 100));
         live = true;

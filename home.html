@@ -10,6 +10,13 @@
 <title>Karakuli — tradition, read anew</title>
 <meta name="description" content="Steel shelves, hangers and magazine holders, each cut with a pattern drawn once and never repeated.">
 <meta name="theme-color" content="#111111">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Karakuli">
+<meta property="og:title" content="Karakuli — tradition, read anew">
+<meta property="og:description" content="Steel shelves, hangers and magazine holders, each cut with a pattern drawn once and never repeated.">
+<meta property="og:image" content="https://karakuli.vercel.app/assets/products/shelf-0.jpg">
+<meta property="og:url" content="https://karakuli.vercel.app/">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -146,7 +153,7 @@ button { font: inherit; color: inherit; }
 
       <div class="hero" id="hero">
         <h1>Tradition,<br>read anew.</h1>
-        <p>Hangers, shelves and magazine holders in steel. From ink on paper to metal: a path from the light to the lasting.</p>
+        <p>Hangers, shelves and magazine holders in steel. From ink on paper to metal: from the fleeting to the lasting.</p>
       </div>
       <div class="cue" id="cue"><i></i>Scroll</div>
 
@@ -177,7 +184,7 @@ button { font: inherit; color: inherit; }
     <ul class="ways" id="ways"></ul>
     <div class="foot">
       <span>KARAKULI — tradition, read anew.</span>
-      <a href="/editor">Studio</a>
+      <a href="#top">Back to top</a>
     </div>
   </section>
 </main>
@@ -396,7 +403,7 @@ function startScene() {
     const vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
     const narrow = wpx < 820;
     heroScale = 1.1 * Math.min(vw * (narrow ? 0.94 : 0.8) / A.W, vh * (narrow ? 0.34 : 0.46) / A.H);   // the pattern sits in the upper part, the headline has the lower part
-    heroY = vh * (narrow ? 0.16 : 0.13);
+    heroY = vh * (narrow ? 0.1 : 0.13);
     const cw = B.W + B.w, ch = B.H + B.w;
     if (narrow) { L.s = Math.min(vw * 0.8 / cw, vh * 0.34 / ch); L.x = 0; L.y = vh * 0.21; }
     else { L.s = Math.min(vw * 0.32 / cw, vh * 0.7 / ch); L.x = -vw * 0.21; L.y = -vh * 0.01; }
