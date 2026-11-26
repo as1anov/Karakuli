@@ -34,10 +34,8 @@ a { color: inherit; }
 button { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--saffron); outline-offset: 3px; border-radius: 4px; }
 
-/* ---------- navigation: paper on the ink stage, ink on the paper shop ---------- */
-.nav { position: fixed; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 20px var(--pad); color: var(--paper); transition: color .4s; pointer-events: none; }
-.nav > * { pointer-events: auto; }
-.nav.on-paper { color: var(--ink); }
+/* ---------- navigation: always a solid ink bar, so the page scrolls under it and the words stay readable ---------- */
+.nav { position: fixed; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 20px var(--pad); color: var(--paper); background: var(--ink); }
 .brand { font-weight: 700; letter-spacing: 0.06em; text-decoration: none; font-size: 15px; }
 .nav ul { display: flex; gap: clamp(16px, 3vw, 40px); list-style: none; margin: 0; padding: 0; }
 .nav a.link { text-decoration: none; font-size: 13px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; padding: 6px 0; background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .4s var(--ease-out); }
@@ -205,13 +203,6 @@ const warm = () => {
 };
 new IntersectionObserver((es, o) => { if (es.some(e => e.isIntersecting)) { o.disconnect(); warm(); } }, { rootMargin: '600px 0px' }).observe($('shop'));
 
-// ------------------------------------------------------------------ nav colour: paper on the ink stage, ink on the paper shop
-const nav = $('nav'), shop = $('shop'), contact = $('contact');
-function navTone() {
-  const y = nav.offsetHeight / 2, s = shop.getBoundingClientRect(), c = contact.getBoundingClientRect();
-  nav.classList.toggle('on-paper', s.top <= y && c.top > y);
-}
-
 // ------------------------------------------------------------------ the pattern scene
 const scrolly = document.querySelector('.scrolly'), stage = $('stage'), canvas = $('gl');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -252,7 +243,7 @@ else {
   try { startFooter(); } catch (e) { console.error(e); }
 }
 if (document.body.classList.contains('no-gl')) {
-  const tick = () => { textAt(progress()); navTone(); }; addEventListener('scroll', tick, { passive: true }); tick();
+  const tick = () => textAt(progress()); addEventListener('scroll', tick, { passive: true }); tick();
 }
 
 // ------------------------------------------------------------------ steel, light, and a drawing cut into parts
@@ -427,7 +418,7 @@ function startScene() {
     const target = progress();
     pv = reduce ? target : pv + (target - pv) * (1 - Math.exp(-dt * 5));
     const p = pv, time = now / 1000;
-    textAt(p); navTone();
+    textAt(p);
     const morph = seg(p, ...P.morph), s3 = seg(p, ...P.fall), hs = heroScale;
     // while the pattern is whole it turns gently, 5 degrees to either side, as one rigid sheet; the turn draws a line of light across it
     const whole = reduce ? 0 : 1 - smooth(clamp01(morph / 0.12)), swing = Math.sin(time * 0.7);
