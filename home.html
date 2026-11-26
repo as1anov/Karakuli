@@ -44,7 +44,7 @@ button { font: inherit; color: inherit; }
 .nav a.link:hover { background-size: 100% 1px; }
 
 /* ---------- the pattern story: a pinned stage ---------- */
-.scrolly { position: relative; height: 640vh; background: var(--ink); color: var(--paper); }
+.scrolly { position: relative; height: 820vh; background: var(--ink); color: var(--paper); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
 #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .fallback { position: absolute; inset: 0; display: none; place-items: center; padding: 12vh var(--pad); }
@@ -62,6 +62,7 @@ button { font: inherit; color: inherit; }
 .chapter { position: absolute; left: 0; right: var(--pad); top: 50%; transform: translateY(-50%); max-width: 520px; opacity: 0; will-change: opacity, transform; }
 .chapter h2 { margin: 0 0 18px; font-weight: 500; font-size: clamp(28px, 3.4vw, 48px); line-height: 1.08; letter-spacing: -0.015em; }
 .chapter p { margin: 0 0 12px; color: var(--ink-2); font-size: clamp(15px, 1.15vw, 17px); }
+.chapter p.lead { color: var(--paper); font-size: clamp(17px, 1.4vw, 21px); }
 .progress { position: absolute; left: var(--pad); right: var(--pad); bottom: 16px; height: 2px; background: var(--ink-line); }
 .progress i { display: block; height: 100%; width: 0; background: var(--saffron); }
 
@@ -85,7 +86,8 @@ button { font: inherit; color: inherit; }
 
 /* ---------- contact ---------- */
 .contact { background: var(--ink); color: var(--paper); padding: clamp(80px, 12vh, 140px) var(--pad) 40px; }
-.contact h2 { margin: 0 0 28px; font-weight: 500; font-size: clamp(40px, 6vw, 80px); line-height: 1.02; letter-spacing: -0.025em; max-width: 12em; }
+.contact h2 { margin: 0 0 16px; font-weight: 500; font-size: clamp(34px, 4.6vw, 64px); line-height: 1.05; letter-spacing: -0.025em; max-width: 14em; }
+.contact .sub { margin: 0 0 32px; color: var(--ink-2); font-size: 18px; }
 .contact .ways { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 clamp(64px, 10vh, 120px); padding: 0; list-style: none; }
 .contact .ways a { display: inline-block; padding: 12px 18px; border: 1px solid var(--ink-line); border-radius: var(--r-sm); text-decoration: none; font-weight: 500; transition: border-color .3s, background .3s; }
 .contact .ways a:hover { border-color: var(--saffron); }
@@ -190,23 +192,36 @@ dialog.sheet::backdrop { background: rgba(17,17,17,.55); backdrop-filter: blur(4
 
       <div class="hero" id="hero">
         <h1>Ornament,<br>inspired by the East.</h1>
-        <p>Shelves, hangers and magazine holders cut from steel. Every piece carries a pattern drawn once, only for it.</p>
+        <p>Hangers, shelves and magazine holders in steel. From ink on paper to metal: a path from the light to the lasting.</p>
       </div>
       <div class="cue" id="cue"><i></i>Scroll</div>
 
       <div class="chapters" id="about">
         <section class="chapter" data-ch="0">
-          <h2>It began with old walls.</h2>
-          <p>Geometry carved into the stone of old buildings in Azerbaijan: straight lines, sharp corners, nothing wasted. Our first school of strictness.</p>
+          <h2>Stone remembers. Geometry carved to last for centuries.</h2>
+          <p>In the old buildings of Azerbaijan, geometry is carved right into the stone. Nameless masters left patterns on the walls that have outlived the centuries. There are no random lines in them: every turn is measured, every rhythm thought through.</p>
+          <p>Standing before such a wall, you understand that ornament can be eternal. This stone geometry became my first school of strictness and beauty.</p>
         </section>
         <section class="chapter" data-ch="1">
-          <h2>Then warm threads and coloured light.</h2>
-          <p>Carpets taught rhythm: diamonds that repeat with no beginning and no end. Shebeke taught that a strict frame can turn light itself into a pattern.</p>
+          <h2>The carpet: ornament that keeps the warmth of the hearth.</h2>
+          <p>If stone speaks of eternity, the carpet speaks of the hearth. Azerbaijani carpets keep ornament in warm threads: diamonds, medallions, a rhythm with no beginning and no end.</p>
+          <p>You can look at a carpet for hours and find a new detail every time. That is what I wanted to learn: to make a pattern you want to come back to.</p>
         </section>
         <section class="chapter" data-ch="2">
-          <h2>A free hand, put in order.</h2>
-          <p>Karakuli started as free lines drawn by hand. Step by step they found a grid of 90 and 45 degrees, but kept the liveliness of the scribble. A diamond is a sign, a line is a path, a circle is the sun: eight roads lead out of it, and the choice is yours.</p>
-          <p>From ink on paper to steel: from the light to the lasting.</p>
+          <h2>Shebeke: light gathered into a pattern.</h2>
+          <p>Thousands of tiny wooden pieces lock into a lattice, and coloured glass flares between them. By day the window draws coloured ornaments on the floor, and the room comes alive.</p>
+          <p>What amazes me in shebeke is the master's patience, and how a strict structure gives birth to real magic.</p>
+        </section>
+        <section class="chapter" data-ch="3">
+          <h2>From a free line to an ornament of my own.</h2>
+          <p>At first the lines were born freely, by hand, alive and uneven. Then I began to look for their order. Out of scattered strokes came a form, out of the form came a rhythm.</p>
+          <p>Page by page, chaos gave way to harmony, but never vanished: it stayed in the pattern's character, in its liveliness. That is how the ornament I call Karakuli was born.</p>
+        </section>
+        <section class="chapter" data-ch="4">
+          <h2>The geometry of choice.</h2>
+          <p class="lead">A diamond is a sign. A line is movement. A circle is the sun, and a choice.</p>
+          <p>The circle is the sun, and eight directions, eight possible paths, lead out of it. The sun lights each of them, but does not decide where to go. The choice stays with you.</p>
+          <p>Karakuli is a geometry of choice, where every element has its meaning and every path stays open.</p>
         </section>
       </div>
 
@@ -217,13 +232,14 @@ dialog.sheet::backdrop { background: rgba(17,17,17,.55); backdrop-filter: blur(4
   <section class="shop" id="shop" aria-labelledby="shop-h">
     <div class="shop-head">
       <h2 id="shop-h">Shop</h2>
-      <p>Three pieces, any size, in steel or a powder coat colour. Each one is cut with its own pattern.</p>
+      <p>The pattern is laser-cut from sheet steel, so the lines stay as sharp as in the drawing. The metal is strong and lasting, like the stone of old walls.</p>
     </div>
     <div class="cards" id="cards"></div>
   </section>
 
   <section class="contact" id="contact" aria-labelledby="contact-h">
-    <h2 id="contact-h">Let's make yours.</h2>
+    <h2 id="contact-h">A pattern can be drawn, or you can live in it.</h2>
+    <p class="sub">I invite you to find your own path in it.</p>
     <ul class="ways" id="ways"></ul>
     <div class="foot">
       <span>KARAKULI — ornament, inspired by the East.</span>
@@ -269,7 +285,7 @@ dialog.sheet::backdrop { background: rgba(17,17,17,.55); backdrop-filter: blur(4
 
 <script type="module">
 // ------------------------------------------------------------------ where people reach Karakuli (fill these in; empty ones are not shown)
-const CONTACT = { email: '', whatsapp: '', instagram: '' };
+const CONTACT = { email: 'aslanov.az@gmail.com', whatsapp: '+994 50 789 9999', instagram: '@aeldar' };
 
 // ------------------------------------------------------------------ products (sizes and options follow the editor)
 const RAL = [
@@ -283,13 +299,13 @@ const FINISHES = [['textured', 'Textured powder coat'], ['gloss', 'Gloss paint']
 const THICK = [1, 1.5, 2, 3];
 const HOOK_PITCH = 24 * 30 * 12 / 58;   // mm between hanger hooks, as in the editor
 const PRODUCTS = [
-  { key: 'shelf', name: 'Shelf', lede: 'A wall shelf with a patterned back plate and a 120 mm deep ledge.', sub: 'Any width · 20 colours', colour: '2004',
+  { key: 'shelf', name: 'Shelf', lede: 'A strict base for the things you love.', sub: 'Any width · 20 colours', colour: '2004',
     w: 894, h: 379, minW: 200, maxW: 2000, minH: 250, maxH: 900,
     extra: { title: 'Extras', items: [['hooks', 'Key hooks'], ['towel', 'Towel pocket']], multi: true } },
-  { key: 'hanger', name: 'Hanger', lede: 'A patterned plate with steel hooks for coats, bags and keys.', sub: '4 to 7 hooks · 20 colours', colour: '3020',
+  { key: 'hanger', name: 'Hanger', lede: 'The first thing that greets you at home. Steel that holds and adorns.', sub: '4 to 7 hooks · 20 colours', colour: '3020',
     hooks: 7, h: 321, minH: 200, maxH: 900,
     extra: { title: 'Hooks', items: [[4, '4'], [5, '5'], [6, '6'], [7, '7']], multi: false } },
-  { key: 'magazine', name: 'Magazine holder', lede: 'A patterned panel that holds magazines and records against the wall.', sub: 'Any width · 20 colours', colour: '6005',
+  { key: 'magazine', name: 'Magazine holder', lede: 'Order with a mood of its own.', sub: 'Any width · 20 colours', colour: '6005',
     w: 894, h: 262, minW: 200, maxW: 2000, minH: 180, maxH: 700 }
 ];
 const img = (k, i) => `assets/products/${k}-${i}.jpg`;
@@ -393,7 +409,7 @@ function navTone() {
 // ------------------------------------------------------------------ the pattern scene
 const scrolly = document.querySelector('.scrolly'), stage = $('stage'), canvas = $('gl');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const P = { hero: [0.03, 0.11], scatter: [0.06, 0.25], gather: [0.25, 0.45], ch: [[0.45, 0.56], [0.56, 0.66], [0.66, 0.77]], fall: [0.77, 0.95] };
+const P = { hero: [0.025, 0.09], scatter: [0.05, 0.2], gather: [0.2, 0.36], ch: [[0.36, 0.45], [0.45, 0.54], [0.54, 0.63], [0.63, 0.72], [0.72, 0.82]], fall: [0.82, 0.96] };
 const clamp01 = v => Math.max(0, Math.min(1, v)), seg = (v, a, b) => clamp01((v - a) / (b - a));
 const smooth = t => t * t * (3 - 2 * t);
 const progress = () => { const r = scrolly.getBoundingClientRect(), span = scrolly.offsetHeight - innerHeight; return clamp01(-r.top / span); };
@@ -411,7 +427,7 @@ function textAt(p) {
   const h = 1 - seg(p, P.hero[0], P.hero[1]);
   hero.style.opacity = h; hero.style.transform = `translateY(${(1 - h) * -24}px)`; cue.style.opacity = h;
   chapters.forEach((el, i) => {
-    const [a, b] = P.ch[i], fin = seg(p, a, a + 0.03), fout = i === 2 ? 1 - seg(p, P.fall[0], P.fall[0] + 0.04) : 1 - seg(p, b - 0.02, b + 0.01);
+    const [a, b] = P.ch[i], fin = seg(p, a, a + 0.03), fout = i === P.ch.length - 1 ? 1 - seg(p, P.fall[0], P.fall[0] + 0.04) : 1 - seg(p, b - 0.02, b + 0.01);
     const o = Math.min(fin, fout);
     el.style.opacity = o; el.style.visibility = o > 0.01 ? 'visible' : 'hidden';
     const dy = (1 - fin) * 28 - (1 - fout) * 28;
@@ -444,69 +460,78 @@ function startScene() {
   const key = new T.DirectionalLight(0xffffff, 2.8); key.position.set(-9, 11, 7); scene.add(key);    // grazing light from the upper left: the tops shine, the sides fall into shade
   const rim = new T.DirectionalLight(0xfff1cc, 0.7); rim.position.set(10, -5, 4); scene.add(rim);
 
-  // ---- read the pattern: every stroke of the SVG path is one part, plus the two rings and the diamonds
+  // ---- read the pattern: the drawing is cut into long straight bars, plus the two rings and the diamonds
   const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
   const svg = doc.querySelector('svg'), vb = svg.getAttribute('viewBox').split(/\s+/).map(Number);
-  const W0 = vb[2], H0 = vb[3], S = 1 / 100, D = 0.24;          // 100 px of the drawing = 1 unit; parts are 24 px thick
+  const W0 = vb[2], H0 = vb[3], S = 1 / 100, D = 0.36;          // 100 px of the drawing = 1 unit; parts are 36 px thick
   const sw = +(doc.querySelector('path').getAttribute('stroke-width') || 58), w = sw * S;
   const rings = [...doc.querySelectorAll('circle')].filter(c => c.getAttribute('fill') === 'none').map(c => ({ x: +c.getAttribute('cx'), y: +c.getAttribute('cy'), r: +c.getAttribute('r') }));
   const toW = (x, y) => [(x - W0 / 2) * S, -(y - H0 / 2) * S];
-  const strokes = [];
+  // every unit step of the drawing, once: the drawing repeats steps where its strokes overlap
+  const steps = new Map(), at = new Map(), nk = q => q[0] + ',' + q[1];
   doc.querySelector('path').getAttribute('d').trim().split(/(?=M)/).forEach(sp => {
     const nums = sp.match(/-?\d+(\.\d+)?/g); if (!nums) return;
     const pts = []; for (let i = 0; i + 1 < nums.length; i += 2) pts.push([+nums[i], +nums[i + 1]]);
-    // straight runs: points that keep the direction are merged
-    const runs = []; let a = pts[0];
     for (let i = 1; i < pts.length; i++) {
-      const b = pts[i], n = pts[i + 1];
-      const dir = (u, v) => [Math.sign(v[0] - u[0]), Math.sign(v[1] - u[1])].join();
-      if (!n || dir(a, b) !== dir(b, n)) { runs.push([a, b]); a = b; }
+      const a = pts[i - 1], b = pts[i], k = [nk(a), nk(b)].sort().join('|'); if (steps.has(k) || nk(a) === nk(b)) continue;
+      steps.set(k, { a, b, used: false });
+      [a, b].forEach(q => { const n = nk(q); if (!at.has(n)) at.set(n, []); at.get(n).push(k); });
     }
-    // a stroke that starts in the eye of a ring stops at the ring's band (the drawing masks the eye)
-    runs.forEach(run => run.forEach((q, k) => {
-      const R0 = rings.find(r => Math.hypot(q[0] - r.x, q[1] - r.y) < 1); if (!R0) return;
-      const o = run[1 - k], d = Math.hypot(o[0] - q[0], o[1] - q[1]) || 1;
-      run[k] = [q[0] + (o[0] - q[0]) / d * R0.r, q[1] + (o[1] - q[1]) / d * R0.r];
-    }));
-    strokes.push(runs);
+  });
+  const ringAt = q => rings.find(r => Math.hypot(q[0] - r.x, q[1] - r.y) < 1);
+  // a bar is the longest straight line the steps make: it runs on through crossings and junctions, as one piece of steel,
+  // and stops only where the line turns, ends, or reaches the eye of a ring
+  const bars = [];
+  steps.forEach((s0, k0) => {
+    if (s0.used) return; s0.used = true;
+    const v = [s0.b[0] - s0.a[0], s0.b[1] - s0.a[1]];
+    const walk = (q, dx, dy) => {
+      for (;;) {
+        if (ringAt(q)) return q;
+        const n = [q[0] + dx, q[1] + dy], k = [nk(q), nk(n)].sort().join('|'), s = steps.get(k);
+        if (!s || s.used) return q; s.used = true; q = n;
+      }
+    };
+    bars.push([walk(s0.a, -v[0], -v[1]), walk(s0.b, v[0], v[1])]);
   });
 
   const steel = new T.MeshStandardMaterial({ color: 0xe9e7e1, roughness: 0.42, metalness: 0.38 });
-  const saffron = new T.MeshStandardMaterial({ color: 0xf2c230, roughness: 0.38, metalness: 0.15 });
   const parts = [];
   const addPart = (geo, mat, cx, cy, isRing) => {
     geo.computeBoundingBox(); const c = new T.Vector3(); geo.boundingBox.getCenter(c); geo.translate(-c.x, -c.y, -c.z);
     const m = new T.Mesh(geo, mat); scene.add(m);
     parts.push({ m, home: new T.Vector3(c.x, c.y, 0), ring: !!isRing, px: cx, py: cy });
   };
-  // every stroke is one exact outline, as the SVG draws it: flat (butt) ends, and at each bend the two edges meet in a mitre, so no corner of one
-  // straight piece sticks out past the other; then the outline is extruded into a steel part
-  strokes.forEach(runs => {
-    const pts = [runs[0][0], ...runs.map(r => r[1])].map(q => toW(...q)), n = pts.length, h = w / 2;
-    const nrm = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [-dy / l, dx / l]; };   // left normal of a segment
-    const left = [], right = [];
-    for (let i = 0; i < n; i++) {
-      let m, k = h;
-      if (i === 0) m = nrm(pts[0], pts[1]);
-      else if (i === n - 1) m = nrm(pts[n - 2], pts[n - 1]);
-      else {
-        const a = nrm(pts[i - 1], pts[i]), b = nrm(pts[i], pts[i + 1]), s = [a[0] + b[0], a[1] + b[1]], l = Math.hypot(...s) || 1;
-        m = [s[0] / l, s[1] / l]; k = h / Math.max(0.5, m[0] * a[0] + m[1] * a[1]);   // mitre length (limit 2, as in the drawing)
-      }
-      left.push([pts[i][0] + m[0] * k, pts[i][1] + m[1] * k]); right.push([pts[i][0] - m[0] * k, pts[i][1] - m[1] * k]);
-    }
-    const outline = [...left, ...right.reverse()];
-    const sh = new T.Shape(); sh.moveTo(...outline[0]); outline.slice(1).forEach(q => sh.lineTo(...q)); sh.closePath();
-    const g = new T.ExtrudeGeometry(sh, { depth: D, bevelEnabled: false }); g.translate(0, 0, -D / 2);
-    const mid = runs[Math.floor(runs.length / 2)][0];
-    addPart(g, steel, mid[0], mid[1]);
+  // each bar is a straight steel strip with square ends. Where it meets other lines, its end runs on just far enough to fill the outer corner of
+  // the joint (half the width at a right angle, less at an open angle), so every joint is closed and no corner sticks out past the strip it meets
+  const h = sw / 2;
+  bars.forEach(([A, B], i) => {
+    const L0 = Math.hypot(B[0] - A[0], B[1] - A[1]), u = [(B[0] - A[0]) / L0, (B[1] - A[1]) / L0];
+    const endExt = (q, out) => {
+      const R0 = ringAt(q); if (R0) return -R0.r;            // into a ring: stop on the ring's band
+      let e = 0;
+      (at.get(nk(q)) || []).forEach(k => {
+        const s = steps.get(k), o = nk(s.a) === nk(q) ? s.b : s.a, l = Math.hypot(o[0] - q[0], o[1] - q[1]);
+        const c = ((o[0] - q[0]) * out[0] + (o[1] - q[1]) * out[1]) / l;   // cos of the angle between this bar's way out and the other line
+        if (c > 0.99) return;
+        const phi = Math.acos(Math.max(-1, Math.min(1, c)));
+        if (phi > 1e-3 && phi <= Math.PI / 2 + 1e-3) e = Math.max(e, h * Math.tan(phi / 2));   // outer corner of a right or open joint
+      });
+      return Math.min(e, h);
+    };
+    const ea = endExt(A, [-u[0], -u[1]]), eb = endExt(B, u);
+    const len = (L0 + ea + eb) * S, dz = D + (i % 3) * 0.006;           // a hair of depth apart, so strips that overlap at a joint never flicker
+    const g = new T.BoxGeometry(len, w, dz);
+    g.translate((eb - ea) / 2 * S, 0, 0); g.rotateZ(-Math.atan2(u[1], u[0]));
+    const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2, [x, y] = toW(mx, my); g.translate(x, y, 0);
+    addPart(g, steel, mx, my);
   });
   rings.forEach(r => {
     const sh = new T.Shape(); sh.absarc(0, 0, (r.r + sw / 2) * S, 0, Math.PI * 2);
     const hole = new T.Path(); hole.absarc(0, 0, (r.r - sw / 2) * S, 0, Math.PI * 2, true); sh.holes.push(hole);
     const g = new T.ExtrudeGeometry(sh, { depth: D, bevelEnabled: false, curveSegments: 48 }); g.translate(0, 0, -D / 2);
     const [x, y] = toW(r.x, r.y); g.translate(x, y, 0);
-    addPart(g, saffron, r.x, r.y, true);
+    addPart(g, steel, r.x, r.y, true);
   });
   doc.querySelectorAll('rect').forEach(rc => {
     const t = (rc.getAttribute('transform') || '').match(/rotate\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/); if (!t) return;
