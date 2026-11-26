@@ -865,6 +865,7 @@
         html body :is(.modal-content, .ad-card, #cv-bar) { background: var(--modal-bg, var(--tbar-bg));   /* windows stand over a dimmed picture, so they are almost opaque: they stay light */ -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
         /* Flat / Folded bar and the camera effects */
         html body :is(#v3-fxbtn, #v3-play) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
+        html body #v3d .v3-oflip { background: none !important; box-shadow: none !important; border: 0; }   /* the turn arrow in an Objects row is a bare icon: no plate under it */
         html body #v3-fx .v3-chip.on { background-color: var(--text-color); background-image: none; color: var(--bg-color); }
         html body #v3-fx :is(.v3-chip:not(.on), .v3-fxc:not(.on)) { background: var(--btn-bg); border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
         html body :is(.modal-content, .ad-card) :is(.field input, .chip:not(.active), .preset-card, .seg, .modal-btn.secondary, .nc-close, .swap-btn, .tpl-btn, .preset-icon, .card-hooks) { border-color: var(--glass-edge); box-shadow: var(--btn-hi); background-image: var(--vol); }
