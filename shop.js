@@ -15,13 +15,13 @@ export const hangerWidth = n => Math.round(12 + (n - 1) * HOOK_PITCH);
 
 // view: the editor's view link of the design shown in 3D on the product page (it follows the design as it is edited)
 export const PRODUCTS = [
-  { key: 'shelf', name: 'Shelf', lede: 'A strict base for the things you love.', sub: 'Any width · key hooks · towel pocket', colour: '2004', view: 'aupxpcplv0',
+  { key: 'shelf', name: 'Shelf', lede: 'A strict base for the things you love.', colour: '2004', view: 'aupxpcplv0',
     w: 894, h: 379, minW: 200, maxW: 2000, minH: 250, maxH: 900,
     extra: { title: 'Extras', items: [['hooks', 'Key hooks'], ['towel', 'Towel pocket']], multi: true } },
-  { key: 'hanger', name: 'Hanger', lede: 'The first thing that greets you at home. Steel that holds and adorns.', sub: '4 to 7 hooks', colour: '9005', poster: 3, view: 'f5n0tklfv2',
+  { key: 'hanger', name: 'Hanger', lede: 'The first thing that greets you at home. Steel that holds and adorns.', colour: '9005', poster: 3, view: 'f5n0tklfv2',
     hooks: 7, h: 321, minH: 200, maxH: 900,
     extra: { title: 'Hooks', items: [[4, '4'], [5, '5'], [6, '6'], [7, '7']], multi: false } },
-  { key: 'magazine', name: 'Magazine holder', lede: 'Order with a mood of its own.', sub: 'Any width', colour: '6005', view: 'mdfvavrtl8',
+  { key: 'magazine', name: 'Magazine holder', lede: 'Order with a mood of its own.', colour: '6005', view: 'mdfvavrtl8',
     w: 894, h: 262, minW: 200, maxW: 2000, minH: 180, maxH: 700 }
 ];
 export const img = (k, i) => `/assets/products/${k}-${i}.jpg`;
