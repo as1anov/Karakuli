@@ -305,6 +305,9 @@ function startScene() {
   });
 
   const steel = new T.MeshStandardMaterial({ color: 0xe9e7e1, roughness: 0.42, metalness: 0.38 });
+  // front faces win the depth test where another part's side wall ends flush with them, so no specks show along the joints
+  const face = steel.clone(); Object.assign(face, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+  const boxMats = [steel, steel, steel, steel, face, face], extrudeMats = [face, steel];   // BoxGeometry: +z, -z are groups 4, 5; ExtrudeGeometry: caps, sides
   const parts = [];
   const addPart = (geo, mat, cx, cy, isRing) => {
     geo.computeBoundingBox(); const c = new T.Vector3(); geo.boundingBox.getCenter(c); geo.translate(-c.x, -c.y, -c.z);
@@ -314,7 +317,7 @@ function startScene() {
   // each bar is a straight steel strip with square ends. Where it meets other lines, its end runs on just far enough to fill the outer corner of
   // the joint (half the width at a right angle, less at an open angle), so every joint is closed and no corner sticks out past the strip it meets
   const h = sw / 2;
-  bars.forEach(([A, B], i) => {
+  bars.forEach(([A, B]) => {
     const L0 = Math.hypot(B[0] - A[0], B[1] - A[1]), u = [(B[0] - A[0]) / L0, (B[1] - A[1]) / L0];
     const endExt = (q, out) => {
       const R0 = ringAt(q); if (R0) return -R0.r;            // into a ring: stop on the ring's band
@@ -329,24 +332,25 @@ function startScene() {
       return Math.min(e, h);
     };
     const ea = endExt(A, [-u[0], -u[1]]), eb = endExt(B, u);
-    const len = (L0 + ea + eb) * S, dz = D + (i % 3) * 0.006;           // a hair of depth apart, so strips that overlap at a joint never flicker
-    const g = new T.BoxGeometry(len, w, dz);
+    const len = (L0 + ea + eb) * S;
+    // every part has exactly the same depth: overlapping faces then shade identically, and no hairline step shows at a joint
+    const g = new T.BoxGeometry(len, w, D);
     g.translate((eb - ea) / 2 * S, 0, 0); g.rotateZ(-Math.atan2(u[1], u[0]));
     const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2, [x, y] = toW(mx, my); g.translate(x, y, 0);
-    addPart(g, steel, mx, my);
+    addPart(g, boxMats, mx, my);
   });
   rings.forEach(r => {
     const sh = new T.Shape(); sh.absarc(0, 0, (r.r + sw / 2) * S, 0, Math.PI * 2);
     const hole = new T.Path(); hole.absarc(0, 0, (r.r - sw / 2) * S, 0, Math.PI * 2, true); sh.holes.push(hole);
     const g = new T.ExtrudeGeometry(sh, { depth: D, bevelEnabled: false, curveSegments: 48 }); g.translate(0, 0, -D / 2);
     const [x, y] = toW(r.x, r.y); g.translate(x, y, 0);
-    addPart(g, steel, r.x, r.y, true);
+    addPart(g, extrudeMats, r.x, r.y, true);
   });
   doc.querySelectorAll('rect').forEach(rc => {
     const t = (rc.getAttribute('transform') || '').match(/rotate\(([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\)/); if (!t) return;
     const s = +rc.getAttribute('width') * S, g = new T.BoxGeometry(s, s, D); g.rotateZ(Math.PI / 4);
     const [x, y] = toW(+t[2], +t[3]); g.translate(x, y, 0);
-    addPart(g, steel, +t[2], +t[3]);
+    addPart(g, boxMats, +t[2], +t[3]);
   });
 
   // ---- where every part goes. A seeded random keeps the choreography the same on every visit.
