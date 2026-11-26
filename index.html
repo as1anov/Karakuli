@@ -4506,7 +4506,9 @@ service cloud.firestore {
         // the pattern's parts: lines (grouped into straight runs), rings and rhombi - exactly where the editor draws them
         function buildGameBricks() {
             const lw = LINE_WEIGHT, Rout = BASE_STEP_VAL + lw / 2, I = BW.inner;
-            const box = { x0: I.minX + lw / 2, x1: I.maxX - lw / 2, y0: I.minY + lw / 2, y1: Math.min(BW.cropY, bwCutY()) };
+            BW.clipY = Math.min(BW.cropY + lw / 2, bwCutY());
+            const box = { x0: I.minX + lw / 2, x1: I.maxX - lw / 2, y0: I.minY + lw / 2, y1: BW.clipY - lw / 2 };
+            BW.box = box;
             gameBricks = { lines: [], nodes: [], diamonds: [] };
             BW.holes = []; BW.els = []; BW.runs = [];
             const addEl = e => { e.alive = true; BW.els.push(e); return BW.els.length - 1; };
@@ -4526,7 +4528,7 @@ service cloud.firestore {
                 const a = { x: c[0], y: c[1] }, b = { x: c[2], y: c[3] }, dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
                 // the masonry runs along the line; collinear lines share their direction (and so their joints)
                 let ux = len ? dx / len : 1, uy = len ? dy / len : 0; if (ux < -1e-9 || (Math.abs(ux) < 1e-9 && uy < 0)) { ux = -ux; uy = -uy; }
-                const el = addEl({ t: 'seg', a, b, ux, uy, len, sg: dx * ux + dy * uy >= 0 ? 1 : -1 });
+                const el = addEl({ t: 'seg', a, b, ux, uy, len, sg: dx * ux + dy * uy >= 0 ? 1 : -1, src: s });
                 const off = Math.round((-uy * a.x + ux * a.y) * 2) / 2, k = Math.round(ux * 1000) + ':' + Math.round(uy * 1000) + ':' + off;
                 const ua = a.x * ux + a.y * uy, ub = b.x * ux + b.y * uy;
                 if (!runKey.has(k)) runKey.set(k, []);
@@ -4783,6 +4785,39 @@ service cloud.firestore {
             BW.layer = document.createElement('canvas'); BW.layer.width = gw; BW.layer.height = gh; BW.lx = BW.layer.getContext('2d');
             BW.img = BW.lx.createImageData(gw, gh);
             for (let yy = 0; yy < gh; yy++) for (let xx = 0; xx < gw; xx++) bwBrickCell(xx, yy);
+            // The shape itself is drawn the way the editor draws the pattern (joined polylines, square ends, mitred corners, rings, rhombi),
+            // antialiased, so the game shows exactly the drawing with smooth edges; the geometry above only says which part a cell belongs to.
+            {
+                const mk = document.createElement('canvas'); mk.width = gw; mk.height = gh; const m = mk.getContext('2d', { willReadFrequently: true });
+                const sc = z / cssPerCell, Rout = BASE_STEP_VAL + lw / 2, bx = BW.box;
+                m.setTransform(sc, 0, 0, sc, targetOffsetX / cssPerCell - gx, targetOffsetY / cssPerCell - gy);
+                const clipBox = () => { m.beginPath(); m.rect(bx.x0 - lw / 2, bx.y0 - lw / 2, bx.x1 - bx.x0 + lw, BW.clipY - bx.y0 + lw / 2); m.clip(); };
+                m.save(); clipBox();
+                m.beginPath(); m.rect(-1e6, -1e6, 2e6, 2e6); BW.holes.forEach(h => { m.moveTo(h.x + Rout, h.y); m.arc(h.x, h.y, Rout, 0, Math.PI * 2, true); }); m.clip();
+                const src = BW.els.filter(e => e.t === 'seg' && e.alive && e.src).map(e => e.src);
+                m.strokeStyle = '#000'; m.lineWidth = lw; m.lineCap = 'square'; m.lineJoin = 'miter'; m.miterLimit = 2;
+                m.beginPath(); getPathGroups(true, src).forEach(gr => { m.moveTo(gr[0].p1.x * STEP, gr[0].p1.y * STEP); gr.forEach(sg => m.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); }); m.stroke();
+                m.restore(); m.save(); clipBox();
+                m.strokeStyle = '#000'; m.lineWidth = lw;
+                m.beginPath(); BW.els.forEach(e => { if (e.t === 'ring' && e.alive) { m.moveTo(e.x + BASE_STEP_VAL, e.y); m.arc(e.x, e.y, BASE_STEP_VAL, 0, Math.PI * 2); } }); m.stroke();
+                const dd = lw / Math.SQRT2; m.fillStyle = '#000'; m.beginPath();
+                BW.els.forEach(e => { if (e.t === 'dia' && e.alive) { m.moveTo(e.x, e.y - dd); m.lineTo(e.x + dd, e.y); m.lineTo(e.x, e.y + dd); m.lineTo(e.x - dd, e.y); m.closePath(); } }); m.fill();
+                m.restore();
+                const md = m.getImageData(0, 0, gw, gh).data, A = new Uint8Array(gw * gh);
+                for (let i = 0; i < gw * gh; i++) A[i] = md[i * 4 + 3];
+                for (let i = 0; i < gw * gh; i++) {
+                    if (!A[i]) { BW.own[i] = -1; continue; }
+                    if (BW.own[i] >= 0) continue;
+                    const xx = i % gw, yy = (i / gw) | 0; let f = -1;   // a mitred corner or an edge pixel: take a neighbour's part
+                    for (let r = 1; r <= 4 && f < 0; r++) for (let dy = -r; dy <= r && f < 0; dy++) for (let dx = -r; dx <= r; dx++) {
+                        const X = xx + dx, Y = yy + dy; if (X < 0 || Y < 0 || X >= gw || Y >= gh) continue;
+                        const j = Y * gw + X; if (BW.own[j] >= 0 && A[j]) { f = j; break; }
+                    }
+                    if (f < 0) { A[i] = 0; continue; }
+                    BW.own[i] = BW.own[f]; BW.key[i] = BW.key[f]; BW.gv[i] = BW.gv[f]; BW.gu[i] = BW.gu[f];
+                }
+                BW.alpha = A;
+            }
             // every brick on its own: its cells, its centre, where it sits along its line / round its ring
             BW.bid = new Int32Array(gw * gh).fill(-1); BW.bricks = []; BW.live = 0;
             const map = new Map();
@@ -4805,28 +4840,18 @@ service cloud.firestore {
         function bwShade(x0, y0, x1, y1) {
             const g = BW.g, W = g.w, H = g.h, dt = BW.dt, own = BW.own, BV = BW.bev, cap = BV + 2, m = Math.ceil(cap) + 2;
             const X0 = Math.max(0, x0 - m), Y0 = Math.max(0, y0 - m), X1 = Math.min(W, x1 + m), Y1 = Math.min(H, y1 + m);
-            for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) { const i = yy * W + xx; dt[i] = own[i] < 0 ? 0 : cap; }
-            const at = (xx, yy) => (xx < 0 || yy < 0 || xx >= W || yy >= H) ? 0 : dt[yy * W + xx];
-            for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) {
-                const i = yy * W + xx; if (!dt[i]) continue;
-                dt[i] = Math.min(dt[i], at(xx - 1, yy) + 1, at(xx, yy - 1) + 1, at(xx - 1, yy - 1) + 1.414, at(xx + 1, yy - 1) + 1.414);
-            }
-            for (let yy = Y1 - 1; yy >= Y0; yy--) for (let xx = X1 - 1; xx >= X0; xx--) {
-                const i = yy * W + xx; if (!dt[i]) continue;
-                dt[i] = Math.min(dt[i], at(xx + 1, yy) + 1, at(xx, yy + 1) + 1, at(xx + 1, yy + 1) + 1.414, at(xx - 1, yy + 1) + 1.414);
-            }
             // a flat, polished top face (brushed along the lines, a soft sheen across the screen) with sharp edges: bright where they face the light, dark on the far side
             const cw = BW.cw, E = Math.max(1, Math.round(LINE_WEIGHT * 0.045 / cw));
-            const empty = (xx, yy) => xx < 0 || yy < 0 || xx >= W || yy >= H || own[yy * W + xx] < 0;
+            const A = BW.alpha, cov = (xx, yy) => (xx < 0 || yy < 0 || xx >= W || yy >= H || own[yy * W + xx] < 0) ? 0 : A[yy * W + xx] / 255;
             for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) {
                 const i = yy * W + xx; if (own[i] < 0) continue;
-                let lit = false, dark = false;
-                for (let q = 1; q <= E && !lit; q++) lit = empty(xx - q, yy) || empty(xx, yy - q) || empty(xx - q, yy - q);
-                for (let q = 1; q <= E && !dark; q++) dark = empty(xx + q, yy) || empty(xx, yy + q) || empty(xx + q, yy + q);
+                let lit = 0, dark = 0;   // 0..1: how much of an edge facing the light (or away from it) lies within E cells
+                for (let q = 1; q <= E; q++) { lit = Math.max(lit, 1 - Math.min(cov(xx - q, yy), cov(xx, yy - q), cov(xx - q, yy - q))); dark = Math.max(dark, 1 - Math.min(cov(xx + q, yy), cov(xx, yy + q), cov(xx + q, yy + q))); }
                 const grain = 1 + ((bwHash(Math.round(BW.gv[i] / cw * 1.3), 11) % 100) / 100 - 0.5) * 0.07 + ((bwHash(Math.round(BW.gv[i] / cw * 0.4), (BW.gu[i] / (cw * 30)) | 0) % 100) / 100 - 0.5) * 0.05;
                 const t = (xx + yy) / (W + H), sheen = 0.78 + 0.3 * (1 - t) + 0.16 * Math.exp(-Math.pow((t - 0.38) * 7, 2));
                 let k = sheen * grain, r = 128 * k, gg = 140 * k, b = 160 * k;
-                if (lit) { r = 225; gg = 238; b = 252; } else if (dark) { r *= 0.45; gg *= 0.45; b *= 0.5; }
+                if (dark > 0) { const t = dark * (1 - lit); r *= 1 - 0.55 * t; gg *= 1 - 0.55 * t; b *= 1 - 0.5 * t; }
+                if (lit > 0) { r += (225 - r) * lit; gg += (238 - gg) * lit; b += (252 - b) * lit; }
                 BW.rgb[i] = (Math.min(255, r) << 16) | (Math.min(255, gg) << 8) | Math.min(255, b);
             }
         }
@@ -4845,7 +4870,7 @@ service cloud.firestore {
             x0 = Math.max(0, x0 - 1); y0 = Math.max(0, y0 - 1); x1 = Math.min(W, x1 + 1); y1 = Math.min(H, y1 + 1);
             for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) {
                 const i = yy * W + xx, q = i * 4;
-                if (BW.own[i] >= 0) { const c = BW.rgb[i]; d[q] = c >> 16; d[q + 1] = (c >> 8) & 255; d[q + 2] = c & 255; d[q + 3] = 255; } else d[q + 3] = 0;
+                if (BW.own[i] >= 0) { const c = BW.rgb[i]; d[q] = c >> 16; d[q + 1] = (c >> 8) & 255; d[q + 2] = c & 255; d[q + 3] = BW.alpha[i]; } else d[q + 3] = 0;
             }
             BW.lx.putImageData(BW.img, 0, 0);
             // the plate's thickness: its outline pushed down and to the right, in a dark steel (a sharp 3D side, no rounding)
@@ -4853,7 +4878,7 @@ service cloud.firestore {
             BW.sil = mk(BW.sil); BW.side = mk(BW.side); BW.shadow = mk(BW.shadow);
             const si = BW.sil.getContext('2d'); si.globalCompositeOperation = 'source-over'; si.clearRect(0, 0, W, H); si.drawImage(BW.layer, 0, 0);
             si.globalCompositeOperation = 'source-in'; si.fillStyle = '#273041'; si.fillRect(0, 0, W, H); si.globalCompositeOperation = 'source-over';
-            const dep = LINE_WEIGHT * 0.2 * targetZoom / g.css, n = Math.max(2, Math.ceil(dep)), sd = BW.side.getContext('2d');
+            const dep = LINE_WEIGHT * 0.12 * targetZoom / g.css, n = Math.max(2, Math.ceil(dep)), sd = BW.side.getContext('2d');
             sd.clearRect(0, 0, W, H);
             for (let j = 1; j <= n; j++) sd.drawImage(BW.sil, Math.round(j * dep / n * 0.6), Math.round(j * dep / n));
             sd.globalCompositeOperation = 'source-atop'; const sg = sd.createLinearGradient(0, 0, W * 0.3, H); sg.addColorStop(0, '#3a4558'); sg.addColorStop(1, '#1a202b'); sd.fillStyle = sg; sd.fillRect(0, 0, W, H); sd.globalCompositeOperation = 'source-over';
@@ -4878,21 +4903,21 @@ service cloud.firestore {
                 const b = BW.bricks[id]; if (!b || !b.alive) return;
                 b.alive = false; elsHit.add(b.el); BW.live--;
                 const f = fragOf ? fragOf(id) : 0; let fr = frags.get(f); if (!fr) frags.set(f, fr = { cells: [], x0: W, y0: g.h, x1: 0, y1: 0 });
-                b.cells.forEach(i => { if (BW.own[i] < 0) return; const xx = i % W, yy = (i / W) | 0; fr.cells.push([xx, yy, BW.rgb[i]]); if (xx < fr.x0) fr.x0 = xx; if (yy < fr.y0) fr.y0 = yy; if (xx > fr.x1) fr.x1 = xx; if (yy > fr.y1) fr.y1 = yy; });
-                b.cells.forEach(i => { BW.own[i] = -1; BW.bid[i] = -1; });
+                b.cells.forEach(i => { if (BW.own[i] < 0) return; const xx = i % W, yy = (i / W) | 0; fr.cells.push([xx, yy, BW.rgb[i], BW.alpha[i]]); if (xx < fr.x0) fr.x0 = xx; if (yy < fr.y0) fr.y0 = yy; if (xx > fr.x1) fr.x1 = xx; if (yy > fr.y1) fr.y1 = yy; });
+                b.cells.forEach(i => { BW.own[i] = -1; BW.bid[i] = -1; BW.alpha[i] = 0; });
             });
             // each fragment flies off whole: one solid piece, tumbling slowly, with a few sparks where it broke
             frags.forEach(fr => {
                 if (!fr.cells.length) return;
                 const w = fr.x1 - fr.x0 + 1, h = fr.y1 - fr.y0 + 1, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
                 const cx = cv.getContext('2d'), im = cx.createImageData(w, h);
-                fr.cells.forEach(([xx, yy, c]) => { const q = ((yy - fr.y0) * w + (xx - fr.x0)) * 4; im.data[q] = c >> 16; im.data[q + 1] = (c >> 8) & 255; im.data[q + 2] = c & 255; im.data[q + 3] = 255; });
+                fr.cells.forEach(([xx, yy, c, al]) => { const q = ((yy - fr.y0) * w + (xx - fr.x0)) * 4; im.data[q] = c >> 16; im.data[q + 1] = (c >> 8) & 255; im.data[q + 2] = c & 255; im.data[q + 3] = al; });
                 cx.putImageData(im, 0, 0);
                 const sdc = document.createElement('canvas'); sdc.width = w; sdc.height = h; const sdx = sdc.getContext('2d');   // its side: the same shape in dark steel
                 sdx.drawImage(cv, 0, 0); sdx.globalCompositeOperation = 'source-in'; sdx.fillStyle = '#1e2633'; sdx.fillRect(0, 0, w, h);
                 const px = (g.x + fr.x0) * g.css, py = (g.y + fr.y0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
                 const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (0.5 + Math.random() * 0.8) * U;
-                BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.4, vy: dy / dl * spd - (0.8 + Math.random() * 0.8) * U, life: 90 + Math.random() * 30, r: 0, vr: (Math.random() - 0.5) * 0.07, dep: LINE_WEIGHT * 0.2 * targetZoom, sd: sdc });
+                BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.4, vy: dy / dl * spd - (0.8 + Math.random() * 0.8) * U, life: 90 + Math.random() * 30, r: 0, vr: (Math.random() - 0.5) * 0.07, dep: LINE_WEIGHT * 0.12 * targetZoom, sd: sdc });
                 for (let j = 0; j < 10; j++) { const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random() * 1.8) * U; BW.parts.push({ x: sx + (mx - sx) * 0.3, y: sy + (my - sy) * 0.3, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5 * U, life: 18 + Math.random() * 22, r: U * (0.2 + Math.random() * 0.3), col: Math.random() < 0.5 ? '#9fe3ff' : '#ffffff', spark: true }); }
                 if (fr.x0 < x0) x0 = fr.x0; if (fr.y0 < y0) y0 = fr.y0; if (fr.x1 > x1) x1 = fr.x1; if (fr.y1 > y1) y1 = fr.y1;
             });
@@ -4907,7 +4932,7 @@ service cloud.firestore {
             const xa = Math.max(0, Math.floor(bcx - rb)), xb = Math.min(g.w - 1, Math.ceil(bcx + rb)), ya = Math.max(0, Math.floor(bcy - rb)), yb = Math.min(g.h - 1, Math.ceil(bcy + rb));
             let sx = 0, sy = 0, n = 0, best = -1, bd = Infinity;
             for (let yy = ya; yy <= yb; yy += st) for (let xx = xa; xx <= xb; xx += st) {
-                const i = yy * g.w + xx; if (BW.bid[i] < 0) continue;
+                const i = yy * g.w + xx; if (BW.bid[i] < 0 || BW.alpha[i] < 128) continue;
                 const dx = xx + 0.5 - bcx, dy = yy + 0.5 - bcy, d2 = dx * dx + dy * dy; if (d2 > rb * rb) continue;
                 sx += dx; sy += dy; n++; if (d2 < bd) { bd = d2; best = BW.bid[i]; }
             }
