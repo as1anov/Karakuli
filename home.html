@@ -67,7 +67,8 @@ button { font: inherit; color: inherit; }
 .progress i { display: block; height: 100%; width: 0; background: var(--saffron); }
 
 /* ---------- shop ---------- */
-.shop { padding: clamp(96px, 14vh, 160px) var(--pad) clamp(72px, 10vh, 120px); }
+/* the shop comes up over the last screen of the pinned stage, while the pieces are still falling into it: no empty black screen */
+.shop { position: relative; z-index: 2; background: var(--paper); margin-top: -100vh; margin-top: -100svh; padding: clamp(96px, 14vh, 160px) var(--pad) clamp(72px, 10vh, 120px); }
 .shop-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 24px 48px; margin-bottom: clamp(32px, 5vw, 56px); }
 .shop-head h2 { margin: 0; font-weight: 500; font-size: clamp(40px, 6vw, 80px); line-height: 1.02; letter-spacing: -0.025em; }
 .shop-head p { margin: 0; max-width: 28em; color: var(--graphite); }
@@ -112,6 +113,7 @@ button { font: inherit; color: inherit; }
   .chapter h2 { font-size: 28px; margin-bottom: 12px; }
   .chapter p { font-size: 15px; }
   .cards { grid-template-columns: 1fr; }
+  .contact .ways { margin-bottom: 200px; }
   .contact-gl::after { background: linear-gradient(180deg, var(--ink) 0%, rgba(17,17,17,.82) 45%, rgba(17,17,17,.62) 100%); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -207,7 +209,7 @@ function navTone() {
 const scrolly = document.querySelector('.scrolly'), stage = $('stage'), canvas = $('gl');
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // hero: drawing 10 whole · scatter: it comes apart · gather: its pieces build drawing 11 beside the story · fall: drawing 11 lets go
-const P = { hero: [0.03, 0.12], scatter: [0.06, 0.28], gather: [0.28, 0.52], text: [0.44, 0.8], fall: [0.78, 0.96] };
+const P = { hero: [0.03, 0.12], scatter: [0.06, 0.28], gather: [0.28, 0.52], text: [0.44, 0.79], fall: [0.76, 0.94] };
 const clamp01 = v => Math.max(0, Math.min(1, v)), seg = (v, a, b) => clamp01((v - a) / (b - a));
 const smooth = t => t * t * (3 - 2 * t);
 const progress = () => { const r = scrolly.getBoundingClientRect(), span = scrolly.offsetHeight - innerHeight; return clamp01(-r.top / span); };
@@ -248,11 +250,35 @@ if (document.body.classList.contains('no-gl')) {
 }
 
 // ------------------------------------------------------------------ steel, light, and a drawing cut into parts
-function steelMats() {
-  const steel = new T.MeshStandardMaterial({ color: 0xe9e7e1, roughness: 0.42, metalness: 0.38 });
+function steelMats(bend) {
+  const face = new T.MeshStandardMaterial({ color: 0xe9e7e1, roughness: 0.42, metalness: 0.38 });
+  const side = face.clone(); side.color.set(0xaeaca5);   // the cut edges are a tone darker than the face
   // front faces win the depth test where another part's side wall ends flush with them, so no specks show along the joints
-  const face = steel.clone(); Object.assign(face, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
-  return { box: [steel, steel, steel, steel, face, face], ext: [face, steel] };   // BoxGeometry: +z, -z are groups 4, 5; ExtrudeGeometry: caps, sides
+  Object.assign(face, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+  if (bend) [face, side].forEach(m => bendable(m, bend, m === face));
+  return { box: [side, side, side, side, face, face], ext: [face, side] };   // BoxGeometry: +z, -z are groups 4, 5; ExtrudeGeometry: caps, sides
+}
+// The whole pattern bends as one sheet, its left and right wings swinging a little like a boomerang's: every vertex moves by the same
+// curve (z grows with the square of its distance from the middle), so the joints stay closed. The normals tilt with it, and a soft
+// reflection slides across the front faces as the wings move.
+function bendable(mat, U, glint) {
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'uniform float uBend, uHalf;\nvarying float vU, vFront;\n' + sh.vertexShader
+      .replace('#include <defaultnormal_vertex>', `#include <defaultnormal_vertex>
+        vec4 bentW = modelMatrix * vec4(position, 1.0);
+        vU = bentW.x / uHalf; vFront = step(0.5, normal.z);
+        transformedNormal.x -= 2.0 * uBend * vU / uHalf * transformedNormal.z;
+        transformedNormal = normalize(transformedNormal);`)
+      .replace('#include <project_vertex>', `bentW.z += uBend * vU * vU;
+        vec4 mvPosition = viewMatrix * bentW;
+        gl_Position = projectionMatrix * mvPosition;`);
+    if (glint) sh.fragmentShader = 'uniform float uGlint, uGlintX;\nvarying float vU, vFront;\n' + sh.fragmentShader
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        float gd = (vU - uGlintX) / 0.3;
+        totalEmissiveRadiance += vec3(1.0, 0.97, 0.9) * uGlint * vFront * exp(-gd * gd);`);
+  };
+  mat.customProgramCacheKey = () => 'bend' + (glint ? '-glint' : '');
 }
 function lightUp(scene) {
   scene.add(new T.HemisphereLight(0xf4f3ef, 0x111111, 0.55));
@@ -296,7 +322,7 @@ function buildPattern(text, mats, scene) {
   });
   const parts = [], Z = new T.Vector3(0, 0, 1);
   const add = (geo, mat, kind, cx, cy, ang, len) => {
-    const m = new T.Mesh(geo, mat); scene.add(m);
+    const m = new T.Mesh(geo, mat); m.frustumCulled = false; scene.add(m);
     const [x, y] = toW(cx, cy);
     parts.push({ m, kind, len, home: new T.Vector3(x, y, 0), qHome: new T.Quaternion().setFromAxisAngle(Z, ang) });
   };
@@ -319,7 +345,7 @@ function buildPattern(text, mats, scene) {
     const ea = endExt(A, [-u[0], -u[1]]), eb = endExt(B, u), len = (L0 + ea + eb) * S;
     const sh = (eb - ea) / 2, cx = (A[0] + B[0]) / 2 + u[0] * sh, cy = (A[1] + B[1]) / 2 + u[1] * sh;
     // every part has exactly the same depth: overlapping faces then shade identically, and no hairline step shows at a joint
-    add(new T.BoxGeometry(len, w, D), mats.box, 'bar', cx, cy, -Math.atan2(u[1], u[0]), len);
+    add(new T.BoxGeometry(len, w, D, Math.max(1, Math.ceil(len / 0.3))), mats.box, 'bar', cx, cy, -Math.atan2(u[1], u[0]), len);
   });
   rings.forEach(r => {
     const sh = new T.Shape(); sh.absarc(0, 0, (r.r + sw / 2) * S, 0, Math.PI * 2);
@@ -343,7 +369,8 @@ function startScene() {
   renderer.outputColorSpace = T.SRGBColorSpace;
   const scene = new T.Scene(), camera = new T.PerspectiveCamera(26, 1, 0.1, 400);
   lightUp(scene);
-  const mats = steelMats();
+  const wing = { uBend: { value: 0 }, uHalf: { value: 10 }, uGlint: { value: 0 }, uGlintX: { value: 0 } };
+  const mats = steelMats(wing);
   const A = buildPattern(svg10, mats, scene);    // the whole pattern of the first screen
   const B = buildPattern(svg11, mats, scene);    // the pattern its pieces build beside the story
 
@@ -402,6 +429,12 @@ function startScene() {
     const p = pv, time = now / 1000;
     textAt(p); navTone();
     const s1 = seg(p, ...P.scatter), s2 = seg(p, ...P.gather), s3 = seg(p, ...P.fall), hs = heroScale;
+    // the boomerang: only while the pattern is whole (it fades as the pieces come apart); about one swing in seven seconds
+    const whole = reduce ? 0 : 1 - smooth(clamp01(s1 / 0.3)), swing = Math.sin(time * 0.9);
+    wing.uHalf.value = A.W * hs / 2;
+    wing.uBend.value = swing * 0.055 * wing.uHalf.value * whole;
+    wing.uGlintX.value = Math.sin(time * 0.9 - 0.9) * 0.95;                       // the reflection trails the swing
+    wing.uGlint.value = (0.05 + 0.09 * Math.abs(swing)) * whole;
     A.parts.forEach(pt => {
       const m = pt.m;
       let sc = poseA(pt, s1, hs, time);
@@ -458,8 +491,8 @@ function startFooter() {
     renderer.setSize(wpx, hpx, false); camera.aspect = wpx / hpx;
     camera.position.set(0, 0, 30); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
     const vh = 2 * 30 * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect, narrow = wpx < 820;
-    s = narrow ? vw * 1.15 / C.W : Math.max(vw * 0.62 / C.W, vh * 0.7 / C.H);
-    ox = narrow ? 0 : vw * 0.2; oy = narrow ? -vh * 0.18 : -vh * 0.04;
+    s = 0.6 * (narrow ? vw * 1.15 / C.W : Math.max(vw * 0.62 / C.W, vh * 0.7 / C.H));
+    ox = narrow ? 0 : vw * 0.25; oy = narrow ? -vh * (0.5 - 190 / hpx) : -vh * 0.04;   // on a phone it has its own room between the buttons and the foot line
   }
   layout(); addEventListener('resize', layout);
   // 0 when the section comes into view, 1 at the very bottom of the page
