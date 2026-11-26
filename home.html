@@ -117,7 +117,7 @@ button { font: inherit; color: inherit; }
   .chapter h2 { font-size: 28px; margin-bottom: 12px; }
   .chapter p { font-size: 15px; }
   .cards { grid-template-columns: 1fr; }
-  .contact .ways { margin-bottom: 210px; }
+  .contact .ways { margin-bottom: 250px; }
   .contact-gl::after { background: linear-gradient(180deg, var(--ink) 0%, rgba(17,17,17,.7) 45%, rgba(17,17,17,.34) 100%); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -482,15 +482,15 @@ function startFooter() {
   };
   // what floats, and where: [shape, x, y (shares of the view, from its middle), depth, turn in the plane]. Most keep to the right, clear of the words
   const wide = [
-    [ring, 0.26, 0.16, 0.6, 0], [ring, 0.42, -0.16, -2, 0],
-    [bar(3.2), 0.19, -0.25, -1.5, 0], [bar(2.4), 0.42, 0.25, -1, Math.PI / 2],
-    [dia, 0.24, 0.39, -2, Math.PI / 4], [dia, 0.31, -0.03, 0, Math.PI / 4]
+    [ring, 0.26, 0.16, 0.6, 0], [ring, 0.42, -0.16, -2, 0], [ring, 0.15, -0.09, -4, 0], [ring, 0.36, 0.37, -5, 0],
+    [bar(3.2), 0.19, -0.27, -1.5, 0], [bar(2.4), 0.43, 0.24, -1, Math.PI / 2], [bar(1.8), 0.45, 0.02, -2.5, Math.PI / 4], [bar(2.2), 0.09, 0.42, -3, -Math.PI / 7],
+    [dia, 0.24, 0.39, -2, Math.PI / 4], [dia, 0.31, -0.03, 0, Math.PI / 4], [dia, 0.07, -0.31, -3, Math.PI / 4], [dia, 0.34, -0.31, 1, Math.PI / 4]
   ];
   // on a phone they have their own band between the buttons and the foot line: y is counted in that band
   const phone = [
-    [ring, 0.24, 0.15, 0, 0], [ring, -0.27, -0.3, -2, 0],
-    [bar(2.2), -0.2, 0.55, -1, 0], [bar(1.8), 0.04, -0.45, -1.5, -Math.PI / 4],
-    [dia, 0.0, 0.25, -1, Math.PI / 4], [dia, 0.40, -0.5, 0, Math.PI / 4]
+    [ring, 0.24, 0.15, 0, 0], [ring, -0.29, -0.4, -2, 0], [ring, -0.37, 0.5, -5, 0], [ring, 0.33, -0.62, -4, 0],
+    [bar(2.2), -0.12, 0.62, -1, 0], [bar(1.8), 0.04, -0.62, -1.5, -Math.PI / 4], [bar(1.5), 0.40, 0.55, -2.5, Math.PI / 2], [bar(1.4), -0.22, 0.02, -3, Math.PI / 4],
+    [dia, 0.0, 0.2, -1, Math.PI / 4], [dia, 0.42, -0.15, 0, Math.PI / 4], [dia, -0.42, -0.02, -1, Math.PI / 4], [dia, 0.14, -0.28, -3, Math.PI / 4]
   ];
   const { rr } = seeded(23);
   const make = list => list.map(([shape, x, y, z, turn]) => {
@@ -519,7 +519,7 @@ function startFooter() {
     const time = reduce ? 0 : now / 1000, rise = reduce ? 0 : 1 - smooth(pv);   // they float up into place as the page ends
     const size = narrow ? Math.min(vw / 11.5, vh / 20) : Math.min(vh / 15, vw / 30);
     (narrow ? sets.phone : sets.wide).forEach(p => {
-      const x = p.x * vw, y = narrow ? -vh * (0.5 - 175 / hp) + p.y * vh * (70 / hp) : p.y * vh;
+      const x = p.x * vw, y = narrow ? -vh * (0.5 - 195 / hp) + p.y * vh * (100 / hp) : p.y * vh;
       p.m.position.set(x + Math.cos(time * p.sp * 0.7 + p.ph) * p.amp * 0.6, y + Math.sin(time * p.sp + p.ph) * p.amp - rise * (2.5 + p.amp * 6), p.z);
       p.m.quaternion.copy(spun.setFromAxisAngle(p.axis, Math.sin(time * p.spin * 2 + p.ph) * 0.7)).multiply(p.q);
       p.m.scale.setScalar(size);
