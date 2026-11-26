@@ -4472,7 +4472,7 @@ service cloud.firestore {
             const md = Math.min(width, height), zMin = md / (md > 600 ? 40 : 30) / lw, zMax = md / (md > 600 ? 24 : 17.5) / lw;   // a line is 1/26 .. 1/15 of the short side: on a phone the pattern stays big and is cropped
             const big = Math.min(width, height) > 600;                // a tablet or a computer: the camera further back, more room to play
             let z = Math.min(uW / pw, uH * (big ? 0.34 : 0.45) / ph);   // the pattern takes at most 45% (34%) of the height; the rest is room to play
-            z = Math.max(zMin, Math.min(Math.max(zMin, zMax), z));
+            z = Math.min(zMax, z); void zMin;   // the whole drawing is played: it is fitted, never cropped
             const fw = uW / z, fh = uH / z;
             // horizontal window: centred, or - when the pattern is wider than the field - the stretch holding the most of it
             let x0 = (minX + maxX) / 2 - fw / 2;
@@ -4490,7 +4490,7 @@ service cloud.firestore {
             const field = { minX: x0, maxX: x0 + fw, minY: minY - pad - hud, maxY: minY - pad - hud + fh };
             const f = 2 * BW.U / z;      // inner margin of the arena
             BW.inner = { minX: field.minX + f, maxX: field.maxX - f, minY: field.minY + f, maxY: field.maxY };
-            BW.cropY = field.minY + fh * (Math.min(width, height) > 600 ? 0.42 : 0.5);
+            BW.cropY = maxY + lw;   // nothing of the drawing is cut off at the bottom either
             return { field, z, ox: side - field.minX * z, oy: top - field.minY * z };
         }
 
