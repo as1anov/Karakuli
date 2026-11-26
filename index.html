@@ -235,6 +235,7 @@
         body.game-active #main-toolbar .tb-act:not(#eraser-btn), body.game-active #tb-sep, body.game-active #v3d-btn { display: none !important; }
         #mode-text { display: none !important; }
         body.game-active #main-toolbar .mode-header { width: 96px; }
+        html body.game-active #main-toolbar .mode-header { background-color: #1b1746; background-image: none; border-color: #0b0a24; box-shadow: inset 0 0 0 2px #2c2558; }   /* the hearts sit on a piece of the game's night sky */
         body.game-active #mode-ico { display: none; }
         :root { --tbot: 34px; }   /* how far the bottom toolbars stand above the screen edge: within reach of the hand */
         @media (min-width: 601px) { :root { --tb: 48px; --tbot: 56px; --ico: 20.4px; } }   /* tablets and desktops: bigger buttons */
@@ -247,6 +248,7 @@
             body .top-nav-wrapper { left: 12px; right: 12px; transform: none; width: auto; align-items: stretch; }
             body #main-toolbar { --ico: 24px; display: flex; align-items: center; gap: 10px; padding: 10px; width: 100%; border-radius: 24px; }   /* the same 10 px between the buttons and at the left, right, top and bottom (the same at the top, while the keyboard is open); the buttons share the width and stay square */
             body #main-toolbar :is(.control-btn, .mode-header) { border-radius: 18px; flex: 1 1 0; min-width: 0; width: auto; height: auto; aspect-ratio: 1 / 1; }   /* the buttons share the width equally and stay square */
+            body.game-active #main-toolbar .mode-header { aspect-ratio: auto; height: 52px; flex: 1 1 auto; }   /* in the game the toolbar holds just the hearts: a bar, not a square */
             body #main-toolbar .tb-sep { flex: none; width: 1px; height: auto; align-self: stretch; margin: 9px 0; }   /* the divider before 3D stays; 10 px on each side of it */
             :root { --tb: 44px; --ico: 20.5px; }   /* the top bars and the menu button on the left: taller */
             html body #dashboard .dash-btn { min-height: 52px; }   /* side-menu buttons */
@@ -4394,322 +4396,793 @@ service cloud.firestore {
             isPanning = false;
         }
 
-        // --- BREAK MAZE LOGIC ---
-        function startBreakMaze() {
-            // The game always starts from the complete drawing, not from an
-            // intermediate Time-lapse frame or its overlay controls.
-            if (isTimelapseUIOpen) toggleTimelapseUI();
-            if (segments.length === 0 && Object.keys(specialElements).length === 0) {
-                showActionHint("Draw something first!", false);
-                return;
-            }
-            if(isDashboardOpen) toggleDashboard();
-            isGameMode = true;
-            lives = 3;
-            document.body.classList.add('game-active');
+        // --- BRICK AND WALL: an 8-bit breakout over the drawing ---
+        // Everything is drawn into a small canvas (one cell = BW.PX screen pixels) and scaled up without smoothing: sky, stone frame, hearts,
+        // ball, paddle, text - and the pattern, which is laid as brick masonry. When the ball breaks a part, its bricks fly off one by one.
+        // Physics stays in world units (the drawing's own coordinates), the camera is the editor's zoom / offset.
+        const BW = { PX: 3, cv: null, cx: null, mk: null, mx: null, bk: null, bx: null, sky: null, frame: null, W: 0, H: 0, sw: 0, sh: 0,
+            prevA: null, prevC: null, parts: [], pops: [], caps: [], gems: [], fx: { W: 0, S: 0, F: 0 }, score: 0, best: 0, combo: 0, hits: 0,
+            shake: 0, t: 0, holes: [], field: null, inner: null, F: 3, dirty: true, stars: [], fireworks: 0, sound: true, trail: [] };
+        try { BW.best = +localStorage.getItem('kk-bw-best') || 0; BW.sound = localStorage.getItem('kk-bw-sound') !== '0'; } catch (e) {}
+        const BW_COL = {
+            brick: ['#b4442e', '#c2502f', '#a83b29', '#cc5a36', '#b84a34'], brickHi: '#e57a4f', brickLo: '#7a2618', mortar: '#5c2118', outline: '#1d0e1c',
+            stone: ['#6c7385', '#7b8296', '#5f6677'], stoneHi: '#a3aabb', stoneLo: '#3f4454', stoneMortar: '#2b2f3c',
+            ball: ['#ffffff', '#fff3b0', '#ffc94a', '#1d0e1c'], fire: ['#fff7c2', '#ffb43b', '#ff5a1f', '#1d0e1c'],
+            pad: { body: '#cfd6e4', hi: '#ffffff', lo: '#7b849a', cap: '#e5463a', capHi: '#ff8a6e', out: '#1d0e1c' },
+            text: '#fff4d6', shadow: '#1d0e1c', gold: '#ffd25a', gem: ['#7ff3ff', '#2fc4e8', '#1677b8', '#ffffff'],
+            caps: { W: '#3f8cff', S: '#38c172', F: '#ff7a1f', L: '#ff4f7b' }
+        };
+        // 3 x 5 pixel font
+        const BW_FONT = (() => {
+            const g = { A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100', G: '011100101101011',
+                H: '101101111101101', I: '111010010010111', J: '001001001101010', K: '101101110101101', L: '100100100100111', M: '1000111011101011000110001', N: '10011101101110011001',
+                O: '010101101101010', P: '110101110100100', Q: '010101101110011', R: '110101110101101', S: '011100010001110', T: '111010010010010', U: '101101101101111',
+                V: '101101101101010', W: '1000110001101011101110001', X: '101101010101101', Y: '101101010010010', Z: '111001010100111',
+                0: '111101101101111', 1: '010110010010111', 2: '110001010100111', 3: '110001010001110', 4: '101101111001001', 5: '111100110001110', 6: '011100111101111',
+                7: '111001010010010', 8: '111101111101111', 9: '111101111001110', '!': '010010010000010', ':': '000010000010000', '-': '000000111000000',
+                '+': '000010111010000', 'x': '000101010101000', '.': '000000000000010', ' ': '000000000000000', '?': '110001010000010', '/': '001001010100100' };
+            return g;
+        })();
+        const BW_HEART = ['0110110', '1111111', '1111111', '0111110', '0011100', '0001000'];
 
-            // UI Changes
+        // ---------- sound: tiny chiptune effects on Web Audio (square / triangle waves and a noise burst) ----------
+        const BWS = {
+            ctx: null,
+            init() {
+                if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            },
+            tone(f0, f1, dur, type = 'square', vol = 0.06, delay = 0) {
+                if (!BW.sound || !this.ctx) return;
+                const c = this.ctx, t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
+                o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+                g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
+                o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+            },
+            noise(dur, vol = 0.08, freq = 1500, delay = 0) {
+                if (!BW.sound || !this.ctx) return;
+                const c = this.ctx, t = c.currentTime + delay, n = Math.floor(c.sampleRate * dur), b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+                for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+                const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+                s.buffer = b; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.8; g.gain.value = vol;
+                s.connect(f).connect(g).connect(c.destination); s.start(t);
+            },
+            seq(notes, step, type = 'square', vol = 0.05) { notes.forEach((f, i) => f && this.tone(f, f, step * 0.9, type, vol, i * step)); },
+            paddle() { this.tone(520, 780, 0.07, 'square', 0.05); },
+            wall() { this.tone(260, 240, 0.04, 'square', 0.035); },
+            brick() { this.noise(0.16, 0.12, 1200); this.tone(220, 70, 0.12, 'square', 0.05); },
+            ring() { this.noise(0.28, 0.14, 700); this.seq([392, 330, 262, 196], 0.05, 'square', 0.05); },
+            gem() { this.seq([988, 1319, 1568, 1976], 0.045, 'square', 0.04); },
+            power() { this.seq([523, 659, 784, 1047, 1319], 0.06, 'square', 0.045); },
+            lose() { this.seq([494, 392, 330, 262, 196], 0.09, 'triangle', 0.09); },
+            over() { this.seq([392, 0, 330, 0, 262, 247, 233, 220], 0.13, 'triangle', 0.09); },
+            win() { this.seq([523, 523, 523, 659, 784, 0, 659, 784, 1047, 1047], 0.1, 'square', 0.05); },
+            start() { this.seq([262, 330, 392, 523], 0.06, 'square', 0.04); }
+        };
+
+        // ---------- layout: a field that fills the screen under the toolbar; a pattern too wide (or too tall) for it is cropped ----------
+        function bwLayout() {
+            const lw = LINE_WEIGHT, Rout = BASE_STEP_VAL + lw / 2;
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            const grow = (x0, y0, x1, y1) => { minX = Math.min(minX, x0); maxX = Math.max(maxX, x1); minY = Math.min(minY, y0); maxY = Math.max(maxY, y1); };
+            segments.forEach(s => { const ax = s.p1.x * STEP, ay = s.p1.y * STEP, bx = s.p2.x * STEP, by = s.p2.y * STEP; grow(Math.min(ax, bx) - lw / 2, Math.min(ay, by) - lw / 2, Math.max(ax, bx) + lw / 2, Math.max(ay, by) + lw / 2); });
+            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; const r = el.isNode ? Rout : lw; if (el.isNode || el.isDiamond) grow(i * STEP - r, j * STEP - r, i * STEP + r, j * STEP + r); }
+            if (minX === Infinity) { minX = 0; maxX = 1000; minY = 0; maxY = 600; }
+            const nav = document.querySelector('.top-nav-wrapper'), nr = nav && nav.getBoundingClientRect();
+            const top = nr && nr.height && nr.top < height / 2 ? Math.round(nr.bottom + 8) : 16, side = 8, bottom = 12;
+            const uW = width - 2 * side, uH = height - top - bottom;
+            BW.PX = Math.max(2, Math.min(6, Math.round(Math.min(width, height) / 130)));
+            const pad = lw * 1.4;
+            const pw = maxX - minX + 2 * pad, ph = maxY - minY + 2 * pad;
+            const zMin = 4.2 * BW.PX / lw, zMax = 9 * BW.PX / lw;   // a line is 4..9 cells thick: one to three rows of bricks
+            let z = Math.min(uW / pw, uH * 0.55 / ph);               // the pattern takes at most 55% of the height; the rest is room to play
+            z = Math.max(zMin, Math.min(zMax, z));
+            const fw = uW / z, fh = uH / z;
+            // horizontal window: centred, or - when the pattern is wider than the field - the stretch holding the most of it
+            let x0 = (minX + maxX) / 2 - fw / 2;
+            if (pw > fw) {
+                const span = (a, b) => Math.max(0, Math.min(b, x0c + fw) - Math.max(a, x0c));
+                let best = -1, x0c;
+                for (x0c = minX - pad; x0c <= maxX + pad - fw + 1e-6; x0c += lw) {
+                    let sc = 0;
+                    segments.forEach(s => { const a = Math.min(s.p1.x, s.p2.x) * STEP, b = Math.max(s.p1.x, s.p2.x) * STEP; sc += a === b ? (a > x0c && a < x0c + fw ? Math.abs(s.p1.y - s.p2.y) * STEP : 0) : span(a, b); });
+                    sc -= Math.abs(x0c + fw / 2 - (minX + maxX) / 2) * 0.05;
+                    if (sc > best) { best = sc; x0 = x0c; }
+                }
+            }
+            const hud = 12 * BW.PX / z;   // a row for the score above the pattern
+            const field = { minX: x0, maxX: x0 + fw, minY: minY - pad - hud, maxY: minY - pad - hud + fh };
+            const f = BW.F * BW.PX / z;   // the stone frame, in world units
+            BW.inner = { minX: field.minX + f, maxX: field.maxX - f, minY: field.minY + f, maxY: field.maxY };
+            BW.cropY = field.minY + fh * 0.62;
+            return { field, z, ox: side - field.minX * z, oy: top - field.minY * z };
+        }
+
+        // Liang-Barsky: the part of a-b inside the rectangle
+        function bwClip(ax, ay, bx, by, r) {
+            let t0 = 0, t1 = 1; const dx = bx - ax, dy = by - ay;
+            const p = [-dx, dx, -dy, dy], q = [ax - r.x0, r.x1 - ax, ay - r.y0, r.y1 - ay];
+            for (let i = 0; i < 4; i++) {
+                if (p[i] === 0) { if (q[i] < 0) return null; continue; }
+                const t = q[i] / p[i];
+                if (p[i] < 0) { if (t > t1) return null; if (t > t0) t0 = t; } else { if (t < t0) return null; if (t < t1) t1 = t; }
+            }
+            return [ax + t0 * dx, ay + t0 * dy, ax + t1 * dx, ay + t1 * dy];
+        }
+
+        function buildGameBricks() {
+            const lw = LINE_WEIGHT, Rout = BASE_STEP_VAL + lw / 2, I = BW.inner;
+            const box = { x0: I.minX + lw / 2, x1: I.maxX - lw / 2, y0: I.minY + lw / 2, y1: BW.cropY };
+            gameBricks = { lines: [], nodes: [], diamonds: [] };
+            BW.holes = []; BW.els = [];
+            const addEl = e => { e.alive = true; BW.els.push(e); return BW.els.length - 1; };
+            for (const id in specialElements) {
+                const [i, j] = id.split(',').map(Number), el = specialElements[id], x = i * STEP, y = j * STEP;
+                if (el.isNode) {
+                    BW.holes.push({ x, y });   // every ring leaves a clean round gap: no line shows inside it, even after the ring is broken
+                    if (x - Rout > I.minX && x + Rout < I.maxX && y - Rout > I.minY && y < BW.cropY) gameBricks.nodes.push({ id, x, y, el: addEl({ t: 'ring', x, y }) });
+                }
+                if (el.isDiamond && x > box.x0 && x < box.x1 && y > box.y0 && y < box.y1) gameBricks.diamonds.push({ id, x, y: y + lw / 2, el: addEl({ t: 'gem', x, y: y + lw / 2 }) });
+            }
+            segments.forEach((s, idx) => {
+                const c = bwClip(s.p1.x * STEP, s.p1.y * STEP, s.p2.x * STEP, s.p2.y * STEP, box);
+                if (!c) return;
+                const a = { x: c[0], y: c[1] }, b = { x: c[2], y: c[3] };
+                // collision pieces: the line minus the parts inside ring gaps
+                let iv = [[0, 1]]; const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
+                // the masonry runs along the line; collinear lines share their direction (and so their joints)
+                const len = Math.sqrt(L2); let ux = len ? dx / len : 1, uy = len ? dy / len : 0; if (ux < -1e-9 || (Math.abs(ux) < 1e-9 && uy < 0)) { ux = -ux; uy = -uy; }
+                const el = addEl({ t: 'seg', a, b, ux, uy, len, sg: dx * ux + dy * uy >= 0 ? 1 : -1 });
+                if (L2 < 1) { if (BW.holes.every(h => Math.hypot(a.x - h.x, a.y - h.y) > Rout)) gameBricks.lines.push({ id: idx, a, b, el, subs: [[a.x, a.y, b.x, b.y]] }); else BW.els[el].alive = false; return; }
+                BW.holes.forEach(h => {
+                    const fx = a.x - h.x, fy = a.y - h.y, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - Rout * Rout, D = B * B - 4 * L2 * C;
+                    if (D <= 0) return;
+                    const sq = Math.sqrt(D), u0 = (-B - sq) / (2 * L2), u1 = (-B + sq) / (2 * L2);
+                    iv = iv.flatMap(([p, q]) => { const out = []; if (u0 > p) out.push([p, Math.min(q, u0)]); if (u1 < q) out.push([Math.max(p, u1), q]); return out.filter(([m, n]) => n - m > 1e-4); });
+                });
+                if (!iv.length) BW.els[el].alive = false;   // wholly inside a ring gap
+                if (iv.length) gameBricks.lines.push({ id: idx, a, b, el, subs: iv.map(([p, q]) => [a.x + dx * p, a.y + dy * p, a.x + dx * q, a.y + dy * q]) });
+            });
+            BW.dirty = true;
+        }
+
+        function startBreakMaze() {
+            // The game always starts from the complete drawing, not from an intermediate Time-lapse frame or its overlay controls.
+            if (isTimelapseUIOpen) toggleTimelapseUI();
+            if (segments.length === 0 && Object.keys(specialElements).length === 0) { showActionHint("Draw something first!", false); return; }
+            if (isDashboardOpen) toggleDashboard();
+            const wasPlaying = isGameMode;
+            isGameMode = true; lives = 3;
+            document.body.classList.add('game-active');
             document.getElementById('mode-text').style.display = 'none';
             document.getElementById('game-hearts').style.display = 'flex';
             document.getElementById('eraser-btn').style.display = 'none';
-            
-            let menuBtn = document.getElementById('menu-btn');
+            const menuBtn = document.getElementById('menu-btn');
             menuBtn.innerHTML = `<svg viewBox="0 0 24 24" class="theme-svg"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
-            menuBtn.onclick = function(e) { e.stopPropagation(); exitGame(); };
-
+            menuBtn.onclick = function (e) { e.stopPropagation(); exitGame(); };
             updateHeartsUI();
-            
-            buildGameBricks();
-            calculateGameBounds();
-
-            // Set targets for smooth camera fly
-            let worldW = gameBounds.maxX - gameBounds.minX;
-            let worldH = gameBounds.maxY - gameBounds.minY;
-            targetZoom = Math.min(width / worldW, height / worldH) * 0.85;
-            targetOffsetX = width/2 - ((gameBounds.minX + gameBounds.maxX)/2) * targetZoom;
-            targetOffsetY = height/2 - ((gameBounds.minY + gameBounds.maxY)/2) * targetZoom;
-
-            paddle = { w: 8 * STEP, h: LINE_WEIGHT, x: (gameBounds.minX + gameBounds.maxX)/2, y: gameBounds.maxY - LINE_WEIGHT };
-            ball = { r: (STEP * 0.7) / 2, x: paddle.x, y: paddle.y - paddle.h/2 - (STEP*0.7)/2, vx: 0, vy: 0, speed: STEP * 0.4 };
-
-            gameState = 'loading';
+            gameState = 'loading'; loadingProgress = 0; gameParticles = [];
+            BW.setupIn = wasPlaying ? 0 : 2; BW.wasPlaying = wasPlaying; BW.field = null; BW.fr = null; BW.frame = null; BW.W = 0;
+            BW.parts = []; BW.bparts = []; BW.pops = []; BW.caps = []; BW.g = null;
+            if (wasPlaying) bwSetup();
+            loop();
+        }
+        // laid out once the toolbar has moved to its game place (the frame after the class change), so the field starts under it
+        function bwSetup() {
+            const wasPlaying = BW.wasPlaying;
+            const L = bwLayout();
+            gameBounds = BW.field = L.field;
+            targetZoom = L.z; targetOffsetX = L.ox; targetOffsetY = L.oy;
+            if (wasPlaying) { zoom = targetZoom; offsetX = targetOffsetX; offsetY = targetOffsetY; }
+            buildGameBricks(); bwBricksInit();
+            const z = L.z, I = BW.inner, fh = L.field.maxY - L.field.minY;
+            paddle = { w: Math.max(16 * BW.PX / z, (I.maxX - I.minX) * 0.22), h: 3 * BW.PX / z, x: (I.minX + I.maxX) / 2, y: L.field.maxY - 7 * BW.PX / z, base: 0 };
+            paddle.base = paddle.w;
+            ball = { r: 1.9 * BW.PX / z, x: paddle.x, y: 0, vx: 0, vy: 0, speed: fh / 105, base: fh / 105 };
+            ball.y = paddle.y - paddle.h / 2 - ball.r;
+            BW.score = 0; BW.combo = 0; BW.hits = 0; BW.parts = []; BW.bparts = []; BW.pops = []; BW.caps = []; BW.trail = []; BW.fx = { W: 0, S: 0, F: 0 }; BW.fireworks = 0;
+            BW.prevA = null; BW.frame = null; BW.sky = null; BW.W = 0;
+            gameState = wasPlaying ? 'start' : 'loading';
             loadingProgress = 0;
-            gameParticles = [];
-            
-            showActionHint("Loading Maze...", true);
-            loop(); // start animation
         }
 
+        function bwHeartSVG(full) {
+            let r = '';
+            BW_HEART.forEach((row, y) => [...row].forEach((c, x) => {
+                if (c !== '1') return;
+                let col = full ? '#e8364a' : '#4b4560';
+                if (full && ((x === 1 && y === 1) || (x === 2 && y === 1) || (x === 1 && y === 2))) col = '#ffb0b8';
+                if (full && (y >= 3 && (x === 4 + (y - 3) || (y === 2 && x === 6)))) col = '#a5182c';
+                if (!full && (y === 1 || y === 2) && x > 0 && x < 6) col = '#2c2740';
+                r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${col}"/>`;
+            }));
+            return `<svg class="pixel-heart" viewBox="0 0 7 6" shape-rendering="crispEdges" style="width:24px;height:21px">${r}</svg>`;
+        }
         function updateHeartsUI() {
             let html = '';
-            let heartSVG = `<svg class="pixel-heart" viewBox="0 0 24 24" fill="#FF6666" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
-            let emptySVG = `<svg class="pixel-heart" viewBox="0 0 24 24" fill="none" stroke="var(--disabled-color)" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
-            for(let i=0; i<3; i++) html += (i < lives) ? heartSVG : emptySVG;
+            for (let i = 0; i < 3; i++) html += bwHeartSVG(i < lives);
             document.getElementById('game-hearts').innerHTML = html;
             const ch = document.getElementById('cv-hearts'); if (ch) ch.innerHTML = html;
         }
 
-        function buildGameBricks() {
-            gameBricks = { lines: [], nodes: [], diamonds: [] };
-            segments.forEach((s, idx) => { gameBricks.lines.push({ id: idx, seg: s, active: true }); });
-            for(let id in specialElements) {
-                let [i, j] = id.split(',').map(Number);
-                if (specialElements[id].isNode) gameBricks.nodes.push({ id: id, x: i*STEP, y: j*STEP, hp: 3 });
-                if (specialElements[id].isDiamond) gameBricks.diamonds.push({ id: id, x: i*STEP, y: j*STEP, hp: 1 });
-            }
-        }
-
-        function calculateGameBounds() {
-            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-            segments.forEach(s => {
-                minX = Math.min(minX, s.p1.x*STEP, s.p2.x*STEP); maxX = Math.max(maxX, s.p1.x*STEP, s.p2.x*STEP);
-                minY = Math.min(minY, s.p1.y*STEP, s.p2.y*STEP); maxY = Math.max(maxY, s.p1.y*STEP, s.p2.y*STEP);
-            });
-            for(let id in specialElements) {
-                let [i, j] = id.split(',').map(Number);
-                minX = Math.min(minX, i*STEP - BASE_STEP_VAL); maxX = Math.max(maxX, i*STEP + BASE_STEP_VAL);
-                minY = Math.min(minY, j*STEP - BASE_STEP_VAL); maxY = Math.max(maxY, j*STEP + BASE_STEP_VAL);
-            }
-            if (minX === Infinity) { minX = 0; maxX = width; minY = 0; maxY = height; }
-            let pad = 4 * STEP;
-            gameBounds = { minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad + 15 * STEP };
-        }
-
-        function handleGameInput(type, val) {
+        function handleGameInput(type, pt) {
             if (!isGameMode) return;
-            if ((gameState === 'start' || gameState === 'gameover' || gameState === 'victory') && (type === 'click' || type === 'keydown')) {
-                if(gameState === 'gameover' || gameState === 'victory') { startBreakMaze(); return; }
-                gameState = 'playing';
-                ball.vy = -ball.speed; ball.vx = (Math.random() - 0.5) * ball.speed;
+            BWS.init();
+            if (type === 'click' && pt && BW.spk && pt.x >= BW.spk.x0 && pt.x <= BW.spk.x1 && pt.y >= BW.spk.y0 && pt.y <= BW.spk.y1) { bwToggleSound(); return; }
+            if (gameState === 'gameover' || gameState === 'victory') { if (BW.t - (BW.endT || 0) > 45) startBreakMaze(); return; }
+            if (gameState === 'start') {
+                gameState = 'playing'; BWS.start();
+                const a = (Math.random() - 0.5) * 0.8;
+                ball.vx = Math.sin(a) * ball.speed; ball.vy = -Math.cos(a) * ball.speed;
             }
         }
+        function bwToggleSound() { BW.sound = !BW.sound; try { localStorage.setItem('kk-bw-sound', BW.sound ? '1' : '0'); } catch (e) {} if (BW.sound) BWS.paddle(); }
 
         function handleGameControlDown(key) {
+            if (String(key).toLowerCase() === 'm') { bwToggleSound(); return; }
             const control = resolveShortcut(key);
             if (control === '4') { keys.left = true; return; }
             if (control === '6') { keys.right = true; return; }
-            if (control === '5') { handleGameInput('keydown'); return; }
+            if (control === '5' || key === ' ') { handleGameInput('keydown'); return; }
             if (control === 'backspace') { ignoreBackspaceUntilKeyUp = true; exitGame(); }
         }
-
         function handleGameControlUp(key) {
             const control = resolveShortcut(key);
             if (control === '4') keys.left = false;
             if (control === '6') keys.right = false;
         }
 
-        class Particle {
-            constructor(x, y, type) {
-                this.x = x; this.y = y;
-                this.vx = (Math.random() - 0.5) * 15;
-                this.vy = (Math.random() - 0.5) * 15 - 5;
-                this.life = 1.0;
-                this.size = Math.random() * 10 + 5;
-                this.rot = Math.random() * TWO_PI;
-                this.vRot = (Math.random() - 0.5) * 0.5;
-                this.type = type;
-            }
-            update() { this.x += this.vx; this.y += this.vy; this.vy += 0.5; this.life -= 0.03; this.rot += this.vRot; }
-            draw(col) {
-                push(); noStroke(); translate(this.x, this.y); rotate(this.rot);
-                fill(col);
-                if(this.type === 'node') circle(0,0, this.size); else { rectMode(CENTER); rect(0,0, this.size, this.size); }
-                pop();
-            }
-        }
-
-        function destroyLineChain(startIndex) {
-            let toDestroy = [startIndex];
-            gameBricks.lines[startIndex].active = false;
-            let count = 1, queue = [startIndex];
-            
-            while(queue.length > 0 && count < 4) {
-                let currIdx = queue.shift();
-                let currSeg = gameBricks.lines[currIdx].seg;
-                for(let i=0; i<gameBricks.lines.length; i++) {
-                    if (!gameBricks.lines[i].active) continue;
-                    let s = gameBricks.lines[i].seg;
-                    if ((s.p1.x === currSeg.p1.x && s.p1.y === currSeg.p1.y) || (s.p1.x === currSeg.p2.x && s.p1.y === currSeg.p2.y) ||
-                        (s.p2.x === currSeg.p1.x && s.p2.y === currSeg.p1.y) || (s.p2.x === currSeg.p2.x && s.p2.y === currSeg.p2.y)) {
-                        gameBricks.lines[i].active = false; toDestroy.push(i); queue.push(i); count++;
-                        if (count >= 4) break;
-                    }
+        function destroyLineChain(startIndex, hx, hy) {
+            const ls = gameBricks.lines, dead = new Set([startIndex]), queue = [startIndex];
+            const near = (p, q) => Math.abs(p.x - q.x) < 1 && Math.abs(p.y - q.y) < 1;
+            while (queue.length && dead.size < 4) {
+                const c = ls[queue.shift()];
+                for (let i = 0; i < ls.length && dead.size < 4; i++) {
+                    if (dead.has(i)) continue;
+                    const s = ls[i];
+                    if (near(s.a, c.a) || near(s.a, c.b) || near(s.b, c.a) || near(s.b, c.b)) { dead.add(i); queue.push(i); }
                 }
             }
-            toDestroy.forEach(idx => {
-                let seg = gameBricks.lines[idx].seg;
-                for(let j=0; j<3; j++) gameParticles.push(new Particle((seg.p1.x + seg.p2.x)*STEP/2, (seg.p1.y + seg.p2.y)*STEP/2, 'line'));
-            });
-            gameBricks.lines = gameBricks.lines.filter(l => l.active);
+            dead.forEach(i => { BW.els[ls[i].el].alive = false; });
+            gameBricks.lines = ls.filter((_, i) => !dead.has(i));
+            bwScore(10 * dead.size, hx, hy);
+            if (Math.random() < 0.09) bwDropCap(hx, hy);
+            BW.dirty = true; BW.spawnAt = [hx, hy]; BWS.brick(); BW.shake = Math.max(BW.shake, 3);
+        }
+
+        function bwScore(n, x, y) {
+            BW.combo++; const mult = Math.min(5, 1 + Math.floor(BW.combo / 4));
+            const v = n * mult; BW.score += v;
+            BW.pops.push({ x, y, s: '+' + v + (mult > 1 ? ' x' + mult : ''), t: 0 });
+        }
+        function bwDropCap(x, y) {
+            const r = Math.random(), k = r < 0.35 ? 'W' : r < 0.6 ? 'S' : r < 0.85 ? 'F' : 'L';
+            BW.caps.push({ k, x, y, vy: (BW.field.maxY - BW.field.minY) / 320 });
         }
 
         function distToSegmentSquared(p, v, w) {
-            let l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
-            if (l2 === 0) return (p.x - v.x)**2 + (p.y - v.y)**2;
+            let l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+            if (l2 === 0) return { distSq: (p.x - v.x) ** 2 + (p.y - v.y) ** 2, proj: { x: v.x, y: v.y } };
             let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
             t = Math.max(0, Math.min(1, t));
             let proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
-            return { distSq: (p.x - proj.x)**2 + (p.y - proj.y)**2, proj: proj };
+            return { distSq: (p.x - proj.x) ** 2 + (p.y - proj.y) ** 2, proj: proj };
         }
 
-        function physicsStep() {
-            ball.x += ball.vx; ball.y += ball.vy;
-            
-            // Walls
-            if (ball.x - ball.r < gameBounds.minX) { ball.x = gameBounds.minX + ball.r; ball.vx *= -1; }
-            if (ball.x + ball.r > gameBounds.maxX) { ball.x = gameBounds.maxX - ball.r; ball.vx *= -1; }
-            if (ball.y - ball.r < gameBounds.minY) { ball.y = gameBounds.minY + ball.r; ball.vy *= -1; }
-            
-            // Paddle
-            let px = constrain(ball.x, paddle.x - paddle.w/2, paddle.x + paddle.w/2);
-            let distToPaddle = Math.sqrt((ball.x - px)**2 + (ball.y - paddle.y)**2);
-            if (distToPaddle < ball.r + paddle.h/2 && ball.vy > 0) {
-                ball.vy = -Math.abs(ball.vy);
-                ball.vx += (ball.x - paddle.x) * 0.08;
-                let s = Math.sqrt(ball.vx**2 + ball.vy**2);
-                ball.vx = (ball.vx/s) * ball.speed; ball.vy = (ball.vy/s) * ball.speed;
-            }
+        function bwReflect(nx, ny) { const d = ball.vx * nx + ball.vy * ny; if (d < 0) { ball.vx -= 2 * d * nx; ball.vy -= 2 * d * ny; } }
+        function bwNormSpeed() {
+            const sp = ball.speed * (BW.fx.S > 0 ? 0.62 : 1), s = Math.hypot(ball.vx, ball.vy) || 1;
+            ball.vx = ball.vx / s * sp; ball.vy = ball.vy / s * sp;
+            if (Math.abs(ball.vy) < sp * 0.22) { ball.vy = Math.sign(ball.vy || -1) * sp * 0.22; ball.vx = Math.sign(ball.vx) * Math.sqrt(sp * sp - ball.vy * ball.vy); }   // never a near-horizontal ball
+        }
 
-            if (ball.y > gameBounds.maxY) {
-                lives--; updateHeartsUI();
-                if (lives <= 0) { gameState = 'gameover'; }
-                else { gameState = 'start'; ball.x = paddle.x; ball.y = paddle.y - paddle.h/2 - ball.r; }
-            }
-
-            // Bricks
-            for(let i=gameBricks.nodes.length-1; i>=0; i--) {
-                let n = gameBricks.nodes[i];
-                let d = Math.sqrt((ball.x - n.x)**2 + (ball.y - n.y)**2);
-                let outerR = BASE_STEP_VAL; let innerR = BASE_STEP_VAL - LINE_WEIGHT;
-                if (d > innerR - ball.r && d < outerR + ball.r) {
-                    let nx = (ball.x - n.x) / d; let ny = (ball.y - n.y) / d;
-                    if (d < (innerR + outerR)/2) { nx = -nx; ny = -ny; ball.x = n.x - nx * (innerR - ball.r); ball.y = n.y - ny * (innerR - ball.r); } 
-                    else { ball.x = n.x + nx * (outerR + ball.r); ball.y = n.y + ny * (outerR + ball.r); }
-                    let dot = ball.vx * nx + ball.vy * ny;
-                    ball.vx -= 2 * dot * nx; ball.vy -= 2 * dot * ny;
-                    n.hp--;
-                    for(let j=0; j<5; j++) gameParticles.push(new Particle(ball.x, ball.y, 'node'));
-                    if (n.hp <= 0) gameBricks.nodes.splice(i, 1);
-                    return;
+        function physicsStep(k) {
+            const I = BW.inner, lw = LINE_WEIGHT, fire = BW.fx.F > 0;
+            const sp = Math.hypot(ball.vx, ball.vy), steps = Math.max(1, Math.ceil(sp * k / (ball.r * 0.7)));
+            for (let st = 0; st < steps; st++) {
+                ball.x += ball.vx * k / steps; ball.y += ball.vy * k / steps;
+                // stone frame
+                if (ball.x - ball.r < I.minX) { ball.x = I.minX + ball.r; bwReflect(1, 0); BWS.wall(); }
+                if (ball.x + ball.r > I.maxX) { ball.x = I.maxX - ball.r; bwReflect(-1, 0); BWS.wall(); }
+                if (ball.y - ball.r < I.minY) { ball.y = I.minY + ball.r; bwReflect(0, 1); BWS.wall(); }
+                // paddle: the bounce angle follows where it hits (up to 62 deg from vertical)
+                if (ball.vy > 0 && ball.y + ball.r >= paddle.y - paddle.h / 2 && ball.y - ball.r <= paddle.y + paddle.h / 2 && ball.x >= paddle.x - paddle.w / 2 - ball.r && ball.x <= paddle.x + paddle.w / 2 + ball.r) {
+                    const rel = Math.max(-1, Math.min(1, (ball.x - paddle.x) / (paddle.w / 2))), a = rel * 1.08, s = ball.speed * (BW.fx.S > 0 ? 0.62 : 1);
+                    ball.vx = Math.sin(a) * s; ball.vy = -Math.cos(a) * s; ball.y = paddle.y - paddle.h / 2 - ball.r;
+                    BW.combo = 0; BWS.paddle();
+                }
+                if (ball.y - ball.r > BW.field.maxY) { bwLoseLife(); return; }
+                // rings: one hit breaks them
+                for (let i = gameBricks.nodes.length - 1; i >= 0; i--) {
+                    const n = gameBricks.nodes[i], d = Math.hypot(ball.x - n.x, ball.y - n.y) || 1e-6, inR = BASE_STEP_VAL - lw / 2, outR = BASE_STEP_VAL + lw / 2;
+                    if (d > inR - ball.r && d < outR + ball.r) {
+                        let nx = (ball.x - n.x) / d, ny = (ball.y - n.y) / d;
+                        if (!fire) { if (d < BASE_STEP_VAL) { nx = -nx; ny = -ny; } bwReflect(nx, ny); bwNormSpeed(); }
+                        gameBricks.nodes.splice(i, 1); BW.els[n.el].alive = false;
+                        bwScore(50, n.x, n.y); BW.dirty = true; BW.spawnAt = [ball.x, ball.y]; BWS.ring(); BW.shake = 6;
+                        if (Math.random() < 0.25) bwDropCap(n.x, n.y);
+                        bwHit(); if (!fire) return; break;
+                    }
+                }
+                // gems: the ball collects them on the way - each drops a power-up
+                for (let i = gameBricks.diamonds.length - 1; i >= 0; i--) {
+                    const g = gameBricks.diamonds[i];
+                    if (Math.hypot(ball.x - g.x, ball.y - g.y) < ball.r + lw * 0.6) {
+                        gameBricks.diamonds.splice(i, 1); BW.els[g.el].alive = false; BW.dirty = true; BW.spawnAt = [g.x, g.y]; bwScore(100, g.x, g.y); bwDropCap(g.x, g.y); BWS.gem();
+                        bwSpark(g.x, g.y, BW_COL.gem, 18);
+                    }
+                }
+                // brick lines
+                const ls = gameBricks.lines, rr = ball.r + lw / 2;
+                for (let i = ls.length - 1; i >= 0; i--) {
+                    let hit = null;
+                    for (const s of ls[i].subs) {
+                        const res = distToSegmentSquared(ball, { x: s[0], y: s[1] }, { x: s[2], y: s[3] });
+                        if (res.distSq < rr * rr) { hit = res; break; }
+                    }
+                    if (!hit) continue;
+                    const dist = Math.sqrt(hit.distSq) || 1e-6, nx = (ball.x - hit.proj.x) / dist, ny = (ball.y - hit.proj.y) / dist;
+                    if (!fire) { ball.x = hit.proj.x + nx * rr; ball.y = hit.proj.y + ny * rr; bwReflect(nx, ny); ball.vx += (Math.random() - 0.5) * ball.speed * 0.08; bwNormSpeed(); }
+                    destroyLineChain(i, hit.proj.x, hit.proj.y);
+                    bwHit(); if (!fire) return; break;
                 }
             }
-            
-            for(let i=gameBricks.diamonds.length-1; i>=0; i--) {
-                let d = gameBricks.diamonds[i];
-                let tx = ball.x - d.x; let ty = ball.y - d.y - LINE_WEIGHT/2;
-                let c = Math.cos(-Math.PI/4), s = Math.sin(-Math.PI/4);
-                let lx = tx * c - ty * s; let ly = tx * s + ty * c;
-                let half = LINE_WEIGHT/2;
-                let p_x = Math.max(-half, Math.min(lx, half)); let p_y = Math.max(-half, Math.min(ly, half));
-                let distSq = (lx - p_x)**2 + (ly - p_y)**2;
-                if (distSq < ball.r * ball.r) {
-                    let dist = Math.sqrt(distSq); let lnx = (lx - p_x) / dist; let lny = (ly - p_y) / dist;
-                    if(dist===0) { lnx = 1; lny = 0; }
-                    let bc = Math.cos(Math.PI/4), bs = Math.sin(Math.PI/4);
-                    let nx = lnx * bc - lny * bs; let ny = lnx * bs + lny * bc;
-                    ball.x += nx * (ball.r - dist + 1); ball.y += ny * (ball.r - dist + 1);
-                    let dot = ball.vx * nx + ball.vy * ny; ball.vx -= 2 * dot * nx; ball.vy -= 2 * dot * ny;
-                    for(let j=0; j<5; j++) gameParticles.push(new Particle(d.x, d.y + LINE_WEIGHT/2, 'diamond'));
-                    gameBricks.diamonds.splice(i, 1);
-                    return;
+        }
+        function bwHit() {
+            BW.hits++; ball.speed = Math.min(ball.base * 1.45, ball.base * (1 + BW.hits * 0.012));
+            if (!gameBricks.lines.length && !gameBricks.nodes.length) {
+                BW.score += gameBricks.diamonds.length * 100; gameBricks.diamonds.forEach(g => { BW.els[g.el].alive = false; }); gameBricks.diamonds = []; BW.dirty = true;
+                bwEnd('victory');
+            }
+        }
+        function bwLoseLife() {
+            lives--; updateHeartsUI(); BW.shake = 10; BW.combo = 0; BW.fx = { W: 0, S: 0, F: 0 }; BW.caps = []; paddle.w = paddle.base;
+            bwSpark(ball.x, BW.field.maxY - ball.r, ['#ffffff', '#ffc94a', '#ff5a1f'], 14);
+            if (lives <= 0) { BWS.over(); bwEnd('gameover'); return; }
+            BWS.lose(); gameState = 'start';
+            ball.x = paddle.x; ball.y = paddle.y - paddle.h / 2 - ball.r; ball.vx = ball.vy = 0;
+        }
+        function bwEnd(state) {
+            gameState = state; BW.endT = BW.t; BW.dirty = true;
+            if (BW.score > BW.best) { BW.best = BW.score; BW.newBest = true; try { localStorage.setItem('kk-bw-best', BW.best); } catch (e) {} } else BW.newBest = false;
+            if (state === 'victory') { BWS.win(); BW.fireworks = 1; }
+        }
+
+        // ---------- pixel drawing ----------
+        function bwCell(wx, wy) { return [(offsetX + wx * zoom) / BW.PX, (offsetY + wy * zoom) / BW.PX]; }
+        function bwText(s, x, y, col, sc = 1, align = 'left', shadow = true) {
+            const c = BW.cx; s = String(s).toUpperCase();
+            const gl = [...s].map(ch => BW_FONT[ch] || BW_FONT[ch.toLowerCase()] || BW_FONT[' ']);   // glyphs are 5 rows high, 3 (or 4 / 5) wide
+            const w = gl.reduce((a, g) => a + (g.length / 5 + 1) * sc, 0) - sc;
+            let x0 = Math.round(align === 'center' ? x - w / 2 : align === 'right' ? x - w : x), y0 = Math.round(y);
+            const draw = (ox, oy, colr) => {
+                c.fillStyle = colr; let cx0 = 0;
+                gl.forEach(g => {
+                    const gw = g.length / 5;
+                    for (let p = 0; p < g.length; p++) if (g[p] === '1') c.fillRect(x0 + ox + (cx0 + p % gw) * sc, y0 + oy + Math.floor(p / gw) * sc, sc, sc);
+                    cx0 += gw + 1;
+                });
+            };
+            if (shadow) draw(sc, sc, BW_COL.shadow);
+            draw(0, 0, col);
+            return w;
+        }
+        function bwHash(a, b) { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return (h ^ (h >>> 16)) >>> 0; }
+        function bwRGB(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+
+        // The pattern as hi-res masonry. Every line is four courses of bricks laid along it (a horizontal line - horizontal courses, a 45 deg line -
+        // courses at 45 deg), a ring is four concentric courses, a rhombus is a gold block of four bricks turned 45 deg. The layer is drawn once
+        // at the final camera, at about 32 cells across a line, and only the cells of broken parts are redone; those bricks fly off.
+        const BW_LIGHT = [-0.55, -0.83];
+        function bwBrickColour(e, px, py) {   // -> [r, g, b, brick key] for a world point inside element e
+            const lw = LINE_WEIGHT, rowH = lw / 4, mw = Math.max(BW.cw * 1.0, rowH * 0.13), bev = Math.max(BW.cw, rowH * 0.17);
+            let u, v, Lb, ud, vd, pal = BW.palB, hi = BW.hiB, lo = BW.loB, rows = 4, half = lw / 2;
+            if (e.t === 'seg') {
+                u = px * e.ux + py * e.uy; v = -e.uy * (px - e.a.x) + e.ux * (py - e.a.y);
+                ud = [e.ux, e.uy]; vd = [-e.uy, e.ux]; Lb = lw / 2;
+            } else if (e.t === 'ring') {
+                const rx = px - e.x, ry = py - e.y, d = Math.hypot(rx, ry) || 1e-6;
+                v = d - BASE_STEP_VAL; vd = [rx / d, ry / d]; ud = [-ry / d, rx / d];
+                const C = 2 * Math.PI * BASE_STEP_VAL, n = Math.max(6, Math.round(C / (lw / 2)));
+                Lb = C / n; u = (Math.atan2(ry, rx) + Math.PI) * BASE_STEP_VAL;
+            } else {   // gem: a 2 x 2 block turned 45 deg
+                const rx = px - e.x, ry = py - e.y;
+                u = (rx + ry) / Math.SQRT2; v = (ry - rx) / Math.SQRT2;
+                ud = [Math.SQRT1_2, Math.SQRT1_2]; vd = [-Math.SQRT1_2, Math.SQRT1_2];
+                pal = BW.palG; hi = BW.hiG; lo = BW.loG; rows = 2; half = lw * 0.62; Lb = half;
+                u += half;   // so the joint falls on the centre
+            }
+            const rh = 2 * half / rows, vv = v + half, row = Math.max(0, Math.min(rows - 1, Math.floor(vv / rh))), fv = vv - row * rh;
+            const uu = u / Lb + (rows === 4 && (row & 1) ? 0.5 : 0), col = Math.floor(uu), fu = (uu - col) * Lb;
+            const key = (row * 7919 + col * 104729) | 0;
+            if ((fv < mw && row > 0) || fu < mw) return [BW.morB, key];
+            const sV = vd[0] * BW_LIGHT[0] + vd[1] * BW_LIGHT[1], sU = ud[0] * BW_LIGHT[0] + ud[1] * BW_LIGHT[1];
+            const vHi = rh - fv, vLo = fv - (row > 0 ? mw : 0), uHi = Lb - fu, uLo = fu - mw;
+            const lit = (sV > 0 ? vHi : vLo) < bev || (sU > 0 ? uHi : uLo) < bev * 0.8;
+            const dark = (sV > 0 ? vLo : vHi) < bev || (sU > 0 ? uLo : uHi) < bev * 0.8;
+            const base = pal[bwHash(row * 31 + col, (e.seed || 0) + 7) % pal.length];
+            return [lit ? hi : dark ? lo : base, key];
+        }
+
+        function bwOwnerAt(px, py, list) {   // the element a world point belongs to: inside the band, nearest to its middle
+            const lw = LINE_WEIGHT, half = lw / 2, Rout = BASE_STEP_VAL + half;
+            let inHole = false;
+            for (const h of BW.holes) { const dx = px - h.x, dy = py - h.y; if (dx * dx + dy * dy < Rout * Rout) { inHole = true; break; } }
+            let best = -1, bs = Infinity;
+            for (const i of list) {
+                const e = BW.els[i]; if (!e.alive) continue;
+                let sc;
+                if (e.t === 'seg') {
+                    if (inHole) continue;
+                    const rx = px - e.a.x, ry = py - e.a.y, v = -e.uy * rx + e.ux * ry, t = (rx * e.ux + ry * e.uy) * (e.sg || 1);
+                    if (Math.abs(v) > half || t < -half || t > e.len + half) continue;
+                    sc = Math.abs(v) + (t < 0 || t > e.len ? half : 0);
+                } else if (e.t === 'ring') {
+                    const v = Math.hypot(px - e.x, py - e.y) - BASE_STEP_VAL;
+                    if (Math.abs(v) > half) continue;
+                    sc = Math.abs(v) - 0.01;
+                } else {
+                    const rx = px - e.x, ry = py - e.y, u = (rx + ry) / Math.SQRT2, w = (ry - rx) / Math.SQRT2, g = lw * 0.62;
+                    if (Math.abs(u) > g || Math.abs(w) > g) continue;
+                    sc = -1;
+                }
+                if (sc < bs) { bs = sc; best = i; }
+            }
+            return best;
+        }
+
+        function bwBricksInit() {
+            const lw = LINE_WEIGHT, D = (typeof pixelDensity === 'function' ? pixelDensity() : 1) || 1, z = targetZoom;
+            BW.D = D; BW.bc = Math.max(1, Math.round(lw * z * D / 32));   // device pixels per cell
+            const cssPerCell = BW.bc / D; BW.cw = cssPerCell / z;          // world units per cell
+            BW.palB = BW_COL.brick.map(bwRGB); BW.hiB = bwRGB(BW_COL.brickHi); BW.loB = bwRGB(BW_COL.brickLo); BW.morB = bwRGB(BW_COL.mortar);
+            BW.palG = ['#f2b632', '#e6a21e', '#ffc94a'].map(bwRGB); BW.hiG = bwRGB('#fff0a8'); BW.loG = bwRGB('#a86a0c');
+            BW.els.forEach((e, i) => { e.seed = bwHash(i, 3) % 97; });
+            // world bbox of the pattern -> the region of cells the layer covers
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+            const R = BASE_STEP_VAL + lw;
+            BW.els.forEach(e => {
+                if (e.t === 'seg') { x0 = Math.min(x0, e.a.x - lw, e.b.x - lw); x1 = Math.max(x1, e.a.x + lw, e.b.x + lw); y0 = Math.min(y0, e.a.y - lw, e.b.y - lw); y1 = Math.max(y1, e.a.y + lw, e.b.y + lw); }
+                else { x0 = Math.min(x0, e.x - R); x1 = Math.max(x1, e.x + R); y0 = Math.min(y0, e.y - R); y1 = Math.max(y1, e.y + R); }
+            });
+            if (x0 === Infinity) { x0 = y0 = 0; x1 = y1 = 1; }
+            const toCell = (wx, wy) => [(targetOffsetX + wx * z) / cssPerCell, (targetOffsetY + wy * z) / cssPerCell];
+            const [c0x, c0y] = toCell(x0, y0), [c1x, c1y] = toCell(x1, y1);
+            const gx = Math.floor(c0x), gy = Math.floor(c0y), gw = Math.max(1, Math.ceil(c1x) - gx), gh = Math.max(1, Math.ceil(c1y) - gy);
+            BW.g = { x: gx, y: gy, w: gw, h: gh, css: cssPerCell };
+            // buckets of elements
+            const B = lw * 2, bk = new Map(), add = (bx, by, i) => { const kk = bx * 65536 + by; let a = bk.get(kk); if (!a) bk.set(kk, a = []); a.push(i); };
+            BW.els.forEach((e, i) => {
+                const ex0 = e.t === 'seg' ? Math.min(e.a.x, e.b.x) - lw : e.x - R, ex1 = e.t === 'seg' ? Math.max(e.a.x, e.b.x) + lw : e.x + R;
+                const ey0 = e.t === 'seg' ? Math.min(e.a.y, e.b.y) - lw : e.y - R, ey1 = e.t === 'seg' ? Math.max(e.a.y, e.b.y) + lw : e.y + R;
+                for (let bx = Math.floor(ex0 / B); bx <= Math.floor(ex1 / B); bx++) for (let by = Math.floor(ey0 / B); by <= Math.floor(ey1 / B); by++) add(bx + 30000, by + 30000, i);
+            });
+            BW.bkt = bk; BW.B = B;
+            BW.own = new Int32Array(gw * gh).fill(-1); BW.key = new Int32Array(gw * gh); BW.rgb = new Uint32Array(gw * gh);
+            BW.layer = document.createElement('canvas'); BW.layer.width = gw; BW.layer.height = gh; BW.lx = BW.layer.getContext('2d');
+            BW.img = BW.lx.createImageData(gw, gh);
+            for (let yy = 0; yy < gh; yy++) for (let xx = 0; xx < gw; xx++) bwBrickCell(xx, yy);
+            bwBricksPaint(0, 0, gw, gh);
+            BW.dirty = false;
+        }
+        function bwWorldOfCell(xx, yy) { const g = BW.g; return [((g.x + xx + 0.5) * g.css - targetOffsetX) / targetZoom, ((g.y + yy + 0.5) * g.css - targetOffsetY) / targetZoom]; }
+        function bwBrickCell(xx, yy) {
+            const i = yy * BW.g.w + xx, [px, py] = bwWorldOfCell(xx, yy);
+            const list = BW.bkt.get((Math.floor(px / BW.B) + 30000) * 65536 + Math.floor(py / BW.B) + 30000);
+            const o = list ? bwOwnerAt(px, py, list) : -1;
+            BW.own[i] = o;
+            if (o < 0) return;
+            const [c, key] = bwBrickColour(BW.els[o], px, py);
+            BW.rgb[i] = (c[0] << 16) | (c[1] << 8) | c[2]; BW.key[i] = key ^ (o * 2654435761);
+        }
+        function bwBricksPaint(x0, y0, x1, y1) {   // cells -> pixels, with a dark outline round the wall
+            const g = BW.g, d = BW.img.data, ol = bwRGB(BW_COL.outline), W = g.w, H = g.h;
+            const ow = Math.max(1, Math.round(1.4 / g.css));   // outline about 1.4 css px
+            x0 = Math.max(0, x0 - ow - 1); y0 = Math.max(0, y0 - ow - 1); x1 = Math.min(W, x1 + ow + 1); y1 = Math.min(H, y1 + ow + 1);
+            for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) {
+                const i = yy * W + xx, q = i * 4;
+                if (BW.own[i] >= 0) { const c = BW.rgb[i]; d[q] = c >> 16; d[q + 1] = (c >> 8) & 255; d[q + 2] = c & 255; d[q + 3] = 255; continue; }
+                let edge = false;
+                for (let dy = -ow; dy <= ow && !edge; dy++) for (let dx = -ow; dx <= ow; dx++) {
+                    const X = xx + dx, Y = yy + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+                    if (BW.own[Y * W + X] >= 0) { edge = true; break; }
+                }
+                if (edge) { d[q] = ol[0]; d[q + 1] = ol[1]; d[q + 2] = ol[2]; d[q + 3] = 255; } else d[q + 3] = 0;
+            }
+            BW.lx.putImageData(BW.img, 0, 0);
+        }
+        // after a hit: the cells of dead elements are given to a living neighbour (at a joint) or emptied; emptied bricks fly off
+        function bwBricksUpdate() {
+            if (!BW.g) return;
+            const g = BW.g, W = g.w, groups = new Map(), lw = LINE_WEIGHT, R = BASE_STEP_VAL + lw;
+            // only the cells round the parts that have just died are looked at
+            let rx0 = Infinity, ry0 = Infinity, rx1 = -Infinity, ry1 = -Infinity;
+            BW.els.forEach(e => {
+                if (e.alive || e.gone) return; e.gone = true;
+                const ex0 = e.t === 'seg' ? Math.min(e.a.x, e.b.x) - lw : e.x - R, ex1 = e.t === 'seg' ? Math.max(e.a.x, e.b.x) + lw : e.x + R;
+                const ey0 = e.t === 'seg' ? Math.min(e.a.y, e.b.y) - lw : e.y - R, ey1 = e.t === 'seg' ? Math.max(e.a.y, e.b.y) + lw : e.y + R;
+                rx0 = Math.min(rx0, ex0); ry0 = Math.min(ry0, ey0); rx1 = Math.max(rx1, ex1); ry1 = Math.max(ry1, ey1);
+            });
+            if (rx0 === Infinity) { BW.spawnAt = null; BW.dirty = false; return; }
+            const cX = wx => Math.floor((targetOffsetX + wx * targetZoom) / g.css) - g.x, cY = wy => Math.floor((targetOffsetY + wy * targetZoom) / g.css) - g.y;
+            const sx0 = Math.max(0, cX(rx0)), sy0 = Math.max(0, cY(ry0)), sx1 = Math.min(W - 1, cX(rx1) + 1), sy1 = Math.min(g.h - 1, cY(ry1) + 1);
+            let x0 = W, y0 = g.h, x1 = 0, y1 = 0;
+            for (let yy = sy0; yy <= sy1; yy++) for (let xx = sx0; xx <= sx1; xx++) {
+                const i = yy * W + xx, o = BW.own[i]; if (o < 0 || BW.els[o].alive) continue;
+                const key = BW.key[i], c = BW.rgb[i];
+                bwBrickCell(xx, yy);
+                if (BW.own[i] < 0) { let gr = groups.get(key); if (!gr) groups.set(key, gr = { px: [], x0: xx, y0: yy, x1: xx, y1: yy }); gr.px.push([xx, yy, c]); if (xx < gr.x0) gr.x0 = xx; if (yy < gr.y0) gr.y0 = yy; if (xx > gr.x1) gr.x1 = xx; if (yy > gr.y1) gr.y1 = yy; }
+                if (xx < x0) x0 = xx; if (yy < y0) y0 = yy; if (xx > x1) x1 = xx; if (yy > y1) y1 = yy;
+            }
+            if (x1 >= x0) bwBricksPaint(x0, y0, x1 + 1, y1 + 1);
+            // flying bricks: each brick becomes a little sprite, thrown away from the hit
+            const [sx, sy] = BW.spawnAt ? [targetOffsetX + BW.spawnAt[0] * targetZoom, targetOffsetY + BW.spawnAt[1] * targetZoom] : [width / 2, height / 3];
+            let n = 0;
+            for (const gr of groups.values()) {
+                if (gr.px.length < 3) continue;
+                if (++n > 160) break;
+                const w = gr.x1 - gr.x0 + 1, h = gr.y1 - gr.y0 + 1, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+                const cx = cv.getContext('2d'), im = cx.createImageData(w, h);
+                gr.px.forEach(([xx, yy, c]) => { const q = ((yy - gr.y0) * w + (xx - gr.x0)) * 4; im.data[q] = c >> 16; im.data[q + 1] = (c >> 8) & 255; im.data[q + 2] = c & 255; im.data[q + 3] = 255; });
+                cx.putImageData(im, 0, 0);
+                const px = (g.x + gr.x0) * g.css, py = (g.y + gr.y0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
+                const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, sp = (1.2 + Math.random() * 2.6) * BW.PX * 0.5;
+                BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * sp + (Math.random() - 0.5) * BW.PX, vy: dy / dl * sp - (1 + Math.random() * 2) * BW.PX * 0.6, life: 60 + Math.random() * 50, r: 0, vr: (Math.random() - 0.5) * 0.25 });
+            }
+            BW.spawnAt = null; BW.dirty = false;
+        }
+
+        function bwSpark(wx, wy, cols, n) {
+            const [x, y] = bwCell(wx, wy);
+            for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = 0.5 + Math.random() * 1.5; BW.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5, px: [[0, 0, cols[i % cols.length]]], life: 25 + Math.random() * 25, spark: true }); }
+        }
+
+        // night sky with dithered bands, a moon and a skyline; cached until the screen size changes
+        function bwBuildSky() {
+            const W = BW.W, H = BW.H, c = document.createElement('canvas'); c.width = W; c.height = H;
+            const x = c.getContext('2d'), bands = ['#0b0a24', '#121135', '#1b1746', '#281c59', '#3b2268', '#55276f', '#742d70', '#933a6c'];
+            const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+            const img = x.createImageData(W, H), d = img.data, B = bands.map(bwRGB), horizon = H * 0.92;
+            for (let yy = 0; yy < H; yy++) {
+                const f = Math.min(0.999, Math.max(0, yy / horizon)) * (B.length - 1), b0 = Math.floor(f), fr = f - b0;
+                for (let xx = 0; xx < W; xx++) {
+                    const c0 = fr * 16 > bayer[(yy & 3) * 4 + (xx & 3)] ? B[Math.min(B.length - 1, b0 + 1)] : B[b0], i = (yy * W + xx) * 4;
+                    d[i] = c0[0]; d[i + 1] = c0[1]; d[i + 2] = c0[2]; d[i + 3] = 255;
                 }
             }
-
-            for(let i=gameBricks.lines.length-1; i>=0; i--) {
-                let l = gameBricks.lines[i].seg;
-                let p1x = l.p1.x * STEP, p1y = l.p1.y * STEP, p2x = l.p2.x * STEP, p2y = l.p2.y * STEP;
-                let res = distToSegmentSquared(ball, {x: p1x, y: p1y}, {x: p2x, y: p2y});
-                let r = ball.r + LINE_WEIGHT/2;
-                if (res.distSq < r*r) {
-                    let dist = Math.sqrt(res.distSq);
-                    let nx = (ball.x - res.proj.x) / dist; let ny = (ball.y - res.proj.y) / dist;
-                    if (dist === 0) { nx = 1; ny = 0; }
-                    ball.x = res.proj.x + nx * r; ball.y = res.proj.y + ny * r;
-                    let dot = ball.vx * nx + ball.vy * ny;
-                    ball.vx = ball.vx - 2 * dot * nx; ball.vy = ball.vy - 2 * dot * ny;
-                    ball.vx += (Math.random() - 0.5); ball.vy += (Math.random() - 0.5);
-                    let spd = Math.sqrt(ball.vx**2 + ball.vy**2); ball.vx = (ball.vx/spd)*ball.speed; ball.vy = (ball.vy/spd)*ball.speed;
-                    destroyLineChain(i);
-                    return;
-                }
+            x.putImageData(img, 0, 0);
+            // moon
+            const mr = Math.max(4, Math.round(Math.min(W, H) * 0.045)), mx = Math.round(W * 0.78), my = Math.round(H * 0.5);
+            for (let yy = -mr; yy <= mr; yy++) for (let xx = -mr; xx <= mr; xx++) {
+                const q = xx * xx + yy * yy; if (q > mr * mr) continue;
+                x.fillStyle = q > (mr - 1) * (mr - 1) ? '#d9c9a0' : (bwHash(xx + 50, yy + 50) % 9 === 0 ? '#e2d3ad' : '#f6ecc9'); x.fillRect(mx + xx, my + yy, 1, 1);
             }
+            [[-0.3, -0.2, 0.22], [0.35, 0.25, 0.18], [0.1, 0.45, 0.12]].forEach(([a, b, r]) => { const R = Math.max(1, Math.round(mr * r)); x.fillStyle = '#dccca2'; for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) if (xx * xx + yy * yy <= R * R) x.fillRect(mx + Math.round(a * mr) + xx, my + Math.round(b * mr) + yy, 1, 1); });
+            // skyline: two rows of buildings with lit windows
+            [[0.16, '#1e1440', 7], [0.1, '#130c2b', 3]].forEach(([hgt, col, seed]) => {
+                let xx = 0;
+                while (xx < W) {
+                    const bw = 6 + bwHash(xx, seed) % 14, bh = Math.round(H * hgt * (0.35 + (bwHash(seed, xx) % 100) / 100 * 0.65));
+                    x.fillStyle = col; x.fillRect(xx, H - bh, bw, bh);
+                    for (let wy = H - bh + 2; wy < H - 2; wy += 3) for (let wx = xx + 1; wx < xx + bw - 1; wx += 2) {
+                        const h = bwHash(wx * 7 + seed, wy); if (h % 7 === 0) { x.fillStyle = h % 3 ? '#ffd76a' : '#7fd3ff'; x.fillRect(wx, wy, 1, 1); }
+                    }
+                    xx += bw + (bwHash(xx, seed + 1) % 3);
+                }
+            });
+            BW.sky = c;
+            BW.stars = [];
+            for (let i = 0; i < W * H / 260; i++) { const h = bwHash(i, 991); BW.stars.push({ x: h % W, y: (bwHash(i, 17) % Math.round(H * 0.7)), p: (h % 100) / 16, c: h % 5 === 0 ? '#ffe9a8' : h % 7 === 0 ? '#a8d8ff' : '#ffffff' }); }
+        }
 
-            if (gameBricks.lines.length === 0 && gameBricks.nodes.length === 0 && gameBricks.diamonds.length === 0) {
-                gameState = 'victory'; showActionHint("YOU WIN!", true);
+        // the stone frame round the field (left, right, top), drawn in cells at the final camera
+        function bwBuildFrame() {
+            const W = BW.W, H = BW.H, c = document.createElement('canvas'); c.width = W; c.height = H;
+            const x = c.getContext('2d'), F = BW.F;
+            const [x0, y0] = bwCell(BW.field.minX, BW.field.minY), [x1, y1] = bwCell(BW.field.maxX, BW.field.maxY);
+            const X0 = Math.round(x0), Y0 = Math.round(y0), X1 = Math.round(x1), Y1 = Math.round(y1);
+            const pal = BW_COL.stone;
+            const cell = (cx, cy) => {
+                const row = Math.floor(cy / 3), off = (row & 1) * 2, col = Math.floor((cx + off) / 4), inY = ((cy % 3) + 3) % 3, inX = (((cx + off) % 4) + 4) % 4;
+                if (inY === 2 || inX === 3) return BW_COL.stoneMortar;
+                if (inY === 0) return BW_COL.stoneHi;
+                return pal[bwHash(row + 7, col + 3) % pal.length];
+            };
+            const rect = (rx0, ry0, rx1, ry1) => { for (let yy = ry0; yy < ry1; yy++) for (let xx = rx0; xx < rx1; xx++) { x.fillStyle = cell(xx, yy); x.fillRect(xx, yy, 1, 1); } };
+            rect(X0, Y0, X1, Y0 + F); rect(X0, Y0, X0 + F, Y1); rect(X1 - F, Y0, X1, Y1);
+            x.fillStyle = BW_COL.outline;
+            x.fillRect(X0 - 1, Y0 - 1, X1 - X0 + 2, 1); x.fillRect(X0 - 1, Y0, 1, Y1 - Y0); x.fillRect(X1, Y0, 1, Y1 - Y0);
+            x.fillRect(X0 + F, Y0 + F, X1 - X0 - 2 * F, 1); x.fillRect(X0 + F, Y0 + F, 1, Y1 - Y0 - F); x.fillRect(X1 - F - 1, Y0 + F, 1, Y1 - Y0 - F);
+            BW.frame = c; BW.fr = { X0, Y0, X1, Y1 };
+        }
+
+        function bwSprite(cx, cy, r, cols) {   // a pixel disc: light core, rim, dark outline
+            const c = BW.cx, R = Math.max(1.5, r), X = Math.round(cx), Y = Math.round(cy), n = Math.ceil(R) + 1;
+            for (let yy = -n; yy <= n; yy++) for (let xx = -n; xx <= n; xx++) {
+                const q = Math.hypot(xx + 0.5 - (cx - X) + 0.0, yy + 0.5 - (cy - Y));
+                if (q > R + 1) continue;
+                let col = q > R ? cols[3] : q > R - 1 ? cols[2] : cols[1];
+                if (q <= R && xx + 0.5 < -R * 0.15 && yy + 0.5 < -R * 0.15 && q < R - 0.6) col = cols[0];
+                c.fillStyle = col; c.fillRect(X + xx, Y + yy, 1, 1);
             }
         }
 
         function drawBreakMaze() {
-            background(themeConfig[currentTheme].canvasBg);
-            push(); translate(offsetX, offsetY); scale(zoom);
-            
-            // Bounds
-            stroke('rgba(128,128,128,0.2)'); strokeWeight(5); noFill();
-            rectMode(CORNER);
-            rect(gameBounds.minX, gameBounds.minY, gameBounds.maxX - gameBounds.minX, gameBounds.maxY - gameBounds.minY);
+            const k = Math.min(2.5, (deltaTime || 16.7) / 16.667);
+            BW.t += k;
+            const W = Math.ceil(width / BW.PX), H = Math.ceil(height / BW.PX);
+            if (W !== BW.W || H !== BW.H) {
+                BW.W = W; BW.H = H;
+                BW.cv = document.createElement('canvas'); BW.cv.width = W; BW.cv.height = H; BW.cx = BW.cv.getContext('2d');
+                BW.sp = document.createElement('canvas'); BW.sp.width = W; BW.sp.height = H; BW.spx = BW.sp.getContext('2d');
+                BW.bgx = BW.cx; bwBuildSky(); BW.frame = null;
+                if (gameState !== 'loading' && BW.field) {   // the screen changed mid-game: fit the same field again
+                    const nav = document.querySelector('.top-nav-wrapper'), nr = nav && nav.getBoundingClientRect(), top = nr && nr.height && nr.top < height / 2 ? nr.bottom + 8 : 16;
+                    const z = Math.min((width - 16) / (BW.field.maxX - BW.field.minX), (height - top - 12) / (BW.field.maxY - BW.field.minY));
+                    zoom = targetZoom = z; offsetX = targetOffsetX = width / 2 - (BW.field.minX + BW.field.maxX) / 2 * z; offsetY = targetOffsetY = top - BW.field.minY * z;
+                    bwBricksInit(); BW.bparts = [];
+                }
+            }
+            BW.cx = BW.bgx; let c = BW.cx;
+            c.imageSmoothingEnabled = false;
+            c.drawImage(BW.sky, 0, 0);
+            if (!BW.field) {   // waiting for the layout (two frames)
+                if (--BW.setupIn <= 0) bwSetup();
+                background('#0b0a24'); drawingContext.save(); drawingContext.imageSmoothingEnabled = false; drawingContext.drawImage(BW.cv, 0, 0, BW.W * BW.PX, BW.H * BW.PX); drawingContext.restore();
+                return;
+            }
+            BW.stars.forEach(s => { if (Math.sin(BW.t * 0.05 + s.p * 6) > -0.3) { c.fillStyle = s.c; c.fillRect(s.x, s.y, 1, 1); } });
 
             if (gameState === 'loading') {
-                loadingProgress += 0.02;
-                zoom = lerp(zoom, targetZoom, 0.1);
-                offsetX = lerp(offsetX, targetOffsetX, 0.1);
-                offsetY = lerp(offsetY, targetOffsetY, 0.1);
-                fill(themeConfig[currentTheme].geomColor); rectMode(CENTER);
-                rect((gameBounds.minX + gameBounds.maxX)/2, (gameBounds.minY + gameBounds.maxY)/2, 300 * Math.min(1, loadingProgress), 10, 5);
-                if (loadingProgress >= 1.0) { gameState = 'start'; showActionHint("Tap to Start", true); }
-                pop(); return;
+                loadingProgress += 0.022 * k;
+                const e = Math.min(1, loadingProgress);
+                zoom = lerp(zoom, targetZoom, 0.14 * k); offsetX = lerp(offsetX, targetOffsetX, 0.14 * k); offsetY = lerp(offsetY, targetOffsetY, 0.14 * k);
+                if (e >= 1) { zoom = targetZoom; offsetX = targetOffsetX; offsetY = targetOffsetY; gameState = 'start'; BW.frame = null; }
+            }
+            if (BW.dirty) bwBricksUpdate();
+            if (gameState !== 'loading' && !BW.frame) bwBuildFrame();
+            if (BW.frame) c.drawImage(BW.frame, 0, 0);
+            // to the screen in layers: pixel sky + frame, hi-res masonry and flying bricks, then the pixel sprites
+            BW.shake = Math.max(0, BW.shake - 0.6 * k);
+            const sh = BW.shake > 0.5 ? Math.round((Math.random() - 0.5) * BW.shake * 0.6) * BW.PX : 0;
+            const ctx = drawingContext;
+            background('#0b0a24');
+            ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(sh, sh * 0.5);
+            ctx.drawImage(BW.cv, 0, 0, BW.W * BW.PX, BW.H * BW.PX);
+            if (BW.g) {   // the layer was made for the final camera: during the fly-in it is scaled to the current one
+                const f = zoom / targetZoom, g = BW.g;
+                ctx.drawImage(BW.layer, offsetX + (g.x * g.css - targetOffsetX) * f, offsetY + (g.y * g.css - targetOffsetY) * f, g.w * g.css * f, g.h * g.css * f);
+            }
+            BW.bparts = BW.bparts.filter(p => {
+                p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.22 * BW.PX * 0.5 * k; p.r += p.vr * k; p.life -= k;
+                if (p.life <= 0 || p.y > height + 40) return false;
+                if (p.life < 14 && ((p.life | 0) % 4 < 2)) return true;
+                ctx.save(); ctx.translate(p.x + p.w / 2, p.y + p.h / 2); ctx.rotate(Math.round(p.r / 0.26) * 0.26); ctx.drawImage(p.cv, -p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+                return true;
+            });
+            ctx.restore();
+            BW.cx = BW.spx; c = BW.cx; c.clearRect(0, 0, BW.W, BW.H); c.imageSmoothingEnabled = false;
+
+            // gems are gold bricks in the masonry layer; a glint now and then
+            gameBricks.diamonds.forEach((g, i) => { if ((BW.t / 5 + i * 11) % 40 < 4) { const [x, y] = bwCell(g.x, g.y); c.fillStyle = '#ffffff'; c.fillRect(Math.round(x) - 1, Math.round(y) - 2, 1, 3); c.fillRect(Math.round(x) - 2, Math.round(y) - 1, 3, 1); } });
+
+            if (gameState !== 'loading') {
+                // power-ups falling
+                const pw = paddle.w;
+                BW.caps = BW.caps.filter(cp => {
+                    if (gameState === 'playing') cp.y += cp.vy * k;
+                    if (cp.y > paddle.y - paddle.h && cp.y < paddle.y + paddle.h && Math.abs(cp.x - paddle.x) < pw / 2 + LINE_WEIGHT * 0.4) {
+                        if (cp.k === 'W') BW.fx.W = 900; if (cp.k === 'S') BW.fx.S = 720; if (cp.k === 'F') BW.fx.F = 480;
+                        let msg = { W: 'WIDE!', S: 'SLOW!', F: 'FIRE!', L: 'LIFE!' }[cp.k];
+                        if (cp.k === 'L') { if (lives < 3) { lives++; updateHeartsUI(); } else { BW.score += 250; msg = '+250'; } }
+                        BW.pops.push({ x: cp.x, y: cp.y, s: msg, t: 0 });
+                        BWS.power(); bwSpark(cp.x, cp.y, [BW_COL.caps[cp.k], '#ffffff'], 12); return false;
+                    }
+                    if (cp.y > BW.field.maxY) return false;
+                    const [x, y] = bwCell(cp.x, cp.y), X = Math.round(x) - 4, Y = Math.round(y) - 3;
+                    c.fillStyle = BW_COL.outline; c.fillRect(X, Y, 9, 7);
+                    c.fillStyle = BW_COL.caps[cp.k]; c.fillRect(X + 1, Y + 1, 7, 5);
+                    c.fillStyle = 'rgba(255,255,255,0.55)'; c.fillRect(X + 1, Y + 1, 7, 1);
+                    const g = BW_FONT[cp.k === 'L' ? '+' : cp.k], gw = g.length / 5, gx = X + Math.floor((9 - gw) / 2); c.fillStyle = '#ffffff';
+                    for (let p = 0; p < g.length; p++) if (g[p] === '1') c.fillRect(gx + p % gw, Y + 1 + Math.floor(p / gw), 1, 1);
+                    return true;
+                });
+                // power-up timers
+                ['W', 'S', 'F'].forEach(key => { if (BW.fx[key] > 0 && gameState === 'playing') BW.fx[key] = Math.max(0, BW.fx[key] - k); });
+                const wantW = paddle.base * (BW.fx.W > 0 ? 1.6 : 1); paddle.w += (wantW - paddle.w) * Math.min(1, 0.2 * k);
+
+                // paddle movement (keys) and the ball sitting on it before a launch
+                const I = BW.inner;
+                if (gameState === 'playing' || gameState === 'start') {
+                    if (keys.left) paddle.x -= (I.maxX - I.minX) * 0.018 * k;
+                    if (keys.right) paddle.x += (I.maxX - I.minX) * 0.018 * k;
+                    paddle.x = constrain(paddle.x, I.minX + paddle.w / 2, I.maxX - paddle.w / 2);
+                    if (gameState === 'start') { ball.x = paddle.x; ball.y = paddle.y - paddle.h / 2 - ball.r; }
+                }
+                if (gameState === 'playing') physicsStep(k);
+
+                // paddle sprite
+                {
+                    const [x0, y0] = bwCell(paddle.x - paddle.w / 2, paddle.y - paddle.h / 2), [x1, y1] = bwCell(paddle.x + paddle.w / 2, paddle.y + paddle.h / 2);
+                    const X0 = Math.round(x0), Y0 = Math.round(y0), X1 = Math.round(x1), Y1 = Math.max(Y0 + 3, Math.round(y1)), P = BW_COL.pad;
+                    c.fillStyle = P.out; c.fillRect(X0 + 1, Y0 - 1, X1 - X0 - 2, Y1 - Y0 + 2); c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+                    c.fillStyle = P.body; c.fillRect(X0 + 1, Y0, X1 - X0 - 2, Y1 - Y0);
+                    c.fillStyle = P.hi; c.fillRect(X0 + 2, Y0, X1 - X0 - 4, 1);
+                    c.fillStyle = P.lo; c.fillRect(X0 + 1, Y1 - 1, X1 - X0 - 2, 1);
+                    c.fillStyle = P.cap; c.fillRect(X0 + 1, Y0, 3, Y1 - Y0); c.fillRect(X1 - 4, Y0, 3, Y1 - Y0);
+                    c.fillStyle = P.capHi; c.fillRect(X0 + 1, Y0, 3, 1); c.fillRect(X1 - 4, Y0, 3, 1);
+                    if (BW.fx.W > 0 && (BW.fx.W > 120 || (BW.t | 0) % 10 < 5)) { c.fillStyle = BW_COL.caps.W; c.fillRect(Math.round((X0 + X1) / 2) - 2, Y0 + 1, 4, 1); }
+                }
+                // ball (+ a short pixel trail when it is fire)
+                {
+                    const [bx, by] = bwCell(ball.x, ball.y), r = ball.r * zoom / BW.PX, fire = BW.fx.F > 0;
+                    if (gameState === 'playing') { BW.trail.push([bx, by]); if (BW.trail.length > 6) BW.trail.shift(); } else BW.trail = [];
+                    if (fire) BW.trail.forEach(([tx, ty], i) => { c.fillStyle = i % 2 ? '#ff5a1f' : '#ffb43b'; const s = Math.max(1, Math.round(r * (i + 1) / 7)); c.fillRect(Math.round(tx) - (s >> 1), Math.round(ty) - (s >> 1), s, s); });
+                    bwSprite(bx, by, r, fire ? BW_COL.fire : BW_COL.ball);
+                }
             }
 
-            // Draw Bricks exactly as SVG
-            let ogSeg = segments; let ogSpec = specialElements;
-            segments = gameBricks.lines.map(l => l.seg);
-            specialElements = {};
-            gameBricks.nodes.forEach(n => specialElements[n.id] = {isNode: true, hp: n.hp});
-            gameBricks.diamonds.forEach(d => specialElements[d.id] = {isDiamond: true});
-            
-            drawGeometry(themeConfig[currentTheme].geomColor, true);
-            
-            segments = ogSeg; specialElements = ogSpec;
+            // flying bricks, dust and sparks
+            const floorY = BW.H + 4;
+            BW.parts = BW.parts.filter(p => {
+                p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.09 * k; p.life -= k;
+                if (p.life <= 0 || p.y > floorY) return false;
+                if (p.life < 12 && ((p.life | 0) % 4 < 2)) return true;   // blink out, 8-bit style
+                const X = Math.round(p.x), Y = Math.round(p.y);
+                p.px.forEach(([dx, dy, col]) => { c.fillStyle = col; c.fillRect(X + dx, Y + dy, 1, 1); });
+                return true;
+            });
+            // score pop-ups
+            BW.pops = BW.pops.filter(pp => {
+                pp.t += k; if (pp.t > 50) return false;
+                const [x, y] = bwCell(pp.x, pp.y);
+                bwText(pp.s, x, y - 4 - pp.t * 0.35, pp.t > 38 && (pp.t | 0) % 4 < 2 ? BW_COL.gold : BW_COL.text, 1, 'center');
+                return true;
+            });
 
-            // Particles
-            gameParticles.forEach(p => p.update());
-            gameParticles = gameParticles.filter(p => p.life > 0);
-            gameParticles.forEach(p => p.draw(themeConfig[currentTheme].geomColor));
-
-            // Paddle
-            fill(themeConfig[currentTheme].geomColor); noStroke(); rectMode(CENTER);
-            rect(paddle.x, paddle.y, paddle.w, paddle.h);
-
-            // Ball
-            fill(themeConfig[currentTheme].cursorColor); noStroke();
-            circle(ball.x, ball.y, ball.r * 2);
-
-            pop();
-
-            if (isGameMode && (gameState === 'playing' || gameState === 'start')) {
-                if (keys.left) paddle.x -= STEP * 0.6;
-                if (keys.right) paddle.x += STEP * 0.6;
-                paddle.x = constrain(paddle.x, gameBounds.minX + paddle.w/2, gameBounds.maxX - paddle.w/2);
-                if (gameState === 'start') ball.x = paddle.x;
+            // HUD: score, best, active power-ups, sound
+            if (BW.fr) {
+                const { X0, Y0, X1 } = BW.fr, ty = Y0 + BW.F + 3;
+                bwText('SCORE ' + String(BW.score).padStart(5, '0'), X0 + BW.F + 3, ty, BW_COL.text);
+                const hw = bwText('HI ' + String(Math.max(BW.best, BW.score)).padStart(5, '0'), X1 - BW.F - 12, ty, BW_COL.gold, 1, 'right');
+                let fx = X0 + BW.F + 3;
+                ['W', 'S', 'F'].forEach(key => { const v = BW.fx[key]; if (v > 0 && (v > 120 || (BW.t | 0) % 10 < 5)) { c.fillStyle = BW_COL.caps[key]; c.fillRect(fx, ty + 7, 7, 5); bwText(key, fx + 2, ty + 7, '#ffffff', 1, 'left', false); fx += 9; } });
+                // speaker
+                const sx = X1 - BW.F - 9, sy = ty;
+                c.fillStyle = BW.sound ? BW_COL.text : '#6d6480';
+                c.fillRect(sx, sy + 1, 2, 3); c.fillRect(sx + 2, sy, 1, 5); c.fillRect(sx + 3, sy - 1, 1, 7);
+                if (BW.sound) { c.fillRect(sx + 5, sy + 1, 1, 3); c.fillRect(sx + 7, sy, 1, 5); } else { c.fillStyle = '#ff4f7b'; for (let i = 0; i < 4; i++) { c.fillRect(sx + 5 + i, sy + i, 1, 1); c.fillRect(sx + 8 - i, sy + i, 1, 1); } }
+                BW.spk = { x0: (sx - 4) * BW.PX, x1: (sx + 12) * BW.PX, y0: (sy - 5) * BW.PX, y1: (sy + 10) * BW.PX };
+                void hw;
             }
 
-            if (gameState === 'playing') physicsStep();
-
-            if (gameState === 'gameover') {
-                fill(0, 0, 0, 180);
-                noStroke();
-                rectMode(CORNER);
-                rect(0, 0, width, height);
-                fill(255);
-                textAlign(CENTER, CENTER);
-                textFont('Google Sans Flex');
-                textStyle(BOLD);
-                textSize(48);
-                text("Game Over!", width/2, height/2 - 20);
-                textSize(16);
-                textStyle(NORMAL);
-                fill(200);
-                text("Tap to restart", width/2, height/2 + 30);
+            // messages
+            const cxm = BW.W / 2, blink = (BW.t | 0) % 50 < 34;
+            if (gameState === 'start') {
+                const [, py] = bwCell(paddle.x, paddle.y);
+                if (blink) bwText(lives < 3 ? 'TAP TO GO ON' : 'TAP TO START', cxm, py - 22, BW_COL.text, 1, 'center');
+                bwText('DRAG TO MOVE', cxm, py - 14, '#b9a9d6', 1, 'center');
             }
+            if (gameState === 'gameover' || gameState === 'victory') {
+                const win = gameState === 'victory', bw = Math.min(BW.W - 6, 84), bh = 46, X = Math.round(cxm - bw / 2), Y = Math.round(BW.H * 0.42 - bh / 2);
+                if (win && BW.fireworks && (BW.t | 0) % 18 === 0) {
+                    const fxw = BW.field.minX + Math.random() * (BW.field.maxX - BW.field.minX), fyw = BW.field.minY + Math.random() * (BW.field.maxY - BW.field.minY) * 0.5;
+                    bwSpark(fxw, fyw, [['#ff4f7b', '#ffd25a'], ['#7ff3ff', '#ffffff'], ['#38c172', '#ffd25a']][(Math.random() * 3) | 0], 26); BWS.noise(0.2, 0.05, 900);
+                }
+                c.fillStyle = BW_COL.outline; c.fillRect(X - 1, Y - 1, bw + 2, bh + 2);
+                c.fillStyle = '#2a1d4d'; c.fillRect(X, Y, bw, bh);
+                c.fillStyle = win ? BW_COL.gold : '#ff4f7b'; c.fillRect(X, Y, bw, 1); c.fillRect(X, Y + bh - 1, bw, 1); c.fillRect(X, Y, 1, bh); c.fillRect(X + bw - 1, Y, 1, bh);
+                const ttl = win ? 'YOU WIN!' : 'GAME OVER', tsc = ttl.length * 8 + 12 <= bw ? 2 : 1;
+                bwText(ttl, cxm, Y + (tsc === 2 ? 6 : 9), win ? BW_COL.gold : '#ff4f7b', tsc, 'center');
+                bwText('SCORE ' + BW.score, cxm, Y + 20, BW_COL.text, 1, 'center');
+                bwText((BW.newBest ? 'NEW ' : '') + 'BEST ' + BW.best, cxm, Y + 28, BW.newBest && blink ? BW_COL.gold : '#b9a9d6', 1, 'center');
+                if (blink && BW.t - BW.endT > 45) bwText('TAP TO PLAY', cxm, Y + 37, BW_COL.text, 1, 'center');
+            }
+
+            // the pixel sprites on top
+            ctx.save(); ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(BW.sp, sh, sh * 0.5, BW.W * BW.PX, BW.H * BW.PX);
+            ctx.restore();
         }
 
         function exitGame() {
@@ -4788,7 +5261,7 @@ service cloud.firestore {
                     mainPointerId = e.pointerId;
                     pX = e.clientX; pY = e.clientY;
                     isPointerDrawing = true;
-                    handleGameInput('click');
+                    handleGameInput('click', { x: e.clientX, y: e.clientY });
                     handleStart(e.clientX, e.clientY);
                     if (isEraserActive && !isTimelapseUIOpen && !isGameMode && !isResizingCanvas && !isOverUI(e.clientX, e.clientY)) eraserBegin((pX - offsetX) / zoom, (pY - offsetY) / zoom);
                 } else if (activePointers.size === 2) {
@@ -4814,7 +5287,7 @@ service cloud.firestore {
                     if (isPointerDrawing && !isOverUI(pX, pY)) {
                         if (isGameMode && (gameState === 'playing' || gameState === 'start')) {
                             let worldDx = dx / zoom;
-                            paddle.x = constrain(paddle.x + worldDx, gameBounds.minX + paddle.w/2, gameBounds.maxX - paddle.w/2);
+                            paddle.x = constrain(paddle.x + worldDx, BW.inner.minX + paddle.w/2, BW.inner.maxX - paddle.w/2);
                             if(gameState === 'start') ball.x = paddle.x;
                         }
                         else if (isResizingCanvas && !isGameMode) {
