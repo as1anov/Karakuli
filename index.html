@@ -4480,7 +4480,8 @@ service cloud.firestore {
             const big = Math.min(width, height) > 600;                // a tablet or a computer: the camera further back, more room to play
             let z = Math.min(uW / pw, uH * (big ? 0.34 : 0.45) / ph);   // the pattern takes at most 45% (34%) of the height; the rest is room to play
             const phone = md <= 600;
-            if (phone) z = Math.max(md / 26 / lw, Math.min(md / 15 / lw, z)); else z = Math.min(zMax, z); void zMin;   // a phone plays a close-up of a part; a bigger screen the whole drawing
+            if (phone) z = Math.max(md / 26 / lw, Math.min(md / 15 / lw, z)); else z = Math.min(zMax, z); void zMin;
+            if (phone) { const zt = (uW - 4 * BW.U) / Math.max(1, maxX - minX); if (zt >= md / 26 / lw && zt <= md / 15 / lw * 1.6) z = zt; }   // the drawing's width fits the field exactly: the pattern touches the container on both sides   // a phone plays a close-up of a part; a bigger screen the whole drawing
             const fw = uW / z, fh = uH / z;
             // horizontal window: centred, or - when the pattern is wider than the field - the stretch holding the most of it
             let x0 = (minX + maxX) / 2 - fw / 2;
@@ -4506,12 +4507,12 @@ service cloud.firestore {
                 const rings = []; for (const id in specialElements) if (specialElements[id].isNode) { const [i, j] = id.split(',').map(Number); if (j * STEP < cut) rings.push({ x: i * STEP, y: j * STEP }); }
                 const f0 = 2 * BW.U / z, Ro = BASE_STEP_VAL + lw / 2;
                 const bad = (cx, ty) => {
-                    const fy = ty - pad - hud, L0 = cx + f0 + lw / 2, R0 = cx + fw - f0 - lw / 2, T0 = fy + f0 + lw / 2, B0 = Math.min(fy + fh * 0.55, cut);
+                    const fy = ty - pad - hud, L0 = cx + f0, R0 = cx + fw - f0, T0 = fy + f0 + lw / 2, B0 = Math.min(fy + fh * 0.55, cut);
                     let n = 0; rings.forEach(r => { const inX = r.x + Ro > L0 && r.x - Ro < R0, inY = r.y + Ro > T0 && r.y - Ro < B0; if (!inX || !inY) return; if (r.x - Ro < L0 || r.x + Ro > R0 || r.y - Ro < T0 || r.y + Ro > B0) n++; }); return n;
                 };
                 const cands = [], xs = [], ys = [];
-                const xlo = minX - pad, xhi = Math.max(xlo, maxX + pad - fw), ylo = minY, yhi = Math.max(ylo, maxY - fh * 0.5);
-                for (let v = xlo; v <= xhi + 1e-6; v += lw / 2) xs.push(v); if (!xs.length) xs.push(xlo);
+                const xlo = minX - f0, xhi = maxX - fw + f0, ylo = minY, yhi = Math.max(ylo, maxY - fh * 0.5), xfit = xhi >= xlo;   // the window stays inside the drawing's width, so the pattern reaches both sides
+                if (xfit) for (let v = xlo; v <= xhi + 1e-6; v += lw / 2) xs.push(v); else xs.push((minX + maxX) / 2 - fw / 2);
                 for (let v = ylo; v <= yhi + 1e-6; v += lw / 2) ys.push(v); if (!ys.length) ys.push(ylo);
                 let best = 0;
                 xs.forEach(cx => ys.forEach(ty => {
@@ -4525,7 +4526,7 @@ service cloud.firestore {
                 pool.forEach(c => { c.cc = cc(false, c.cx + f0) + cc(false, c.cx + fw - f0) + cc(true, c.ty - pad - hud + f0); });
                 const minCC = Math.min(...pool.map(c => c.cc)), pool2 = pool.filter(c => c.cc <= minCC + 1);
                 if (pool2.length) {
-                    const c = pool2[Math.floor(Math.random() * pool2.length)]; if (pw > fw) x0 = c.cx; yTop = c.ty;
+                    const c = pool2[Math.floor(Math.random() * pool2.length)]; x0 = c.cx; yTop = c.ty;
                     // the crop line too: where it crosses no diagonal, no horizontal stroke and no ring
                     const fy = yTop - pad - hud; let bestF = 0.55, bestC = Infinity;
                     for (let fr = 0.42; fr <= 0.68; fr += 0.01) { const yc = fy + fh * fr; let cost = cc(true, yc) + Math.abs(fr - 0.55) * 4; rings.forEach(r => { if (r.y + Ro > yc && r.y - Ro < yc) cost += 20; }); if (cost < bestC) { bestC = cost; bestF = fr; } }
