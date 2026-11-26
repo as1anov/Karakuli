@@ -10600,6 +10600,7 @@ function close3D() {
 window.addEventListener('resize', resize);
 document.addEventListener('fullscreenchange', () => { resize(); if (R) R.dirty = true; });
 window.open3D = open3D; window.close3D = close3D; window.openShopEditor = openShopEditor;
+window.__v3dEmbed = { S, MATS, get R() { return R; }, applyMaterial, rebuild, ensureSel };   // for the shop's product page (embed mode)
 window.__v3d = { get R() { return R; }, holesMm, designPrimitives, rasterMask, maskGroups, crossRuns, refineLoop, refineGroups, creaseNormals, buildDXF, traceContours, traceLoops, groupLoops, simplifyClosed, loopArea, bendSpec, layoutPieces, computeChain, runsOfRow, S, BEND_ANGLES };
 
 // the 3D button lives on the canvas, only for the products
@@ -10682,6 +10683,69 @@ setInterval(() => {
         else if (Math.abs(dy) > 60 && Math.abs(dy) > dx) st = null;
     }, true);
     ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, () => { st = null; }, true));
+})();
+</script>
+<script>
+// ===== Embed: the 3D view alone, inside a product page of the shop =====
+// /editor?embed=1&v=<view token>   (a shared view link)   or   /editor?embed=1&src=<project .json>   (a project file next to the site)
+// The page that holds the frame drives the look with postMessage: { k3d: 'set', mat, color, t, hooks, towel }.
+// It hears back { k3d: 'ready' } once the model stands, and { k3d: 'busy' | 'idle' } around a rebuild.
+(function () {
+    const q = new URLSearchParams(location.search);
+    if (!q.has('embed')) return;
+    document.documentElement.classList.add('embed');
+    const css = document.createElement('style');
+    css.textContent = `
+        html.embed body { background: #dcdee1 !important; }
+        html.embed :is(#cv-head, #v3d-title, #v3-rail, #v3d-panel, #v3d-bar, #v3-fx, #v3-ral, #share-badge, #action-indicator, .top-nav-container, .handle-arrow, #mobile-keyboard, #dashboard, #edge-tab, #prod-info) { display: none !important; }
+        html.embed #v3d-load .v3-lbox { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+        html.embed #v3-loadsub, html.embed #v3-retry { display: none !important; }`;
+    document.head.appendChild(css);
+    const V = () => window.__v3dEmbed;
+    const post = m => { try { parent.postMessage(Object.assign({ k3d: m.k3d }, m), '*'); } catch (e) {} };
+    const ready = () => window.karakuliShare && typeof redraw === 'function' && typeof width === 'number' && width > 0;
+
+    // writes a choice into the 3D state; true when the shape itself changes (a rebuild), false when only the look does
+    function setState(m) {
+        let geo = false;
+        if (m.mat && V().MATS[m.mat]) V().S.mat = m.mat;
+        if ('color' in m) V().S.color = V().MATS[V().S.mat].brushed ? null : (m.color || null);
+        if (m.t && +m.t !== V().S.t) { V().S.t = +m.t; geo = true; }
+        if (activeProductKey === 'shelf') {
+            if ('hooks' in m && !!shelfOpts.hooks.length !== !!m.hooks) { shelfOpts.hooks = m.hooks ? shelfDefaultHooks() : []; geo = true; }
+            if ('towel' in m && shelfOpts.towel !== !!m.towel) { shelfOpts.towel = !!m.towel; shelfOpts.tx = m.towel ? shelfTowel().cx : null; shelfOpts.tl = null; geo = true; }
+            if (shelfOpts.towel && shelfOpts.hooks.length) { const T = shelfTowel(); shelfOpts.tx = T.cx; shelfOpts.tl = T.len; }
+        }
+        V().ensureSel();
+        return geo;
+    }
+    let busy = false, live = false, pending = null;
+    async function apply(m) {
+        if (!live) { setState(m); return; }                       // before the model stands: the first build uses it
+        if (busy) { pending = Object.assign(pending || {}, m); return; }
+        busy = true; post({ k3d: 'busy' });
+        try { const geo = setState(m); V().applyMaterial(); V().R.dirty = true; if (geo) await V().rebuild(); } catch (e) { console.warn('embed', e); }
+        busy = false; post({ k3d: 'idle' });
+        if (pending) { const p = pending; pending = null; apply(p); }
+    }
+    window.addEventListener('message', e => { if (e.data && e.data.k3d === 'set') apply(e.data); });
+
+    async function start() {
+        if (q.has('src')) {
+            const res = await fetch(q.get('src'), { cache: 'no-cache' }); if (!res.ok) throw new Error('project file ' + res.status);
+            const data = await res.json();
+            applyProjectData(data);
+            isViewOnly = true;
+        } else {
+            // a view link: initSharedLink opens it; wait until the drawing is on the canvas
+            for (let i = 0; i < 200 && !(shareSession && segments.length); i++) await new Promise(r => setTimeout(r, 100));
+        }
+        await window.open3D();
+        for (let i = 0; i < 300 && !(V() && V().R && V().R.model); i++) await new Promise(r => setTimeout(r, 100));
+        live = true;
+        post({ k3d: 'ready', product: activeProductKey });
+    }
+    const timer = setInterval(() => { if (ready()) { clearInterval(timer); start().catch(e => { console.error(e); post({ k3d: 'error', message: String(e && e.message || e) }); }); } }, 100);
 })();
 </script>
 </body>
