@@ -235,7 +235,8 @@
         body.game-active #main-toolbar .tb-act:not(#eraser-btn), body.game-active #tb-sep, body.game-active #v3d-btn { display: none !important; }
         #mode-text { display: none !important; }
         body.game-active #main-toolbar .mode-header { width: 96px; }
-        html body.game-active #main-toolbar .mode-header { background-color: #0f1529; background-image: linear-gradient(#141c36, #0b1022); border-color: rgba(140, 180, 255, 0.25); box-shadow: inset 0 0 0 1px rgba(140, 180, 255, 0.18), 0 0 12px rgba(90, 160, 255, 0.18); }   /* the hearts sit on a piece of the game's dark arena */
+        html body.game-active #main-toolbar, html body.game-active #main-toolbar .mode-header { background: none !important; border-color: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }   /* in the game: three hearts on their own, no plate */
+        html body.game-active #main-toolbar .mode-header.x-old { background-color: #0f1529; background-image: linear-gradient(#141c36, #0b1022); border-color: rgba(140, 180, 255, 0.25); box-shadow: inset 0 0 0 1px rgba(140, 180, 255, 0.18), 0 0 12px rgba(90, 160, 255, 0.18); }   /* the hearts sit on a piece of the game's dark arena */
         body.game-active #mode-ico { display: none; }
         :root { --tbot: 34px; }   /* how far the bottom toolbars stand above the screen edge: within reach of the hand */
         @media (min-width: 601px) { :root { --tb: 48px; --tbot: 56px; --ico: 20.4px; } }   /* tablets and desktops: bigger buttons */
@@ -1006,7 +1007,7 @@
             <div class="dash-section">
                 <span class="dash-label">Available Games</span>
                 <div class="dash-btn" onclick="startBreakMaze()">
-                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5h4M10 5h4M16.5 5h4" /><circle cx="14" cy="12.5" r="1.8" /><path d="M7 19h8" /></svg>
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3.5" width="5" height="3" rx=".6"/><rect x="9.5" y="3.5" width="5" height="3" rx=".6"/><rect x="16" y="3.5" width="5" height="3" rx=".6"/><rect x="6.25" y="8" width="5" height="3" rx=".6"/><rect x="12.75" y="8" width="5" height="3" rx=".6"/><circle cx="14.5" cy="15" r="1.5" fill="currentColor" stroke="none"/><path d="M7.5 20h9"/><path d="M14.5 15 11 12" stroke-dasharray="1 1.8" stroke-width="1.2"/></svg>
                     Break Maze
                 </div>
             </div>
@@ -4685,7 +4686,12 @@ service cloud.firestore {
                 BW.bricks.forEach((b, i) => { if (b.alive && b.el === b0.el) ids.push(i); });
                 bwScore(40, e.x, e.y); BWS.brick(); BW.shake = Math.max(BW.shake, 4);
             }
-            bwRemoveBricks([...new Set(ids)], ball.x, ball.y);
+            let fragOf = null;
+            if (e.t === 'seg') {   // a long third breaks in two at the hit, a short one stays one piece
+                const uh = ball.x * e.ux + ball.y * e.uy, r = BW.runs[e.run];
+                if (r.len / 3 > LINE_WEIGHT * 3) fragOf = id => (BW.bricks[id].u < uh ? 0 : 1);
+            }
+            bwRemoveBricks([...new Set(ids)], ball.x, ball.y, fragOf);
         }
         function bwHit() {
             BW.hits++; ball.speed = Math.min(ball.base * 1.4, ball.base * (1 + BW.hits * 0.025));
@@ -4707,20 +4713,18 @@ service cloud.firestore {
         // ---------- the pattern layer: one piece of cast, polished metal ----------
         // Drawn once at the final camera (about 44 cells across a line). Its relief comes from a distance field: every edge of the shape -
         // line ends, joints, rings, rhombi, broken edges - gets the same rounded bevel, lit from the top left, with a thin cyan rim.
-        // Internally the metal is cut into invisible chunks (two along the width, ~0.8 line long), which fly off as shards when broken.
+        // Internally the metal is cut into thin invisible slices across the line, so a break is a clean straight cut; the broken part flies off in one or two solid pieces.
         function bwHash(a, b) { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return (h ^ (h >>> 16)) >>> 0; }
         function bwRGB(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
         function bwChunk(e, px, py) {   // -> [chunk key, grain coordinate across the brushing]
             const lw = LINE_WEIGHT;
-            let u, v, Lb, rows = 2, half = lw / 2;
-            if (e.t === 'seg') { u = px * e.ux + py * e.uy; v = -e.uy * (px - e.a.x) + e.ux * (py - e.a.y); Lb = lw * 0.8; }
+            let u, v, Lb;
+            if (e.t === 'seg') { u = px * e.ux + py * e.uy; v = -e.uy * (px - e.a.x) + e.ux * (py - e.a.y); Lb = lw * 0.2; }
             else if (e.t === 'ring') {
-                const rx = px - e.x, ry = py - e.y, d = Math.hypot(rx, ry) || 1e-6, C = 2 * Math.PI * BASE_STEP_VAL, n = Math.max(6, Math.round(C / (lw * 0.8)));
+                const rx = px - e.x, ry = py - e.y, d = Math.hypot(rx, ry) || 1e-6, C = 2 * Math.PI * BASE_STEP_VAL, n = Math.max(12, Math.round(C / (lw * 0.2)));
                 v = d - BASE_STEP_VAL; Lb = C / n; u = (Math.atan2(ry, rx) + Math.PI) * BASE_STEP_VAL;
-            } else { const rx = px - e.x, ry = py - e.y; u = (rx + ry) / Math.SQRT2 + half; v = (ry - rx) / Math.SQRT2; Lb = half; }
-            const rh = 2 * half / rows, vv = v + half, row = Math.max(0, Math.min(rows - 1, Math.floor(vv / rh)));
-            const col = Math.floor(u / Lb + (row & 1 ? 0.5 : 0));
-            return [(row * 7919 + col * 104729) | 0, v, u];
+            } else { const rx = px - e.x, ry = py - e.y; return [7, (ry - rx) / Math.SQRT2, (rx + ry) / Math.SQRT2]; }
+            return [(Math.floor(u / Lb) * 104729) | 0, v, u];
         }
 
         function bwOwnerAt(px, py, list) {   // the element a world point belongs to: inside its band, nearest to its middle
@@ -4811,21 +4815,18 @@ service cloud.firestore {
                 const i = yy * W + xx; if (!dt[i]) continue;
                 dt[i] = Math.min(dt[i], at(xx + 1, yy) + 1, at(xx, yy + 1) + 1, at(xx + 1, yy + 1) + 1.414, at(xx - 1, yy + 1) + 1.414);
             }
-            // light from the top left and the viewer; a polished, slightly blue titanium with a brushed grain along the lines
-            const L = [-0.45, -0.62, 0.64], Hh = [-0.3, -0.42, 1.0], hl = Math.hypot(...Hh), H3 = Hh.map(v => v / hl);
-            const hgt = (xx, yy) => { const d = at(xx, yy); return d >= BV ? 1 : Math.sin(d / BV * Math.PI / 2); };
-            const cw = BW.cw;
+            // a flat, polished top face (brushed along the lines, a soft sheen across the screen) with sharp edges: bright where they face the light, dark on the far side
+            const cw = BW.cw, E = Math.max(1, Math.round(LINE_WEIGHT * 0.045 / cw));
+            const empty = (xx, yy) => xx < 0 || yy < 0 || xx >= W || yy >= H || own[yy * W + xx] < 0;
             for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) {
                 const i = yy * W + xx; if (own[i] < 0) continue;
-                const gx = hgt(xx + 1, yy) - hgt(xx - 1, yy), gy = hgt(xx, yy + 1) - hgt(xx, yy - 1), sl = BV * 0.75;
-                let nx = -gx * sl, ny = -gy * sl, nz = 1; const nl = Math.hypot(nx, ny, nz); nx /= nl; ny /= nl; nz /= nl;
-                const dif = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]), sp = Math.pow(Math.max(0, nx * H3[0] + ny * H3[1] + nz * H3[2]), 36);
-                const grain = 1 + ((bwHash(Math.round(BW.gv[i] / cw * 1.3), 11) % 100) / 100 - 0.5) * 0.1 + ((bwHash(Math.round(BW.gv[i] / cw * 0.4), (BW.gu[i] / (cw * 30)) | 0) % 100) / 100 - 0.5) * 0.06;
-                const env = 0.82 + 0.3 * (1 - yy / H);            // a sky-like reflection, lighter at the top
-                const k = (0.3 + 0.85 * dif) * env * grain;
-                let r = 112 * k + 255 * sp * 0.85, gg = 124 * k + 255 * sp * 0.85, b = 146 * k + 255 * sp * 0.9;
-                const d = dt[i];
-                if (d < 1.7) { const t = (1.7 - d) / 1.7 * 0.65; r += (120 - r) * t; gg += (215 - gg) * t; b += (255 - b) * t; }   // a thin cyan rim
+                let lit = false, dark = false;
+                for (let q = 1; q <= E && !lit; q++) lit = empty(xx - q, yy) || empty(xx, yy - q) || empty(xx - q, yy - q);
+                for (let q = 1; q <= E && !dark; q++) dark = empty(xx + q, yy) || empty(xx, yy + q) || empty(xx + q, yy + q);
+                const grain = 1 + ((bwHash(Math.round(BW.gv[i] / cw * 1.3), 11) % 100) / 100 - 0.5) * 0.07 + ((bwHash(Math.round(BW.gv[i] / cw * 0.4), (BW.gu[i] / (cw * 30)) | 0) % 100) / 100 - 0.5) * 0.05;
+                const t = (xx + yy) / (W + H), sheen = 0.78 + 0.3 * (1 - t) + 0.16 * Math.exp(-Math.pow((t - 0.38) * 7, 2));
+                let k = sheen * grain, r = 128 * k, gg = 140 * k, b = 160 * k;
+                if (lit) { r = 225; gg = 238; b = 252; } else if (dark) { r *= 0.45; gg *= 0.45; b *= 0.5; }
                 BW.rgb[i] = (Math.min(255, r) << 16) | (Math.min(255, gg) << 8) | Math.min(255, b);
             }
         }
@@ -4847,12 +4848,19 @@ service cloud.firestore {
                 if (BW.own[i] >= 0) { const c = BW.rgb[i]; d[q] = c >> 16; d[q + 1] = (c >> 8) & 255; d[q + 2] = c & 255; d[q + 3] = 255; } else d[q + 3] = 0;
             }
             BW.lx.putImageData(BW.img, 0, 0);
-            // a soft shadow of the whole wall, cast down and to the right
-            if (!BW.shadow || BW.shadow.width !== W || BW.shadow.height !== H) { BW.shadow = document.createElement('canvas'); BW.shadow.width = W; BW.shadow.height = H; }
-            const sx = BW.shadow.getContext('2d'), blur = Math.max(2, LINE_WEIGHT * targetZoom / g.css * 0.16);
+            // the plate's thickness: its outline pushed down and to the right, in a dark steel (a sharp 3D side, no rounding)
+            const mk = c => { if (!c || c.width !== W || c.height !== H) { c = document.createElement('canvas'); c.width = W; c.height = H; } return c; };
+            BW.sil = mk(BW.sil); BW.side = mk(BW.side); BW.shadow = mk(BW.shadow);
+            const si = BW.sil.getContext('2d'); si.globalCompositeOperation = 'source-over'; si.clearRect(0, 0, W, H); si.drawImage(BW.layer, 0, 0);
+            si.globalCompositeOperation = 'source-in'; si.fillStyle = '#273041'; si.fillRect(0, 0, W, H); si.globalCompositeOperation = 'source-over';
+            const dep = LINE_WEIGHT * 0.2 * targetZoom / g.css, n = Math.max(2, Math.ceil(dep)), sd = BW.side.getContext('2d');
+            sd.clearRect(0, 0, W, H);
+            for (let j = 1; j <= n; j++) sd.drawImage(BW.sil, Math.round(j * dep / n * 0.6), Math.round(j * dep / n));
+            sd.globalCompositeOperation = 'source-atop'; const sg = sd.createLinearGradient(0, 0, W * 0.3, H); sg.addColorStop(0, '#3a4558'); sg.addColorStop(1, '#1a202b'); sd.fillStyle = sg; sd.fillRect(0, 0, W, H); sd.globalCompositeOperation = 'source-over';
+            const sx = BW.shadow.getContext('2d'), blur = Math.max(2, LINE_WEIGHT * targetZoom / g.css * 0.2);
             sx.clearRect(0, 0, W, H); sx.save();
-            sx.shadowColor = 'rgba(0, 0, 0, 0.7)'; sx.shadowBlur = blur; sx.shadowOffsetX = W + 50; sx.shadowOffsetY = 0;
-            sx.drawImage(BW.layer, -W - 50, 0); sx.restore();
+            sx.shadowColor = 'rgba(0, 0, 0, 0.75)'; sx.shadowBlur = blur; sx.shadowOffsetX = W + 50; sx.shadowOffsetY = 0;
+            sx.drawImage(BW.side, -W - 50, 0); sx.restore();
         }
         // bricks of elements that died as a whole go too
         function bwBricksUpdate() {
@@ -4862,27 +4870,31 @@ service cloud.firestore {
             BW.dirty = false;
         }
         // take bricks out of the wall; each flies off as a small sprite, away from the hit, with a puff of dust
-        function bwRemoveBricks(ids, hx, hy) {
+        function bwRemoveBricks(ids, hx, hy, fragOf) {
             const g = BW.g, W = g.w; let x0 = W, y0 = g.h, x1 = 0, y1 = 0;
             const [sx, sy] = hx != null ? [targetOffsetX + hx * targetZoom, targetOffsetY + hy * targetZoom] : [width / 2, height / 3];
-            const elsHit = new Set(), U = BW.U;
-            ids.forEach((id, n) => {
+            const elsHit = new Set(), U = BW.U, frags = new Map();
+            ids.forEach(id => {
                 const b = BW.bricks[id]; if (!b || !b.alive) return;
                 b.alive = false; elsHit.add(b.el); BW.live--;
-                let bx0 = W, by0 = g.h, bx1 = 0, by1 = 0;
-                b.cells.forEach(i => { const xx = i % W, yy = (i / W) | 0; if (xx < bx0) bx0 = xx; if (yy < by0) by0 = yy; if (xx > bx1) bx1 = xx; if (yy > by1) by1 = yy; });
-                if (n < 180 && b.cells.length > 2) {
-                    const w = bx1 - bx0 + 1, h = by1 - by0 + 1, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-                    const cx = cv.getContext('2d'), im = cx.createImageData(w, h);
-                    b.cells.forEach(i => { if (BW.own[i] < 0) return; const c = BW.rgb[i], q = (((i / W) | 0) - by0) * w * 4 + ((i % W) - bx0) * 4; im.data[q] = c >> 16; im.data[q + 1] = (c >> 8) & 255; im.data[q + 2] = c & 255; im.data[q + 3] = 255; });
-                    cx.putImageData(im, 0, 0);
-                    const px = (g.x + bx0) * g.css, py = (g.y + by0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
-                    const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (0.6 + Math.random() * 1.6) * U;
-                    BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.8, vy: dy / dl * spd - (0.6 + Math.random() * 1.4) * U, life: 70 + Math.random() * 50, r: 0, vr: (Math.random() - 0.5) * 0.18 });
-                    if (Math.random() < 0.6) { const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random() * 1.6) * U; BW.parts.push({ x: mx, y: my, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5 * U, life: 20 + Math.random() * 25, r: U * (0.25 + Math.random() * 0.35), col: Math.random() < 0.5 ? '#9fe3ff' : '#ffffff', spark: true }); }
-                }
+                const f = fragOf ? fragOf(id) : 0; let fr = frags.get(f); if (!fr) frags.set(f, fr = { cells: [], x0: W, y0: g.h, x1: 0, y1: 0 });
+                b.cells.forEach(i => { if (BW.own[i] < 0) return; const xx = i % W, yy = (i / W) | 0; fr.cells.push([xx, yy, BW.rgb[i]]); if (xx < fr.x0) fr.x0 = xx; if (yy < fr.y0) fr.y0 = yy; if (xx > fr.x1) fr.x1 = xx; if (yy > fr.y1) fr.y1 = yy; });
                 b.cells.forEach(i => { BW.own[i] = -1; BW.bid[i] = -1; });
-                if (bx0 < x0) x0 = bx0; if (by0 < y0) y0 = by0; if (bx1 > x1) x1 = bx1; if (by1 > y1) y1 = by1;
+            });
+            // each fragment flies off whole: one solid piece, tumbling slowly, with a few sparks where it broke
+            frags.forEach(fr => {
+                if (!fr.cells.length) return;
+                const w = fr.x1 - fr.x0 + 1, h = fr.y1 - fr.y0 + 1, cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+                const cx = cv.getContext('2d'), im = cx.createImageData(w, h);
+                fr.cells.forEach(([xx, yy, c]) => { const q = ((yy - fr.y0) * w + (xx - fr.x0)) * 4; im.data[q] = c >> 16; im.data[q + 1] = (c >> 8) & 255; im.data[q + 2] = c & 255; im.data[q + 3] = 255; });
+                cx.putImageData(im, 0, 0);
+                const sdc = document.createElement('canvas'); sdc.width = w; sdc.height = h; const sdx = sdc.getContext('2d');   // its side: the same shape in dark steel
+                sdx.drawImage(cv, 0, 0); sdx.globalCompositeOperation = 'source-in'; sdx.fillStyle = '#1e2633'; sdx.fillRect(0, 0, w, h);
+                const px = (g.x + fr.x0) * g.css, py = (g.y + fr.y0) * g.css, mx = px + w * g.css / 2, my = py + h * g.css / 2;
+                const dx = mx - sx, dy = my - sy, dl = Math.hypot(dx, dy) || 1, spd = (0.5 + Math.random() * 0.8) * U;
+                BW.bparts.push({ cv, x: px, y: py, w: w * g.css, h: h * g.css, vx: dx / dl * spd + (Math.random() - 0.5) * U * 0.4, vy: dy / dl * spd - (0.8 + Math.random() * 0.8) * U, life: 90 + Math.random() * 30, r: 0, vr: (Math.random() - 0.5) * 0.07, dep: LINE_WEIGHT * 0.2 * targetZoom, sd: sdc });
+                for (let j = 0; j < 10; j++) { const a = Math.random() * Math.PI * 2, s = (0.6 + Math.random() * 1.8) * U; BW.parts.push({ x: sx + (mx - sx) * 0.3, y: sy + (my - sy) * 0.3, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.5 * U, life: 18 + Math.random() * 22, r: U * (0.2 + Math.random() * 0.3), col: Math.random() < 0.5 ? '#9fe3ff' : '#ffffff', spark: true }); }
+                if (fr.x0 < x0) x0 = fr.x0; if (fr.y0 < y0) y0 = fr.y0; if (fr.x1 > x1) x1 = fr.x1; if (fr.y1 > y1) y1 = fr.y1;
             });
             if (x1 >= x0) { bwShade(x0, y0, x1 + 1, y1 + 1); const m = Math.ceil(BW.bev) + 4; bwBricksPaint(x0 - m, y0 - m, x1 + 1 + m, y1 + 1 + m); }
             elsHit.forEach(el => { if (!BW.bricks.some(b => b.alive && b.el === el)) BW.els[el].alive = false; });
@@ -5011,6 +5023,7 @@ service cloud.firestore {
                 const f = zoom / targetZoom, g = BW.g, lx = offsetX + (g.x * g.css - targetOffsetX) * f, ly = offsetY + (g.y * g.css - targetOffsetY) * f, so = LINE_WEIGHT * zoom * 0.12;
                 ctx.imageSmoothingEnabled = true;
                 if (BW.shadow) ctx.drawImage(BW.shadow, lx + so, ly + so * 1.4, g.w * g.css * f, g.h * g.css * f);
+                if (BW.side) ctx.drawImage(BW.side, lx, ly, g.w * g.css * f, g.h * g.css * f);
                 ctx.drawImage(BW.layer, lx, ly, g.w * g.css * f, g.h * g.css * f);
             }
             // flying bricks
@@ -5019,6 +5032,7 @@ service cloud.firestore {
                 if (p.life <= 0 || p.y > height + 60) return false;
                 ctx.save(); ctx.globalAlpha = Math.min(1, p.life / 18); ctx.translate(p.x + p.w / 2, p.y + p.h / 2); ctx.rotate(p.r);
                 ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
+                if (p.sd) { ctx.drawImage(p.sd, -p.w / 2 + p.dep * 0.5, -p.h / 2 + p.dep * 0.8, p.w, p.h); ctx.shadowColor = 'transparent'; }
                 ctx.drawImage(p.cv, -p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
                 return true;
             });
