@@ -4778,8 +4778,12 @@ service cloud.firestore {
         // and any scrap left behind that is smaller than a line's width falls with it. A corner where a straight line meets a 45 degree one breaks like any other part.
         function bwCarve(hit) {
             const g = BW.g, W = g.w, H = g.h, lc = LINE_WEIGHT / BW.cw, nl = Math.hypot(hit.nx, hit.ny) || 1, nx = hit.nx / nl, ny = hit.ny / nl;   // n: from the metal to the ball
-            const hu = lc * 1.1, d0 = -lc * 0.35, d1 = lc * 1.5, R = Math.ceil(Math.hypot(hu, d1)) + 2;
-            const cx = hit.ccx, cy = hit.ccy, xa = Math.max(0, Math.floor(cx - R)), xb = Math.min(W - 1, Math.ceil(cx + R)), ya = Math.max(0, Math.floor(cy - R)), yb = Math.min(H - 1, Math.ceil(cy + R));
+            const cx = hit.ccx, cy = hit.ccy;
+            // how deep the part is where it was hit: straight in from the touch, to the first empty cell - the bite goes no deeper, so the lines lying behind stay whole
+            let depth = lc * 1.5, inS = false; const sol = (X, Y) => { const xi = Math.floor(X), yi = Math.floor(Y); return xi >= 0 && yi >= 0 && xi < W && yi < H && BW.own[yi * W + xi] >= 0; };
+            for (let t = 0; t <= lc * 1.5; t += 0.5) { if (sol(cx - nx * t, cy - ny * t)) inS = true; else if (inS) { depth = t; break; } }
+            const hu = lc * 1.1, d0 = -lc * 0.35, d1 = depth + 1, R = Math.ceil(Math.hypot(hu, d1)) + 2;
+            const xa = Math.max(0, Math.floor(cx - R)), xb = Math.min(W - 1, Math.ceil(cx + R)), ya = Math.max(0, Math.floor(cy - R)), yb = Math.min(H - 1, Math.ceil(cy + R));
             let cut = [];
             for (let yy = ya; yy <= yb; yy++) for (let xx = xa; xx <= xb; xx++) {
                 const i = yy * W + xx; if (BW.own[i] < 0) continue;
@@ -4788,6 +4792,14 @@ service cloud.firestore {
             }
             if (!cut.length) { for (let yy = ya; yy <= yb; yy++) for (let xx = xa; xx <= xb; xx++) { const i = yy * W + xx; if (BW.own[i] >= 0 && Math.hypot(xx + 0.5 - cx, yy + 0.5 - cy) <= lc * 0.6) cut.push(i); } }
             if (!cut.length) return;
+            {   // only the piece that was hit: what touches it inside the bite, nothing separate
+                const cs = new Set(cut); let seed = cut[0], bd = Infinity;
+                cut.forEach(i => { const d = Math.hypot((i % W) + 0.5 - cx, ((i / W) | 0) + 0.5 - cy); if (d < bd) { bd = d; seed = i; } });
+                const keep = [seed], got = new Set([seed]);
+                for (let h = 0; h < keep.length; h++) { const i = keep[h], xx = i % W, yy = (i / W) | 0;
+                    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const X = xx + dx, Y = yy + dy; if (X < 0 || Y < 0 || X >= W || Y >= H) return; const n2 = Y * W + X; if (!cs.has(n2) || got.has(n2)) return; got.add(n2); keep.push(n2); }); }
+                cut = keep;
+            }
             const mark = (i) => { BW.st[i] = BW.stN; };
             BW.stN++; const rmStamp = BW.stN;
             cut.forEach(mark);
