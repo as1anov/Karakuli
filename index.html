@@ -1034,6 +1034,10 @@
                     <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3.5" width="5" height="3" rx=".6"/><rect x="9.5" y="3.5" width="5" height="3" rx=".6"/><rect x="16" y="3.5" width="5" height="3" rx=".6"/><rect x="6.25" y="8" width="5" height="3" rx=".6"/><rect x="12.75" y="8" width="5" height="3" rx=".6"/><circle cx="14.5" cy="15" r="1.5" fill="currentColor" stroke="none"/><path d="M7.5 20h9"/><path d="M14.5 15 11 12" stroke-dasharray="1 1.8" stroke-width="1.2"/></svg>
                     Break Maze
                 </div>
+                <div class="dash-btn" onclick="startIceMaze()">
+                    <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M3.3 7l17.4 10M20.7 7 3.3 17"/><path d="m9.5 3.5 2.5 2 2.5-2M9.5 20.5l2.5-2 2.5 2M4.2 10.6l3-.6-.9-2.9M19.8 13.4l-3 .6.9 2.9M4.2 13.4l3 .6-.9 2.9M19.8 10.6l-3-.6.9-2.9"/></svg>
+                    Ice Maze
+                </div>
             </div>
         </div>
         <div id="pl-selbar"></div>
@@ -5448,6 +5452,272 @@ service cloud.firestore {
             offsetX = width/2; offsetY = height/2; zoom = 0.48; 
             updateModeUI(); redraw();
         }
+
+
+        // =====================================================================
+        // ICE MAZE: the drawn pattern becomes a rink. Tilt the phone and a puck slides along the lines (the ice); off the lines is deep snow,
+        // the puck cannot leave the ice. Ice holes (лунки) here and there: slide into one for a bonus; one of them is golden. All holes = a win.
+        // =====================================================================
+        const IM = { on: false };
+        function startIceMaze() {
+            if (IM.on) return;
+            if (isGameMode) exitGame();
+            if (isDashboardOpen) toggleDashboard();
+            const lw = LINE_WEIGHT, RB = BASE_STEP_VAL;
+            // ---- the drawing's bounds
+            let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+            const grow = (a, b, c, d) => { x0 = Math.min(x0, a); y0 = Math.min(y0, b); x1 = Math.max(x1, c); y1 = Math.max(y1, d); };
+            segments.forEach(s => grow(Math.min(s.p1.x, s.p2.x) * STEP - lw, Math.min(s.p1.y, s.p2.y) * STEP - lw, Math.max(s.p1.x, s.p2.x) * STEP + lw, Math.max(s.p1.y, s.p2.y) * STEP + lw));
+            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; if (el.isNode) grow(i * STEP - RB - lw, j * STEP - RB - lw, i * STEP + RB + lw, j * STEP + RB + lw); }
+            if (!segments.length || x0 === Infinity) { showActionHint && showActionHint('Draw a pattern first'); return; }
+            const pad = lw * 1.5; x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+            // ---- the ice: the pattern painted the way the editor paints it, on a grid of small cells
+            let cell = lw / 22; while ((x1 - x0) / cell * (y1 - y0) / cell > 5e6) cell *= 1.25;
+            const gw = Math.ceil((x1 - x0) / cell), gh = Math.ceil((y1 - y0) / cell);
+            const mk = document.createElement('canvas'); mk.width = gw; mk.height = gh;
+            const m = mk.getContext('2d', { willReadFrequently: true });
+            m.setTransform(1 / cell, 0, 0, 1 / cell, -x0 / cell, -y0 / cell);
+            const rings = [], dias = [];
+            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; if (el.isNode) rings.push([i * STEP, j * STEP]); if (el.isDiamond) dias.push([i * STEP, j * STEP + lw / 2]); }
+            m.save(); m.beginPath(); m.rect(x0, y0, x1 - x0, y1 - y0); rings.forEach(([x, y]) => { m.moveTo(x + RB + lw / 2 - cell * 2, y); m.arc(x, y, RB + lw / 2 - cell * 2, 0, Math.PI * 2, true); }); m.clip();
+            m.strokeStyle = '#000'; m.lineWidth = lw; m.lineCap = 'butt'; m.lineJoin = 'miter'; m.miterLimit = 2;
+            m.beginPath(); getPathGroups(true, segments).forEach(gr => { m.moveTo(gr[0].p1.x * STEP, gr[0].p1.y * STEP); gr.forEach(sg => m.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); }); m.stroke();
+            m.restore();
+            m.beginPath(); rings.forEach(([x, y]) => { m.moveTo(x + RB, y); m.arc(x, y, RB, 0, Math.PI * 2); }); m.lineWidth = lw; m.stroke();
+            const dd = lw / Math.SQRT2; m.fillStyle = '#000'; m.beginPath(); dias.forEach(([x, y]) => { m.moveTo(x, y - dd); m.lineTo(x + dd, y); m.lineTo(x, y + dd); m.lineTo(x - dd, y); m.closePath(); }); m.fill();
+            const md = m.getImageData(0, 0, gw, gh).data, N = gw * gh, A = new Uint8Array(N), ice = new Uint8Array(N);
+            for (let i = 0; i < N; i++) { A[i] = md[i * 4 + 3]; ice[i] = A[i] >= 128 ? 1 : 0; }
+            // distance (in cells) from every ice cell to the nearest snow: the puck's centre may go where it is at least its radius
+            const D = new Float32Array(N); for (let i = 0; i < N; i++) D[i] = ice[i] ? 1e6 : 0;
+            const a1 = 1, a2 = Math.SQRT2;
+            for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = y * gw + x; if (!D[i]) continue; let v = D[i];
+                if (x > 0) v = Math.min(v, D[i - 1] + a1); if (y > 0) { v = Math.min(v, D[i - gw] + a1); if (x > 0) v = Math.min(v, D[i - gw - 1] + a2); if (x < gw - 1) v = Math.min(v, D[i - gw + 1] + a2); }
+                if (x === 0 || y === 0 || x === gw - 1 || y === gh - 1) v = Math.min(v, 1); D[i] = v; }
+            for (let y = gh - 1; y >= 0; y--) for (let x = gw - 1; x >= 0; x--) { const i = y * gw + x; if (!D[i]) continue; let v = D[i];
+                if (x < gw - 1) v = Math.min(v, D[i + 1] + a1); if (y < gh - 1) { v = Math.min(v, D[i + gw] + a1); if (x < gw - 1) v = Math.min(v, D[i + gw + 1] + a2); if (x > 0) v = Math.min(v, D[i + gw - 1] + a2); }
+                D[i] = v; }
+            const R = lw * 0.26, Rc = R / cell, HR = lw * 0.3;   // puck radius, hole radius (world units)
+            // the stretch of ice the puck can reach: the largest connected area where its centre fits
+            const comp = new Int32Array(N).fill(-1), sizes = [];
+            for (let i = 0; i < N; i++) {
+                if (comp[i] >= 0 || D[i] < Rc + 0.5) continue;
+                const id = sizes.length, st = [i]; comp[i] = id; let n = 0;
+                while (st.length) { const c = st.pop(); n++; const cx = c % gw, cy = (c / gw) | 0;
+                    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = cx + dx, Y = cy + dy; if (X < 0 || Y < 0 || X >= gw || Y >= gh) continue; const k = Y * gw + X; if (comp[k] < 0 && D[k] >= Rc + 0.5) { comp[k] = id; st.push(k); } } }
+                sizes.push(n);
+            }
+            if (!sizes.length) { showActionHint && showActionHint('The lines are too thin for the puck'); return; }
+            const main = sizes.indexOf(Math.max(...sizes));
+            const W2 = (i) => [x0 + (i % gw + 0.5) * cell, y0 + (((i / gw) | 0) + 0.5) * cell];
+            // the puck starts on the ice nearest the top left; the holes sit on the middle of lines, far from it and from each other
+            const centre = lw * 0.42 / cell, mids = [];
+            let start = -1, bestS = Infinity;
+            for (let i = 0; i < N; i++) if (comp[i] === main && D[i] >= centre) { mids.push(i); const [wx, wy] = W2(i); const sc = wy + wx * 0.6; if (sc < bestS) { bestS = sc; start = i; } }
+            if (start < 0) for (let i = 0; i < N; i++) if (comp[i] === main) { start = i; break; }
+            IM.lw = lw; IM.cell = cell; IM.gw = gw; IM.gh = gh; IM.x0 = x0; IM.y0 = y0; IM.x1 = x1; IM.y1 = y1; IM.D = D; IM.ice = ice; IM.A = A; IM.R = R; IM.HR = HR; IM.mids = mids;
+            [IM.sx, IM.sy] = W2(start);
+            imBuildPicture();
+            imMakeUI();
+            IM.on = true; IM.best = (() => { try { return +localStorage.getItem('kk-im-best') || 0; } catch (e) { return 0; } })();
+            imNewRound();
+            IM.last = performance.now(); IM.raf = requestAnimationFrame(imFrame);
+        }
+        function imNewRound() {
+            const lw = IM.lw, n = Math.max(4, Math.min(10, Math.round(IM.mids.length * IM.cell * IM.cell / (lw * lw * 9))));
+            IM.holes = [];
+            const pool = IM.mids.slice(); let guard = 0;
+            while (IM.holes.length < n && pool.length && guard++ < 4000) {
+                const i = pool[(Math.random() * pool.length) | 0], x = IM.x0 + (i % IM.gw + 0.5) * IM.cell, y = IM.y0 + (((i / IM.gw) | 0) + 0.5) * IM.cell;
+                if (Math.hypot(x - IM.sx, y - IM.sy) < lw * 3) continue;
+                if (IM.holes.some(h => Math.hypot(h.x - x, h.y - y) < lw * 3.2)) continue;
+                IM.holes.push({ x, y, gold: false, done: false, t: Math.random() * 6 });
+            }
+            if (IM.holes.length) IM.holes[(Math.random() * IM.holes.length) | 0].gold = true;
+            IM.px = IM.sx; IM.py = IM.sy; IM.vx = IM.vy = 0; IM.score = 0; IM.time = 0; IM.state = 'ready'; IM.trail = []; IM.fx = []; IM.sink = null; IM.combo = 0;
+            IM.camX = IM.px; IM.camY = IM.py;
+            imHud(); imMsg('Tap to start', IM.tiltOK === false ? 'Drag to push the puck' : 'Tilt the phone to slide the puck');
+        }
+        // the ice, drawn once: frosted pale blue, bright where the light runs round its edges
+        function imBuildPicture() {
+            const { gw, gh, A, D } = IM, c = document.createElement('canvas'); c.width = gw; c.height = gh;
+            const x = c.getContext('2d'), im = x.createImageData(gw, gh), d = im.data;
+            for (let yy = 0; yy < gh; yy++) for (let xx = 0; xx < gw; xx++) {
+                const i = yy * gw + xx; if (!A[i]) continue;
+                const t = (xx + yy) / (gw + gh), sheen = 0.82 + 0.26 * (1 - t) + 0.14 * Math.exp(-Math.pow((t - 0.38) * 7, 2));
+                const frost = ((bwHash(xx * 7 + yy * 13, 5) % 100) / 100 - 0.5) * 0.09, streak = (bwHash(((xx - yy * 0.55) / 2.2) | 0, 41) % 71 === 0) ? 0.08 : 0;
+                const k = sheen * (1 + frost) + streak, rim = Math.max(0, 1 - D[i] / 2.2) * 0.8;
+                let r = 172 * k, g = 212 * k, b = 238 * k; r += (255 - r) * rim; g += (255 - g) * rim; b += (255 - b) * rim * 0.8;
+                const q = i * 4; d[q] = Math.min(255, r); d[q + 1] = Math.min(255, g); d[q + 2] = Math.min(255, b); d[q + 3] = A[i];
+            }
+            x.putImageData(im, 0, 0); IM.pic = c;
+        }
+        function imMakeUI() {
+            const el = document.createElement('div'); el.id = 'im-root';
+            el.innerHTML = `<canvas id="im-cv"></canvas>
+                <button id="im-x" aria-label="Close the game"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+                <div id="im-hud"><div><span class="im-l">SCORE</span><b id="im-score">0</b></div><div class="im-mid"><span class="im-l">HOLES</span><b id="im-holes">0</b></div><div class="im-r"><span class="im-l">TIME</span><b id="im-time">0.0</b></div></div>
+                <div id="im-msg"><b id="im-m1"></b><span id="im-m2"></span></div>`;
+            document.body.appendChild(el);
+            const st = document.createElement('style'); st.id = 'im-style';
+            st.textContent = `#im-root{position:fixed;inset:0;z-index:5000;background:#0a1224;touch-action:none;-webkit-user-select:none;user-select:none;font-family:"Google Sans Flex","Google Sans",system-ui,-apple-system,sans-serif;color:#f3f6fb}
+                #im-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+                #im-x{position:absolute;left:max(14px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));width:40px;height:40px;border:0;background:none;color:#e8eef8;padding:3px;cursor:pointer}
+                #im-x svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+                #im-hud{position:absolute;left:max(64px,calc(env(safe-area-inset-left) + 64px));right:max(16px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));display:flex;justify-content:space-between;pointer-events:none;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+                #im-hud div{display:flex;flex-direction:column}#im-hud .im-mid{align-items:center}#im-hud .im-r{align-items:flex-end}
+                .im-l{font-size:11px;letter-spacing:.16em;color:rgba(205,216,236,.7)}#im-hud b{font-size:24px;font-weight:700;line-height:1.1}
+                #im-msg{position:absolute;left:0;right:0;bottom:16%;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.6);transition:opacity .25s}
+                #im-m1{font-size:28px;font-weight:700}#im-m2{font-size:16px;color:rgba(220,232,250,.8)}`;
+            document.head.appendChild(st);
+            const cv = el.querySelector('#im-cv'); IM.cv = cv; IM.c = cv.getContext('2d');
+            const fit = () => { const dpr = Math.min(2, devicePixelRatio || 1); cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); IM.dpr = dpr; IM.W = innerWidth; IM.H = innerHeight;
+                IM.s = Math.max(Math.min(IM.W, IM.H) / 7.5 / IM.lw, Math.min(IM.W / (IM.x1 - IM.x0), IM.H / (IM.y1 - IM.y0))); };   // a line is about 1/7 of the short side; a small drawing is shown whole
+            fit(); IM.fit = fit; addEventListener('resize', fit);
+            el.querySelector('#im-x').addEventListener('click', e => { e.stopPropagation(); exitIceMaze(); });
+            // controls: tilt (the phone's orientation), or a finger dragged from where it went down, or the arrow keys
+            IM.tx = IM.ty = 0; IM.drag = null; IM.keys = {};
+            IM.onOri = e => { if (e.gamma == null) return; IM.gotOri = true; if (IM.b0 == null) { IM.b0 = e.beta; IM.g0 = e.gamma; }
+                let gx = (e.gamma - IM.g0) / 22, gy = (e.beta - IM.b0) / 22; const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+                if (ang === 90) [gx, gy] = [gy, -gx]; else if (ang === -90 || ang === 270) [gx, gy] = [-gy, gx]; else if (ang === 180) { gx = -gx; gy = -gy; }
+                IM.tx = Math.max(-1, Math.min(1, gx)); IM.ty = Math.max(-1, Math.min(1, gy)); };
+            IM.onDown = e => { if (e.target.closest('#im-x')) return; BWS.unlock();
+                if (IM.state === 'ready' || IM.state === 'won') { imGo(); return; }
+                IM.drag = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY }; };
+            IM.onMove = e => { if (IM.drag) { IM.drag.cx = e.clientX; IM.drag.cy = e.clientY; } };
+            IM.onUp = () => { IM.drag = null; };
+            IM.onKey = e => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) { IM.keys[e.key] = e.type === 'keydown'; e.preventDefault(); e.stopPropagation(); }
+                else if (e.type === 'keydown' && e.key === 'Escape') exitIceMaze(); else if (e.type === 'keydown' && (e.key === ' ' || e.key === 'Enter') && IM.state !== 'play') imGo(); };
+            el.addEventListener('pointerdown', IM.onDown); addEventListener('pointermove', IM.onMove); addEventListener('pointerup', IM.onUp); addEventListener('pointercancel', IM.onUp);
+            addEventListener('keydown', IM.onKey, true); addEventListener('keyup', IM.onKey, true);
+            addEventListener('deviceorientation', IM.onOri);
+        }
+        function imGo() {
+            BWS.init();
+            const begin = () => { IM.b0 = null; IM.state = 'play'; IM.time = 0; imMsg('', ''); BWS.start(); };
+            if (IM.state === 'won') { imNewRound(); }
+            // iOS asks for permission to read the tilt, from inside the tap
+            if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function' && IM.tiltOK == null) {
+                DeviceOrientationEvent.requestPermission().then(r => { IM.tiltOK = r === 'granted'; begin(); }).catch(() => { IM.tiltOK = false; begin(); });
+            } else { if (IM.tiltOK == null) IM.tiltOK = 'ondeviceorientation' in window && matchMedia('(pointer: coarse)').matches; begin(); }
+        }
+        function imMsg(a, b) { const m = document.getElementById('im-msg'); if (!m) return; document.getElementById('im-m1').textContent = a; document.getElementById('im-m2').textContent = b; m.style.opacity = a ? 1 : 0; }
+        function imHud() {
+            const q = id => document.getElementById(id); if (!q('im-score')) return;
+            q('im-score').textContent = IM.score; const left = IM.holes.filter(h => !h.done).length; q('im-holes').textContent = `${IM.holes.length - left}/${IM.holes.length}`;
+            q('im-time').textContent = IM.time.toFixed(1);
+        }
+        // bilinear distance to the snow, in cells
+        function imDist(x, y) {
+            const fx = (x - IM.x0) / IM.cell - 0.5, fy = (y - IM.y0) / IM.cell - 0.5, ix = Math.floor(fx), iy = Math.floor(fy), u = fx - ix, v = fy - iy, gw = IM.gw, gh = IM.gh;
+            const at = (X, Y) => (X < 0 || Y < 0 || X >= gw || Y >= gh) ? 0 : IM.D[Y * gw + X];
+            return (at(ix, iy) * (1 - u) + at(ix + 1, iy) * u) * (1 - v) + (at(ix, iy + 1) * (1 - u) + at(ix + 1, iy + 1) * u) * v;
+        }
+        function imFrame(now) {
+            if (!IM.on) return;
+            const dt = Math.min(0.04, (now - IM.last) / 1000); IM.last = now;
+            const lw = IM.lw, Rc = IM.R / IM.cell;
+            if (IM.state === 'play') {
+                IM.time += dt;
+                // the push: tilt, or a finger (the farther it is dragged, the harder), or the keys
+                let ax = IM.tx, ay = IM.ty;
+                if (IM.drag) { ax = Math.max(-1, Math.min(1, (IM.drag.cx - IM.drag.x) / 70)); ay = Math.max(-1, Math.min(1, (IM.drag.cy - IM.drag.y) / 70)); }
+                if (IM.keys.ArrowLeft) ax = -1; if (IM.keys.ArrowRight) ax = 1; if (IM.keys.ArrowUp) ay = -1; if (IM.keys.ArrowDown) ay = 1;
+                const G = lw * 16;
+                IM.vx += ax * G * dt; IM.vy += ay * G * dt;
+                const fr = Math.exp(-dt * 0.45); IM.vx *= fr; IM.vy *= fr;                 // ice: it keeps sliding
+                const sp = Math.hypot(IM.vx, IM.vy), vmax = lw * 11; if (sp > vmax) { IM.vx *= vmax / sp; IM.vy *= vmax / sp; }
+                const steps = Math.max(1, Math.ceil(sp * dt / (IM.cell * 1.5)));
+                let hitV = 0;
+                for (let s = 0; s < steps; s++) {
+                    IM.px += IM.vx * dt / steps; IM.py += IM.vy * dt / steps;
+                    let d = imDist(IM.px, IM.py);
+                    if (d < Rc) {   // touched the snow bank: pushed back onto the ice, bounces off softly
+                        const e = IM.cell * 0.6, gx = imDist(IM.px + e, IM.py) - imDist(IM.px - e, IM.py), gy = imDist(IM.px, IM.py + e) - imDist(IM.px, IM.py - e), gl = Math.hypot(gx, gy) || 1;
+                        const nx = gx / gl, ny = gy / gl;
+                        for (let t = 0; t < 12 && d < Rc; t++) { IM.px += nx * IM.cell * 0.4; IM.py += ny * IM.cell * 0.4; d = imDist(IM.px, IM.py); }
+                        const vn = IM.vx * nx + IM.vy * ny;
+                        if (vn < 0) { IM.vx -= 1.5 * vn * nx; IM.vy -= 1.5 * vn * ny; hitV = Math.max(hitV, -vn); IM.vx *= 0.96; IM.vy *= 0.96; }
+                    }
+                }
+                if (hitV > lw * 2.5) { BWS.tone(200, 160, 0.05, 'sine', Math.min(0.06, hitV / lw * 0.006)); BWS.noise(0.05, Math.min(0.05, hitV / lw * 0.004), 2600); }
+                // the holes: slide close enough and the puck is pulled in
+                IM.holes.forEach(h => {
+                    if (h.done) return;
+                    const dx = h.x - IM.px, dy = h.y - IM.py, dl = Math.hypot(dx, dy);
+                    if (dl < IM.HR * 1.6) { const pull = (1 - dl / (IM.HR * 1.6)) * lw * 22 * dt; IM.vx += dx / (dl || 1) * pull; IM.vy += dy / (dl || 1) * pull; }   // a little suction near the rim
+                    if (dl < IM.HR * 0.7) {
+                        h.done = true; IM.combo++; const pts = (h.gold ? 500 : 100) * Math.min(4, IM.combo); IM.score += pts;
+                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: '+' + pts, gold: h.gold });
+                        for (let k = 0; k < 18; k++) { const a = Math.random() * 6.283, v = lw * (1 + Math.random() * 2.5); IM.fx.push({ x: h.x, y: h.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, p: 1, gold: h.gold }); }
+                        h.gold ? BWS.win() : BWS.power();
+                        IM.vx *= 0.35; IM.vy *= 0.35;
+                        if (IM.holes.every(q => q.done)) {
+                            IM.state = 'won'; const tm = IM.time; const bonus = Math.max(0, Math.round(3000 - tm * 25)); IM.score += bonus;
+                            if (!IM.best || tm < IM.best) { IM.best = tm; try { localStorage.setItem('kk-im-best', String(tm)); } catch (e) {} }
+                            imMsg('All holes! ' + tm.toFixed(1) + ' s', `Score ${IM.score} · best ${IM.best.toFixed(1)} s · tap to play again`); BWS.win();
+                        }
+                    }
+                });
+                if (Math.abs(IM.vx) + Math.abs(IM.vy) < lw * 0.3) IM.combo = 0;   // the combo runs while the puck keeps sliding
+                IM.trail.push([IM.px, IM.py]); if (IM.trail.length > 70) IM.trail.shift();
+                imHud();
+            }
+            imDraw(dt);
+            IM.raf = requestAnimationFrame(imFrame);
+        }
+        function imDraw(dt) {
+            const c = IM.c, W = IM.W, H = IM.H, s = IM.s, lw = IM.lw, dpr = IM.dpr;
+            // the camera follows the puck, smoothly, and stays over the drawing
+            const vw = W / s, vh = H / s;
+            const clampC = (v, a, b, span) => (b - a <= span) ? (a + b) / 2 : Math.max(a + span / 2, Math.min(b - span / 2, v));
+            const tx = clampC(IM.px + IM.vx * 0.25, IM.x0, IM.x1, vw), ty = clampC(IM.py + IM.vy * 0.25, IM.y0, IM.y1, vh);
+            const kc = 1 - Math.exp(-dt * 4); IM.camX += (tx - IM.camX) * kc; IM.camY += (ty - IM.camY) * kc;
+            const ox = W / 2 - IM.camX * s, oy = H / 2 - IM.camY * s;
+            c.setTransform(dpr, 0, 0, dpr, 0, 0);
+            // night snow under the ice
+            let g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b1428'); g.addColorStop(1, '#141a35'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+            c.fillStyle = 'rgba(225,235,255,0.06)';
+            for (let i = 0; i < 140; i++) { const h1 = bwHash(i, 7), h2 = bwHash(i, 8); const X = ((h1 % 2000) / 2000 * (IM.x1 - IM.x0) + IM.x0) * s + ox, Y = ((h2 % 2000) / 2000 * (IM.y1 - IM.y0) + IM.y0) * s + oy; c.beginPath(); c.arc(X, Y, 1 + (h1 % 3), 0, 6.283); c.fill(); }
+            // the ice with a soft shadow
+            c.save(); c.shadowColor = 'rgba(0,0,0,0.55)'; c.shadowBlur = lw * s * 0.25; c.shadowOffsetY = lw * s * 0.08;
+            c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.gw * IM.cell * s, IM.gh * IM.cell * s); c.restore();
+            // skate marks: the puck's track scratched into the ice
+            if (IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
+            // the holes: dark water in the ice, a snowy rim, a slow ripple; the golden one glints
+            const T = performance.now() / 1000;
+            IM.holes.forEach(h => {
+                const X = ox + h.x * s, Y = oy + h.y * s, r = IM.HR * s;
+                if (h.done) { c.fillStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); c.arc(X, Y, r * 0.9, 0, 6.283); c.fill(); c.strokeStyle = 'rgba(200,225,250,0.6)'; c.lineWidth = 1; c.stroke(); return; }   // frozen over
+                const gg = c.createRadialGradient(X - r * 0.2, Y - r * 0.25, r * 0.1, X, Y, r); gg.addColorStop(0, '#2a6b9c'); gg.addColorStop(0.7, '#0f3558'); gg.addColorStop(1, '#071c33');
+                c.fillStyle = gg; c.beginPath(); c.arc(X, Y, r, 0, 6.283); c.fill();
+                const rp = ((T * 0.6 + h.t) % 1); c.strokeStyle = `rgba(190,225,255,${0.45 * (1 - rp)})`; c.lineWidth = 1.2; c.beginPath(); c.arc(X, Y, r * (0.25 + 0.6 * rp), 0, 6.283); c.stroke();
+                c.lineWidth = Math.max(2, r * 0.18); c.strokeStyle = h.gold ? `rgba(255,214,107,${0.75 + 0.25 * Math.sin(T * 4 + h.t)})` : 'rgba(255,255,255,0.92)'; c.beginPath(); c.arc(X, Y, r, 0, 6.283); c.stroke();
+                if (h.gold) { c.save(); c.shadowColor = '#ffd36b'; c.shadowBlur = r * 0.8; c.stroke(); c.restore(); }
+            });
+            // the puck: black rubber, seen from above
+            { const X = ox + IM.px * s, Y = oy + IM.py * s, r = IM.R * s;
+                c.save(); c.shadowColor = 'rgba(0,0,0,0.45)'; c.shadowBlur = r * 0.6; c.shadowOffsetY = r * 0.18;
+                const pg = c.createRadialGradient(X - r * 0.3, Y - r * 0.35, r * 0.1, X, Y, r); pg.addColorStop(0, '#4a4d55'); pg.addColorStop(0.6, '#24262b'); pg.addColorStop(1, '#0d0e10');
+                c.fillStyle = pg; c.beginPath(); c.arc(X, Y, r, 0, 6.283); c.fill(); c.restore();
+                c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = Math.max(1, r * 0.08); c.beginPath(); c.arc(X, Y, r * 0.78, 0, 6.283); c.stroke();
+                c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.ellipse(X - r * 0.32, Y - r * 0.38, r * 0.3, r * 0.14, -0.6, 0, 6.283); c.fill(); }
+            // splashes and points
+            IM.fx = IM.fx.filter(f => {
+                f.t += dt;
+                if (f.p) { if (f.t > 0.7) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; c.fillStyle = f.gold ? `rgba(255,214,107,${1 - f.t / 0.7})` : `rgba(220,238,255,${1 - f.t / 0.7})`; c.beginPath(); c.arc(ox + f.x * s, oy + f.y * s, Math.max(1.2, lw * s * 0.035), 0, 6.283); c.fill(); return true; }
+                if (f.t > 1.1) return false;
+                c.save(); c.globalAlpha = Math.min(1, (1.1 - f.t) / 0.4); c.fillStyle = f.gold ? '#ffd36b' : '#eaf4ff'; c.font = `700 ${Math.round(18 + (f.gold ? 6 : 0))}px "Google Sans Flex","Google Sans",system-ui,sans-serif`; c.textAlign = 'center';
+                c.shadowColor = 'rgba(0,0,0,0.6)'; c.shadowBlur = 6; c.fillText(f.s, ox + f.x * s, oy + f.y * s - lw * s * 0.4 - f.t * 30); c.restore(); return true;
+            });
+        }
+        function exitIceMaze() {
+            if (!IM.on) return; IM.on = false; cancelAnimationFrame(IM.raf);
+            removeEventListener('resize', IM.fit); removeEventListener('pointermove', IM.onMove); removeEventListener('pointerup', IM.onUp); removeEventListener('pointercancel', IM.onUp);
+            removeEventListener('keydown', IM.onKey, true); removeEventListener('keyup', IM.onKey, true); removeEventListener('deviceorientation', IM.onOri);
+            const r = document.getElementById('im-root'); if (r) r.remove(); const st = document.getElementById('im-style'); if (st) st.remove();
+            IM.pic = null; IM.D = null; IM.ice = null; IM.A = null;
+        }
+        window.startIceMaze = startIceMaze;
 
         // --- CORE P5 ---
         function setup() { 
