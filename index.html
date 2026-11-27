@@ -2830,7 +2830,7 @@ service cloud.firestore {
         // the bend line, so the 13 mm fingers between the slots bend out on their own and become the hooks. The closed end of a slot
         // and the free end of a finger are full half-circles (R 6.5); the outer slots stay 25 mm from the side edges.
         const SHELF_NOTCH_DEPTH = 25, SHELF_NOTCH_W = 13, SHELF_NOTCH_R = 6.5, SHELF_HOOK_EDGE = 25,
-             SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 6, SHELF_HOOK_MARGIN = 20, SHELF_HOOK_PITCH = 26, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
+             SHELF_SLOT_H = 50, SHELF_HOOK_MAX = 6, SHELF_HOOK_MARGIN = 40, SHELF_HOOK_PITCH = 26, SHELF_TOWEL_MAX = 400, SHELF_TOWEL_MIN = 120, SHELF_SLOT_Y = 92, SHELF_CORNER = 7.5;
         // phone, zoomed out (the background dots are not drawn yet): no leaders, arrows or labels, they would pile on each other
         function shelfFar() { return ((window.matchMedia && matchMedia('(pointer: coarse)').matches) || window.innerWidth < 768) && zoom < 0.395; }
         // slot centres (mm from the left edge) of a full row whose middle is at c, kept SHELF_HOOK_EDGE from both side edges
@@ -3086,7 +3086,7 @@ service cloud.firestore {
             if (key === 'hooks') {
                 shelfOpts.hooks = shelfOpts.hooks.length ? [] : shelfDefaultHooks();
             } else { if (!shelfOpts.towel) shelfOpts.tx = shelfTowel().cx; else shelfOpts.tx = null; shelfOpts.towel = !shelfOpts.towel; }
-            if (shelfOpts.towel && shelfOpts.hooks.length) { const T = shelfTowel(); shelfOpts.tx = T.cx; shelfOpts.tl = T.len; }   // both on: the pocket moves off the hooks' stretch
+            if (shelfOpts.towel && shelfOpts.hooks.length) { const T = shelfTowel(); shelfOpts.tl = T.len; shelfOpts.tx = T.Z.hi <= Math.min(...shelfOpts.hooks) ? T.Z.lo + T.len / 2 : T.cx; }   // both on: the pocket moves off the hooks' stretch, to the far end of its side (as far from the hooks as it goes)
             shelfAnim = { key, t0: performance.now() };
             const nowOn = key === 'hooks' ? shelfOpts.hooks.length > 0 : shelfOpts.towel;
             shelfHint = nowOn ? { key, t0: performance.now() } : null;
@@ -8952,8 +8952,10 @@ async function buildModel() {
     }
     const mask = R.mask;
     if (mask && mask.cutMm === undefined) { try { mask.cutMm = cutLengthMm(mask); } catch (e) { mask.cutMm = 0; } }
-    disposeModel();
-    if (!mask || mask.count < 10) { return false; }
+    const old = R.model ? { model: R.model, objs: R.objs, st: R.stGroup } : null;   // the old model stays on screen until the new one is ready (no blink)
+    const freeOld = () => { if (!old) return; R.scene.remove(old.model); old.model.traverse(o => { if (o.geometry) o.geometry.dispose(); }); if (old.objs) R.scene.remove(old.objs); if (old.st) R.scene.remove(old.st); };
+    if (old) { R.objs = null; R.stGroup = null; }
+    if (!mask || mask.count < 10) { freeOld(); R.model = null; R.pieces = []; R.strips = []; return false; }
     const t = S.t, G = mask.G, ppm = mask.ppm, gap = P.profile.gap;
     const bends = bendSpec(key, G, t);
     const layout = layoutPieces(h, bends, ppm);
@@ -8961,7 +8963,7 @@ async function buildModel() {
     const model = new T.Group();
     model.position.x = -w / 2;
     R.model = model; R.layout = layout; R.pieces = []; R.strips = []; R.gap = gap; R.t = t;
-    showLoad('Cutting the pattern…', 'Making the sheet and its bends', 65); await nextFrame();
+    if (!old) { showLoad('Cutting the pattern…', 'Making the sheet and its bends', 65); await nextFrame(); }
     layout.pieces.forEach((pc, i) => {
         const ex = Math.ceil(0.4 * ppm), rr = Math.min(0.25, t * 0.125);         // powder coat: the cut edges (0.25 mm) and the convex corners (0.4 mm) are slightly rounded
         const shapes = shapesForRows(mask, pc.r0, pc.r1, { top: i > 0 ? ex : 0, bot: i < layout.pieces.length - 1 ? ex : 0, round: 0.4 });
@@ -9009,6 +9011,7 @@ async function buildModel() {
             m.position.set(hx, -hy, 0); model.add(m);
         });
     });
+    freeOld();
     R.scene.add(model);
     placeObjects();
     R.weightKg = mask.count / (ppm * ppm) * t * MATS[S.mat].density / 1e6;
@@ -10551,7 +10554,7 @@ function loop(now) {
 async function rebuild() {
     if (building || !R) return;
     building = true;
-    showLoad('Rebuilding the model…', '', 40);
+    if (!R.model) { showLoad('Rebuilding the model…', '', 40); }   // with a model on screen it just swaps when ready, nothing blinks
     await nextFrame();
     try { const ok = await buildModel(); if (ok) { updatePose(); applyMaterial(); } updateInfo(); } catch (err) { console.error(err); }
     hideLoad();
