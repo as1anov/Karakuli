@@ -4508,7 +4508,7 @@ service cloud.firestore {
             start() { this.seq([392, 523, 659], 0.07, 'sine', 0.05); }
         };
 
-        ['touchend', 'pointerup', 'click', 'keydown'].forEach(ev => window.addEventListener(ev, () => { if (isGameMode) BWS.unlock(); }, true));
+        ['touchend', 'pointerup', 'click', 'keydown'].forEach(ev => window.addEventListener(ev, () => { if (isGameMode || (typeof IM !== 'undefined' && IM.on)) BWS.unlock(); }, true));
 
         // For the hanger only the plate is played: its hooks (everything below the anchor line) are left out
         function bwCutY() {
@@ -5479,12 +5479,8 @@ service cloud.firestore {
             m.setTransform(1 / cell, 0, 0, 1 / cell, -x0 / cell, -y0 / cell);
             const rings = [], dias = [];
             for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; if (el.isNode) rings.push([i * STEP, j * STEP]); if (el.isDiamond) dias.push([i * STEP, j * STEP + lw / 2]); }
-            m.save(); m.beginPath(); m.rect(x0, y0, x1 - x0, y1 - y0); rings.forEach(([x, y]) => { m.moveTo(x + RB + lw / 2 - cell * 2, y); m.arc(x, y, RB + lw / 2 - cell * 2, 0, Math.PI * 2, true); }); m.clip();
-            m.strokeStyle = '#000'; m.lineWidth = lw; m.lineCap = 'butt'; m.lineJoin = 'miter'; m.miterLimit = 2;
-            m.beginPath(); getPathGroups(true, segments).forEach(gr => { m.moveTo(gr[0].p1.x * STEP, gr[0].p1.y * STEP); gr.forEach(sg => m.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); }); m.stroke();
-            m.restore();
-            m.beginPath(); rings.forEach(([x, y]) => { m.moveTo(x + RB, y); m.arc(x, y, RB, 0, Math.PI * 2); }); m.lineWidth = lw; m.stroke();
-            const dd = lw / Math.SQRT2; m.fillStyle = '#000'; m.beginPath(); dias.forEach(([x, y]) => { m.moveTo(x, y - dd); m.lineTo(x + dd, y); m.lineTo(x, y + dd); m.lineTo(x - dd, y); m.closePath(); }); m.fill();
+            IM.rings = rings; IM.dias = dias; IM.groups = getPathGroups(true, segments);
+            imPaintPattern(m, x0, y0, x1, y1, cell);
             const md = m.getImageData(0, 0, gw, gh).data, N = gw * gh, A = new Uint8Array(N), ice = new Uint8Array(N);
             for (let i = 0; i < N; i++) { A[i] = md[i * 4 + 3]; ice[i] = A[i] >= 128 ? 1 : 0; }
             // distance (in cells) from every ice cell to the nearest snow: the puck's centre may go where it is at least its radius
@@ -5516,11 +5512,21 @@ service cloud.firestore {
             if (start < 0) for (let i = 0; i < N; i++) if (comp[i] === main) { start = i; break; }
             IM.lw = lw; IM.cell = cell; IM.gw = gw; IM.gh = gh; IM.x0 = x0; IM.y0 = y0; IM.x1 = x1; IM.y1 = y1; IM.D = D; IM.ice = ice; IM.A = A; IM.R = R; IM.HR = HR; IM.mids = mids;
             [IM.sx, IM.sy] = W2(start);
-            imBuildPicture();
             imMakeUI();
+            imBuildPicture();
             IM.on = true; IM.best = (() => { try { return +localStorage.getItem('kk-im-best') || 0; } catch (e) { return 0; } })();
             imNewRound();
             IM.last = performance.now(); IM.raf = requestAnimationFrame(imFrame);
+        }
+        // the pattern exactly as the editor paints it (joined lines with square ends and mitred corners, smooth rings, rhombi), in black
+        function imPaintPattern(m, x0, y0, x1, y1, px) {
+            const lw = LINE_WEIGHT, RB = BASE_STEP_VAL;
+            m.save(); m.beginPath(); m.rect(x0, y0, x1 - x0, y1 - y0); IM.rings.forEach(([x, y]) => { m.moveTo(x + RB + lw / 2 - px * 2, y); m.arc(x, y, RB + lw / 2 - px * 2, 0, Math.PI * 2, true); }); m.clip();
+            m.strokeStyle = '#000'; m.lineWidth = lw; m.lineCap = 'butt'; m.lineJoin = 'miter'; m.miterLimit = 2;
+            m.beginPath(); IM.groups.forEach(gr => { m.moveTo(gr[0].p1.x * STEP, gr[0].p1.y * STEP); gr.forEach(sg => m.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); }); m.stroke();
+            m.restore();
+            m.beginPath(); IM.rings.forEach(([x, y]) => { m.moveTo(x + RB, y); m.arc(x, y, RB, 0, Math.PI * 2); }); m.lineWidth = lw; m.strokeStyle = '#000'; m.stroke();
+            const dd = lw / Math.SQRT2; m.fillStyle = '#000'; m.beginPath(); IM.dias.forEach(([x, y]) => { m.moveTo(x, y - dd); m.lineTo(x + dd, y); m.lineTo(x, y + dd); m.lineTo(x - dd, y); m.closePath(); }); m.fill();
         }
         function imNewRound() {
             const lw = IM.lw, n = Math.max(4, Math.min(10, Math.round(IM.mids.length * IM.cell * IM.cell / (lw * lw * 9))));
@@ -5538,39 +5544,44 @@ service cloud.firestore {
             imHud(); imMsg('Tap to start', IM.tiltOK === false ? 'Drag to push the puck' : 'Tilt the phone to slide the puck');
         }
         // the ice, drawn once: frosted pale blue, bright where the light runs round its edges
+        // The picture is painted with vector paths at screen resolution, so every edge - rings inside and out included - is smooth.
+        // The fence (white boards, a red stripe, the face in shade) is the ice grown outwards: it stands on the snow, the ice keeps the line width.
         function imBuildPicture() {
-            const { gw, gh, A, D, ice } = IM, N = gw * gh, c = document.createElement('canvas'); c.width = gw; c.height = gh;
-            // distance from the snow to the ice: the boards (the fence) stand on the snow side of the edge, so the ice keeps the full width of the lines
-            const S = new Float32Array(N); for (let i = 0; i < N; i++) S[i] = ice[i] ? 0 : 1e6;
-            const a2 = Math.SQRT2;
-            for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = y * gw + x; if (!S[i]) continue; let v = S[i];
-                if (x > 0) v = Math.min(v, S[i - 1] + 1); if (y > 0) { v = Math.min(v, S[i - gw] + 1); if (x > 0) v = Math.min(v, S[i - gw - 1] + a2); if (x < gw - 1) v = Math.min(v, S[i - gw + 1] + a2); } S[i] = v; }
-            for (let y = gh - 1; y >= 0; y--) for (let x = gw - 1; x >= 0; x--) { const i = y * gw + x; if (!S[i]) continue; let v = S[i];
-                if (x < gw - 1) v = Math.min(v, S[i + 1] + 1); if (y < gh - 1) { v = Math.min(v, S[i + gw] + 1); if (x < gw - 1) v = Math.min(v, S[i + gw + 1] + a2); if (x > 0) v = Math.min(v, S[i + gw - 1] + a2); } S[i] = v; }
-            const BWd = Math.max(2.5, IM.lw * 0.15 / IM.cell);   // the boards' thickness, in cells
-            const x = c.getContext('2d'), im = x.createImageData(gw, gh), d = im.data;
-            for (let yy = 0; yy < gh; yy++) for (let xx = 0; xx < gw; xx++) {
-                const i = yy * gw + xx, q = i * 4;
-                if (ice[i] || A[i] >= 128) {
-                    const t = (xx + yy) / (gw + gh), sheen = 0.82 + 0.26 * (1 - t) + 0.14 * Math.exp(-Math.pow((t - 0.38) * 7, 2));
-                    const frost = ((bwHash(xx * 7 + yy * 13, 5) % 100) / 100 - 0.5) * 0.09, streak = (bwHash(((xx - yy * 0.55) / 2.2) | 0, 41) % 71 === 0) ? 0.08 : 0;
-                    const sh = 0.22 * Math.exp(-(D[i] - 1) / 1.6);   // the boards cast a thin shadow on the ice
-                    const k = (sheen * (1 + frost) + streak) * (1 - sh);
-                    d[q] = Math.min(255, 172 * k); d[q + 1] = Math.min(255, 212 * k); d[q + 2] = Math.min(255, 238 * k); d[q + 3] = 255;
-                } else if (S[i] <= BWd + 1) {
-                    // the fence: a low white board round every stretch of ice - its inner face in shade, a red stripe along it, the top lit; posts every so often
-                    const u = Math.max(0, Math.min(1, (S[i] - 0.5) / BWd));
-                    let r, g, b;
-                    if (u < 0.3) { r = 150; g = 162; b = 182; }                       // the face turned to the ice, in shade
-                    else if (u < 0.52) { r = 212; g = 58; b = 64; }                  // the stripe
-                    else { const l = 0.9 + 0.1 * (1 - u); r = 246 * l; g = 249 * l; b = 253 * l; }   // the top of the board
-                    const post = (bwHash(((xx + yy) / (BWd * 3.2)) | 0, 3) % 7 === 0) && u >= 0.52;
-                    if (post) { r *= 0.82; g *= 0.85; b *= 0.9; }
-                    const edge = Math.min(1, (BWd + 1 - S[i]) * 1.5);              // a soft outer edge
-                    d[q] = r; d[q + 1] = g; d[q + 2] = b; d[q + 3] = 255 * edge;
-                }
-            }
-            x.putImageData(im, 0, 0); IM.pic = c;
+            const lw = IM.lw, X0 = IM.x0, Y0 = IM.y0, wW = IM.x1 - X0, wH = IM.y1 - Y0;
+            const want = (IM.s || 1) * Math.min(2, devicePixelRatio || 1);
+            const k = Math.max(0.05, Math.min(want, 4096 / wW, 4096 / wH, Math.sqrt(14e6 / (wW * wH))));
+            const W = Math.ceil(wW * k), H = Math.ceil(wH * k);
+            const mk = (w = W, h = H) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+            const M = mk(), m = M.getContext('2d'); m.setTransform(k, 0, 0, k, -X0 * k, -Y0 * k); imPaintPattern(m, X0, Y0, IM.x1, IM.y1, 1 / k);
+            const P = mk(), p = P.getContext('2d'), T = mk(), t = T.getContext('2d');
+            const grown = (r, col) => {   // the pattern grown by r (world units), in one colour
+                t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, W, H);
+                const rp = r * k, n = Math.max(12, Math.min(20, Math.ceil(rp * 0.8)));   // a 12..20-gon round the edge: smooth to the eye, few copies
+                for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; t.drawImage(M, Math.cos(a) * rp, Math.sin(a) * rp); }
+                if (rp > 3) for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2; t.drawImage(M, Math.cos(a) * rp * 0.5, Math.sin(a) * rp * 0.5); }
+                t.globalCompositeOperation = 'source-in'; t.fillStyle = col; t.fillRect(0, 0, W, H); t.globalCompositeOperation = 'source-over';
+                p.drawImage(T, 0, 0);
+            };
+            const bt = lw * 0.15;
+            grown(bt, '#f3f6fa'); grown(bt * 0.52, '#d23a40'); grown(bt * 0.3, '#97a3b7');
+            // the ice: frosted pale blue with a soft sheen across it
+            const tile = mk(256, 256), tc = tile.getContext('2d'), ti = tc.createImageData(256, 256);
+            for (let i = 0; i < 65536; i++) { const v = (bwHash(i * 7 + 3, 5) % 100) / 100 - 0.5; ti.data[i * 4] = 172 * (1 + v * 0.09); ti.data[i * 4 + 1] = 212 * (1 + v * 0.09); ti.data[i * 4 + 2] = Math.min(255, 238 * (1 + v * 0.09)); ti.data[i * 4 + 3] = 255; }
+            tc.putImageData(ti, 0, 0);
+            t.clearRect(0, 0, W, H); t.drawImage(M, 0, 0); t.globalCompositeOperation = 'source-in';
+            t.fillStyle = t.createPattern(tile, 'repeat'); t.fillRect(0, 0, W, H);
+            t.globalCompositeOperation = 'source-atop';
+            let g = t.createLinearGradient(0, 0, W, H); g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(0.38, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(0,20,50,0.12)'); t.fillStyle = g; t.fillRect(0, 0, W, H);
+            t.strokeStyle = 'rgba(255,255,255,0.10)'; t.lineWidth = Math.max(1, k * lw * 0.02);   // a few thin cracks frozen in it
+            for (let i = 0; i < Math.round(W * H / 90000); i++) { const h1 = bwHash(i, 61), h2 = bwHash(i, 62), cx = h1 % W, cy = h2 % H, L = (40 + h1 % 120) * k; t.beginPath(); t.moveTo(cx, cy); t.lineTo(cx + L * 0.55, cy + L); t.stroke(); }
+            t.globalCompositeOperation = 'source-over';
+            p.drawImage(T, 0, 0);
+            // a thin shadow of the boards on the ice, along its edge
+            t.clearRect(0, 0, W, H); t.fillStyle = 'rgba(20,40,70,0.28)'; t.fillRect(0, 0, W, H); t.globalCompositeOperation = 'destination-out';
+            t.filter = `blur(${Math.max(1, lw * k * 0.05)}px)`; t.drawImage(M, 0, 0); t.filter = 'none';
+            t.globalCompositeOperation = 'destination-in'; t.drawImage(M, 0, 0); t.globalCompositeOperation = 'source-over';
+            p.drawImage(T, 0, 0);
+            IM.pic = P; IM.picK = k;
         }
         function imMakeUI() {
             const el = document.createElement('div'); el.id = 'im-root';
@@ -5601,14 +5612,16 @@ service cloud.firestore {
                 let gx = (e.gamma - IM.g0) / 22, gy = (e.beta - IM.b0) / 22; const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
                 if (ang === 90) [gx, gy] = [gy, -gx]; else if (ang === -90 || ang === 270) [gx, gy] = [-gy, gx]; else if (ang === 180) { gx = -gx; gy = -gy; }
                 IM.tx = Math.max(-1, Math.min(1, gx)); IM.ty = Math.max(-1, Math.min(1, gy)); };
-            IM.onDown = e => { if (e.target.closest('#im-x')) return; BWS.unlock();
-                if (IM.state === 'ready' || IM.state === 'won') { imGo(); return; }
+            IM.onDown = e => { if (e.target.closest('#im-x')) return;
+                if (IM.state === 'ready' || IM.state === 'won') return;   // the start waits for the end of the tap (see onTap)
                 IM.drag = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY }; };
+            // iOS gives sound and the tilt sensor only from the END of a tap (click / touchend), not from pointerdown
+            IM.onTap = e => { if (e.target.closest && e.target.closest('#im-x')) return; BWS.unlock(); if (IM.state === 'ready' || IM.state === 'won') imGo(); };
             IM.onMove = e => { if (IM.drag) { IM.drag.cx = e.clientX; IM.drag.cy = e.clientY; } };
             IM.onUp = () => { IM.drag = null; };
             IM.onKey = e => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) { IM.keys[e.key] = e.type === 'keydown'; e.preventDefault(); e.stopPropagation(); }
                 else if (e.type === 'keydown' && e.key === 'Escape') exitIceMaze(); else if (e.type === 'keydown' && (e.key === ' ' || e.key === 'Enter') && IM.state !== 'play') imGo(); };
-            el.addEventListener('pointerdown', IM.onDown); addEventListener('pointermove', IM.onMove); addEventListener('pointerup', IM.onUp); addEventListener('pointercancel', IM.onUp);
+            el.addEventListener('pointerdown', IM.onDown); el.addEventListener('click', IM.onTap); addEventListener('pointermove', IM.onMove); addEventListener('pointerup', IM.onUp); addEventListener('pointercancel', IM.onUp);
             addEventListener('keydown', IM.onKey, true); addEventListener('keyup', IM.onKey, true);
             addEventListener('deviceorientation', IM.onOri);
         }
@@ -5701,7 +5714,7 @@ service cloud.firestore {
             for (let i = 0; i < 140; i++) { const h1 = bwHash(i, 7), h2 = bwHash(i, 8); const X = ((h1 % 2000) / 2000 * (IM.x1 - IM.x0) + IM.x0) * s + ox, Y = ((h2 % 2000) / 2000 * (IM.y1 - IM.y0) + IM.y0) * s + oy; c.beginPath(); c.arc(X, Y, 1 + (h1 % 3), 0, 6.283); c.fill(); }
             // the ice with a soft shadow
             c.save(); c.shadowColor = 'rgba(0,0,0,0.55)'; c.shadowBlur = lw * s * 0.25; c.shadowOffsetY = lw * s * 0.08;
-            c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.gw * IM.cell * s, IM.gh * IM.cell * s); c.restore();
+            c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.pic.width / IM.picK * s, IM.pic.height / IM.picK * s); c.restore();
             // skate marks: the puck's track scratched into the ice
             if (IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
             // the holes: dark water in the ice, a snowy rim, a slow ripple; the golden one glints
