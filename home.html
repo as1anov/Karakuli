@@ -285,14 +285,14 @@ function glinting(mat, U) {
         float gd = vSheet.x - 0.45 * vSheet.y - uGlintX;
         float thin = gd / 0.07, wide = gd / 0.26;                                     // squared by hand: pow() of a negative number is undefined, and Apple GPUs show it
         float band = exp(-thin * thin) + 0.45 * exp(-wide * wide);                    // a bright line inside a soft halo
-        totalEmissiveRadiance += vec3(1.0, 0.97, 0.9) * uGlint * vFront * band;`);
+        totalEmissiveRadiance += vec3(0.97, 0.98, 1.0) * uGlint * vFront * band;`);
   };
   mat.customProgramCacheKey = () => 'glint';
 }
 function lightUp(scene) {
   scene.add(new T.HemisphereLight(0xf4f3ef, 0x111111, 0.55));
   const key = new T.DirectionalLight(0xffffff, 2.8); key.position.set(-9, 11, 7); scene.add(key);    // grazing light from the upper left: the tops shine, the sides fall into shade
-  const rim = new T.DirectionalLight(0xfff1cc, 0.7); rim.position.set(10, -5, 4); scene.add(rim);
+  const rim = new T.DirectionalLight(0xeef0f3, 0.7); rim.position.set(10, -5, 4); scene.add(rim);
 }
 // The drawing is cut into long straight bars (plus its rings and diamonds). Every part is built round its own centre, lying along x;
 // `home` and `qHome` put it in its place in the drawing (centred on the drawing's middle, in world units).
