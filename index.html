@@ -8153,10 +8153,19 @@ function supportInfo() {
         const n = hooksFromWidth(w), pitch = PRODUCTS.hanger.hooks.pitch;
         const lf = chain.frames[chain.frames.indexOf(best) + 1];
         if (!lf) return null;
+        // the hooks are what the user draws in the arm zones: an arm with no metal in it is no hook, and nothing can hang from it
+        const M = R.mask, G = M && M.G, drawn = [];
+        if (G && G.arms) G.arms.forEach((a, i) => {
+            const x0 = Math.max(0, Math.floor(a[0] * M.ppm)), x1 = Math.min(M.W, Math.ceil(a[1] * M.ppm)), y0 = Math.max(0, Math.floor((G.anchor + 2) * M.ppm)), y1 = Math.min(M.H, Math.floor((M.h - 1) * M.ppm));
+            let c = 0, tot = 0;
+            for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { tot++; if (M.g[y * M.W + x]) c++; }
+            if (tot && c / tot > 0.25) drawn.push(i);
+        });
+        if (!drawn.length) return null;
         const ll = Math.hypot(lf.T[0], lf.T[1]) || 1;
         sup.lip = { P: lf.P.slice(), T: [lf.T[0] / ll, lf.T[1] / ll], L: lf.L };
         sup.type = 'hooks'; sup.hooks = [];
-        for (let i = 0; i < n; i++) sup.hooks.push((i - (n - 1) / 2) * pitch);
+        drawn.forEach(i => sup.hooks.push((i - (n - 1) / 2) * pitch));
     }
     return sup;
 }
@@ -8763,6 +8772,7 @@ function placeObjects0() {
     if (S.objKey !== key) { S.objs = []; S.objKey = key; }
     R.support = supportInfo(); R.room = null;
     const sup = R.support;
+    if (key === 'hanger' && !sup) S.objs.length = 0;   // a hanger with no hooks drawn has nothing to hang things on
     if (sup && sup.type === 'hooks' && S.objs.length) {
         // item j hangs on the j-th hook counted from the middle outwards; neighbours are shifted in depth so wide items do not cut each other
         const n = sup.hooks.length, pitch = n > 1 ? sup.hooks[1] - sup.hooks[0] : 0;
