@@ -5539,15 +5539,36 @@ service cloud.firestore {
         }
         // the ice, drawn once: frosted pale blue, bright where the light runs round its edges
         function imBuildPicture() {
-            const { gw, gh, A, D } = IM, c = document.createElement('canvas'); c.width = gw; c.height = gh;
+            const { gw, gh, A, D, ice } = IM, N = gw * gh, c = document.createElement('canvas'); c.width = gw; c.height = gh;
+            // distance from the snow to the ice: the boards (the fence) stand on the snow side of the edge, so the ice keeps the full width of the lines
+            const S = new Float32Array(N); for (let i = 0; i < N; i++) S[i] = ice[i] ? 0 : 1e6;
+            const a2 = Math.SQRT2;
+            for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = y * gw + x; if (!S[i]) continue; let v = S[i];
+                if (x > 0) v = Math.min(v, S[i - 1] + 1); if (y > 0) { v = Math.min(v, S[i - gw] + 1); if (x > 0) v = Math.min(v, S[i - gw - 1] + a2); if (x < gw - 1) v = Math.min(v, S[i - gw + 1] + a2); } S[i] = v; }
+            for (let y = gh - 1; y >= 0; y--) for (let x = gw - 1; x >= 0; x--) { const i = y * gw + x; if (!S[i]) continue; let v = S[i];
+                if (x < gw - 1) v = Math.min(v, S[i + 1] + 1); if (y < gh - 1) { v = Math.min(v, S[i + gw] + 1); if (x < gw - 1) v = Math.min(v, S[i + gw + 1] + a2); if (x > 0) v = Math.min(v, S[i + gw - 1] + a2); } S[i] = v; }
+            const BWd = Math.max(2.5, IM.lw * 0.15 / IM.cell);   // the boards' thickness, in cells
             const x = c.getContext('2d'), im = x.createImageData(gw, gh), d = im.data;
             for (let yy = 0; yy < gh; yy++) for (let xx = 0; xx < gw; xx++) {
-                const i = yy * gw + xx; if (!A[i]) continue;
-                const t = (xx + yy) / (gw + gh), sheen = 0.82 + 0.26 * (1 - t) + 0.14 * Math.exp(-Math.pow((t - 0.38) * 7, 2));
-                const frost = ((bwHash(xx * 7 + yy * 13, 5) % 100) / 100 - 0.5) * 0.09, streak = (bwHash(((xx - yy * 0.55) / 2.2) | 0, 41) % 71 === 0) ? 0.08 : 0;
-                const k = sheen * (1 + frost) + streak, rim = Math.max(0, 1 - D[i] / 2.2) * 0.8;
-                let r = 172 * k, g = 212 * k, b = 238 * k; r += (255 - r) * rim; g += (255 - g) * rim; b += (255 - b) * rim * 0.8;
-                const q = i * 4; d[q] = Math.min(255, r); d[q + 1] = Math.min(255, g); d[q + 2] = Math.min(255, b); d[q + 3] = A[i];
+                const i = yy * gw + xx, q = i * 4;
+                if (ice[i] || A[i] >= 128) {
+                    const t = (xx + yy) / (gw + gh), sheen = 0.82 + 0.26 * (1 - t) + 0.14 * Math.exp(-Math.pow((t - 0.38) * 7, 2));
+                    const frost = ((bwHash(xx * 7 + yy * 13, 5) % 100) / 100 - 0.5) * 0.09, streak = (bwHash(((xx - yy * 0.55) / 2.2) | 0, 41) % 71 === 0) ? 0.08 : 0;
+                    const sh = 0.22 * Math.exp(-(D[i] - 1) / 1.6);   // the boards cast a thin shadow on the ice
+                    const k = (sheen * (1 + frost) + streak) * (1 - sh);
+                    d[q] = Math.min(255, 172 * k); d[q + 1] = Math.min(255, 212 * k); d[q + 2] = Math.min(255, 238 * k); d[q + 3] = 255;
+                } else if (S[i] <= BWd + 1) {
+                    // the fence: a low white board round every stretch of ice - its inner face in shade, a red stripe along it, the top lit; posts every so often
+                    const u = Math.max(0, Math.min(1, (S[i] - 0.5) / BWd));
+                    let r, g, b;
+                    if (u < 0.3) { r = 150; g = 162; b = 182; }                       // the face turned to the ice, in shade
+                    else if (u < 0.52) { r = 212; g = 58; b = 64; }                  // the stripe
+                    else { const l = 0.9 + 0.1 * (1 - u); r = 246 * l; g = 249 * l; b = 253 * l; }   // the top of the board
+                    const post = (bwHash(((xx + yy) / (BWd * 3.2)) | 0, 3) % 7 === 0) && u >= 0.52;
+                    if (post) { r *= 0.82; g *= 0.85; b *= 0.9; }
+                    const edge = Math.min(1, (BWd + 1 - S[i]) * 1.5);              // a soft outer edge
+                    d[q] = r; d[q + 1] = g; d[q + 2] = b; d[q + 3] = 255 * edge;
+                }
             }
             x.putImageData(im, 0, 0); IM.pic = c;
         }
