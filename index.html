@@ -142,7 +142,7 @@
         /* the New Canvas window has no X of its own: Cancel (or a tap beside it) closes it */
         html body #new-canvas-modal .nc-close { display: none; }
         /* not in the New Canvas window, not while the editor is starting, not in 3D; and never where a view has a close button of its own */
-        body:has(#new-canvas-modal.show) #site-x-frame, body.booting #site-x-frame, body.v3d-open #site-x-frame, body.timelapse-active #site-x-frame, body.game-active #site-x-frame, body.customer-view #site-x-frame, body.dashboard-open #site-x-frame, html.embed #site-x-frame { display: none !important; }
+        body:has(#new-canvas-modal.show) #site-x-frame, body:has(#mobile-keyboard.open) #site-x-frame, body.booting #site-x-frame, body.v3d-open #site-x-frame, body.timelapse-active #site-x-frame, body.game-active #site-x-frame, body.customer-view #site-x-frame, body.dashboard-open #site-x-frame, html.embed #site-x-frame { display: none !important; }
 
         /* --- TOP NAV --- */
         .top-nav-container {
