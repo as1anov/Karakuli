@@ -407,8 +407,9 @@ function startScene() {
 
   // ---- layout: how big the pattern and the gathered cluster are on this screen
   let L = { s: 1, x: 0, y: 0 }, heroScale = 1, heroY = 0;
+  let sw = 0, sh = 0;
   function layout() {
-    const wpx = stage.clientWidth, hpx = stage.clientHeight;
+    const wpx = stage.clientWidth, hpx = stage.clientHeight; sw = wpx; sh = hpx;
     renderer.setSize(wpx, hpx, false); camera.aspect = wpx / hpx;
     const dist = 30; camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
     const vh = 2 * dist * Math.tan(camera.fov * Math.PI / 360), vw = vh * camera.aspect;
@@ -420,6 +421,8 @@ function startScene() {
     else { L.s = Math.min(vw * 0.32 / cw, vh * 0.7 / ch); L.x = -vw * 0.21; L.y = -vh * 0.01; }
   }
   layout(); addEventListener('resize', layout);
+  if (window.ResizeObserver) new ResizeObserver(layout).observe(stage);
+  addEventListener('orientationchange', () => setTimeout(layout, 300));
 
   const vA = new T.Vector3(), vB = new T.Vector3(), vC = new T.Vector3(), qA = new T.Quaternion();
   let pv = 0, last = performance.now();
@@ -432,6 +435,8 @@ function startScene() {
   const drift = (pt, time, k) => { if (k > 0) { vA.x += Math.sin(time * 0.6 + pt.ph) * 0.12 * k; vA.y += Math.cos(time * 0.5 + pt.ph) * 0.14 * k; } };
   const goal = new T.Vector3(), qSw = new T.Quaternion(), yAxis = new T.Vector3(0, 1, 0);
   function frame(now) {
+    // in-app browsers (Instagram, Facebook) size the page late and fire no resize: if the stage is not the size the picture was laid out for, lay it out again
+    if (stage.clientWidth !== sw || stage.clientHeight !== sh) layout();
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     const target = progress();
     pv += (target - pv) * (1 - Math.exp(-dt * 5));
@@ -526,9 +531,9 @@ function startFooter() {
       ph: rr(0, Math.PI * 2), sp: rr(0.28, 0.48), amp: rr(0.2, 0.42) };
   });
   const sets = { wide: make(wide), phone: make(phone) };
-  let vw = 1, vh = 1, narrow = false, hp = 1, on = false, pv = 0, last = 0;
+  let cw = 0, ch = 0, vw = 1, vh = 1, narrow = false, hp = 1, on = false, pv = 0, last = 0;
   function layout() {
-    const wpx = box.clientWidth, hpx = box.clientHeight; if (!wpx || !hpx) return;
+    const wpx = box.clientWidth, hpx = box.clientHeight; if (!wpx || !hpx) return; cw = wpx; ch = hpx;
     renderer.setSize(wpx, hpx, false); camera.aspect = wpx / hpx;
     camera.position.set(0, 0, 30); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
     vh = 2 * 30 * Math.tan(camera.fov * Math.PI / 360); vw = vh * camera.aspect; narrow = wpx < 820; hp = hpx;
@@ -540,6 +545,7 @@ function startFooter() {
   const spun = new T.Quaternion();
   function frame(now) {
     if (!on) return;
+    if (box.clientWidth !== cw || box.clientHeight !== ch) layout();
     const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
     const target = prog(); pv += (target - pv) * (1 - Math.exp(-dt * 4));
     const time = now / 1000, rise = 1 - smooth(pv);   // they float up into place as the page ends
