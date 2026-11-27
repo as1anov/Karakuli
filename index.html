@@ -4421,7 +4421,12 @@ service cloud.firestore {
             if (isPanning && performance.now() - (window.lastClickTime || 0) < 200) {
                 if (!isOverUI(x, y) && !isTimelapseUIOpen && !isGameMode) {
                     if (isDashboardOpen && document.body.classList.contains('projects-open')) { isPanning = false; toggleDashboard(); return; }   // one tap on the canvas closes the menu; dragging does not
-                    if (templateKind() === 'product' && !isViewOnly && !isEraserActive && holeAtScreen(x, y)) { isPanning = false; openHolesPopup(); return; }
+                    if (templateKind() === 'product' && !isViewOnly && !isEraserActive && holeAtScreen(x, y)) {
+                        // a tap on the end of a drawn line (or on the cursor) goes on with the drawing: the holes window opens only on a hole nothing is drawn on
+                        const gi = Math.round((x - offsetX) / zoom / STEP), gj = Math.round((y - offsetY) / zoom / STEP);
+                        const onEnd = (gi === curI && gj === curJ) || segments.some(sg => (sg.p1.x === gi && sg.p1.y === gj) || (sg.p2.x === gi && sg.p2.y === gj));
+                        if (!onEnd) { isPanning = false; openHolesPopup(); return; }
+                    }
                     if (templateKind() !== 'product' && !isViewOnly && !isEraserActive) {   // a plain sheet: a tap on a place for a hole adds / removes it
                         const sk = plateSlotAtScreen(x, y);
                         if (sk) { isPanning = false; openPlatePopup(); return; }
