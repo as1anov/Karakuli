@@ -2866,6 +2866,13 @@ service cloud.firestore {
             return { L, R, T, B, notches, slot, MM };
         }
 
+        // the outline as a Path2D, built once per shape (not on every frame of a zoom or a pan)
+        let _opKey = '', _opPath = null;
+        function productOutlinePath() {
+            const k = [templateKind(), activeProductKey, paperWidthMm, paperHeightMm, LINE_WEIGHT, shelfOpts.hooks.join(','), shelfOpts.towel ? shelfOpts.tx + ':' + shelfOpts.tl : ''].join('|');
+            if (k !== _opKey || !_opPath) { _opPath = new Path2D(productOutlineD()); _opKey = k; }
+            return _opPath;
+        }
         function productOutlineD(dx = 0, dy = 0) {
             const kind = templateKind();
             if (kind === 'free') return '';
@@ -2910,7 +2917,7 @@ service cloud.firestore {
             if (yMm == null) return;   // the hanger has no filled zone: its hooks are drawn by the user
             const ctx = drawingContext;
             push(); ctx.save();
-            ctx.clip(new Path2D(productOutlineD()));
+            ctx.clip(productOutlinePath());
             noStroke(); if (currentTheme === 'dark' && !isExporting) fill('#E8E8E8'); else fill(0); rectMode(CORNER);
             rect(-wPx / 2, -hPx / 2 + yMm * MM, wPx, hPx - yMm * MM);
             ctx.restore(); pop();
@@ -2918,7 +2925,7 @@ service cloud.firestore {
 
         function drawProductTemplate(paperColor) {
             const MM = LINE_WEIGHT / 12, wPx = paperWidthMm * MM, hPx = paperHeightMm * MM;
-            const path = new Path2D(productOutlineD());
+            const path = productOutlinePath();
             const ctx = drawingContext;
             push();
             fill(paperColor); stroke('rgba(128,128,128,0.4)'); strokeWeight(2 / zoom);
@@ -2927,7 +2934,7 @@ service cloud.firestore {
             ctx.save();
             const F = shelfFeat();
             if (F && (shelfOpts.hooks.length || shelfOpts.towel)) {
-                const c = new Path2D(), m = 4 / zoom; c.rect(-1e6, -1e6, 2e6, 2e6);
+                const c = new Path2D(), m = 4 / zoom; c.rect((-offsetX) / zoom - 50, (-offsetY) / zoom - 50, width / zoom + 100, height / zoom + 100);   // the visible area only (a huge clip rectangle is slow when zoomed in)
                 if (shelfOpts.hooks.length) { const a = F.notches[0], b = F.notches[F.notches.length - 1]; c.rect(a.cx - a.hw - a.rm - m, F.B - a.d - m, (b.cx + b.hw + b.rm + m) - (a.cx - a.hw - a.rm - m), a.d + 2 * m); }
                 if (shelfOpts.towel) { const s = F.slot; c.rect(s.cx - s.hl - m, s.cy - s.hh - m, 2 * s.hl + 2 * m, 2 * s.hh + 2 * m); }
                 ctx.clip(c, 'evenodd');
