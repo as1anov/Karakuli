@@ -474,7 +474,7 @@ function startScene() {
         qA.slerp(pt.qFall, kf);
       }
       if (rest > 0) {   // the swing: the whole cluster turns about its own vertical axis
-        qSw.setFromAxisAngle(yAxis, swing * T.MathUtils.degToRad(26) * rest);
+        qSw.setFromAxisAngle(yAxis, swing * T.MathUtils.degToRad(15) * rest);
         vB.set(L.x, L.y, 0); vA.sub(vB).applyQuaternion(qSw).add(vB); qA.premultiply(qSw);
       }
       m.position.copy(vA); m.quaternion.copy(qA); m.scale.set(sc * stretch, sc, sc); m.visible = true;
