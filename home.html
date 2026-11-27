@@ -430,7 +430,7 @@ function startScene() {
     vA.multiplyScalar(u * u).addScaledVector(vC, 2 * u * t).addScaledVector(to, t * t);
   }
   const drift = (pt, time, k) => { if (k > 0) { vA.x += Math.sin(time * 0.6 + pt.ph) * 0.12 * k; vA.y += Math.cos(time * 0.5 + pt.ph) * 0.14 * k; } };
-  const goal = new T.Vector3();
+  const goal = new T.Vector3(), qSw = new T.Quaternion(), yAxis = new T.Vector3(0, 1, 0);
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     const target = progress();
@@ -440,9 +440,13 @@ function startScene() {
     const morph = seg(p, ...P.morph), s3 = seg(p, ...P.fall), hs = heroScale;
     // while the pattern is whole it turns gently, 5 degrees to either side, as one rigid sheet; the turn draws a line of light across it
     const whole = 1 - smooth(clamp01(morph / 0.12)), swing = Math.sin(time * 0.7);
-    shine.uHalf.value = A.W * hs / 2; shine.uMidY.value = heroY;
-    shine.uGlintX.value = swing * 1.35;                         // from one edge of the pattern to the other, in step with the turn
-    shine.uGlint.value = 0.2 * whole;
+    // settled beside the story, the gathered pattern swings like a boomerang (a sine: slows to a stop at each end, quick through the middle) and the same line of light crosses it
+    const rest = smooth(clamp01((morph - 0.82) / 0.18)) * (1 - smooth(clamp01(s3 / 0.25))), bHalf = (B.W + B.w) * L.s / 2;
+    const aHalf = A.W * hs / 2;
+    const half = aHalf * whole + bHalf * (1 - whole), midY = heroY * whole + L.y * (1 - whole), midX = L.x * (1 - whole);
+    shine.uHalf.value = half; shine.uMidY.value = midY;
+    shine.uGlintX.value = (midX + swing * 1.35 * half) / half;   // from one edge of the pattern to the other, in step with the turn
+    shine.uGlint.value = 0.2 * Math.max(whole, rest);
     // the pieces that do not go on to drawing 11 loosen, sail after the others and melt into the dark
     A.parts.forEach(pt => {
       const m = pt.m;
@@ -468,6 +472,10 @@ function startScene() {
         const k3 = clamp01((s3 - pt.d3 * 0.6) / 0.55), kf = k3 * k3;            // they let go and fall
         vA.lerp(vB.set(L.x + pt.home.x * L.s * 1.4 + pt.fall.x, pt.fall.y, pt.fall.z), kf);
         qA.slerp(pt.qFall, kf);
+      }
+      if (rest > 0) {   // the swing: the whole cluster turns about its own vertical axis
+        qSw.setFromAxisAngle(yAxis, swing * T.MathUtils.degToRad(26) * rest);
+        vB.set(L.x, L.y, 0); vA.sub(vB).applyQuaternion(qSw).add(vB); qA.premultiply(qSw);
       }
       m.position.copy(vA); m.quaternion.copy(qA); m.scale.set(sc * stretch, sc, sc); m.visible = true;
     });
