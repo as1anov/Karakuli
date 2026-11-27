@@ -4591,6 +4591,15 @@ service cloud.firestore {
                     BW.cropFrac = bestF;
                 }
             }
+            if (phone) {   // the part of the pattern that is really in the window may not reach one of the sides (the long lines are in rows that are cropped away): then centre it
+                const fy0 = yTop - pad - hud, y1c = fy0 + fh * (BW.cropFrac || 0.55), f1 = 2 * BW.U / z, wl = x0 + f1, wr = x0 + fw - f1;
+                let lo = Infinity, hi = -Infinity;
+                const take = (a, b) => { if (b > wl && a < wr) { lo = Math.min(lo, Math.max(a, wl)); hi = Math.max(hi, Math.min(b, wr)); } };
+                segments.forEach(sg => { const ya = Math.min(sg.p1.y, sg.p2.y) * STEP, yb = Math.max(sg.p1.y, sg.p2.y) * STEP; if (yb < yTop - lw / 2 || ya > y1c) return;
+                    const xa = Math.min(sg.p1.x, sg.p2.x) * STEP - (sg.p1.x === sg.p2.x ? lw / 2 : 0), xb = Math.max(sg.p1.x, sg.p2.x) * STEP + (sg.p1.x === sg.p2.x ? lw / 2 : 0); take(xa, xb); });
+                for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id], yy = j * STEP; if (yy < yTop - lw || yy > y1c) continue; const r = el.isNode ? BASE_STEP_VAL + lw / 2 : lw; take(i * STEP - r, i * STEP + r); }
+                if (hi > lo && hi - lo < wr - wl - lw * 0.5) x0 += (lo + hi) / 2 - (wl + wr) / 2;
+            }
             const field = { minX: x0, maxX: x0 + fw, minY: yTop - pad - hud, maxY: yTop - pad - hud + fh };
             const f = 2 * BW.U / z;      // inner margin of the arena
             BW.inner = { minX: field.minX + f, maxX: field.maxX - f, minY: field.minY + f, maxY: field.maxY };
