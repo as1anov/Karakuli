@@ -6104,17 +6104,18 @@ service cloud.firestore {
             const pal = h.gold ? ['#6b5a2a', '#2a1f08', '#0c0803'] : h.tele ? ['#4a4fa8', '#1d2266', '#080a24'] : ['#1f7fa8', '#0c3f66', '#031526'];
             let g;
             if (h.done) { g = c.createRadialGradient(X - r * 0.3, Y - r * 0.3, 0, X, Y, r); g.addColorStop(0, '#f4fbff'); g.addColorStop(1, '#b4d2ea'); c.fillStyle = g; circ(X, Y, r); c.fill(); return; }
-            // the cut edge of the ice: a clean ring, thicker on the side we look into
-            c.fillStyle = 'rgba(10,40,90,0.35)'; circ(X, Y + r * 0.06, r * 1.04); c.fill();
-            g = c.createLinearGradient(X - r, Y - r, X + r, Y + r); g.addColorStop(0, '#f6fcff'); g.addColorStop(1, '#a9cbe6'); c.fillStyle = g; circ(X, Y, r); c.fill();
-            // the water, lower down: seen a little off-centre, so a band of the ice wall shows at the top-left
-            const wx = X + r * 0.07, wy = Y + r * 0.09, wr = r * 0.86;
-            c.save(); circ(wx, wy, wr); c.clip();
+            // looking down from the south: the far (upper) wall of the hole shows its ice thickness, the near (lower) edge hides its wall
+            circ(X, Y, r); c.save(); c.clip();
+            g = c.createLinearGradient(X, Y - r, X, Y + r * 0.1); g.addColorStop(0, '#f4fbff'); g.addColorStop(1, '#7ea9cc'); c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2);   // the wall
+            const wx = X, wy = Y + r * 0.2, wr = r * 0.8;   // the water: touches the near edge, a band of wall above
+            circ(wx, wy, wr); c.save(); c.clip();
             g = c.createRadialGradient(wx, wy, 0, wx, wy, wr); g.addColorStop(0, pal[0]); g.addColorStop(0.6, pal[1]); g.addColorStop(1, pal[2]); c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2);
-            c.fillStyle = 'rgba(0,8,20,0.5)'; c.beginPath(); c.arc(wx, wy, wr, 0, TAU); c.arc(wx + r * 0.3, wy + r * 0.34, wr, 0, TAU, true); c.fill();   // the rim throws a shadow on the water
-            const rp = (T * 0.3 + h.t) % 1; c.strokeStyle = `rgba(190,230,255,${0.22 * (1 - rp)})`; c.lineWidth = Math.max(1, r * 0.04); c.beginPath(); c.ellipse(wx + r * 0.1, wy + r * 0.12, r * (0.1 + 0.4 * rp), r * (0.08 + 0.32 * rp), 0, 0, TAU); c.stroke();   // a slow ripple
-            c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.ellipse(wx + r * 0.3, wy + r * 0.34, r * 0.22, r * 0.09, -0.7, 0, TAU); c.fill();   // sky in the water
+            c.fillStyle = 'rgba(0,8,20,0.5)'; c.beginPath(); c.arc(wx, wy, wr, 0, TAU); c.arc(wx, wy + r * 0.3, wr, 0, TAU, true); c.fill();   // the far wall shades the water
+            const rp = (T * 0.3 + h.t) % 1; c.strokeStyle = `rgba(190,230,255,${0.22 * (1 - rp)})`; c.lineWidth = Math.max(1, r * 0.04); c.beginPath(); c.ellipse(wx, wy + r * 0.1, r * (0.1 + 0.4 * rp), r * (0.08 + 0.32 * rp), 0, 0, TAU); c.stroke();
+            c.fillStyle = 'rgba(255,255,255,0.16)'; c.beginPath(); c.ellipse(wx + r * 0.2, wy + r * 0.35, r * 0.22, r * 0.08, -0.5, 0, TAU); c.fill();
             if (h.gold) for (let i = 0; i < 3; i++) { const a = i * 2.1 + h.t * 3, gl = 0.5 + 0.5 * Math.sin(T * 3 + i * 2), cx = wx + Math.cos(a) * r * 0.3, cy = wy + Math.sin(a) * r * 0.25, cg = c.createRadialGradient(cx, cy, 0, cx, cy, r * 0.18); cg.addColorStop(0, `rgba(255,226,140,${0.9 * gl})`); cg.addColorStop(1, 'rgba(255,190,60,0)'); c.fillStyle = cg; circ(cx, cy, r * 0.18); c.fill(); }
+            c.restore();
+            c.strokeStyle = 'rgba(30,70,120,0.45)'; c.lineWidth = Math.max(1, r * 0.04); circ(wx, wy, wr); c.stroke();   // the waterline
             c.restore();
             c.strokeStyle = h.gold ? '#ffd36b' : 'rgba(40,90,150,0.55)'; c.lineWidth = Math.max(1, r * (h.gold ? 0.07 : 0.05)); circ(X, Y, r); c.stroke();   // the edge
         }
