@@ -69,7 +69,7 @@ button { font: inherit; color: inherit; }
 .chapter p { margin: 0 0 12px; color: var(--ink-2); font-size: clamp(15px, 1.15vw, 17px); }
 .chapter p.lead { color: var(--paper); font-size: clamp(17px, 1.4vw, 21px); }
 .progress { position: absolute; left: var(--pad); right: var(--pad); bottom: 16px; height: 2px; background: var(--ink-line); }
-.progress i { display: block; height: 100%; width: 0; background: var(--saffron); }
+.progress i { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: 0 50%; background: var(--saffron); }
 
 /* ---------- shop ---------- */
 /* the shop comes up over the last screen of the pinned stage, while the pieces are still falling into it: no empty black screen */
@@ -239,13 +239,15 @@ document.querySelector('[data-jump="about"]').addEventListener('click', e => {
 
 // the text on the stage follows the scroll (it is there even when 3D fails)
 const hero = $('hero'), cue = $('cue'), prog = $('prog'), story = $('story');
+const styled = new Map();
+const put = (el, k, v) => { const key = el.id + k; if (styled.get(key) !== v) { styled.set(key, v); el.style[k] = v; } };   // touch the page only when a value really changes
 function textAt(p) {
   const h = 1 - seg(p, P.hero[0], P.hero[1]);
-  hero.style.opacity = h; hero.style.transform = `translateY(${(1 - h) * -24}px)`; cue.style.opacity = h;
+  put(hero, 'opacity', h.toFixed(3)); put(hero, 'transform', `translate3d(0,${((1 - h) * -24).toFixed(1)}px,0)`); put(cue, 'opacity', h.toFixed(3));
   const fin = seg(p, P.text[0], P.text[0] + 0.05), fout = 1 - seg(p, P.text[1] - 0.03, P.text[1] + 0.02), o = Math.min(fin, fout);
-  story.style.opacity = o; story.style.visibility = o > 0.01 ? 'visible' : 'hidden';
-  story.style.translate = `0 ${(1 - fin) * 28 - (1 - fout) * 28}px`;
-  prog.style.width = (p * 100).toFixed(2) + '%';
+  put(story, 'opacity', o.toFixed(3)); put(story, 'visibility', o > 0.01 ? 'visible' : 'hidden');
+  put(story, 'translate', `0 ${((1 - fin) * 28 - (1 - fout) * 28).toFixed(1)}px`);
+  put(prog, 'transform', `scaleX(${p.toFixed(4)})`);
 }
 
 const S = 1 / 100, D = 0.36;   // 100 px of the drawing = 1 unit; parts are 36 px thick
@@ -488,9 +490,16 @@ function startScene() {
     scene.rotation.y = swing * T.MathUtils.degToRad(5) * whole + Math.sin(time * 0.15) * 0.05 * (1 - whole) + 0.1 * (1 - whole) + smooth(morph) * (1 - s3) * -0.12;
     scene.rotation.x = Math.cos(time * 0.12) * 0.03 * (1 - whole) - 0.22 + 0.1 * whole;   // whole, it faces the viewer more squarely
     renderer.render(scene, camera);
-    requestAnimationFrame(frame);
   }
-  requestAnimationFrame(frame);
+  // build every shader before the first frame, so the first scroll does not stall while the GPU compiles
+  try { renderer.compile(scene, camera); } catch (e) { }
+  // draw only while the stage can be seen and the tab is open; one loop at a time, and no jump in time when it wakes
+  let seen = true, running = false;
+  const wake = () => { if (running || !seen || document.hidden) return; running = true; last = performance.now(); requestAnimationFrame(loop); };
+  const loop = now => { if (!seen || document.hidden) { running = false; return; } frame(now); requestAnimationFrame(loop); };
+  new IntersectionObserver(es => { seen = es.some(e => e.isIntersecting); wake(); }, { rootMargin: '200px 0px' }).observe(stage);
+  document.addEventListener('visibilitychange', wake);
+  wake();
 }
 
 // ------------------------------------------------------------------ the foot of the page: a few lines, rings and diamonds adrift, weightless
@@ -543,8 +552,9 @@ function startFooter() {
   // 0 when the section comes into view, 1 at the very bottom of the page
   const prog = () => { const r = box.getBoundingClientRect(); return clamp01((innerHeight - r.top) / Math.max(1, Math.min(r.height, innerHeight) * 0.95)); };
   const spun = new T.Quaternion();
+  let running = false;
   function frame(now) {
-    if (!on) return;
+    if (!on || document.hidden) { running = false; return; }
     if (box.clientWidth !== cw || box.clientHeight !== ch) layout();
     const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
     const target = prog(); pv += (target - pv) * (1 - Math.exp(-dt * 4));
@@ -559,7 +569,10 @@ function startFooter() {
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
-  new IntersectionObserver(es => { const was = on; on = es.some(e => e.isIntersecting); if (on && !was) { layout(); last = 0; requestAnimationFrame(frame); } }).observe(box);
+  const wake = () => { if (running || !on || document.hidden) return; running = true; layout(); last = 0; requestAnimationFrame(frame); };
+  try { renderer.compile(scene, camera); } catch (e) { }
+  new IntersectionObserver(es => { on = es.some(e => e.isIntersecting); wake(); }).observe(box);
+  document.addEventListener('visibilitychange', wake);
 }
 </script>
 </body>
