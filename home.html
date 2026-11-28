@@ -224,9 +224,10 @@ const scrolly = document.querySelector('.scrolly'), stage = $('stage'), canvas =
 // Only the menu's long smooth scroll still respects that setting.
 const calmScroll = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // morph: the pieces of drawing 10 flow, without stopping, into drawing 11 beside the story · fall: drawing 11 lets go
-const P = { hero: [0.02, 0.11], morph: [0.03, 0.56], text: [0.46, 0.72], fall: [0.68, 0.94] };
+const P = { hero: [0.02, 0.11], morph: [0.03, 0.64], text: [0.46, 0.72], fall: [0.68, 0.94] };
 const clamp01 = v => Math.max(0, Math.min(1, v)), seg = (v, a, b) => clamp01((v - a) / (b - a));
 const smooth = t => t * t * (3 - 2 * t);
+const ease = t => { const c = t * t * (3 - 2 * t); return c * 0.7 + t * 0.3; };   // a gentler middle than soft(): no sudden rush half way
 const soft = t => t * t * t * (t * (t * 6 - 15) + 10);   // starts and ends with no jolt
 // measured against the pinned stage, not the window: on iPad and iPhone the window grows and shrinks as Safari's bars move
 const progress = () => { const r = scrolly.getBoundingClientRect(), span = scrolly.offsetHeight - $('stage').offsetHeight; return clamp01(-r.top / Math.max(1, span)); };
@@ -390,9 +391,9 @@ function startScene() {
   const { rnd, rr } = seeded(7);
   const randQuat = amp => new T.Quaternion().setFromEuler(new T.Euler(rr(-amp, amp), rr(-amp, amp), rr(-amp, amp)));
   A.parts.forEach(pt => {
-    pt.bow = new T.Vector3(rr(-3.5, 3.5), rr(-3, 3), rr(-5, 2.5));     // how far its path bows out on the way
+    pt.bow = new T.Vector3(rr(-2.6, 2.6), rr(-2.2, 2.2), rr(-3.6, 1.8));     // how far its path bows out on the way
     pt.qScat = randQuat(1.5).multiply(pt.qHome);
-    pt.d1 = rnd() * 0.34; pt.ph = rnd() * Math.PI * 2;
+    pt.d1 = rnd() * 0.26; pt.ph = rnd() * Math.PI * 2;
   });
   // every piece of drawing 11 is one of the loose pieces of drawing 10, of the same kind and of a like length: it takes that piece's place
   // in the air (stretched to its length) and turns into its own as the magnet pulls it home
@@ -403,7 +404,7 @@ function startScene() {
   const ringB = B.parts.find(p => p.kind === 'ring') || B.parts[0];
   const maxR = Math.max(...B.parts.map(p => p.home.distanceTo(ringB.home)));
   B.parts.forEach(pt => {
-    pt.d2 = 0.26 * (pt.home.distanceTo(ringB.home) / maxR) + 0.08 * rnd();   // the cluster grows outward from its ring
+    pt.d2 = 0.17 * (pt.home.distanceTo(ringB.home) / maxR) + 0.06 * rnd();   // the cluster grows outward from its ring
     pt.qFall = randQuat(3.2); pt.fall = new T.Vector3(rr(-9, 9), rr(-16, -11), rr(-6, 4));
     pt.d3 = rnd() * 0.5; pt.ph = rnd() * Math.PI * 2;
   });
@@ -460,7 +461,7 @@ function startScene() {
     A.parts.forEach(pt => {
       const m = pt.m;
       if (pt.used) { m.visible = false; return; }                                  // its twin in drawing 11 draws it from the start
-      const t = soft(clamp01((morph - pt.d1) / 0.62)), loft = Math.sin(Math.PI * Math.min(1, t * 1.15));
+      const t = ease(clamp01((morph - pt.d1) / 0.74)), loft = Math.sin(Math.PI * Math.min(1, t * 1.15));
       vA.copy(pt.home).multiplyScalar(hs); vA.y += heroY;
       goal.set(L.x + pt.home.x * 0.5, pt.home.y * 0.9, -26);
       arc(goal, pt.bow, t); drift(pt, time, loft);
@@ -471,7 +472,7 @@ function startScene() {
     // each piece of drawing 11 leaves its place in drawing 10, tumbles gently along its arc and settles into the new one
     B.parts.forEach(pt => {
       const m = pt.m, src = pt.src;
-      const t = soft(clamp01((morph - pt.d2) / 0.66)), loft = Math.sin(Math.PI * t);   // follows the scroll, also with reduced motion
+      const t = ease(clamp01((morph - pt.d2) / 0.77)), loft = Math.sin(Math.PI * t);   // follows the scroll, also with reduced motion
       vA.copy(src.home).multiplyScalar(hs); vA.y += heroY;
       goal.set(L.x + pt.home.x * L.s, L.y + pt.home.y * L.s, 0);
       arc(goal, src.bow, t); drift(pt, time, loft);
