@@ -5614,46 +5614,62 @@ service cloud.firestore {
             return true;
         }
         function imMakeDeco() {
-            const lw = IM.lw, Mx = lw * 5.5, My = lw * 6.5, X0 = IM.x0 - Mx, Y0 = IM.y0 - My, W = IM.x1 - IM.x0 + 2 * Mx, H = IM.y1 - IM.y0 + 2 * My, area = W * H / (lw * lw);
+            const lw = IM.lw, Mx = lw * 5.5, My = lw * 6.5;
+            // the box round the ice itself (the picture has an empty margin of its own, the forest starts at the fence, not at the picture's edge)
+            const B = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+            for (let j = 0; j < IM.gh; j++) for (let i = 0; i < IM.gw; i++) if (IM.D[j * IM.gw + i] > 0) { const x = IM.x0 + i * IM.cell, y = IM.y0 + j * IM.cell; if (x < B.x0) B.x0 = x; if (x > B.x1) B.x1 = x; if (y < B.y0) B.y0 = y; if (y > B.y1) B.y1 = y; }
+            IM.box = B;
+            const X0 = B.x0 - Mx, Y0 = B.y0 - My, W = B.x1 - B.x0 + 2 * Mx, H = B.y1 - B.y0 + 2 * My, area = W * H / (lw * lw);
             const items = [], T = { tree: { r: 0.55, h: 1.7 }, snowman: { r: 0.5, h: 1.6 }, gift: { r: 0.4, h: 0.7 }, mound: { r: 0.9, h: 0 } };
-            const ringA = Math.max(10, area - (IM.x1 - IM.x0 + 4 * lw) * (IM.y1 - IM.y0 + 4 * lw) / (lw * lw)), caps = { tree: Math.round(Math.min(150, ringA / 4.5)), snowman: 4, gift: Math.round(Math.min(34, ringA / 9)), mound: Math.round(Math.min(40, ringA / 9)) };
+            const ringA = Math.max(10, area - (B.x1 - B.x0 + 1.5 * lw) * (B.y1 - B.y0 + 1.5 * lw) / (lw * lw)), caps = { tree: Math.round(Math.min(480, ringA / 1.7)), snowman: 6, gift: Math.round(Math.min(70, ringA / 7)), mound: Math.round(Math.min(90, ringA / 6)) };
             const cnt = { tree: 0, snowman: 0, gift: 0, mound: 0 };
-            const outside = (x, y) => x < IM.x0 - lw * 2.0 || x > IM.x1 + lw * 2.0 || y < IM.y0 - lw * 2.0 || y > IM.y1 + lw * 2.0;   // everything stands outside the maze, just beyond the string lights
+            const outside = (x, y) => x < B.x0 - lw * 0.75 || x > B.x1 + lw * 0.75 || y < B.y0 - lw * 0.75 || y > B.y1 + lw * 0.75;   // everything stands outside the maze, just beyond the string lights
+            const HM = { tree: 2.8, snowman: 2.9, gift: 1.5, mound: 0 };
             const tryPlace = kind => {
-                const d = T[kind], r = (kind === 'mound' ? 0.65 + Math.random() * 0.8 : d.r) * lw;
-                for (let tr = 0; tr < 60; tr++) {
+                const d = T[kind], r = (kind === 'mound' ? 0.65 + Math.random() * 0.8 : kind === 'tree' ? 0.3 + Math.random() * 0.32 : d.r) * lw;
+                for (let tr = 0; tr < 40; tr++) {
                     const x = X0 + Math.random() * W, y = Y0 + Math.random() * H;
                     if (!outside(x, y)) continue;
-                    if (!imFree(x, y, r + lw * 0.35)) continue;
-                    if (d.h && (!imFree(x, y - d.h * lw * 0.5, r * 0.9) || !imFree(x, y - d.h * lw, r * 0.7))) continue;
-                    if (items.some(o => Math.hypot(o.x - x, o.y - y) < (o.r + r) * (kind === 'mound' || o.k === 'mound' ? 0.8 : 1.25))) continue;
+                    if (!imFree(x, y, r * 0.9 + lw * 0.1)) continue;
+                    if (HM[kind] && !imFree(x, y - HM[kind] * r * 0.45, r * 0.5)) continue;   // the crown may not cover the ice
+                    if (items.some(o => Math.hypot(o.x - x, o.y - y) < (o.r + r) * (kind === 'tree' && o.k === 'tree' ? 0.72 : 0.85))) continue;
                     items.push({ k: kind, x, y, r, seed: (Math.random() * 1e6) | 0 }); cnt[kind]++; return true;
                 }
                 return false;
             };
             ['snowman', 'snowman', 'gift', 'gift', 'gift', 'gift'].forEach(tryPlace);
-            for (let i = 0; i < 3500; i++) { const q = Math.random(), kind = q < 0.55 ? 'tree' : q < 0.75 ? 'gift' : q < 0.76 ? 'snowman' : 'mound'; if (cnt[kind] < caps[kind]) tryPlace(kind); }
+            for (let i = 0; i < 9000; i++) { const q = Math.random(), kind = q < 0.62 ? 'tree' : q < 0.78 ? 'gift' : q < 0.80 ? 'snowman' : 'mound'; if (cnt[kind] < caps[kind]) tryPlace(kind); }
             items.sort((a, b) => a.y - b.y);
             const drifts = [], sparks = [];
-            for (let i = 0; i < Math.min(160, area / 3); i++) drifts.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, rx: lw * (1 + Math.random() * 2.4), ry: lw * (0.3 + Math.random() * 0.7), blue: Math.random() < 0.5 });
-            for (let i = 0; i < Math.min(220, area / 2); i++) sparks.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, ph: Math.random() * 6.283, z: lw * (0.05 + Math.random() * 0.07) });
+            for (let i = 0; i < Math.min(300, area / 1.6); i++) drifts.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, rx: lw * (1 + Math.random() * 2.4), ry: lw * (0.3 + Math.random() * 0.7), blue: Math.random() < 0.5 });
+            for (let i = 0; i < Math.min(360, area / 1.3); i++) sparks.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, ph: Math.random() * 6.283, z: lw * (0.05 + Math.random() * 0.07) });
             const bunnies = []; let guard = 0;
             while (bunnies.length < 9 && guard++ < 1200) { const x = X0 + Math.random() * W, y = Y0 + Math.random() * H; if (imFree(x, y, lw * 0.7)) bunnies.push({ x, y, hx: x, hy: y, st: 'rest', t: Math.random() * 2, dir: Math.random() < 0.5 ? 1 : -1, ph: 0, tx: x, ty: y, seed: (Math.random() * 1e6) | 0 }); }
             // string lights round the pattern: swags between small posts, bulbs every half a line
             const garlands = [], cols = ['#ff4d6d', '#ffd23f', '#4dd0ff', '#7dff7a', '#ff9a3c', '#c58bff'];
             let bi = 0;
-            [[0.7, 0.5, 3.0], [1.15, 0.38, 2.6], [1.6, 0.5, 3.4]].forEach(([ek, sagk, spacing], row) => {   // three strings, one inside the other
-                const e = lw * ek, gx0 = IM.x0 - e, gy0 = IM.y0 - e, gx1 = IM.x1 + e, gy1 = IM.y1 + e, swags = [];
+            [[0.3, 0.4, 2.8], [0.65, 0.34, 2.4], [1.0, 0.45, 3.2], [1.35, 0.38, 2.6]].forEach(([ek, sagk, spacing], row) => {   // four strings, one inside the other
+                const e = lw * ek, gx0 = B.x0 - e, gy0 = B.y0 - e, gx1 = B.x1 + e, gy1 = B.y1 + e, swags = [];
                 [[gx0, gy0, gx1, gy0, 0, 1], [gx1, gy0, gx1, gy1, 1, 0], [gx1, gy1, gx0, gy1, 0, 1], [gx0, gy1, gx0, gy0, -1, 0]].forEach(([ax, ay, bx, by, nx, ny], side) => {
                     const len = Math.hypot(bx - ax, by - ay), n = Math.max(2, Math.round(len / (lw * spacing)));
                     for (let i = 0; i < n; i++) { const p0 = [ax + (bx - ax) * i / n, ay + (by - ay) * i / n], p1 = [ax + (bx - ax) * (i + 1) / n, ay + (by - ay) * (i + 1) / n], sag = lw * sagk, sx = side % 2 ? nx : 0, sy = side % 2 ? 0 : 1;
                         swags.push([p0, [(p0[0] + p1[0]) / 2 + sx * sag * 2, (p0[1] + p1[1]) / 2 + sy * sag * 2], p1]); } });
-                swags.forEach(([p0, pc, p1]) => { const pts = [], bulbs = [], m = 14, L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]), nb = Math.max(3, Math.round(L / (lw * 0.38)));
+                swags.forEach(([p0, pc, p1]) => { const pts = [], bulbs = [], m = 14, L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]), nb = Math.max(3, Math.round(L / (lw * 0.3)));
                     for (let i = 0; i <= m; i++) { const t = i / m; pts.push([(1 - t) * (1 - t) * p0[0] + 2 * t * (1 - t) * pc[0] + t * t * p1[0], (1 - t) * (1 - t) * p0[1] + 2 * t * (1 - t) * pc[1] + t * t * p1[1]]); }
                     for (let i = 1; i < nb; i++) { const t = i / nb; bulbs.push({ x: (1 - t) * (1 - t) * p0[0] + 2 * t * (1 - t) * pc[0] + t * t * p1[0], y: (1 - t) * (1 - t) * p0[1] + 2 * t * (1 - t) * pc[1] + t * t * p1[1], col: cols[(bi++ + row * 2) % cols.length], ph: bi * 1.7 + row }); }
                     garlands.push({ pts, bulbs, post: p0 }); });
             });
-            IM.deco = { items, drifts, sparks, bunnies, garlands, prints: [] };
+            // snowdrifts heaped on the fences: low-poly lumps along the edge of the ice
+            const piles = [], hash = new Map(), cs = lw * 1.1;
+            { const D = IM.D, gw = IM.gw, gh = IM.gh, cell = IM.cell, cand = [];
+              for (let j = 1; j < gh - 1; j += 2) for (let i = 1; i < gw - 1; i += 2) { const k = j * gw + i; if (D[k] > 0 && (D[k - 1] === 0 || D[k + 1] === 0 || D[k - gw] === 0 || D[k + gw] === 0)) cand.push(k); }
+              cand.sort(() => Math.random() - 0.5);
+              for (const k of cand) { if (piles.length > 520) break; const i = k % gw, j = (k / gw) | 0, x = IM.x0 + (i + 0.5) * cell, y = IM.y0 + (j + 0.5) * cell, hx = Math.floor(x / cs), hy = Math.floor(y / cs);
+                let near = false; for (let a = -1; a <= 1 && !near; a++) for (let b = -1; b <= 1 && !near; b++) { const L = hash.get((hx + a) + ',' + (hy + b)); if (L && L.some(q => Math.hypot(q.x - x, q.y - y) < lw * 1.25)) near = true; }
+                if (near) continue; let nx = -(D[k + 1] - D[k - 1]), ny = -(D[k + gw] - D[k - gw]); const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+                const q = { x: x + nx * lw * 0.2, y: y + ny * lw * 0.2, ang: Math.atan2(ny, nx) + 1.5708, rx: lw * (0.38 + Math.random() * 0.3), ry: lw * (0.17 + Math.random() * 0.08), seed: (Math.random() * 1e6) | 0 };
+                piles.push(q); const key = hx + ',' + hy; (hash.get(key) || hash.set(key, []).get(key)).push(q); } }
+            IM.deco = { items, drifts, sparks, bunnies, garlands, piles, prints: [] };
         }
         function imTapGift(cx, cy) {
             if (!IM.deco) return false;
@@ -5664,6 +5680,21 @@ service cloud.firestore {
             for (let k = 0; k < 8; k++) { const a = -1.5708 + (Math.random() - 0.5) * 2.2, v = lw * (5 + Math.random() * 5); IM.fx.push({ x: g.x, y: g.y - g.r, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 1.7, e: E[(Math.random() * E.length) | 0], sz: 0.5 + Math.random() * 0.4, rot: (Math.random() - 0.5) * 3 }); }
             BWS.seq([1047, 1319, 1568, 2093], 0.05, 'sine', 0.04);
             return true;
+        }
+        // trees, gifts, snowmen and drifts are drawn once into small pictures and stamped: a dense forest stays light
+        const IM_PS = 2, IM_U = 40, IM_ORX = 1.7 * IM_U * IM_PS, IM_ORY = 3.2 * IM_U * IM_PS, IM_SPR = {};
+        function imSprite(kind, seed) {
+            const v = (kind === 'tree' || kind === 'gift') ? (seed & 3) : 0, key = kind + v; if (IM_SPR[key]) return IM_SPR[key];
+            const cv = document.createElement('canvas'); cv.width = Math.ceil(3.9 * IM_U * IM_PS); cv.height = Math.ceil(3.65 * IM_U * IM_PS); const c = cv.getContext('2d');
+            c.translate(IM_ORX, IM_ORY); c.scale(IM_PS, IM_PS); imDrawDeco(c, kind, { r: IM_U, seed: v * 977 + 13 }, 0);
+            return (IM_SPR[key] = cv);
+        }
+        function imStamp(c, o, X, Y, s, T) {
+            const sp = imSprite(o.k, o.seed), k = o.r / IM_U * s / IM_PS; let jump = 0, rot = 0;
+            if (o.popT) { const q = Math.max(0, 1 - (performance.now() - o.popT) / 450); jump = Math.sin(q * 3.1416) * o.r * 0.9 * s; rot = q * Math.sin(q * 25) * 0.15; }
+            c.save(); c.translate(X, Y - jump); if (rot) c.rotate(rot); c.drawImage(sp, -IM_ORX * k, -IM_ORY * k, sp.width * k, sp.height * k);
+            if (o.k === 'tree') { const u = o.r * s, tw = 0.5 + 0.5 * Math.sin(T * 4 + o.seed); c.globalAlpha = 0.3 + 0.6 * tw; c.fillStyle = '#fff6b0'; c.beginPath(); c.arc(0, -u * 2.55, u * 0.17, 0, 6.283); c.fill(); c.globalAlpha = 1; }
+            c.restore();
         }
         function imBunnyStep(b, dt) {
             const lw = IM.lw, D = IM.deco;
@@ -5989,8 +6020,13 @@ service cloud.firestore {
             c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.pic.width / IM.picK * s, IM.pic.height / IM.picK * s); c.restore();
             // skate marks: the puck's track scratched into the ice
             if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
+            if (D) D.piles.forEach(q => {   // snow heaped on the fence
+                if (q.x < vx0 || q.x > vx1 || q.y < vy0 || q.y > vy1) return;
+                c.save(); c.translate(ox + q.x * s, oy + q.y * s); c.rotate(q.ang); c.scale(s, s);
+                lpPoly(c, 'rgba(60,90,140,0.22)', [[-q.rx, q.ry * 0.5], [q.rx, q.ry * 0.5], [q.rx * 0.8, q.ry * 1.2], [-q.rx * 0.8, q.ry * 1.2]]);
+                lpBall(c, 0, 0, q.rx, q.ry, 8, 0.2 + (q.seed % 5) * 0.15, [218, 229, 245], [255, 255, 255]); c.restore(); });
             if (D) {
-                D.items.forEach(o => { if (o.x < vx0 - lw * 2 || o.x > vx1 + lw * 2 || o.y < vy0 || o.y > vy1 + lw * 4) return; c.save(); c.translate(ox + o.x * s, oy + o.y * s); c.scale(s, s); imDrawDeco(c, o.k, o, T0); c.restore(); });
+                D.items.forEach(o => { if (o.x < vx0 - lw * 2 || o.x > vx1 + lw * 2 || o.y < vy0 || o.y > vy1 + lw * 4) return; imStamp(c, o, ox + o.x * s, oy + o.y * s, s, T0); });
                 D.bunnies.forEach(b => { if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1 + lw * 2) return; c.save(); c.translate(ox + b.x * s, oy + b.y * s); c.scale(s, s); imDrawBunny(c, b, lw * 0.75, T0); c.restore(); });
             }
             if (D) {   // string lights: a dark wire on small posts, bulbs that chase and glow
@@ -6028,7 +6064,7 @@ service cloud.firestore {
             { const vg = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(40,60,140,0)'); vg.addColorStop(1, 'rgba(40,55,130,0.2)'); c.fillStyle = vg; c.fillRect(-30, -30, W + 60, H + 60); }
             // snow falling over everything
             c.fillStyle = 'rgba(255,255,255,0.85)';
-            for (let i = 0; i < 60; i++) { const h1 = bwHash(i, 31), h2 = bwHash(i, 32), sz = 1 + (h1 % 3) * 0.7, sp = 18 + (h2 % 30), X = (((h1 % 1000) / 1000 * W + Math.sin(T0 * 0.8 + i) * 14) % W + W) % W, Y = (((h2 % 1000) / 1000 * H + T0 * sp) % H); c.beginPath(); c.arc(X, Y, sz, 0, 6.283); c.fill(); }
+            for (let i = 0; i < 150; i++) { const h1 = bwHash(i, 31), h2 = bwHash(i, 32), sz = 1 + (h1 % 4) * 0.7, sp = 18 + (h2 % 40), X = (((h1 % 1000) / 1000 * W + Math.sin(T0 * 0.8 + i) * 14) % W + W) % W, Y = (((h2 % 1000) / 1000 * H + T0 * sp) % H); c.beginPath(); c.arc(X, Y, sz, 0, 6.283); c.fill(); }
         }
         // an ice-fishing hole: a ring of packed snow and broken ice round dark, deep water; light plays on the water, rings spread, small floes drift.
         // The golden one has gold glinting under the water. Done: the water has frozen over.
