@@ -5945,7 +5945,7 @@ service cloud.firestore {
                     }
                     if (dl < IM.HR * 0.7) {
                         h.done = true; IM.combo++; const pts = (h.gold ? 500 : 100) * Math.min(4, IM.combo); IM.score += pts;
-                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: (h.gold ? '🌟 Santa\'s gold! +' : '❄️ Snowflake! +') + pts, gold: h.gold });
+                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: (h.gold ? '🌟 Santa\'s gold! +' : '+') + pts, gold: h.gold });
                         for (let k = 0; k < 18; k++) { const a = Math.random() * 6.283, v = lw * (1 + Math.random() * 2.5); IM.fx.push({ x: h.x, y: h.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, p: 1, gold: h.gold }); }
                         imPlop(h.gold); imHorn(false); IM.shake = { t: 0, dur: h.gold ? 0.5 : 0.35, amp: h.gold ? 8 : 5 }; try { navigator.vibrate && navigator.vibrate(h.gold ? 40 : 20); } catch (e) {}
                         IM.sink = { x: h.x, y: h.y, t: 0, gold: h.gold }; IM.vx = IM.vy = 0; IM.px = h.x; IM.py = h.y;   // the puck drops into the water and bobs back up
@@ -6052,8 +6052,8 @@ service cloud.firestore {
                 if (f.e) { if (f.t > f.life) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += lw * 10 * dt; c.save(); c.globalAlpha = Math.max(0, Math.min(1, (f.life - f.t) / 0.4)); c.font = `${Math.round(lw * s * f.sz)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.translate(ox + f.x * s, oy + f.y * s); c.rotate(f.rot * Math.max(0, f.t)); c.fillText(f.e, 0, 0); c.restore(); return true; }
                 if (f.p) { const L = f.life || 0.7; if (f.t > L) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; c.fillStyle = f.h != null ? `hsla(${f.h},95%,58%,${Math.max(0, 1 - f.t / L)})` : f.gold ? `rgba(255,214,107,${1 - f.t / L})` : f.tele ? `rgba(196,176,255,${1 - f.t / L})` : `rgba(255,255,255,${1 - f.t / L})`; c.beginPath(); c.arc(ox + f.x * s, oy + f.y * s, Math.max(1.2, lw * s * (f.h != null ? 0.05 : 0.035)), 0, 6.283); c.fill(); return true; }
                 if (f.t > 1.1) return false;
-                c.save(); c.globalAlpha = Math.min(1, (1.1 - f.t) / 0.4); c.fillStyle = f.gold ? '#ffd36b' : '#eaf4ff'; c.font = `700 ${Math.round(18 + (f.gold ? 6 : 0))}px "Google Sans Flex","Google Sans",system-ui,sans-serif`; c.textAlign = 'center';
-                c.shadowColor = 'rgba(0,0,0,0.6)'; c.shadowBlur = 6; c.fillText(f.s, ox + f.x * s, oy + f.y * s - lw * s * 0.4 - f.t * 30); c.restore(); return true;
+                c.save(); c.globalAlpha = Math.min(1, (1.1 - f.t) / 0.4); c.fillStyle = f.gold ? '#ffd36b' : '#eaf4ff'; c.font = `700 ${Math.round((f.gold ? 24 : 26) * (1 + 0.25 * Math.max(0, 1 - f.t * 6)))}px "Google Sans Flex","Google Sans",system-ui,sans-serif`; c.textAlign = 'center';
+                c.shadowColor = 'rgba(0,0,0,0.6)'; c.shadowBlur = 6; c.fillText(f.s, ox + f.x * s, oy + f.y * s - lw * s * 0.4 - f.t * 70); c.restore(); return true;
             });
             // a soft blue dusk at the edges so the lights glow
             { const vg = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(40,60,140,0)'); vg.addColorStop(1, 'rgba(40,55,130,0.2)'); c.fillStyle = vg; c.fillRect(-30, -30, W + 60, H + 60); }
