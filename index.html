@@ -5620,13 +5620,13 @@ service cloud.firestore {
             for (let j = 0; j < IM.gh; j++) for (let i = 0; i < IM.gw; i++) if (IM.D[j * IM.gw + i] > 0) { const x = IM.x0 + i * IM.cell, y = IM.y0 + j * IM.cell; if (x < B.x0) B.x0 = x; if (x > B.x1) B.x1 = x; if (y < B.y0) B.y0 = y; if (y > B.y1) B.y1 = y; }
             IM.box = B;
             const X0 = B.x0 - Mx, Y0 = B.y0 - My, W = B.x1 - B.x0 + 2 * Mx, H = B.y1 - B.y0 + 2 * My, area = W * H / (lw * lw);
-            const items = [], T = { tree: { r: 0.55, h: 1.7 }, snowman: { r: 0.5, h: 1.6 }, gift: { r: 0.4, h: 0.7 }, mound: { r: 0.9, h: 0 } };
+            const items = [], T = { tree: { r: 0.8, h: 1.7 }, snowman: { r: 0.72, h: 1.6 }, gift: { r: 0.58, h: 0.7 }, mound: { r: 0.9, h: 0 } };
             const ringA = Math.max(10, area - (B.x1 - B.x0 + 1.5 * lw) * (B.y1 - B.y0 + 1.5 * lw) / (lw * lw)), caps = { tree: Math.round(Math.min(150, ringA / 5)), snowman: 6, gift: Math.round(Math.min(30, ringA / 12)), mound: Math.round(Math.min(30, ringA / 12)) };
             const cnt = { tree: 0, snowman: 0, gift: 0, mound: 0 };
             const outside = (x, y) => x < B.x0 - lw * 0.75 || x > B.x1 + lw * 0.75 || y < B.y0 - lw * 0.75 || y > B.y1 + lw * 0.75;   // everything stands outside the maze, just beyond the string lights
             const HM = { tree: 2.8, snowman: 2.9, gift: 1.5, mound: 0 };
             const tryPlace = kind => {
-                const d = T[kind], r = (kind === 'mound' ? 0.65 + Math.random() * 0.8 : kind === 'tree' ? 0.3 + Math.random() * 0.32 : d.r) * lw;
+                const d = T[kind], r = (kind === 'mound' ? 0.9 + Math.random() * 1.1 : kind === 'tree' ? 0.45 + Math.random() * 0.45 : d.r) * lw;
                 for (let tr = 0; tr < 40; tr++) {
                     const x = X0 + Math.random() * W, y = Y0 + Math.random() * H;
                     if (!outside(x, y)) continue;
@@ -5940,12 +5940,12 @@ service cloud.firestore {
                         for (let tries = 0; tries < 400 && !dest; tries++) { const i = pool2[(Math.random() * pool2.length) | 0], x = IM.x0 + (i % IM.gw + 0.5) * IM.cell, y = IM.y0 + (((i / IM.gw) | 0) + 0.5) * IM.cell;
                             if (Math.hypot(x - h.x, y - h.y) < IM.lw * 5 && tries < 300) continue; if (IM.holes.some(q => Math.hypot(q.x - x, q.y - y) < IM.lw * 1.8)) continue; dest = [x, y]; }
                         if (!dest) return;
-                        IM.sink = { x: h.x, y: h.y, t: 0, tele: true, dx: dest[0], dy: dest[1] }; IM.vx = IM.vy = 0; IM.px = h.x; IM.py = h.y; IM.tpCool = 1.3; IM.combo = 0; imWhoosh(); IM.shake = { t: 0, dur: 0.95, amp: 15 }; try { navigator.vibrate && navigator.vibrate([60, 40, 90]); } catch (e) {}
+                        IM.sink = { x: h.x, y: h.y, t: 0, tele: true, dx: dest[0], dy: dest[1] }; IM.vx = IM.vy = 0; IM.px = h.x; IM.py = h.y; IM.tpCool = 1.3; IM.combo = 0; imWhoosh();
                         return;
                     }
                     if (dl < IM.HR * 0.7) {
                         h.done = true; IM.combo++; const pts = (h.gold ? 500 : 100) * Math.min(4, IM.combo); IM.score += pts;
-                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: (h.gold ? '⭐ Golden gift! +' : '🎁 Merry goal! +') + pts, gold: h.gold });
+                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: (h.gold ? '🌟 Santa\'s gold! +' : '❄️ Snowflake! +') + pts, gold: h.gold });
                         for (let k = 0; k < 18; k++) { const a = Math.random() * 6.283, v = lw * (1 + Math.random() * 2.5); IM.fx.push({ x: h.x, y: h.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, p: 1, gold: h.gold }); }
                         imPlop(h.gold); imHorn(false); IM.shake = { t: 0, dur: h.gold ? 0.5 : 0.35, amp: h.gold ? 8 : 5 }; try { navigator.vibrate && navigator.vibrate(h.gold ? 40 : 20); } catch (e) {}
                         IM.sink = { x: h.x, y: h.y, t: 0, gold: h.gold }; IM.vx = IM.vy = 0; IM.px = h.x; IM.py = h.y;   // the puck drops into the water and bobs back up
@@ -6022,7 +6022,7 @@ service cloud.firestore {
             if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
             if (D) {
                 D.items.forEach(o => { if (o.x < vx0 - lw * 2 || o.x > vx1 + lw * 2 || o.y < vy0 || o.y > vy1 + lw * 4) return; imStamp(c, o, ox + o.x * s, oy + o.y * s, s, T0); });
-                D.bunnies.forEach(b => { if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1 + lw * 2) return; c.save(); c.translate(ox + b.x * s, oy + b.y * s); c.scale(s, s); imDrawBunny(c, b, lw * 0.75, T0); c.restore(); });
+                D.bunnies.forEach(b => { if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1 + lw * 2) return; c.save(); c.translate(ox + b.x * s, oy + b.y * s); c.scale(s, s); imDrawBunny(c, b, lw * 1.1, T0); c.restore(); });
             }
             if (D) {   // string lights: a dark wire on small posts, bulbs that chase and glow
                 const bl = (lw * s * 0.5);
@@ -6030,7 +6030,7 @@ service cloud.firestore {
                     const q = gl.pts[Math.floor(gl.pts.length / 2)]; if (q[0] < vx0 - lw * 4 || q[0] > vx1 + lw * 4 || q[1] < vy0 - lw * 4 || q[1] > vy1 + lw * 4) return;
                     const px = ox + gl.post[0] * s, py = oy + gl.post[1] * s; lpPolyS(c, '#5b3a24', [[px - lw * s * 0.05, py], [px + lw * s * 0.05, py], [px + lw * s * 0.04, py - lw * s * 0.55], [px - lw * s * 0.04, py - lw * s * 0.55]]);
                     c.strokeStyle = 'rgba(25,70,48,0.9)'; c.lineWidth = Math.max(1, lw * s * 0.035); c.lineJoin = 'round'; c.beginPath(); gl.pts.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s - lw * s * 0.5) : c.moveTo(ox + x * s, oy + y * s - lw * s * 0.5)); c.stroke();
-                    gl.bulbs.forEach((b, i) => { const X = ox + b.x * s, Y = oy + b.y * s - lw * s * 0.5, tw = 0.5 + 0.5 * Math.sin(T0 * 4 + b.ph), z = lw * s * 0.075;
+                    gl.bulbs.forEach((b, i) => { const X = ox + b.x * s, Y = oy + b.y * s - lw * s * 0.5, tw = 0.5 + 0.5 * Math.sin(T0 * 4 + b.ph), z = lw * s * 0.1;
                         const hg = c.createRadialGradient(X, Y, 0, X, Y, bl); hg.addColorStop(0, b.col + 'cc'); hg.addColorStop(1, b.col + '00'); c.globalAlpha = 0.1 + 0.3 * tw; c.fillStyle = hg; c.fillRect(X - bl, Y - bl, bl * 2, bl * 2); c.globalAlpha = 0.55 + 0.45 * tw;
                         lpPolyS(c, b.col, [[X, Y - z * 1.2], [X + z, Y], [X, Y + z * 1.2], [X - z, Y]]); lpPolyS(c, 'rgba(255,255,255,0.75)', [[X, Y - z * 1.2], [X + z * 0.1, Y - z * 0.1], [X - z * 0.6, Y - z * 0.2]]); c.globalAlpha = 1; });
                 });
