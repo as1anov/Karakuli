@@ -5562,7 +5562,7 @@ service cloud.firestore {
                 t.globalCompositeOperation = 'source-in'; t.fillStyle = col; t.fillRect(0, 0, W, H); t.globalCompositeOperation = 'source-over';
                 p.drawImage(T, 0, 0);
             };
-            const bt = lw * 0.15;
+            const bt = lw * 0.075;   // a thin fence
             grown(bt, '#f3f6fa'); grown(bt * 0.52, '#d23a40'); grown(bt * 0.3, '#97a3b7');
             // the ice: frosted pale blue with a soft sheen across it
             const tile = mk(256, 256), tc = tile.getContext('2d'), ti = tc.createImageData(256, 256);
@@ -5676,7 +5676,7 @@ service cloud.firestore {
                         if (vn < 0) { IM.vx -= 1.5 * vn * nx; IM.vy -= 1.5 * vn * ny; hitV = Math.max(hitV, -vn); IM.vx *= 0.96; IM.vy *= 0.96; }
                     }
                 }
-                if (hitV > lw * 2.5) { BWS.tone(200, 160, 0.05, 'sine', Math.min(0.06, hitV / lw * 0.006)); BWS.noise(0.05, Math.min(0.05, hitV / lw * 0.004), 2600); }
+                if (hitV > lw * 2.5) { const v = Math.min(1, hitV / (lw * 9)); BWS.noise(0.07, 0.05 + 0.07 * v, 380, 0, 'lowpass'); BWS.tone(95, 60, 0.07, 'sine', 0.03 + 0.05 * v); }   // a dull rubber knock on the boards, nothing metallic
                 // the holes: slide close enough and the puck is pulled in
                 IM.holes.forEach(h => {
                     if (h.done) return;
