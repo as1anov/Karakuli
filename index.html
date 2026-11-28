@@ -4498,34 +4498,34 @@ service cloud.firestore {
                 this.mBus = c.createGain(); this.mBus.gain.value = 0.5; this.mBus.connect(c.destination);
                 const tick = () => {
                     if (!this.mOn) return; if (!BW.sound) { this.musicStop(); return; }
-                    while (this.mNext < c.currentTime + 0.35) { this.musicStep(this.mStep++, this.mNext); this.mNext += 0.2344; }
+                    while (this.mNext < c.currentTime + 0.35) { this.musicStep(this.mStep++, this.mNext); this.mNext += 0.2143; }
                 };
                 tick(); this.mTimer = setInterval(tick, 100);
             },
             musicStop() { this.mOn = false; clearInterval(this.mTimer); if (this.mBus) { try { this.mBus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05); const b = this.mBus; setTimeout(() => { try { b.disconnect(); } catch (e) {} }, 400); } catch (e) {} this.mBus = null; } },
-            // 16 bars in A minor: the verse (Am F C G), a lifting chorus (Am F G E), then both again with an arpeggio and a fill before the loop
+            // 16 bars in E minor at 140 bpm: a driving arena anthem - four on the floor, claps on 2 and 4, a pumping bass, a sing-along hook (verse, chorus, then both again with an arpeggio)
             musicStep(n, t) {
                 const c = this.ctx, bus = this.mBus; if (!bus) return;
-                const st = n % 8, bar = ((n / 8) | 0) % 16, f = k => 440 * Math.pow(2, k / 12);
-                const A = [[7, null, 7, 5, 3, null, 5, 7], [8, null, 8, 7, 5, null, 3, 5], [3, 5, 7, null, 10, null, 7, 5], [5, null, 2, 5, 7, null, null, null]];
-                const B = [[12, null, 10, 7, 12, null, 10, 7], [8, null, 5, 8, 12, null, 8, 5], [10, null, 7, 10, 14, null, 12, 10], [14, null, 12, 11, 7, null, 11, null]];
-                const lead = (bar % 8 < 4 ? A : B)[bar % 4];
-                const Am = [-24, [0, 3, 7]], F = [-28, [-4, 0, 3]], C = [-21, [-9, -5, -2]], G = [-26, [-2, 2, 5]], E = [-29, [-5, -1, 2]];
-                const ch = (bar % 8 < 4 ? [Am, F, C, G] : [Am, F, G, E])[bar % 4];
+                const st = n % 8, bar = ((n / 8) | 0) % 16, f = k => 440 * Math.pow(2, k / 12), chorus = bar % 8 >= 4, second = bar >= 8;
+                const V = [[7, null, 10, null, 12, 10, 7, null], [7, null, 10, null, 15, null, 12, 10], [14, null, 12, 10, 12, null, 10, 7], [5, null, 7, null, 10, null, 7, 5]];
+                const C = [[15, null, 14, 12, 14, null, 12, 10], [14, null, 12, 10, 12, null, 10, 7], [12, null, 10, 7, 10, null, 7, 5], [7, 7, null, 10, null, 12, 14, null]];
+                const lead = (chorus ? C : V)[bar % 4];
+                const Em = [-29, [-5, -2, 2]], Cm = [-21, [-9, -5, -2]], G = [-26, [-2, 2, 5]], D = [-19, [-7, -3, 0]];
+                const ch = (chorus ? [Cm, G, D, Em] : [Em, Cm, G, D])[bar % 4];
                 const voice = (fr, type, vol, dur, cut) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = type; o.frequency.value = fr; lp.type = 'lowpass'; lp.frequency.value = cut;
-                    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.setValueAtTime(vol, t + dur * 0.65); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); o.connect(lp).connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.03); };
+                    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.setValueAtTime(vol, t + dur * 0.6); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); o.connect(lp).connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.03); };
                 if (!this.nb) { const nn = c.sampleRate; this.nb = c.createBuffer(1, nn, c.sampleRate); const d = this.nb.getChannelData(0); for (let i = 0; i < nn; i++) d[i] = Math.random() * 2 - 1; }
                 const hit = (freq, q, vol, dur, type) => { const sr = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain(); sr.buffer = this.nb; fl.type = type; fl.frequency.value = freq; fl.Q.value = q;
                     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); sr.connect(fl).connect(g).connect(bus); sr.start(t, Math.random() * 0.5, dur + 0.02); };
-                const kick = () => { const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12); g.gain.setValueAtTime(0.32, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g).connect(bus); o.start(t); o.stop(t + 0.22); };
+                const kick = () => { const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.11); g.gain.setValueAtTime(0.34, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g).connect(bus); o.start(t); o.stop(t + 0.22); };
                 const fill = bar % 8 === 7;
-                const k = lead[st]; if (k != null) { voice(f(k), 'square', 0.032, 0.21, 2600); voice(f(k) * 1.005, 'sawtooth', 0.012, 0.21, 3000); voice(f(k - 12), 'square', 0.012, 0.21, 1200); }   // the organ, with a fat low double
-                if (st % 2 === 0) voice(f(ch[0]), 'triangle', 0.1, 0.22, 520); else if (st === 7) voice(f(ch[0] + 12), 'triangle', 0.06, 0.14, 700);   // bass
-                if (st % 2 === 1 && bar >= 4) ch[1].forEach(x => voice(f(x), 'square', 0.011, 0.1, 1800));   // off-beat organ stabs
-                if (bar >= 8) voice(f(ch[1][[0, 1, 2, 1, 2, 1, 0, 2][st]] + 12), 'triangle', 0.028, 0.16, 3000);   // arpeggio
-                if (st === 0 || st === 4 || (bar >= 8 && st === 6) || (fill && st === 7)) kick();
-                if (st === 2 || st === 6 || (fill && st >= 5)) hit(1700, 0.8, 0.16, 0.12, 'bandpass');   // clap
-                hit(7000, 0.7, st % 2 ? 0.035 : 0.05, st === 7 ? 0.12 : 0.04, 'highpass');   // hat
+                const k = lead[st]; if (k != null) { voice(f(k), 'sawtooth', 0.03, 0.2, 3400); voice(f(k - 12), 'square', 0.014, 0.2, 1500); voice(f(k) * 1.006, 'sawtooth', 0.012, 0.2, 3000); }   // the hook
+                voice(f(ch[0] + [0, 0, 12, 0, 0, 12, 0, 12][st]), 'sawtooth', 0.075, 0.18, 420);   // pumping bass
+                if (st === 0 || st === 3 || st === 6) ch[1].forEach(x => voice(f(x), 'square', 0.012, 0.16, 2000));   // chord stabs on the 1, the "and" of 2 and the 4
+                if (second) voice(f(ch[1][[0, 1, 2, 1, 2, 1, 0, 2][st]] + 12), 'triangle', 0.03, 0.15, 3200);   // arpeggio
+                if (st % 2 === 0 || (fill && st === 7)) kick();
+                if (st === 2 || st === 6 || (fill && st >= 5)) hit(1800, 0.8, 0.17, 0.12, 'bandpass');   // clap
+                hit(7500, 0.7, st % 2 ? 0.055 : 0.025, st % 2 ? 0.07 : 0.03, 'highpass');   // hats: open on the off-beats
             },
             tone(f0, f1, dur, type = 'sine', vol = 0.06, delay = 0) {
                 if (!BW.sound || !this.ctx) return;
@@ -6020,13 +6020,13 @@ service cloud.firestore {
             if (!p) return;
             if (IM.lsx != null && sp > lw * 0.4 && Math.hypot(IM.px - IM.lsx, IM.py - IM.lsy) < lw * 3) {
                 const nx = -IM.vy / sp, ny = IM.vx / sp, q = Math.min(1, sp / (lw * 7)), tt = IM.time * 3;
-                p.save(); p.globalCompositeOperation = 'source-atop'; p.lineCap = 'round';
-                [[0.1, -0.3, 0.3], [0, 0.85, 0.15]].forEach(([o, a, wd], i) => {   // one track: a soft groove with a bright scratch in it
-                    const off = o * IM.R;
-                    p.strokeStyle = a > 0 ? `rgba(255,255,255,${a * (0.6 + 0.4 * q)})` : `rgba(50,90,150,${-a * (0.6 + 0.4 * q)})`;
-                    p.lineWidth = Math.max(1.2, IM.R * k * wd);
-                    p.beginPath(); p.moveTo((IM.lsx + nx * off - IM.x0) * k, (IM.lsy + ny * off - IM.y0) * k); p.lineTo((IM.px + nx * off - IM.x0) * k, (IM.py + ny * off - IM.y0) * k); p.stroke();
-                });
+                p.save(); p.globalCompositeOperation = 'source-atop'; p.lineCap = 'butt';
+                const X1 = (IM.lsx - IM.x0) * k, Y1 = (IM.lsy - IM.y0) * k, X2 = (IM.px - IM.x0) * k, Y2 = (IM.py - IM.y0) * k, a = 0.5 + 0.5 * q;
+                p.strokeStyle = `rgba(255,255,255,${0.2 * a})`; p.lineWidth = Math.max(2, IM.R * k * 0.85); p.beginPath(); p.moveTo(X1, Y1); p.lineTo(X2, Y2); p.stroke();   // the loosened snow band
+                p.strokeStyle = `rgba(60,100,160,${0.07 * a})`; p.lineWidth = Math.max(1, IM.R * k * 0.3); p.beginPath(); p.moveTo(X1, Y1); p.lineTo(X2, Y2); p.stroke();   // a faint groove in the middle
+                const L = Math.hypot(X2 - X1, Y2 - Y1), nsp = Math.min(14, Math.ceil(L / 3));   // a scatter of snow grains
+                for (let i = 0; i < nsp; i++) { const tt2 = Math.random(), off = (Math.random() - 0.5) * IM.R * k * 1.5, gx = X1 + (X2 - X1) * tt2 + nx * off, gy = Y1 + (Y2 - Y1) * tt2 + ny * off, gr = Math.max(0.6, IM.R * k * (0.03 + Math.random() * 0.05));
+                    p.fillStyle = `rgba(255,255,255,${(0.25 + Math.random() * 0.3) * a})`; p.beginPath(); p.arc(gx, gy, gr, 0, 6.2832); p.fill(); }
                 p.restore();
                 if (sp > lw * 3 && Math.random() < 0.9) { const a = Math.atan2(IM.vy, IM.vx) + Math.PI + (Math.random() - 0.5) * 1.2; IM.fx.push({ x: IM.px, y: IM.py, vx: Math.cos(a) * lw * 1.5, vy: Math.sin(a) * lw * 1.5, t: 0.45, p: 1 }); }   // ice shavings
             }
