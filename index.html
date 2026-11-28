@@ -4498,34 +4498,22 @@ service cloud.firestore {
                 this.mBus = c.createGain(); this.mBus.gain.value = 0.5; this.mBus.connect(c.destination);
                 const tick = () => {
                     if (!this.mOn) return; if (!BW.sound) { this.musicStop(); return; }
-                    while (this.mNext < c.currentTime + 0.35) { this.musicStep(this.mStep++, this.mNext); this.mNext += 0.2143; }
+                    while (this.mNext < c.currentTime + 0.35) { this.musicStep(this.mStep++, this.mNext); this.mNext += 0.42; }
                 };
                 tick(); this.mTimer = setInterval(tick, 100);
             },
             musicStop() { this.mOn = false; clearInterval(this.mTimer); if (this.mBus) { try { this.mBus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05); const b = this.mBus; setTimeout(() => { try { b.disconnect(); } catch (e) {} }, 400); } catch (e) {} this.mBus = null; } },
-            // 16 bars in E minor at 140 bpm: a driving arena anthem - four on the floor, claps on 2 and 4, a pumping bass, a sing-along hook (verse, chorus, then both again with an arpeggio)
+            // calm winter ambience: slow warm pads, a soft bell that plays only now and then, no drums (16 bars in D major, about 70 bpm)
             musicStep(n, t) {
                 const c = this.ctx, bus = this.mBus; if (!bus) return;
-                const st = n % 8, bar = ((n / 8) | 0) % 16, f = k => 440 * Math.pow(2, k / 12), chorus = bar % 8 >= 4, second = bar >= 8;
-                const V = [[7, null, 10, null, 12, 10, 7, null], [7, null, 10, null, 15, null, 12, 10], [14, null, 12, 10, 12, null, 10, 7], [5, null, 7, null, 10, null, 7, 5]];
-                const C = [[15, null, 14, 12, 14, null, 12, 10], [14, null, 12, 10, 12, null, 10, 7], [12, null, 10, 7, 10, null, 7, 5], [7, 7, null, 10, null, 12, 14, null]];
-                const lead = (chorus ? C : V)[bar % 4];
-                const Em = [-29, [-5, -2, 2]], Cm = [-21, [-9, -5, -2]], G = [-26, [-2, 2, 5]], D = [-19, [-7, -3, 0]];
-                const ch = (chorus ? [Cm, G, D, Em] : [Em, Cm, G, D])[bar % 4];
-                const voice = (fr, type, vol, dur, cut) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = type; o.frequency.value = fr; lp.type = 'lowpass'; lp.frequency.value = cut;
-                    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.setValueAtTime(vol, t + dur * 0.6); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); o.connect(lp).connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.03); };
-                if (!this.nb) { const nn = c.sampleRate; this.nb = c.createBuffer(1, nn, c.sampleRate); const d = this.nb.getChannelData(0); for (let i = 0; i < nn; i++) d[i] = Math.random() * 2 - 1; }
-                const hit = (freq, q, vol, dur, type) => { const sr = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain(); sr.buffer = this.nb; fl.type = type; fl.frequency.value = freq; fl.Q.value = q;
-                    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); sr.connect(fl).connect(g).connect(bus); sr.start(t, Math.random() * 0.5, dur + 0.02); };
-                const kick = () => { const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.11); g.gain.setValueAtTime(0.34, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g).connect(bus); o.start(t); o.stop(t + 0.22); };
-                const fill = bar % 8 === 7;
-                const k = lead[st]; if (k != null) { voice(f(k), 'sawtooth', 0.03, 0.2, 3400); voice(f(k - 12), 'square', 0.014, 0.2, 1500); voice(f(k) * 1.006, 'sawtooth', 0.012, 0.2, 3000); }   // the hook
-                voice(f(ch[0] + [0, 0, 12, 0, 0, 12, 0, 12][st]), 'sawtooth', 0.075, 0.18, 420);   // pumping bass
-                if (st === 0 || st === 3 || st === 6) ch[1].forEach(x => voice(f(x), 'square', 0.012, 0.16, 2000));   // chord stabs on the 1, the "and" of 2 and the 4
-                if (second) voice(f(ch[1][[0, 1, 2, 1, 2, 1, 0, 2][st]] + 12), 'triangle', 0.03, 0.15, 3200);   // arpeggio
-                if (st % 2 === 0 || (fill && st === 7)) kick();
-                if (st === 2 || st === 6 || (fill && st >= 5)) hit(1800, 0.8, 0.17, 0.12, 'bandpass');   // clap
-                hit(7500, 0.7, st % 2 ? 0.055 : 0.025, st % 2 ? 0.07 : 0.03, 'highpass');   // hats: open on the off-beats
+                const st = n % 8, bar = ((n / 8) | 0) % 16, f = k => 440 * Math.pow(2, k / 12);
+                const CH = [[-31 + 12, [-7, -3, 0, 4]], [-34 + 12, [-10, -7, -3, 0]], [-38 + 12, [-14, -10, -7, -3]], [-36 + 12, [-12, -7, -5, 0]]][bar % 4];   // Dmaj7, Bm7, Gmaj7, Asus
+                const M = [[null, null, 9, null, null, 12, null, null], [14, null, null, 12, null, null, 9, null], [null, null, 7, null, 9, null, null, null], [12, null, null, null, null, 9, null, 7], [null, 14, null, null, 12, null, null, 9], [null, null, 17, null, null, 14, null, null], [12, null, null, 9, null, null, 7, null], [null, null, 9, null, null, null, null, null]];
+                const mel = bar < 8 ? M[bar] : M[15 - bar].slice().reverse();
+                const note = (fr, type, vol, att, dur, cut) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = type; o.frequency.value = fr; lp.type = 'lowpass'; lp.frequency.value = cut;
+                    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + att); g.gain.setTargetAtTime(0.0001, t + att, dur / 3); o.connect(lp).connect(g).connect(bus); o.start(t); o.stop(t + att + dur + 0.2); };
+                if (st === 0) { CH[1].forEach((x, i) => { note(f(x), 'triangle', 0.02, 0.9, 2.6, 1100); note(f(x) * 1.003, 'sine', 0.012, 1.1, 2.6, 900); }); note(f(CH[0]), 'sine', 0.05, 0.5, 2.4, 400); }   // a warm pad and a soft bass note, one per bar
+                const k = mel[st]; if (k != null) { note(f(k), 'sine', 0.03, 0.01, 1.3, 4000); note(f(k) * 2.76, 'sine', 0.006, 0.005, 0.5, 6000); note(f(k - 12), 'sine', 0.012, 0.02, 1.6, 1500); }   // a bell: a bright strike that rings and fades
             },
             tone(f0, f1, dur, type = 'sine', vol = 0.06, delay = 0) {
                 if (!BW.sound || !this.ctx) return;
@@ -6111,43 +6099,40 @@ service cloud.firestore {
         }
         // an ice-fishing hole: a ring of packed snow and broken ice round dark, deep water; light plays on the water, rings spread, small floes drift.
         // The golden one has gold glinting under the water. Done: the water has frozen over.
-        function imHole(c, X, Y, r, h, T) {
-            const rnd = k => (bwHash(h.seed, k) % 1000) / 1000, N = 22;
-            const blob = (R, amp, k0) => { c.beginPath(); for (let i = 0; i <= N; i++) { const a = i / N * Math.PI * 2, rr = R * (1 + amp * (Math.sin(a * 3 + rnd(k0) * 6) * 0.5 + Math.sin(a * 5 + rnd(k0 + 1) * 6) * 0.3 + (rnd(k0 + 2 + (i % N)) - 0.5) * 0.4)); i ? c.lineTo(X + Math.cos(a) * rr, Y + Math.sin(a) * rr) : c.moveTo(X + Math.cos(a) * rr, Y + Math.sin(a) * rr); } c.closePath(); };
-            // the snow heaped round it, with a soft shadow
-            c.save(); c.shadowColor = 'rgba(10,30,60,0.35)'; c.shadowBlur = r * 0.35; c.shadowOffsetY = r * 0.08;
-            blob(r * 1.32, 0.09, 10); const sg = c.createRadialGradient(X - r * 0.4, Y - r * 0.5, r * 0.3, X, Y, r * 1.4); sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, '#d5e2f0'); c.fillStyle = sg; c.fill(); c.restore();
-            // broken-ice chips on the rim
-            for (let i = 0; i < 7; i++) { const a = rnd(40 + i) * 6.283, d = r * (1.05 + rnd(50 + i) * 0.18), z = r * (0.08 + rnd(60 + i) * 0.08); c.fillStyle = 'rgba(200,228,250,0.9)'; c.beginPath(); c.moveTo(X + Math.cos(a) * d + z, Y + Math.sin(a) * d); c.lineTo(X + Math.cos(a) * d, Y + Math.sin(a) * d + z); c.lineTo(X + Math.cos(a) * d - z * 0.8, Y + Math.sin(a) * d - z * 0.3); c.closePath(); c.fill(); }
-            if (h.done) {   // frozen over: smooth new ice with a star of cracks
-                blob(r, 0.06, 20); const fg = c.createRadialGradient(X - r * 0.3, Y - r * 0.3, 0, X, Y, r); fg.addColorStop(0, '#eaf6ff'); fg.addColorStop(1, '#a9cbe6'); c.fillStyle = fg; c.fill();
-                c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = Math.max(1, r * 0.04); c.beginPath(); for (let i = 0; i < 5; i++) { const a = rnd(70 + i) * 6.283; c.moveTo(X, Y); c.lineTo(X + Math.cos(a) * r * 0.8, Y + Math.sin(a) * r * 0.8); } c.stroke();
+        function imHole(c, X, Y, r, h, T) {   // an ice hole: a frosted lip, the wall of the ice going down, deep clear water with light playing on it
+            const rnd = k => (bwHash(h.seed, k) % 1000) / 1000, TAU = 6.2832, circ = (x, y, rr) => { c.beginPath(); c.arc(x, y, rr, 0, TAU); };
+            const pal = h.gold ? { w0: '#7a5a1c', w1: '#3a2606', w2: '#120a01', lip: '#ffe2a0', glow: 'rgba(255,205,100,' } : h.tele ? { w0: '#5f6fd6', w1: '#2a2f86', w2: '#0b0c32', lip: '#e4dcff', glow: 'rgba(170,150,255,' } : { w0: '#2f9bc4', w1: '#0f4f80', w2: '#04172e', lip: '#ffffff', glow: 'rgba(150,215,255,' };
+            // frost spreading over the ice round it
+            let g = c.createRadialGradient(X, Y, r * 0.9, X, Y, r * 1.75); g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; circ(X, Y, r * 1.75); c.fill();
+            c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = Math.max(1, r * 0.03); c.lineCap = 'round';
+            for (let i = 0; i < 14; i++) { const a = i / 14 * TAU + rnd(5) * 0.4, d0 = r * 1.25, d1 = r * (1.4 + rnd(10 + i) * 0.28); c.beginPath(); c.moveTo(X + Math.cos(a) * d0, Y + Math.sin(a) * d0); c.lineTo(X + Math.cos(a) * d1, Y + Math.sin(a) * d1); c.stroke(); }   // frost crystals
+            // the raised lip: a soft shadow below it, then a ring lit from the upper left
+            c.save(); c.shadowColor = 'rgba(8,30,70,0.4)'; c.shadowBlur = r * 0.3; c.shadowOffsetY = r * 0.1; g = c.createLinearGradient(X - r, Y - r, X + r, Y + r); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#bcd4ec'); c.fillStyle = g; circ(X, Y, r * 1.22); c.fill(); c.restore();
+            if (h.done) {   // frozen over: smooth new ice and a star of cracks
+                g = c.createRadialGradient(X - r * 0.3, Y - r * 0.3, 0, X, Y, r); g.addColorStop(0, '#f4fbff'); g.addColorStop(1, '#a9cbe6'); c.fillStyle = g; circ(X, Y, r * 1.02); c.fill();
+                c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = Math.max(1, r * 0.04); c.beginPath(); for (let i = 0; i < 5; i++) { const a = rnd(70 + i) * TAU; c.moveTo(X, Y); c.lineTo(X + Math.cos(a) * r * 0.8, Y + Math.sin(a) * r * 0.8); } c.stroke();
                 return;
             }
-            // the water: deep in the middle, an inner shadow under the ice edge
-            c.save(); blob(r, 0.06, 20); c.clip();
-            const wg = c.createRadialGradient(X + r * 0.1, Y + r * 0.15, 0, X, Y, r * 1.05);
-            if (h.gold) { wg.addColorStop(0, '#3d6f8a'); wg.addColorStop(0.55, '#12405e'); wg.addColorStop(1, '#03111f'); } else if (h.tele) { wg.addColorStop(0, '#3a6aa8'); wg.addColorStop(0.55, '#1c3466'); wg.addColorStop(1, '#0a1230'); } else { wg.addColorStop(0, '#2a78a8'); wg.addColorStop(0.55, '#0e3a60'); wg.addColorStop(1, '#03111f'); }
-            c.fillStyle = wg; c.fillRect(X - r * 1.2, Y - r * 1.2, r * 2.4, r * 2.4);
-            if (h.gold) {   // gold coins glinting under the water
-                for (let i = 0; i < 4; i++) { const a = T * 0.4 + i * 1.57 + h.t, d = r * 0.38, cx = X + Math.cos(a) * d, cy = Y + Math.sin(a) * d * 0.8, gl = 0.55 + 0.45 * Math.sin(T * 3 + i * 2);
-                    const cg = c.createRadialGradient(cx, cy, 0, cx, cy, r * 0.22); cg.addColorStop(0, `rgba(255,226,140,${0.9 * gl})`); cg.addColorStop(1, 'rgba(255,190,60,0)'); c.fillStyle = cg; c.beginPath(); c.arc(cx, cy, r * 0.22, 0, 6.283); c.fill(); }
-            }
-            // light playing on the water
+            // the wall of the ice, sloping down into the water: dark under the lit lip, bright on the far side
+            g = c.createLinearGradient(X - r, Y - r, X + r, Y + r); g.addColorStop(0, '#6f9bc4'); g.addColorStop(0.5, '#a9cdea'); g.addColorStop(1, '#f2f9ff'); c.fillStyle = g; circ(X, Y, r * 1.02); c.fill();
+            // the water
+            c.save(); circ(X, Y, r * 0.86); c.clip();
+            g = c.createRadialGradient(X + r * 0.1, Y + r * 0.2, 0, X, Y, r * 0.9); g.addColorStop(0, pal.w0); g.addColorStop(0.55, pal.w1); g.addColorStop(1, pal.w2); c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2);
+            if (h.gold) for (let i = 0; i < 4; i++) { const a = T * 0.4 + i * 1.57 + h.t, d = r * 0.38, cx = X + Math.cos(a) * d, cy = Y + Math.sin(a) * d * 0.8, gl = 0.55 + 0.45 * Math.sin(T * 3 + i * 2), cg = c.createRadialGradient(cx, cy, 0, cx, cy, r * 0.22);   // coins glinting under the water
+                cg.addColorStop(0, `rgba(255,226,140,${0.95 * gl})`); cg.addColorStop(1, 'rgba(255,190,60,0)'); c.fillStyle = cg; circ(cx, cy, r * 0.22); c.fill(); }
             c.globalCompositeOperation = 'lighter';
-            for (let i = 0; i < 3; i++) { const a = T * (0.5 + i * 0.17) + i * 2.1 + h.t; c.strokeStyle = `rgba(150,210,255,${0.16 + 0.08 * Math.sin(T * 2 + i)})`; c.lineWidth = Math.max(1, r * 0.06); c.beginPath(); c.arc(X + Math.cos(a) * r * 0.25, Y + Math.sin(a * 1.3) * r * 0.2, r * (0.3 + i * 0.12), a, a + 1.2); c.stroke(); }
-            const rp = (T * 0.45 + h.t) % 1; c.strokeStyle = `rgba(210,235,255,${0.35 * (1 - rp)})`; c.lineWidth = Math.max(1, r * 0.05); c.beginPath(); c.ellipse(X, Y, r * (0.15 + 0.75 * rp), r * (0.13 + 0.65 * rp), 0, 0, 6.283); c.stroke();
+            for (let i = 0; i < 3; i++) { const a = T * (0.45 + i * 0.15) + i * 2.1 + h.t; c.strokeStyle = pal.glow + (0.16 + 0.07 * Math.sin(T * 2 + i)) + ')'; c.lineWidth = Math.max(1, r * 0.055); c.beginPath(); c.arc(X + Math.cos(a) * r * 0.22, Y + Math.sin(a) * r * 0.22, r * (0.3 + i * 0.17), a, a + 1.25); c.stroke(); }   // light moving over the water
+            const rp = (T * 0.4 + h.t) % 1; c.strokeStyle = pal.glow + (0.4 * (1 - rp)) + ')'; c.lineWidth = Math.max(1, r * 0.045); c.beginPath(); c.ellipse(X, Y, r * (0.12 + 0.7 * rp), r * (0.1 + 0.6 * rp), 0, 0, TAU); c.stroke();   // a slow ripple
+            if (h.tele) { c.strokeStyle = 'rgba(200,180,255,0.3)'; c.lineWidth = Math.max(1, r * 0.05); c.beginPath(); for (let a = 0; a < 9; a += 0.2) { const rr = r * (0.1 + a * 0.085), ang = a + T * 0.7 + h.t; a ? c.lineTo(X + Math.cos(ang) * rr, Y + Math.sin(ang) * rr) : c.moveTo(X + Math.cos(ang) * rr, Y + Math.sin(ang) * rr); } c.stroke(); }
             c.globalCompositeOperation = 'source-over';
-            if (h.tele) { c.strokeStyle = 'rgba(190,170,255,0.16)'; c.lineWidth = Math.max(1, r * 0.06); c.beginPath(); for (let a = 0; a < 9; a += 0.2) { const rr = r * (0.12 + a * 0.085), ang = a + T * 0.7 + h.t; a ? c.lineTo(X + Math.cos(ang) * rr, Y + Math.sin(ang) * rr) : c.moveTo(X + Math.cos(ang) * rr, Y + Math.sin(ang) * rr); } c.stroke(); }
-            // a small floe drifting round
-            { const a = T * 0.25 + h.t * 3, fx = X + Math.cos(a) * r * 0.45, fy = Y + Math.sin(a) * r * 0.4, z = r * 0.13; c.fillStyle = 'rgba(235,246,255,0.95)'; c.beginPath(); c.moveTo(fx - z, fy - z * 0.4); c.lineTo(fx + z * 0.3, fy - z); c.lineTo(fx + z, fy + z * 0.2); c.lineTo(fx - z * 0.2, fy + z * 0.8); c.closePath(); c.fill(); }
-            const ig = c.createRadialGradient(X, Y, r * 0.6, X, Y, r * 1.05); ig.addColorStop(0, 'rgba(0,10,25,0)'); ig.addColorStop(1, 'rgba(0,10,25,0.75)'); c.fillStyle = ig; c.fillRect(X - r * 1.2, Y - r * 1.2, r * 2.4, r * 2.4);   // the ice edge throws the water's rim into shade
+            g = c.createRadialGradient(X, Y, r * 0.55, X, Y, r * 0.88); g.addColorStop(0, 'rgba(0,8,20,0)'); g.addColorStop(1, 'rgba(0,8,20,0.55)'); c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2);   // the ice wall shades the water at the edge
             c.restore();
-            // the edge of the ice: a bright lip
-            blob(r, 0.06, 20); c.strokeStyle = h.gold ? `rgba(255,214,107,${0.8 + 0.2 * Math.sin(T * 4 + h.t)})` : 'rgba(255,255,255,0.95)'; c.lineWidth = Math.max(1.5, r * 0.09); c.stroke();
-            if (h.gold) {   // sparkles round the golden hole
-                c.save(); c.shadowColor = '#ffd36b'; c.shadowBlur = r * 0.5; c.stroke(); c.restore();
-                for (let i = 0; i < 4; i++) { const a = T * 0.8 + i * 1.57, d = r * 1.45, sx = X + Math.cos(a) * d, sy = Y + Math.sin(a) * d, z = r * (0.12 + 0.07 * Math.sin(T * 5 + i)); c.fillStyle = '#ffe9a8'; c.beginPath(); c.moveTo(sx, sy - z); c.lineTo(sx + z * 0.25, sy - z * 0.25); c.lineTo(sx + z, sy); c.lineTo(sx + z * 0.25, sy + z * 0.25); c.lineTo(sx, sy + z); c.lineTo(sx - z * 0.25, sy + z * 0.25); c.lineTo(sx - z, sy); c.lineTo(sx - z * 0.25, sy - z * 0.25); c.closePath(); c.fill(); }
+            // a window highlight and the bright lip
+            c.fillStyle = 'rgba(255,255,255,0.4)'; c.beginPath(); c.ellipse(X - r * 0.34, Y - r * 0.4, r * 0.3, r * 0.14, -0.7, 0, TAU); c.fill();
+            c.strokeStyle = pal.lip; c.lineWidth = Math.max(1.5, r * 0.07); circ(X, Y, r * 0.86); c.stroke();
+            if (h.gold) {   // a warm glow and sparkles round the golden hole
+                c.save(); c.shadowColor = '#ffd36b'; c.shadowBlur = r * 0.6; c.strokeStyle = `rgba(255,214,107,${0.75 + 0.25 * Math.sin(T * 4 + h.t)})`; c.lineWidth = Math.max(1.5, r * 0.08); circ(X, Y, r * 1.2); c.stroke(); c.restore();
+                for (let i = 0; i < 4; i++) { const a = T * 0.8 + i * 1.57, d = r * 1.5, sx = X + Math.cos(a) * d, sy = Y + Math.sin(a) * d, z = r * (0.12 + 0.07 * Math.sin(T * 5 + i)); c.fillStyle = '#ffe9a8'; c.beginPath(); c.moveTo(sx, sy - z); c.lineTo(sx + z * 0.25, sy - z * 0.25); c.lineTo(sx + z, sy); c.lineTo(sx + z * 0.25, sy + z * 0.25); c.lineTo(sx, sy + z); c.lineTo(sx - z * 0.25, sy + z * 0.25); c.lineTo(sx - z, sy); c.lineTo(sx - z * 0.25, sy - z * 0.25); c.closePath(); c.fill(); }
             }
         }
         // the puck falls in: a deep "bloop", a splash, bubbles rising; the golden hole adds a chime of bells
