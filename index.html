@@ -5579,6 +5579,14 @@ service cloud.firestore {
             let g = t.createLinearGradient(0, 0, W, H); g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(0.38, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(0,20,50,0.12)'); t.fillStyle = g; t.fillRect(0, 0, W, H);
             t.strokeStyle = 'rgba(255,255,255,0.10)'; t.lineWidth = Math.max(1, k * lw * 0.02);   // a few thin cracks frozen in it
             for (let i = 0; i < Math.round(W * H / 90000); i++) { const h1 = bwHash(i, 61), h2 = bwHash(i, 62), cx = h1 % W, cy = h2 % H, L = (40 + h1 % 120) * k; t.beginPath(); t.moveTo(cx, cy); t.lineTo(cx + L * 0.55, cy + L); t.stroke(); }
+            // hockey markings painted into the ice: red centre line and circle, blue lines, face-off dots
+            { const wx = u => (u - X0) * k, wy = u => (u - Y0) * k, cxm = (X0 + IM.x1) / 2, cym = (Y0 + IM.y1) / 2, red = 'rgba(205,60,72,0.5)', blue = 'rgba(55,105,205,0.45)';
+              const vline = (x, col, wd) => { t.strokeStyle = col; t.lineWidth = Math.max(1, wd * lw * k); t.beginPath(); t.moveTo(wx(x), 0); t.lineTo(wx(x), H); t.stroke(); };
+              vline(X0 + (IM.x1 - X0) * 0.27, blue, 0.3); vline(X0 + (IM.x1 - X0) * 0.73, blue, 0.3); vline(cxm, red, 0.3);
+              t.setLineDash([lw * k * 0.5, lw * k * 0.35]); vline(cxm, 'rgba(255,255,255,0.55)', 0.12); t.setLineDash([]);
+              t.strokeStyle = blue; t.lineWidth = Math.max(1, lw * k * 0.16); t.beginPath(); t.arc(wx(cxm), wy(cym), lw * 3.4 * k, 0, 6.283); t.stroke();
+              t.fillStyle = blue; t.beginPath(); t.arc(wx(cxm), wy(cym), lw * 0.4 * k, 0, 6.283); t.fill();
+              [[0.15, 0.3], [0.15, 0.7], [0.85, 0.3], [0.85, 0.7]].forEach(([fx, fy]) => { const x = X0 + (IM.x1 - X0) * fx, y = Y0 + (IM.y1 - Y0) * fy; t.strokeStyle = red; t.lineWidth = Math.max(1, lw * k * 0.12); t.beginPath(); t.arc(wx(x), wy(y), lw * 2.2 * k, 0, 6.283); t.stroke(); t.fillStyle = red; t.beginPath(); t.arc(wx(x), wy(y), lw * 0.3 * k, 0, 6.283); t.fill(); }); }
             t.globalCompositeOperation = 'source-over';
             p.drawImage(T, 0, 0);
             // a thin shadow of the boards on the ice, along its edge
@@ -5586,13 +5594,13 @@ service cloud.firestore {
             t.filter = `blur(${Math.max(1, lw * k * 0.05)}px)`; t.drawImage(M, 0, 0); t.filter = 'none';
             t.globalCompositeOperation = 'destination-in'; t.drawImage(M, 0, 0); t.globalCompositeOperation = 'source-over';
             p.drawImage(T, 0, 0);
-            IM.pic = P; IM.picK = k;
+            IM.pic = P; IM.picK = k; IM.pc = p; IM.lsx = null;
         }
         function imMakeUI() {
             const el = document.createElement('div'); el.id = 'im-root';
             el.innerHTML = `<canvas id="im-cv"></canvas>
                 <button id="im-x" aria-label="Close the game"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-                <div id="im-hud"><div><span class="im-l">SCORE</span><b id="im-score">0</b></div><div class="im-mid"><span class="im-l">HOLES</span><b id="im-holes">0</b></div><div class="im-r"><span class="im-l">TIME</span><b id="im-time">0.0</b></div></div>
+                <div id="im-hud"><div><span class="im-l">SCORE</span><b id="im-score">0</b></div><div class="im-mid"><span class="im-l">GOALS</span><b id="im-holes">0</b></div><div class="im-r"><span class="im-l">TIME</span><b id="im-time">0.0</b></div></div>
                 <div id="im-msg"><b id="im-m1"></b><span id="im-m2"></span></div>`;
             document.body.appendChild(el);
             const st = document.createElement('style'); st.id = 'im-style';
@@ -5635,7 +5643,7 @@ service cloud.firestore {
         function imGo() {
             BWS.init();
             const begin = () => { IM.b0 = null; IM.state = 'play'; IM.time = 0; imMsg('', ''); BWS.start(); };
-            if (IM.state === 'won') { imNewRound(); }
+            if (IM.state === 'won') { imBuildPicture(); imNewRound(); }   // fresh ice for the next period
             // iOS asks for permission to read the tilt, from inside the tap
             if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function' && IM.tiltOK == null) {
                 DeviceOrientationEvent.requestPermission().then(r => { IM.tiltOK = r === 'granted'; begin(); }).catch(() => { IM.tiltOK = false; begin(); });
@@ -5707,23 +5715,52 @@ service cloud.firestore {
                     }
                     if (dl < IM.HR * 0.7) {
                         h.done = true; IM.combo++; const pts = (h.gold ? 500 : 100) * Math.min(4, IM.combo); IM.score += pts;
-                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: '+' + pts, gold: h.gold });
+                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: (h.gold ? 'GOLDEN GOAL! +' : 'GOAL! +') + pts, gold: h.gold });
                         for (let k = 0; k < 18; k++) { const a = Math.random() * 6.283, v = lw * (1 + Math.random() * 2.5); IM.fx.push({ x: h.x, y: h.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, p: 1, gold: h.gold }); }
-                        imPlop(h.gold);
+                        imPlop(h.gold); imHorn(false);
                         IM.sink = { x: h.x, y: h.y, t: 0, gold: h.gold }; IM.vx = IM.vy = 0; IM.px = h.x; IM.py = h.y;   // the puck drops into the water and bobs back up
                         if (IM.holes.filter(q => !q.tele).every(q => q.done)) {
                             IM.state = 'won'; const tm = IM.time; const bonus = Math.max(0, Math.round(3000 - tm * 25)); IM.score += bonus;
                             if (!IM.best || tm < IM.best) { IM.best = tm; try { localStorage.setItem('kk-im-best', String(tm)); } catch (e) {} }
-                            imMsg('All holes! ' + tm.toFixed(1) + ' s', `Score ${IM.score} · best ${IM.best.toFixed(1)} s · tap to play again`); BWS.win();
+                            imMsg('FINAL HORN! ' + tm.toFixed(1) + ' s', `Score ${IM.score} · best ${IM.best.toFixed(1)} s · tap for the next period`); BWS.win(); imHorn(true);
                         }
                     }
                 });
                 if (Math.abs(IM.vx) + Math.abs(IM.vy) < lw * 0.3) IM.combo = 0;   // the combo runs while the puck keeps sliding
                 IM.trail.push([IM.px, IM.py]); if (IM.trail.length > 70) IM.trail.shift();
+                imScratch(dt);
                 imHud();
             }
             imDraw(dt);
             IM.raf = requestAnimationFrame(imFrame);
+        }
+        // skate marks: pale scored grooves cut into the ice, a few thin parallel lines that stay for the whole round
+        function imScratch(dt) {
+            const p = IM.pc, k = IM.picK, lw = IM.lw, sp = Math.hypot(IM.vx, IM.vy);
+            if (!p) return;
+            if (IM.lsx != null && sp > lw * 0.8 && Math.hypot(IM.px - IM.lsx, IM.py - IM.lsy) < lw * 3) {
+                const nx = -IM.vy / sp, ny = IM.vx / sp, q = Math.min(1, sp / (lw * 7)), tt = IM.time * 3;
+                p.save(); p.globalCompositeOperation = 'source-atop'; p.lineCap = 'round';
+                [[-0.5, 0.3], [0, 0.4], [0.45, 0.3], [0.15, -0.2]].forEach(([o, a], i) => {
+                    const off = (o + Math.sin(tt + i * 2.1) * 0.08) * IM.R;
+                    p.strokeStyle = a > 0 ? `rgba(255,255,255,${a * (0.5 + 0.5 * q)})` : `rgba(70,110,160,${-a * (0.5 + 0.5 * q)})`;
+                    p.lineWidth = Math.max(0.7, IM.R * k * (a > 0 ? 0.05 : 0.04));
+                    p.beginPath(); p.moveTo((IM.lsx + nx * off - IM.x0) * k, (IM.lsy + ny * off - IM.y0) * k); p.lineTo((IM.px + nx * off - IM.x0) * k, (IM.py + ny * off - IM.y0) * k); p.stroke();
+                });
+                p.restore();
+                if (sp > lw * 4 && Math.random() < 0.7) { const a = Math.atan2(IM.vy, IM.vx) + Math.PI + (Math.random() - 0.5) * 1.2; IM.fx.push({ x: IM.px, y: IM.py, vx: Math.cos(a) * lw * 1.5, vy: Math.sin(a) * lw * 1.5, t: 0.45, p: 1 }); }   // ice shavings
+            }
+            IM.lsx = IM.px; IM.lsy = IM.py;
+            IM.scr = (IM.scr || 0) - dt;   // the hiss of the blade on the ice
+            if (sp > lw * 2.5 && IM.scr <= 0) { IM.scr = 0.11; BWS.noise(0.12, 0.008 + 0.016 * Math.min(1, sp / (lw * 9)), 5200, 0, 'bandpass'); }
+        }
+        // the goal horn and the roar of the stands
+        function imHorn(long) {
+            BWS.init(); const S = BWS; if (!S.ctx || !BW.sound) return;
+            const c = S.ctx, t = c.currentTime, d = long ? 1.1 : 0.45, f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
+            const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.04); g.gain.setValueAtTime(0.07, t + d * 0.7); g.gain.exponentialRampToValueAtTime(0.001, t + d); f.connect(g).connect(c.destination);
+            [233, 311].forEach(fr => { const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = fr; o.connect(f); o.start(t); o.stop(t + d + 0.05); });
+            S.noise(long ? 1.6 : 0.8, 0.045, 1100, 0.05, 'bandpass'); S.noise(long ? 1.3 : 0.6, 0.03, 2200, 0.15, 'bandpass');
         }
         function imDraw(dt) {
             const c = IM.c, W = IM.W, H = IM.H, s = IM.s, lw = IM.lw, dpr = IM.dpr;
@@ -5736,13 +5773,16 @@ service cloud.firestore {
             c.setTransform(dpr, 0, 0, dpr, 0, 0);
             // night snow under the ice
             let g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b1428'); g.addColorStop(1, '#141a35'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+            { const T0 = performance.now() / 4000;   // arena floodlights sweeping over the dark stands
+              [[0.2, 0], [0.8, 0]].forEach(([fx], i) => { const lx = W * (fx + Math.sin(T0 + i * 2) * 0.06), lg = c.createRadialGradient(lx, -H * 0.05, 0, lx, H * 0.25, H * 0.8); lg.addColorStop(0, 'rgba(190,215,255,0.16)'); lg.addColorStop(1, 'rgba(190,215,255,0)'); c.fillStyle = lg; c.fillRect(0, 0, W, H); });
+              c.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = 0; i < 70; i++) { const h1 = bwHash(i, 91), h2 = bwHash(i, 92); c.beginPath(); c.arc((h1 % 1000) / 1000 * W, (h2 % 1000) / 1000 * H, 1.2 + (h1 % 3) * 0.5, 0, 6.283); c.fill(); } }
             c.fillStyle = 'rgba(225,235,255,0.06)';
             for (let i = 0; i < 140; i++) { const h1 = bwHash(i, 7), h2 = bwHash(i, 8); const X = ((h1 % 2000) / 2000 * (IM.x1 - IM.x0) + IM.x0) * s + ox, Y = ((h2 % 2000) / 2000 * (IM.y1 - IM.y0) + IM.y0) * s + oy; c.beginPath(); c.arc(X, Y, 1 + (h1 % 3), 0, 6.283); c.fill(); }
             // the ice with a soft shadow
             c.save(); c.shadowColor = 'rgba(0,0,0,0.55)'; c.shadowBlur = lw * s * 0.25; c.shadowOffsetY = lw * s * 0.08;
             c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.pic.width / IM.picK * s, IM.pic.height / IM.picK * s); c.restore();
             // skate marks: the puck's track scratched into the ice
-            if (IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
+            if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
             // the holes: dark water in the ice, a snowy rim, a slow ripple; the golden one glints
             const T = performance.now() / 1000;
             IM.holes.forEach(h => imHole(c, ox + h.x * s, oy + h.y * s, IM.HR * s, h, T));
