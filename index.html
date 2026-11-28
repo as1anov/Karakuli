@@ -5865,7 +5865,7 @@ service cloud.firestore {
         }
         function imMakeUI() {
             const el = document.createElement('div'); el.id = 'im-root';
-            el.innerHTML = `<canvas id="im-cv"></canvas>
+            el.innerHTML = `<canvas id="im-cv"></canvas><div id="im-frost"></div>
                 <button id="im-x" aria-label="Close the game"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
                 <div id="im-hud"><div><span class="im-l">CHEER</span><b id="im-score">0</b></div><div class="im-mid"><span class="im-l">HOLES</span><b id="im-holes">0</b></div><div class="im-r"><span class="im-l">TIME</span><b id="im-time">0.0</b></div></div>
                 <div id="im-msg"><b id="im-m1"></b><span id="im-m2"></span></div>`;
@@ -5873,6 +5873,9 @@ service cloud.firestore {
             const st = document.createElement('style'); st.id = 'im-style';
             st.textContent = `#im-root{position:fixed;inset:0;z-index:5000;background:#dbe7f5;touch-action:none;-webkit-user-select:none;user-select:none;font-family:"Google Sans Flex","Google Sans",system-ui,-apple-system,sans-serif;color:#14233f}
                 #im-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+                #im-frost{position:absolute;inset:0;pointer-events:none;-webkit-backdrop-filter:blur(3.5px) saturate(.75) brightness(1.06);backdrop-filter:blur(3.5px) saturate(.75) brightness(1.06);background:rgba(225,240,255,.12);
+                  -webkit-mask-image:linear-gradient(to right,#000,rgba(0,0,0,.6) 5%,transparent 13%,transparent 87%,rgba(0,0,0,.6) 95%,#000),linear-gradient(to bottom,#000,rgba(0,0,0,.6) 3%,transparent 7%,transparent 93%,rgba(0,0,0,.6) 97%,#000);
+                  mask-image:linear-gradient(to right,#000,rgba(0,0,0,.6) 5%,transparent 13%,transparent 87%,rgba(0,0,0,.6) 95%,#000),linear-gradient(to bottom,#000,rgba(0,0,0,.6) 3%,transparent 7%,transparent 93%,rgba(0,0,0,.6) 97%,#000)}
                 #im-x{position:absolute;left:max(14px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));width:40px;height:40px;border:0;background:none;color:#14233f;padding:3px;cursor:pointer}
                 #im-x svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
                 #im-hud{position:absolute;left:max(64px,calc(env(safe-area-inset-left) + 64px));right:max(16px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));display:flex;justify-content:space-between;pointer-events:none;text-shadow:0 1px 5px rgba(255,255,255,.9)}
@@ -5930,7 +5933,7 @@ service cloud.firestore {
                     if (i % 2 === 0) { c.moveTo(nx, ny); c.lineTo(nx + Math.cos(ang + 0.8) * bl, ny + Math.sin(ang + 0.8) * bl); c.moveTo(nx, ny); c.lineTo(nx + Math.cos(ang - 0.8) * bl, ny + Math.sin(ang - 0.8) * bl); }
                     c.stroke(); px = nx; py = ny; ang += bend / n; } };
             // a six-armed dendrite snowflake: arms with side branches, a small hexagon at the heart
-            const flake = (x, y, R, rot, al) => { c.save(); c.translate(x, y); c.rotate(rot); c.strokeStyle = `rgba(255,255,255,${al})`; c.shadowColor = 'rgba(110,165,230,0.7)'; c.shadowBlur = 3;
+            const flake = (x, y, R, rot, al) => { c.save(); c.translate(x, y); c.rotate(rot); c.strokeStyle = `rgba(250,253,255,${al * 0.85})`; c.shadowColor = 'rgba(200,228,255,0.95)'; c.shadowBlur = 5;
                 const kind = rnd(), lw0 = Math.max(0.8, R * 0.07);
                 for (let i = 0; i < 6; i++) { c.save(); c.rotate(i * Math.PI / 3); c.lineWidth = lw0; c.beginPath(); c.moveTo(0, 0); c.lineTo(R, 0);
                     const br = kind < 0.5 ? [[0.32, 0.36], [0.55, 0.3], [0.76, 0.18]] : [[0.45, 0.42], [0.72, 0.22]];
