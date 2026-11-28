@@ -4469,7 +4469,7 @@ service cloud.firestore {
             // so the first tap opens the audio session as playback, resumes the context and plays a silent buffer and a silent looping clip
             unlock() {
                 try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
-                this.init();
+                this.init(); this.wake();
                 if (this.ctx) { try { const b = this.ctx.createBuffer(1, 1, 22050), s = this.ctx.createBufferSource(); s.buffer = b; s.connect(this.ctx.destination); s.start(0); } catch (e) {} }
                 if (!this.el && !(navigator.audioSession)) {   // old iOS only: without the audioSession API a silent clip keeps Web Audio audible on silent mode
                     try {
@@ -4481,12 +4481,16 @@ service cloud.firestore {
                 }
                 if (this.el) { try { const pr = this.el.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {} }
             },
+            wake() {   // the tilt sensor does not count as activity: without this the screen goes dark in the middle of a game
+                try { if (navigator.wakeLock && (!this.wl || this.wl.released) && !document.hidden) navigator.wakeLock.request('screen').then(l => { this.wl = l; }).catch(() => {}); } catch (e) {}
+            },
             // nothing may keep playing once the game is closed or the page is hidden: no lock-screen player, no music
             stop() {
                 this.musicStop();
                 if (this.el) { try { this.el.pause(); } catch (e) {} }
                 try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch (e) {}
             },
+            sleepOK() { if (this.wl) { try { this.wl.release().catch(() => {}); } catch (e) {} this.wl = null; } },
             // hockey-arena music: a stadium-organ riff over a stomp-stomp-clap beat, scheduled a little ahead of the clock (all synthesised, nothing loaded)
             musicStart() {
                 if (this.mOn || !BW.sound) return; this.init(); if (!this.ctx) return;
@@ -4499,19 +4503,29 @@ service cloud.firestore {
                 tick(); this.mTimer = setInterval(tick, 100);
             },
             musicStop() { this.mOn = false; clearInterval(this.mTimer); if (this.mBus) { try { this.mBus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05); const b = this.mBus; setTimeout(() => { try { b.disconnect(); } catch (e) {} }, 400); } catch (e) {} this.mBus = null; } },
+            // 16 bars in A minor: the verse (Am F C G), a lifting chorus (Am F G E), then both again with an arpeggio and a fill before the loop
             musicStep(n, t) {
                 const c = this.ctx, bus = this.mBus; if (!bus) return;
-                const st = n % 8, bar = ((n / 8) | 0) % 8, f = k => 440 * Math.pow(2, k / 12);
-                const LEAD = [[0, 0, 3, 0, 5, 5, 3, null], [7, 7, 5, 3, 5, null, null, null], [0, 0, 3, 0, 5, 5, 7, 8], [7, 5, 3, 0, -2, null, 0, null]];
-                const lead = bar === 7 ? [0, null, 0, null, 0, 0, null, null] : LEAD[bar % 4];
-                const ROOT = [-24, -28, -21, -26];   // A  F  C  G
+                const st = n % 8, bar = ((n / 8) | 0) % 16, f = k => 440 * Math.pow(2, k / 12);
+                const A = [[7, null, 7, 5, 3, null, 5, 7], [8, null, 8, 7, 5, null, 3, 5], [3, 5, 7, null, 10, null, 7, 5], [5, null, 2, 5, 7, null, null, null]];
+                const B = [[12, null, 10, 7, 12, null, 10, 7], [8, null, 5, 8, 12, null, 8, 5], [10, null, 7, 10, 14, null, 12, 10], [14, null, 12, 11, 7, null, 11, null]];
+                const lead = (bar % 8 < 4 ? A : B)[bar % 4];
+                const Am = [-24, [0, 3, 7]], F = [-28, [-4, 0, 3]], C = [-21, [-9, -5, -2]], G = [-26, [-2, 2, 5]], E = [-29, [-5, -1, 2]];
+                const ch = (bar % 8 < 4 ? [Am, F, C, G] : [Am, F, G, E])[bar % 4];
                 const voice = (fr, type, vol, dur, cut) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = type; o.frequency.value = fr; lp.type = 'lowpass'; lp.frequency.value = cut;
-                    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.setValueAtTime(vol, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); o.connect(lp).connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.03); };
-                const k = lead[st]; if (k != null) { voice(f(k), 'square', 0.035, 0.2, 2400); voice(f(k + 12) * 1.004, 'sawtooth', 0.012, 0.2, 3200); }   // the organ
-                if (st % 2 === 0) voice(f(ROOT[bar % 4]), 'triangle', 0.09, 0.22, 500);   // bass
-                if (st === 0 || st === 3) { voice(130, 'sine', 0.2, 0.16, 400); }   // stomp
-                if (st === 4) { const nn = Math.floor(c.sampleRate * 0.12), b = c.createBuffer(1, nn, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < nn; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nn, 2.5);
-                    const sr = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain(); sr.buffer = b; fl.type = 'bandpass'; fl.frequency.value = 1700; g.gain.value = 0.16; sr.connect(fl).connect(g).connect(bus); sr.start(t); }   // clap
+                    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.setValueAtTime(vol, t + dur * 0.65); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); o.connect(lp).connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.03); };
+                if (!this.nb) { const nn = c.sampleRate; this.nb = c.createBuffer(1, nn, c.sampleRate); const d = this.nb.getChannelData(0); for (let i = 0; i < nn; i++) d[i] = Math.random() * 2 - 1; }
+                const hit = (freq, q, vol, dur, type) => { const sr = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain(); sr.buffer = this.nb; fl.type = type; fl.frequency.value = freq; fl.Q.value = q;
+                    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); sr.connect(fl).connect(g).connect(bus); sr.start(t, Math.random() * 0.5, dur + 0.02); };
+                const kick = () => { const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12); g.gain.setValueAtTime(0.32, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g).connect(bus); o.start(t); o.stop(t + 0.22); };
+                const fill = bar % 8 === 7;
+                const k = lead[st]; if (k != null) { voice(f(k), 'square', 0.032, 0.21, 2600); voice(f(k) * 1.005, 'sawtooth', 0.012, 0.21, 3000); voice(f(k - 12), 'square', 0.012, 0.21, 1200); }   // the organ, with a fat low double
+                if (st % 2 === 0) voice(f(ch[0]), 'triangle', 0.1, 0.22, 520); else if (st === 7) voice(f(ch[0] + 12), 'triangle', 0.06, 0.14, 700);   // bass
+                if (st % 2 === 1 && bar >= 4) ch[1].forEach(x => voice(f(x), 'square', 0.011, 0.1, 1800));   // off-beat organ stabs
+                if (bar >= 8) voice(f(ch[1][[0, 1, 2, 1, 2, 1, 0, 2][st]] + 12), 'triangle', 0.028, 0.16, 3000);   // arpeggio
+                if (st === 0 || st === 4 || (bar >= 8 && st === 6) || (fill && st === 7)) kick();
+                if (st === 2 || st === 6 || (fill && st >= 5)) hit(1700, 0.8, 0.16, 0.12, 'bandpass');   // clap
+                hit(7000, 0.7, st % 2 ? 0.035 : 0.05, st === 7 ? 0.12 : 0.04, 'highpass');   // hat
             },
             tone(f0, f1, dur, type = 'sine', vol = 0.06, delay = 0) {
                 if (!BW.sound || !this.ctx) return;
@@ -4542,7 +4556,12 @@ service cloud.firestore {
 
         document.addEventListener('visibilitychange', () => { if (document.hidden) BWS.stop(); });
         window.addEventListener('pagehide', () => BWS.stop());
-        setInterval(() => { if (!(isGameMode || (typeof IM !== 'undefined' && IM.on)) && (BWS.mOn || (BWS.el && !BWS.el.paused))) BWS.stop(); }, 700);   // the game closed: silence, and the lock-screen player goes away
+        setInterval(() => {
+            const act = isGameMode || (typeof IM !== 'undefined' && IM.on);
+            if (!act) { if (BWS.mOn || (BWS.el && !BWS.el.paused)) BWS.stop(); BWS.sleepOK(); return; }
+            BWS.wake();   // back from another app: take the screen lock again
+            if (typeof IM !== 'undefined' && IM.on && IM.state === 'play' && !BWS.mOn && BW.sound && !document.hidden && BWS.ctx && BWS.ctx.state === 'running') BWS.musicStart();
+        }, 700);   // the game closed: silence, and the lock-screen player goes away
         ['touchend', 'pointerup', 'click', 'keydown'].forEach(ev => window.addEventListener(ev, () => { if (isGameMode || (typeof IM !== 'undefined' && IM.on)) BWS.unlock(); }, true));
 
         // For the hanger only the plate is played: its hooks (everything below the anchor line) are left out
@@ -5553,7 +5572,7 @@ service cloud.firestore {
             IM.lw = lw; IM.cell = cell; IM.gw = gw; IM.gh = gh; IM.x0 = x0; IM.y0 = y0; IM.x1 = x1; IM.y1 = y1; IM.D = D; IM.ice = ice; IM.A = A; IM.R = R; IM.HR = HR; IM.mids = mids;
             [IM.sx, IM.sy] = W2(start);
             imMakeUI();
-            imBuildPicture();
+            imBuildPicture(); imMakeDeco();
             IM.on = true; IM.best = (() => { try { return +localStorage.getItem('kk-im-best') || 0; } catch (e) { return 0; } })();
             imNewRound();
             IM.last = performance.now(); IM.raf = requestAnimationFrame(imFrame);
@@ -5575,6 +5594,7 @@ service cloud.firestore {
             while (IM.holes.length < n + nTele && pool.length && guard++ < 8000) {
                 const i = pool[(Math.random() * pool.length) | 0], x = IM.x0 + (i % IM.gw + 0.5) * IM.cell, y = IM.y0 + (((i / IM.gw) | 0) + 0.5) * IM.cell;
                 if (Math.hypot(x - IM.sx, y - IM.sy) < lw * 2.6) continue;
+                if (IM.dias.some(d => Math.hypot(d[0] - x, d[1] - y) < lw * 3.8)) continue;   // never in or near a rhombus
                 if (IM.holes.some(h => Math.hypot(h.x - x, h.y - y) < lw * 2.4)) continue;
                 IM.holes.push({ x, y, gold: false, tele: IM.holes.length >= n, done: false, t: Math.random() * 6, seed: (Math.random() * 1e6) | 0 });
             }
@@ -5586,6 +5606,108 @@ service cloud.firestore {
         // the ice, drawn once: frosted pale blue, bright where the light runs round its edges
         // The picture is painted with vector paths at screen resolution, so every edge - rings inside and out included - is smooth.
         // The fence (white boards, a red stripe, the face in shade) is the ice grown outwards: it stands on the snow, the ice keeps the line width.
+        // ---------- the snowy world round the pattern: firs with lights, snowmen, gifts, hearts in the snow, bunnies ----------
+        const imIce = (x, y) => { const ix = Math.floor((x - IM.x0) / IM.cell), iy = Math.floor((y - IM.y0) / IM.cell); return ix >= 0 && iy >= 0 && ix < IM.gw && iy < IM.gh && IM.D[iy * IM.gw + ix] > 0; };
+        function imFree(x, y, r) {   // a disc of clean snow
+            if (imIce(x, y) || IM.dias.some(d => Math.hypot(d[0] - x, d[1] - y) < IM.lw * 2.2)) return false;
+            for (let i = 0; i < 8; i++) { const a = i * 0.7854; if (imIce(x + Math.cos(a) * r, y + Math.sin(a) * r) || imIce(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5)) return false; }
+            return true;
+        }
+        function imMakeDeco() {
+            const lw = IM.lw, M = lw * 9, X0 = IM.x0 - M, Y0 = IM.y0 - M, W = IM.x1 - IM.x0 + 2 * M, H = IM.y1 - IM.y0 + 2 * M, area = W * H / (lw * lw);
+            const items = [], T = { tree: { r: 0.55, h: 1.7 }, snowman: { r: 0.5, h: 1.6 }, gift: { r: 0.4, h: 0.7 }, heart: { r: 0.55, h: 0 } };
+            const caps = { tree: Math.round(Math.min(70, area / 12)), snowman: 3, gift: 5, heart: 3 };
+            const cnt = { tree: 0, snowman: 0, gift: 0, heart: 0 };
+            const tryPlace = kind => {
+                const d = T[kind], r = d.r * lw;
+                for (let tr = 0; tr < 60; tr++) {
+                    const x = X0 + Math.random() * W, y = Y0 + Math.random() * H;
+                    if (!imFree(x, y, r + lw * 0.35)) continue;
+                    if (d.h && (!imFree(x, y - d.h * lw * 0.5, r * 0.9) || !imFree(x, y - d.h * lw, r * 0.7))) continue;
+                    if (items.some(o => Math.hypot(o.x - x, o.y - y) < (o.r + r) * 1.25)) continue;
+                    items.push({ k: kind, x, y, r, seed: (Math.random() * 1e6) | 0 }); cnt[kind]++; return true;
+                }
+                return false;
+            };
+            ['heart', 'snowman', 'heart', 'snowman'].forEach(tryPlace);
+            for (let i = 0; i < 400; i++) { const q = Math.random(), kind = q < 0.72 ? 'tree' : q < 0.84 ? 'gift' : q < 0.92 ? 'snowman' : 'heart'; if (cnt[kind] < caps[kind]) tryPlace(kind); }
+            items.sort((a, b) => a.y - b.y);
+            const drifts = [], sparks = [];
+            for (let i = 0; i < Math.min(160, area / 3); i++) drifts.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, rx: lw * (1 + Math.random() * 2.4), ry: lw * (0.3 + Math.random() * 0.7), blue: Math.random() < 0.5 });
+            for (let i = 0; i < Math.min(220, area / 2); i++) sparks.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, ph: Math.random() * 6.283, z: lw * (0.05 + Math.random() * 0.07) });
+            const bunnies = []; let guard = 0;
+            while (bunnies.length < 5 && guard++ < 600) { const x = X0 + Math.random() * W, y = Y0 + Math.random() * H; if (imFree(x, y, lw * 0.7)) bunnies.push({ x, y, hx: x, hy: y, st: 'rest', t: Math.random() * 2, dir: Math.random() < 0.5 ? 1 : -1, ph: 0, tx: x, ty: y, seed: (Math.random() * 1e6) | 0 }); }
+            IM.deco = { items, drifts, sparks, bunnies, prints: [] };
+        }
+        function imBunnyStep(b, dt) {
+            const lw = IM.lw, D = IM.deco;
+            if (b.st === 'rest') {
+                b.t -= dt; if (b.t > 0) return;
+                for (let tr = 0; tr < 8; tr++) {
+                    const a = Math.random() * 6.283, d = lw * (2 + Math.random() * 4), tx = b.x + Math.cos(a) * d, ty = b.y + Math.sin(a) * d;
+                    if (Math.hypot(tx - b.hx, ty - b.hy) > lw * 9 || !imFree(tx, ty, lw * 0.6)) continue;
+                    let ok = true; for (let q = 1; q < 12 && ok; q++) ok = imFree(b.x + (tx - b.x) * q / 12, b.y + (ty - b.y) * q / 12, lw * 0.35);
+                    if (!ok) continue; b.tx = tx; b.ty = ty; b.st = 'run'; if (Math.abs(tx - b.x) > lw * 0.2) b.dir = tx > b.x ? 1 : -1; return;
+                }
+                b.t = 0.4;
+            } else {
+                const dx = b.tx - b.x, dy = b.ty - b.y, dist = Math.hypot(dx, dy), step = lw * 3 * dt, was = Math.floor(b.ph / Math.PI);
+                if (dist <= step) { b.x = b.tx; b.y = b.ty; b.st = 'rest'; b.t = 0.5 + Math.random() * 2.5; b.ph = 0; return; }
+                b.x += dx / dist * step; b.y += dy / dist * step; b.ph += dt * 10;
+                if (Math.floor(b.ph / Math.PI) !== was) { D.prints.push({ x: b.x, y: b.y, t: 0, a: Math.atan2(dy, dx) }); if (D.prints.length > 90) D.prints.shift(); }
+            }
+        }
+        function imDrawDeco(c, kind, o, T) {   // all in world units, origin = the foot of the thing
+            const u = o.r;
+            if (kind === 'tree') {
+                c.fillStyle = 'rgba(55,80,125,0.2)'; c.beginPath(); c.ellipse(u * 0.6, u * 0.05, u * 1.1, u * 0.33, 0, 0, 6.283); c.fill();
+                c.fillStyle = '#5b3a24'; c.fillRect(-u * 0.14, -u * 0.35, u * 0.28, u * 0.4);
+                [[-0.2, 1.0, 1.1], [-0.85, 0.78, 1.05], [-1.5, 0.55, 1.0]].forEach(([by, hw, hh], ti) => {
+                    const ay = (by - hh) * u, yb = by * u, w = hw * u, g = c.createLinearGradient(-w, 0, w, 0); g.addColorStop(0, '#17583b'); g.addColorStop(0.55, '#2b8a5a'); g.addColorStop(1, '#1d6b46');
+                    c.fillStyle = g; c.beginPath(); c.moveTo(0, ay); c.lineTo(-w, yb); c.lineTo(w, yb); c.closePath(); c.fill();
+                    const sy = ay + hh * u * 0.5; c.fillStyle = 'rgba(255,255,255,0.96)'; c.beginPath(); c.moveTo(0, ay); c.lineTo(-w * 0.52, sy); c.quadraticCurveTo(-w * 0.26, sy + u * 0.2, 0, sy); c.quadraticCurveTo(w * 0.26, sy + u * 0.2, w * 0.52, sy); c.closePath(); c.fill();
+                    for (let i = 0; i < 3; i++) { const lx = (-0.5 + (i + (ti % 2) * 0.5 + 0.25) / 3 * 1.0) * w * 1.3 * (1 - ((i + ti) % 2) * 0.15), ly = yb - u * (0.12 + ((i * 2 + ti) % 3) * 0.1), col = ['#ff4d6d', '#ffd23f', '#4dd0ff', '#7dff7a'][(i + ti * 2 + o.seed) & 3], al = 0.65 + 0.35 * Math.sin(T * 3 + i * 2 + ti + o.seed);
+                        c.globalAlpha = 0.25 * al; c.fillStyle = col; c.beginPath(); c.arc(lx, ly, u * 0.14, 0, 6.283); c.fill(); c.globalAlpha = al; c.beginPath(); c.arc(lx, ly, u * 0.055, 0, 6.283); c.fill(); c.globalAlpha = 1; }
+                });
+                c.fillStyle = '#ffd23f'; c.beginPath(); for (let i = 0; i < 10; i++) { const a = -1.5708 + i * 0.6283, rr = i % 2 ? u * 0.1 : u * 0.24; c.lineTo(Math.cos(a) * rr, -u * 2.55 + Math.sin(a) * rr); } c.closePath(); c.fill();
+            } else if (kind === 'snowman') {
+                c.fillStyle = 'rgba(55,80,125,0.2)'; c.beginPath(); c.ellipse(u * 0.55, u * 0.05, u * 1.0, u * 0.3, 0, 0, 6.283); c.fill();
+                c.strokeStyle = '#6b4a2e'; c.lineWidth = u * 0.07; c.lineCap = 'round'; c.beginPath(); c.moveTo(-u * 0.4, -u * 1.5); c.lineTo(-u * 1.0, -u * 1.95); c.moveTo(-u * 0.75, -u * 1.75); c.lineTo(-u * 0.7, -u * 2.0); c.moveTo(u * 0.4, -u * 1.5); c.lineTo(u * 1.0, -u * 1.9); c.moveTo(u * 0.75, -u * 1.72); c.lineTo(u * 0.9, -u * 1.5); c.stroke();
+                [[0, -0.6, 0.62], [0, -1.45, 0.45], [0, -2.1, 0.33]].forEach(([x, y, r]) => { const g = c.createRadialGradient(-r * 0.35 * u, (y - r * 0.4) * u, r * 0.1 * u, 0, y * u, r * u); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#cfdcee'); c.fillStyle = g; c.beginPath(); c.arc(x, y * u, r * u, 0, 6.283); c.fill(); });
+                c.fillStyle = '#d9344f'; c.beginPath(); c.ellipse(0, -1.82 * u, 0.36 * u, 0.1 * u, 0, 0, 6.283); c.fill(); c.fillRect(0.18 * u, -1.84 * u, 0.12 * u, 0.5 * u);
+                c.fillStyle = '#1c1f26'; c.beginPath(); c.ellipse(0, -2.38 * u, 0.42 * u, 0.09 * u, 0, 0, 6.283); c.fill(); c.fillRect(-0.24 * u, -2.86 * u, 0.48 * u, 0.5 * u); c.fillStyle = '#d9344f'; c.fillRect(-0.24 * u, -2.5 * u, 0.48 * u, 0.1 * u);
+                c.fillStyle = '#16181d'; [[-0.11, -2.15], [0.11, -2.15], [0, -1.6], [0, -1.38], [0, -0.85], [0, -0.6]].forEach(([x, y]) => { c.beginPath(); c.arc(x * u, y * u, u * 0.04, 0, 6.283); c.fill(); });
+                c.fillStyle = '#ff8a2a'; c.beginPath(); c.moveTo(0.02 * u, -2.1 * u); c.lineTo(0.4 * u, -2.04 * u); c.lineTo(0.02 * u, -2.0 * u); c.closePath(); c.fill();
+            } else if (kind === 'gift') {
+                const col = [['#d9344f', '#ffe08a'], ['#2f7fd6', '#ffffff'], ['#2f9e63', '#ffd23f'], ['#8a4fd6', '#ffe08a']][o.seed & 3];
+                c.fillStyle = 'rgba(55,80,125,0.2)'; c.beginPath(); c.ellipse(u * 0.5, u * 0.05, u * 1.0, u * 0.28, 0, 0, 6.283); c.fill();
+                c.fillStyle = col[0]; c.fillRect(-u * 0.8, -u * 1.05, u * 1.6, u * 1.05); c.fillStyle = 'rgba(0,0,0,0.14)'; c.fillRect(-u * 0.8, -u * 0.35, u * 1.6, u * 0.35);
+                c.fillStyle = col[0]; c.fillRect(-u * 0.9, -u * 1.3, u * 1.8, u * 0.3); c.fillStyle = col[1]; c.fillRect(-u * 0.12, -u * 1.3, u * 0.24, u * 1.3);
+                c.beginPath(); c.ellipse(-u * 0.25, -u * 1.45, u * 0.26, u * 0.15, -0.4, 0, 6.283); c.ellipse(u * 0.25, -u * 1.45, u * 0.26, u * 0.15, 0.4, 0, 6.283); c.fill();
+                c.fillStyle = 'rgba(255,255,255,0.9)'; c.beginPath(); c.ellipse(0, -u * 1.7, u * 0.8, u * 0.14, 0, 0, 3.1416); c.fill();   // snow on the lid
+            } else if (kind === 'heart') {
+                const sz = u * 1.1, path = (k) => { c.beginPath(); c.moveTo(0, sz * 0.9 * k); c.bezierCurveTo(-sz * 1.6 * k, sz * 0.1 * k, -sz * 0.9 * k, -sz * 1.0 * k, 0, -sz * 0.35 * k); c.bezierCurveTo(sz * 0.9 * k, -sz * 1.0 * k, sz * 1.6 * k, sz * 0.1 * k, 0, sz * 0.9 * k); c.closePath(); };
+                c.save(); c.translate(0, -sz * 0.2);
+                c.save(); c.translate(-sz * 0.05, -sz * 0.05); path(1.08); c.fillStyle = 'rgba(100,135,185,0.38)'; c.fill(); c.restore();   // the dent in the snow
+                path(1); const g = c.createLinearGradient(-sz, -sz, sz, sz); g.addColorStop(0, '#f27a96'); g.addColorStop(1, '#d93a62'); c.fillStyle = g; c.fill();
+                c.save(); c.translate(-sz * 0.28, -sz * 0.3); c.scale(0.38, 0.28); path(0.8); c.fillStyle = 'rgba(255,255,255,0.45)'; c.fill(); c.restore();
+                c.restore();
+            }
+        }
+        function imDrawBunny(c, b, u, T) {
+            const hop = b.st === 'run' ? Math.abs(Math.sin(b.ph)) * u * 0.6 : 0, sq = b.st === 'rest' ? 1 + 0.03 * Math.sin(T * 3 + b.seed) : 1;
+            c.fillStyle = 'rgba(55,80,125,0.22)'; c.beginPath(); c.ellipse(0, 0, u * 0.55 * (1 - hop / u * 0.25), u * 0.15, 0, 0, 6.283); c.fill();
+            c.save(); c.translate(0, -hop); c.scale(b.dir * 1, sq);
+            const ear = (x, rot) => { c.save(); c.translate(x * u, -u * 0.82); c.rotate(rot - (b.st === 'run' ? 0.7 : 0)); c.fillStyle = '#f7f7fa'; c.beginPath(); c.ellipse(0, -u * 0.22, u * 0.075, u * 0.27, 0, 0, 6.283); c.fill(); c.fillStyle = '#f5b9c8'; c.beginPath(); c.ellipse(0, -u * 0.22, u * 0.035, u * 0.19, 0, 0, 6.283); c.fill(); c.restore(); };
+            ear(0.36, -0.15); ear(0.5, 0.1);
+            c.fillStyle = '#e4e7ee'; c.beginPath(); c.ellipse(-u * 0.12, -u * 0.12, u * 0.26, u * 0.14, 0, 0, 6.283); c.fill();
+            c.fillStyle = '#f6f6f9'; c.beginPath(); c.ellipse(0, -u * 0.36, u * 0.5, u * 0.32, -0.1, 0, 6.283); c.fill();
+            c.beginPath(); c.arc(-u * 0.52, -u * 0.4, u * 0.14, 0, 6.283); c.fill();
+            c.beginPath(); c.arc(u * 0.46, -u * 0.62, u * 0.22, 0, 6.283); c.fill();
+            c.fillStyle = '#20232b'; c.beginPath(); c.arc(u * 0.56, -u * 0.67, u * 0.035, 0, 6.283); c.fill();
+            c.fillStyle = '#f08aa4'; c.beginPath(); c.arc(u * 0.67, -u * 0.6, u * 0.03, 0, 6.283); c.fill();
+            c.restore();
+        }
         function imBuildPicture() {
             const lw = IM.lw, X0 = IM.x0, Y0 = IM.y0, wW = IM.x1 - X0, wH = IM.y1 - Y0;
             const want = (IM.s || 1) * Math.min(2, devicePixelRatio || 1);
@@ -5606,7 +5728,7 @@ service cloud.firestore {
             grown(bt, 'rgba(244,248,252,0.9)'); grown(bt * 0.45, 'rgba(206,70,78,0.85)');
             // the ice: frosted pale blue with a soft sheen across it
             const tile = mk(256, 256), tc = tile.getContext('2d'), ti = tc.createImageData(256, 256);
-            for (let i = 0; i < 65536; i++) { const v = (bwHash(i * 7 + 3, 5) % 100) / 100 - 0.5; ti.data[i * 4] = 172 * (1 + v * 0.09); ti.data[i * 4 + 1] = 212 * (1 + v * 0.09); ti.data[i * 4 + 2] = Math.min(255, 238 * (1 + v * 0.09)); ti.data[i * 4 + 3] = 255; }
+            for (let i = 0; i < 65536; i++) { const v = (bwHash(i * 7 + 3, 5) % 100) / 100 - 0.5; ti.data[i * 4] = 140 * (1 + v * 0.09); ti.data[i * 4 + 1] = 192 * (1 + v * 0.09); ti.data[i * 4 + 2] = Math.min(255, 232 * (1 + v * 0.09)); ti.data[i * 4 + 3] = 255; }
             tc.putImageData(ti, 0, 0);
             t.clearRect(0, 0, W, H); t.drawImage(M, 0, 0); t.globalCompositeOperation = 'source-in';
             t.fillStyle = t.createPattern(tile, 'repeat'); t.fillRect(0, 0, W, H);
@@ -5639,15 +5761,15 @@ service cloud.firestore {
                 <div id="im-msg"><b id="im-m1"></b><span id="im-m2"></span></div>`;
             document.body.appendChild(el);
             const st = document.createElement('style'); st.id = 'im-style';
-            st.textContent = `#im-root{position:fixed;inset:0;z-index:5000;background:#0a1224;touch-action:none;-webkit-user-select:none;user-select:none;font-family:"Google Sans Flex","Google Sans",system-ui,-apple-system,sans-serif;color:#f3f6fb}
+            st.textContent = `#im-root{position:fixed;inset:0;z-index:5000;background:#dbe7f5;touch-action:none;-webkit-user-select:none;user-select:none;font-family:"Google Sans Flex","Google Sans",system-ui,-apple-system,sans-serif;color:#14233f}
                 #im-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
-                #im-x{position:absolute;left:max(14px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));width:40px;height:40px;border:0;background:none;color:#e8eef8;padding:3px;cursor:pointer}
+                #im-x{position:absolute;left:max(14px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));width:40px;height:40px;border:0;background:none;color:#14233f;padding:3px;cursor:pointer}
                 #im-x svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
-                #im-hud{position:absolute;left:max(64px,calc(env(safe-area-inset-left) + 64px));right:max(16px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));display:flex;justify-content:space-between;pointer-events:none;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+                #im-hud{position:absolute;left:max(64px,calc(env(safe-area-inset-left) + 64px));right:max(16px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));display:flex;justify-content:space-between;pointer-events:none;text-shadow:0 1px 5px rgba(255,255,255,.9)}
                 #im-hud div{display:flex;flex-direction:column}#im-hud .im-mid{align-items:center}#im-hud .im-r{align-items:flex-end}
-                .im-l{font-size:11px;letter-spacing:.16em;color:rgba(205,216,236,.7)}#im-hud b{font-size:24px;font-weight:700;line-height:1.1}
-                #im-msg{position:absolute;left:0;right:0;bottom:16%;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;text-shadow:0 2px 10px rgba(0,0,0,.6);transition:opacity .25s}
-                #im-m1{font-size:28px;font-weight:700}#im-m2{font-size:16px;color:rgba(220,232,250,.8)}`;
+                .im-l{font-size:11px;letter-spacing:.16em;color:rgba(20,35,63,.62)}#im-hud b{font-size:24px;font-weight:700;line-height:1.1}
+                #im-msg{position:absolute;left:0;right:0;bottom:16%;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;text-shadow:0 0 12px rgba(255,255,255,.95),0 0 4px rgba(255,255,255,.9);transition:opacity .25s}
+                #im-m1{font-size:28px;font-weight:700}#im-m2{font-size:16px;color:rgba(20,35,63,.8)}`;
             document.head.appendChild(st);
             const cv = el.querySelector('#im-cv'); IM.cv = cv; IM.c = cv.getContext('2d');
             const fit = () => { const dpr = Math.min(2, devicePixelRatio || 1); cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); IM.dpr = dpr; IM.W = innerWidth; IM.H = innerHeight;
@@ -5712,7 +5834,8 @@ service cloud.firestore {
             if (IM.state === 'play' && !IM.sink) {
                 IM.time += dt;
                 // the push: tilt, or a finger (the farther it is dragged, the harder), or the keys
-                let ax = IM.tx, ay = IM.ty;
+                IM.sax = (IM.sax || 0) + (IM.tx - (IM.sax || 0)) * Math.min(1, dt * 12); IM.say = (IM.say || 0) + (IM.ty - (IM.say || 0)) * Math.min(1, dt * 12);   // sensor noise is smoothed out
+                let ax = IM.sax, ay = IM.say;
                 if (IM.drag) { ax = Math.max(-1, Math.min(1, (IM.drag.cx - IM.drag.x) / 70)); ay = Math.max(-1, Math.min(1, (IM.drag.cy - IM.drag.y) / 70)); }
                 if (IM.keys.ArrowLeft) ax = -1; if (IM.keys.ArrowRight) ax = 1; if (IM.keys.ArrowUp) ay = -1; if (IM.keys.ArrowDown) ay = 1;
                 const G = lw * 16;
@@ -5729,7 +5852,8 @@ service cloud.firestore {
                         const nx = gx / gl, ny = gy / gl;
                         for (let t = 0; t < 12 && d < Rc; t++) { IM.px += nx * IM.cell * 0.4; IM.py += ny * IM.cell * 0.4; d = imDist(IM.px, IM.py); }
                         const vn = IM.vx * nx + IM.vy * ny;
-                        if (vn < 0) { IM.vx -= 1.5 * vn * nx; IM.vy -= 1.5 * vn * ny; hitV = Math.max(hitV, -vn); IM.vx *= 0.96; IM.vy *= 0.96; }
+                        if (vn < 0) { const e2 = -vn > lw * 0.8 ? 1.5 : 1.0; IM.vx -= e2 * vn * nx; IM.vy -= e2 * vn * ny;   // a slow touch just stops against the bank (no buzzing)
+                            hitV = Math.max(hitV, -vn); IM.vx *= 0.96; IM.vy *= 0.96; }
                     }
                 }
                 if (hitV > lw * 2.5) { const v = Math.min(1, hitV / (lw * 9)); BWS.noise(0.07, 0.05 + 0.07 * v, 380, 0, 'lowpass'); BWS.tone(95, 60, 0.07, 'sine', 0.03 + 0.05 * v); }   // a dull rubber knock on the boards, nothing metallic
@@ -5758,6 +5882,8 @@ service cloud.firestore {
                             IM.state = 'won'; const tm = IM.time; const bonus = Math.max(0, Math.round(3000 - tm * 25)); IM.score += bonus;
                             if (!IM.best || tm < IM.best) { IM.best = tm; try { localStorage.setItem('kk-im-best', String(tm)); } catch (e) {} }
                             imMsg('FINAL HORN! ' + tm.toFixed(1) + ' s', `Score ${IM.score} · best ${IM.best.toFixed(1)} s · tap for the next period`); BWS.win(); imHorn(true); BWS.musicStop();
+                            for (let bst = 0; bst < 4; bst++) { const bx = IM.camX + (Math.random() - 0.5) * IM.W / IM.s * 0.7, by = IM.camY + (Math.random() - 0.5) * IM.H / IM.s * 0.6, hh = Math.random() * 360;   // New Year fireworks
+                                for (let k = 0; k < 34; k++) { const an = k / 34 * 6.283, v = lw * (3 + Math.random() * 3); IM.fx.push({ x: bx, y: by, vx: Math.cos(an) * v, vy: Math.sin(an) * v, t: -bst * 0.25, p: 1, h: (hh + k * 3) % 360, life: 1.4 }); } }
                         }
                     }
                 });
@@ -5802,22 +5928,30 @@ service cloud.firestore {
             // the camera follows the puck, smoothly, and stays over the drawing
             const vw = W / s, vh = H / s;
             const clampC = (v, a, b, span) => (b - a <= span) ? (a + b) / 2 : Math.max(a + span / 2, Math.min(b - span / 2, v));
-            const tx = clampC(IM.px + IM.vx * 0.25, IM.x0, IM.x1, vw), ty = clampC(IM.py + IM.vy * 0.25, IM.y0, IM.y1, vh);
-            const kc = 1 - Math.exp(-dt * 4); IM.camX += (tx - IM.camX) * kc; IM.camY += (ty - IM.camY) * kc;
+            const tx = clampC(IM.px + IM.vx * 0.12, IM.x0, IM.x1, vw), ty = clampC(IM.py + IM.vy * 0.12, IM.y0, IM.y1, vh);
+            const kc = 1 - Math.exp(-dt * 3); IM.camX += (tx - IM.camX) * kc; IM.camY += (ty - IM.camY) * kc;
             const ox = W / 2 - IM.camX * s, oy = H / 2 - IM.camY * s;
             c.setTransform(dpr, 0, 0, dpr, 0, 0);
-            // night snow under the ice
-            let g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0b1428'); g.addColorStop(1, '#141a35'); c.fillStyle = g; c.fillRect(0, 0, W, H);
-            { const T0 = performance.now() / 4000;   // arena floodlights sweeping over the dark stands
-              [[0.2, 0], [0.8, 0]].forEach(([fx], i) => { const lx = W * (fx + Math.sin(T0 + i * 2) * 0.06), lg = c.createRadialGradient(lx, -H * 0.05, 0, lx, H * 0.25, H * 0.8); lg.addColorStop(0, 'rgba(190,215,255,0.16)'); lg.addColorStop(1, 'rgba(190,215,255,0)'); c.fillStyle = lg; c.fillRect(0, 0, W, H); });
-              c.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = 0; i < 70; i++) { const h1 = bwHash(i, 91), h2 = bwHash(i, 92); c.beginPath(); c.arc((h1 % 1000) / 1000 * W, (h2 % 1000) / 1000 * H, 1.2 + (h1 % 3) * 0.5, 0, 6.283); c.fill(); } }
-            c.fillStyle = 'rgba(225,235,255,0.06)';
-            for (let i = 0; i < 140; i++) { const h1 = bwHash(i, 7), h2 = bwHash(i, 8); const X = ((h1 % 2000) / 2000 * (IM.x1 - IM.x0) + IM.x0) * s + ox, Y = ((h2 % 2000) / 2000 * (IM.y1 - IM.y0) + IM.y0) * s + oy; c.beginPath(); c.arc(X, Y, 1 + (h1 % 3), 0, 6.283); c.fill(); }
+            // snow all round: a pale blue-white ground with soft drifts and glitter, then the scenery
+            const D = IM.deco, T0 = performance.now() / 1000, vx0 = IM.camX - vw / 2 - lw * 4, vx1 = IM.camX + vw / 2 + lw * 4, vy0 = IM.camY - vh / 2 - lw * 4, vy1 = IM.camY + vh / 2 + lw * 4;
+            let g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#e9f1fb'); g.addColorStop(1, '#cddcf0'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+            if (D) {
+                D.drifts.forEach(d => { if (d.x < vx0 - d.rx || d.x > vx1 + d.rx || d.y < vy0 - d.ry || d.y > vy1 + d.ry) return; c.fillStyle = d.blue ? 'rgba(140,172,214,0.16)' : 'rgba(255,255,255,0.55)'; c.beginPath(); c.ellipse(ox + d.x * s, oy + d.y * s, d.rx * s, d.ry * s, 0, 0, 6.283); c.fill(); });
+                D.sparks.forEach(p => { if (p.x < vx0 || p.x > vx1 || p.y < vy0 || p.y > vy1) return; const a = Math.max(0, Math.sin(T0 * 2 + p.ph)); if (a < 0.2) return; const X = ox + p.x * s, Y = oy + p.y * s, z = p.z * s; c.strokeStyle = `rgba(255,255,255,${a})`; c.lineWidth = Math.max(0.8, z * 0.3); c.beginPath(); c.moveTo(X - z, Y); c.lineTo(X + z, Y); c.moveTo(X, Y - z); c.lineTo(X, Y + z); c.stroke(); });
+                D.items.forEach(o => { if (o.k === 'heart' && o.x > vx0 && o.x < vx1 && o.y > vy0 && o.y < vy1) { c.save(); c.translate(ox + o.x * s, oy + o.y * s); c.scale(s, s); imDrawDeco(c, 'heart', o, T0); c.restore(); } });
+                D.prints.forEach(p => { p.t += dt; }); while (D.prints.length && D.prints[0].t > 22) D.prints.shift();
+                D.prints.forEach(p => { c.save(); c.translate(ox + p.x * s, oy + p.y * s); c.rotate(p.a); c.fillStyle = `rgba(110,140,185,${0.38 * (1 - p.t / 22)})`; c.beginPath(); c.ellipse(0, -lw * s * 0.07, lw * s * 0.06, lw * s * 0.035, 0, 0, 6.283); c.ellipse(0, lw * s * 0.07, lw * s * 0.06, lw * s * 0.035, 0, 0, 6.283); c.fill(); c.restore(); });
+                D.bunnies.forEach(b => imBunnyStep(b, dt));
+            }
             // the ice with a soft shadow
             c.save(); c.shadowColor = 'rgba(0,0,0,0.55)'; c.shadowBlur = lw * s * 0.25; c.shadowOffsetY = lw * s * 0.08;
             c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.pic.width / IM.picK * s, IM.pic.height / IM.picK * s); c.restore();
             // skate marks: the puck's track scratched into the ice
             if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
+            if (D) {
+                D.items.forEach(o => { if (o.k === 'heart' || o.x < vx0 - lw * 2 || o.x > vx1 + lw * 2 || o.y < vy0 || o.y > vy1 + lw * 4) return; c.save(); c.translate(ox + o.x * s, oy + o.y * s); c.scale(s, s); imDrawDeco(c, o.k, o, T0); c.restore(); });
+                D.bunnies.forEach(b => { if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1 + lw * 2) return; c.save(); c.translate(ox + b.x * s, oy + b.y * s); c.scale(s, s); imDrawBunny(c, b, lw * 0.75, T0); c.restore(); });
+            }
             // the holes: dark water in the ice, a snowy rim, a slow ripple; the golden one glints
             const T = performance.now() / 1000;
             IM.holes.forEach(h => imHole(c, ox + h.x * s, oy + h.y * s, IM.HR * s, h, T));
@@ -5832,11 +5966,14 @@ service cloud.firestore {
             // splashes and points
             IM.fx = IM.fx.filter(f => {
                 f.t += dt;
-                if (f.p) { if (f.t > 0.7) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; c.fillStyle = f.gold ? `rgba(255,214,107,${1 - f.t / 0.7})` : f.tele ? `rgba(196,176,255,${1 - f.t / 0.7})` : `rgba(220,238,255,${1 - f.t / 0.7})`; c.beginPath(); c.arc(ox + f.x * s, oy + f.y * s, Math.max(1.2, lw * s * 0.035), 0, 6.283); c.fill(); return true; }
+                if (f.p) { const L = f.life || 0.7; if (f.t > L) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; c.fillStyle = f.h != null ? `hsla(${f.h},95%,58%,${Math.max(0, 1 - f.t / L)})` : f.gold ? `rgba(255,214,107,${1 - f.t / L})` : f.tele ? `rgba(196,176,255,${1 - f.t / L})` : `rgba(255,255,255,${1 - f.t / L})`; c.beginPath(); c.arc(ox + f.x * s, oy + f.y * s, Math.max(1.2, lw * s * (f.h != null ? 0.05 : 0.035)), 0, 6.283); c.fill(); return true; }
                 if (f.t > 1.1) return false;
                 c.save(); c.globalAlpha = Math.min(1, (1.1 - f.t) / 0.4); c.fillStyle = f.gold ? '#ffd36b' : '#eaf4ff'; c.font = `700 ${Math.round(18 + (f.gold ? 6 : 0))}px "Google Sans Flex","Google Sans",system-ui,sans-serif`; c.textAlign = 'center';
                 c.shadowColor = 'rgba(0,0,0,0.6)'; c.shadowBlur = 6; c.fillText(f.s, ox + f.x * s, oy + f.y * s - lw * s * 0.4 - f.t * 30); c.restore(); return true;
             });
+            // snow falling over everything
+            c.fillStyle = 'rgba(255,255,255,0.85)';
+            for (let i = 0; i < 60; i++) { const h1 = bwHash(i, 31), h2 = bwHash(i, 32), sz = 1 + (h1 % 3) * 0.7, sp = 18 + (h2 % 30), X = (((h1 % 1000) / 1000 * W + Math.sin(T0 * 0.8 + i) * 14) % W + W) % W, Y = (((h2 % 1000) / 1000 * H + T0 * sp) % H); c.beginPath(); c.arc(X, Y, sz, 0, 6.283); c.fill(); }
         }
         // an ice-fishing hole: a ring of packed snow and broken ice round dark, deep water; light plays on the water, rings spread, small floes drift.
         // The golden one has gold glinting under the water. Done: the water has frozen over.
