@@ -5639,6 +5639,16 @@ service cloud.firestore {
             while (bunnies.length < 5 && guard++ < 600) { const x = X0 + Math.random() * W, y = Y0 + Math.random() * H; if (imFree(x, y, lw * 0.7)) bunnies.push({ x, y, hx: x, hy: y, st: 'rest', t: Math.random() * 2, dir: Math.random() < 0.5 ? 1 : -1, ph: 0, tx: x, ty: y, seed: (Math.random() * 1e6) | 0 }); }
             IM.deco = { items, drifts, sparks, bunnies, prints: [] };
         }
+        function imTapGift(cx, cy) {
+            if (!IM.deco) return false;
+            const wx = IM.camX + (cx - IM.W / 2) / IM.s, wy = IM.camY + (cy - IM.H / 2) / IM.s;
+            const g = IM.deco.items.find(o => o.k === 'gift' && Math.hypot(o.x - wx, o.y - o.r * 0.6 - wy) < o.r * 1.9);
+            if (!g) return false;
+            g.popT = performance.now(); const E = ['🎉', '🎊', '🎄', '🎁', '✨', '🥳', '⛄', '❄️', '🍾', '🎆', '🦌', '⭐', '🔔', '🧦', '🎅', '💫'], lw = IM.lw;
+            for (let k = 0; k < 8; k++) { const a = -1.5708 + (Math.random() - 0.5) * 2.2, v = lw * (5 + Math.random() * 5); IM.fx.push({ x: g.x, y: g.y - g.r, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 1.7, e: E[(Math.random() * E.length) | 0], sz: 0.5 + Math.random() * 0.4, rot: (Math.random() - 0.5) * 3 }); }
+            BWS.seq([1047, 1319, 1568, 2093], 0.05, 'sine', 0.04);
+            return true;
+        }
         function imBunnyStep(b, dt) {
             const lw = IM.lw, D = IM.deco;
             if (b.st === 'rest') {
@@ -5657,55 +5667,67 @@ service cloud.firestore {
                 if (Math.floor(b.ph / Math.PI) !== was) { D.prints.push({ x: b.x, y: b.y, t: 0, a: Math.atan2(dy, dx) }); if (D.prints.length > 90) D.prints.shift(); }
             }
         }
+        // ---- everything is low-poly: flat-shaded facets, no gradients ----
+        const lpMix = (a, b, t) => `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`;
+        const lpPoly = (c, col, pts) => { c.fillStyle = col; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill(); c.strokeStyle = col; c.lineWidth = 0.4; c.stroke(); };   // a hair of stroke hides the seams between facets
+        function lpBall(c, cx, cy, rx, ry, n, rot, dark, light) {   // a faceted ball: triangles fanned from an off-centre point, each lit by its direction to the light
+            const pts = []; for (let i = 0; i < n; i++) { const a = rot + i / n * 6.2832; pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); }
+            const hx = cx - rx * 0.18, hy = cy - ry * 0.22;
+            for (let i = 0; i < n; i++) { const a = rot + (i + 0.5) / n * 6.2832, l = 0.5 + 0.5 * Math.cos(a + 2.35); lpPoly(c, lpMix(dark, light, l), [[hx, hy], pts[i], pts[(i + 1) % n]]); }
+        }
         function imDrawDeco(c, kind, o, T) {   // all in world units, origin = the foot of the thing
-            const u = o.r;
+            const u = o.r, q = o.popT ? Math.max(0, 1 - (performance.now() - o.popT) / 450) : 0, jump = Math.sin(q * 3.1416) * u * 0.9 * (q > 0 ? 1 : 0);
             if (kind === 'tree') {
-                c.fillStyle = 'rgba(55,80,125,0.2)'; c.beginPath(); c.ellipse(u * 0.6, u * 0.05, u * 1.1, u * 0.33, 0, 0, 6.283); c.fill();
-                c.fillStyle = '#5b3a24'; c.fillRect(-u * 0.14, -u * 0.35, u * 0.28, u * 0.4);
+                lpPoly(c, 'rgba(55,80,125,0.2)', [[-u * 0.4, u * 0.02], [u * 1.5, u * 0.08], [u * 0.9, u * 0.3], [-u * 0.3, u * 0.2]]);
+                lpPoly(c, '#6a4529', [[-u * 0.14, -u * 0.4], [0, -u * 0.4], [0, u * 0.04], [-u * 0.17, u * 0.02]]); lpPoly(c, '#4f3320', [[0, -u * 0.4], [u * 0.14, -u * 0.4], [u * 0.17, u * 0.02], [0, u * 0.04]]);
+                const G = ['#0f4a33', '#17603f', '#23794d', '#2f9360'];
                 [[-0.2, 1.0, 1.1], [-0.85, 0.78, 1.05], [-1.5, 0.55, 1.0]].forEach(([by, hw, hh], ti) => {
-                    const ay = (by - hh) * u, yb = by * u, w = hw * u, g = c.createLinearGradient(-w, 0, w, 0); g.addColorStop(0, '#17583b'); g.addColorStop(0.55, '#2b8a5a'); g.addColorStop(1, '#1d6b46');
-                    c.fillStyle = g; c.beginPath(); c.moveTo(0, ay); c.lineTo(-w, yb); c.lineTo(w, yb); c.closePath(); c.fill();
-                    const sy = ay + hh * u * 0.5; c.fillStyle = 'rgba(255,255,255,0.96)'; c.beginPath(); c.moveTo(0, ay); c.lineTo(-w * 0.52, sy); c.quadraticCurveTo(-w * 0.26, sy + u * 0.2, 0, sy); c.quadraticCurveTo(w * 0.26, sy + u * 0.2, w * 0.52, sy); c.closePath(); c.fill();
-                    for (let i = 0; i < 3; i++) { const lx = (-0.5 + (i + (ti % 2) * 0.5 + 0.25) / 3 * 1.0) * w * 1.3 * (1 - ((i + ti) % 2) * 0.15), ly = yb - u * (0.12 + ((i * 2 + ti) % 3) * 0.1), col = ['#ff4d6d', '#ffd23f', '#4dd0ff', '#7dff7a'][(i + ti * 2 + o.seed) & 3], al = 0.65 + 0.35 * Math.sin(T * 3 + i * 2 + ti + o.seed);
-                        c.globalAlpha = 0.25 * al; c.fillStyle = col; c.beginPath(); c.arc(lx, ly, u * 0.14, 0, 6.283); c.fill(); c.globalAlpha = al; c.beginPath(); c.arc(lx, ly, u * 0.055, 0, 6.283); c.fill(); c.globalAlpha = 1; }
+                    const A = [0, (by - hh) * u], yb = by * u, w = hw * u, L = [-w, yb], K = [-w * 0.42, yb + u * 0.12], F = [0, yb + u * 0.26], M = [w * 0.42, yb + u * 0.14], R = [w, yb];
+                    lpPoly(c, G[0], [A, L, K]); lpPoly(c, G[1], [A, K, F]); lpPoly(c, G[2], [A, F, M]); lpPoly(c, G[3], [A, M, R]);
+                    const my = A[1] + hh * u * 0.5, a = [-w * 0.5, my], bb = [w * 0.5, my], cc = [-w * 0.08, my + u * 0.18];   // snow on the tier: three white facets
+                    lpPoly(c, '#dfeaf7', [A, a, cc]); lpPoly(c, '#ffffff', [A, cc, bb]);
+                    for (let i = 0; i < 3; i++) { const lx = (-0.5 + (i + (ti % 2) * 0.5 + 0.25) / 3) * w * 1.3, ly = yb - u * (0.1 + ((i * 2 + ti) % 3) * 0.1), col = ['#ff4d6d', '#ffd23f', '#4dd0ff', '#7dff7a'][(i + ti * 2 + o.seed) & 3], al = 0.6 + 0.4 * Math.sin(T * 3 + i * 2 + ti + o.seed), z = u * 0.07;
+                        c.globalAlpha = al; lpPoly(c, col, [[lx, ly - z], [lx + z, ly], [lx, ly + z], [lx - z, ly]]); c.globalAlpha = 1; }
                 });
-                c.fillStyle = '#ffd23f'; c.beginPath(); for (let i = 0; i < 10; i++) { const a = -1.5708 + i * 0.6283, rr = i % 2 ? u * 0.1 : u * 0.24; c.lineTo(Math.cos(a) * rr, -u * 2.55 + Math.sin(a) * rr); } c.closePath(); c.fill();
+                const sy = -u * 2.55, z = u * 0.24; lpPoly(c, '#ffe27a', [[0, sy - z], [-z * 0.4, sy], [0, sy + z * 0.4]]); lpPoly(c, '#ffc83a', [[0, sy - z], [z * 0.4, sy], [0, sy + z * 0.4]]); lpPoly(c, '#ffd23f', [[-z, sy], [0, sy - z * 0.4], [z, sy], [0, sy + z * 0.4]]);
             } else if (kind === 'snowman') {
-                c.fillStyle = 'rgba(55,80,125,0.2)'; c.beginPath(); c.ellipse(u * 0.55, u * 0.05, u * 1.0, u * 0.3, 0, 0, 6.283); c.fill();
-                c.strokeStyle = '#6b4a2e'; c.lineWidth = u * 0.07; c.lineCap = 'round'; c.beginPath(); c.moveTo(-u * 0.4, -u * 1.5); c.lineTo(-u * 1.0, -u * 1.95); c.moveTo(-u * 0.75, -u * 1.75); c.lineTo(-u * 0.7, -u * 2.0); c.moveTo(u * 0.4, -u * 1.5); c.lineTo(u * 1.0, -u * 1.9); c.moveTo(u * 0.75, -u * 1.72); c.lineTo(u * 0.9, -u * 1.5); c.stroke();
-                [[0, -0.6, 0.62], [0, -1.45, 0.45], [0, -2.1, 0.33]].forEach(([x, y, r]) => { const g = c.createRadialGradient(-r * 0.35 * u, (y - r * 0.4) * u, r * 0.1 * u, 0, y * u, r * u); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#cfdcee'); c.fillStyle = g; c.beginPath(); c.arc(x, y * u, r * u, 0, 6.283); c.fill(); });
-                c.fillStyle = '#d9344f'; c.beginPath(); c.ellipse(0, -1.82 * u, 0.36 * u, 0.1 * u, 0, 0, 6.283); c.fill(); c.fillRect(0.18 * u, -1.84 * u, 0.12 * u, 0.5 * u);
-                c.fillStyle = '#1c1f26'; c.beginPath(); c.ellipse(0, -2.38 * u, 0.42 * u, 0.09 * u, 0, 0, 6.283); c.fill(); c.fillRect(-0.24 * u, -2.86 * u, 0.48 * u, 0.5 * u); c.fillStyle = '#d9344f'; c.fillRect(-0.24 * u, -2.5 * u, 0.48 * u, 0.1 * u);
-                c.fillStyle = '#16181d'; [[-0.11, -2.15], [0.11, -2.15], [0, -1.6], [0, -1.38], [0, -0.85], [0, -0.6]].forEach(([x, y]) => { c.beginPath(); c.arc(x * u, y * u, u * 0.04, 0, 6.283); c.fill(); });
-                c.fillStyle = '#ff8a2a'; c.beginPath(); c.moveTo(0.02 * u, -2.1 * u); c.lineTo(0.4 * u, -2.04 * u); c.lineTo(0.02 * u, -2.0 * u); c.closePath(); c.fill();
+                lpPoly(c, 'rgba(55,80,125,0.2)', [[-u * 0.6, u * 0.02], [u * 1.6, u * 0.06], [u * 0.9, u * 0.3], [-u * 0.5, u * 0.2]]);
+                const W0 = [176, 196, 224], W1 = [255, 255, 255];
+                c.strokeStyle = '#6b4a2e'; c.lineWidth = u * 0.07; c.lineCap = 'butt'; c.lineJoin = 'miter'; c.beginPath(); c.moveTo(-u * 0.4, -u * 1.5); c.lineTo(-u * 1.0, -u * 1.95); c.moveTo(-u * 0.75, -u * 1.75); c.lineTo(-u * 0.7, -u * 2.0); c.moveTo(u * 0.4, -u * 1.5); c.lineTo(u * 1.0, -u * 1.9); c.moveTo(u * 0.75, -u * 1.72); c.lineTo(u * 0.9, -u * 1.5); c.stroke();
+                lpBall(c, 0, -u * 0.6, u * 0.62, u * 0.6, 8, 0.2, W0, W1); lpBall(c, 0, -u * 1.45, u * 0.45, u * 0.44, 7, 0.5, W0, W1); lpBall(c, 0, -u * 2.1, u * 0.33, u * 0.32, 6, 0.1, W0, W1);
+                lpPoly(c, '#b82a42', [[-u * 0.38, -u * 1.86], [u * 0.38, -u * 1.86], [u * 0.3, -u * 1.74], [-u * 0.3, -u * 1.74]]); lpPoly(c, '#d9344f', [[u * 0.14, -u * 1.76], [u * 0.3, -u * 1.76], [u * 0.34, -u * 1.25], [u * 0.2, -u * 1.22]]);
+                lpPoly(c, '#14161b', [[-u * 0.44, -u * 2.37], [u * 0.44, -u * 2.37], [u * 0.3, -u * 2.3], [-u * 0.3, -u * 2.3]]); lpPoly(c, '#262a33', [[-u * 0.24, -u * 2.86], [0, -u * 2.86], [0, -u * 2.37], [-u * 0.24, -u * 2.37]]); lpPoly(c, '#1a1d24', [[0, -u * 2.86], [u * 0.24, -u * 2.86], [u * 0.24, -u * 2.37], [0, -u * 2.37]]); lpPoly(c, '#d9344f', [[-u * 0.24, -u * 2.52], [u * 0.24, -u * 2.52], [u * 0.24, -u * 2.42], [-u * 0.24, -u * 2.42]]);
+                c.fillStyle = '#16181d'; [[-0.11, -2.15], [0.11, -2.15], [0, -1.6], [0, -1.38], [0, -0.85], [0, -0.6]].forEach(([x, y]) => { const z = u * 0.045; lpPoly(c, '#16181d', [[x * u, y * u - z], [x * u + z, y * u], [x * u, y * u + z], [x * u - z, y * u]]); });
+                lpPoly(c, '#ff9a3c', [[0.02 * u, -2.12 * u], [0.42 * u, -2.04 * u], [0.02 * u, -2.04 * u]]); lpPoly(c, '#e0701a', [[0.02 * u, -2.04 * u], [0.42 * u, -2.04 * u], [0.02 * u, -1.97 * u]]);
             } else if (kind === 'gift') {
-                const col = [['#d9344f', '#ffe08a'], ['#2f7fd6', '#ffffff'], ['#2f9e63', '#ffd23f'], ['#8a4fd6', '#ffe08a']][o.seed & 3];
-                c.fillStyle = 'rgba(55,80,125,0.2)'; c.beginPath(); c.ellipse(u * 0.5, u * 0.05, u * 1.0, u * 0.28, 0, 0, 6.283); c.fill();
-                c.fillStyle = col[0]; c.fillRect(-u * 0.8, -u * 1.05, u * 1.6, u * 1.05); c.fillStyle = 'rgba(0,0,0,0.14)'; c.fillRect(-u * 0.8, -u * 0.35, u * 1.6, u * 0.35);
-                c.fillStyle = col[0]; c.fillRect(-u * 0.9, -u * 1.3, u * 1.8, u * 0.3); c.fillStyle = col[1]; c.fillRect(-u * 0.12, -u * 1.3, u * 0.24, u * 1.3);
-                c.beginPath(); c.ellipse(-u * 0.25, -u * 1.45, u * 0.26, u * 0.15, -0.4, 0, 6.283); c.ellipse(u * 0.25, -u * 1.45, u * 0.26, u * 0.15, 0.4, 0, 6.283); c.fill();
-                c.fillStyle = 'rgba(255,255,255,0.9)'; c.beginPath(); c.ellipse(0, -u * 1.7, u * 0.8, u * 0.14, 0, 0, 3.1416); c.fill();   // snow on the lid
-            } else if (kind === 'heart') {
-                const sz = u * 1.1, path = (k) => { c.beginPath(); c.moveTo(0, sz * 0.9 * k); c.bezierCurveTo(-sz * 1.6 * k, sz * 0.1 * k, -sz * 0.9 * k, -sz * 1.0 * k, 0, -sz * 0.35 * k); c.bezierCurveTo(sz * 0.9 * k, -sz * 1.0 * k, sz * 1.6 * k, sz * 0.1 * k, 0, sz * 0.9 * k); c.closePath(); };
-                c.save(); c.translate(0, -sz * 0.2);
-                c.save(); c.translate(-sz * 0.05, -sz * 0.05); path(1.08); c.fillStyle = 'rgba(100,135,185,0.38)'; c.fill(); c.restore();   // the dent in the snow
-                path(1); const g = c.createLinearGradient(-sz, -sz, sz, sz); g.addColorStop(0, '#f27a96'); g.addColorStop(1, '#d93a62'); c.fillStyle = g; c.fill();
-                c.save(); c.translate(-sz * 0.28, -sz * 0.3); c.scale(0.38, 0.28); path(0.8); c.fillStyle = 'rgba(255,255,255,0.45)'; c.fill(); c.restore();
+                const col = [['#e0405a', '#b32c44', '#f2687e', '#ffe08a'], ['#3b8be0', '#2a68ad', '#69a9ee', '#ffffff'], ['#35a86b', '#27804f', '#5cc78d', '#ffd23f'], ['#9a5be0', '#7640b0', '#b98af0', '#ffe08a']][o.seed & 3];
+                lpPoly(c, 'rgba(55,80,125,0.2)', [[-u * 0.8, u * 0.02], [u * 1.5, u * 0.06], [u * 0.9, u * 0.3], [-u * 0.6, u * 0.2]]);
+                c.save(); c.translate(0, -jump); c.rotate(q * Math.sin(q * 25) * 0.15);
+                lpPoly(c, col[0], [[-u * 0.8, -u * 1.0], [0, -u * 0.8], [0, 0], [-u * 0.8, -u * 0.2]]); lpPoly(c, col[1], [[0, -u * 0.8], [u * 0.8, -u * 1.0], [u * 0.8, -u * 0.2], [0, 0]]); lpPoly(c, col[2], [[-u * 0.8, -u * 1.0], [0, -u * 1.2], [u * 0.8, -u * 1.0], [0, -u * 0.8]]);
+                lpPoly(c, col[3], [[-u * 0.1, -u * 0.81], [u * 0.1, -u * 0.8], [u * 0.1, -u * 0.02], [-u * 0.1, 0]]); lpPoly(c, col[3], [[-u * 0.4, -u * 1.1], [0, -u * 0.95], [u * 0.4, -u * 1.1], [0, -u * 1.15]]);
+                lpPoly(c, col[3], [[0, -u * 1.0], [-u * 0.34, -u * 1.5], [-u * 0.06, -u * 1.1]]); lpPoly(c, col[3], [[0, -u * 1.0], [u * 0.34, -u * 1.5], [u * 0.06, -u * 1.1]]);   // the bow
+                lpPoly(c, '#ffffff', [[-u * 0.8, -u * 1.0], [-u * 0.3, -u * 1.12], [-u * 0.1, -u * 1.0], [-u * 0.5, -u * 0.9]]);   // a patch of snow
                 c.restore();
+            } else if (kind === 'heart') {
+                // a heart drawn by a finger in the snow: only the groove, wobbly, the ends not quite meeting
+                const sz = u * 0.075, N = 46, pts = [];
+                for (let i = 0; i <= N; i++) { const t = 0.15 + i / N * 6.1, w = 1 + 0.05 * Math.sin(t * 5 + o.seed) + 0.03 * Math.sin(t * 11 + o.seed * 0.3);
+                    pts.push([16 * Math.pow(Math.sin(t), 3) * sz * w, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * sz * w - u * 0.4]); }
+                const stroke = (dx, dy, col, wd) => { c.strokeStyle = col; c.lineWidth = wd; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x + dx, y + dy) : c.moveTo(x + dx, y + dy)); c.stroke(); };
+                stroke(u * 0.03, u * 0.04, 'rgba(96,128,178,0.5)', u * 0.2); stroke(0, 0, 'rgba(150,180,222,0.55)', u * 0.14); stroke(-u * 0.025, -u * 0.03, 'rgba(255,255,255,0.95)', u * 0.05);
             }
         }
         function imDrawBunny(c, b, u, T) {
-            const hop = b.st === 'run' ? Math.abs(Math.sin(b.ph)) * u * 0.6 : 0, sq = b.st === 'rest' ? 1 + 0.03 * Math.sin(T * 3 + b.seed) : 1;
-            c.fillStyle = 'rgba(55,80,125,0.22)'; c.beginPath(); c.ellipse(0, 0, u * 0.55 * (1 - hop / u * 0.25), u * 0.15, 0, 0, 6.283); c.fill();
-            c.save(); c.translate(0, -hop); c.scale(b.dir * 1, sq);
-            const ear = (x, rot) => { c.save(); c.translate(x * u, -u * 0.82); c.rotate(rot - (b.st === 'run' ? 0.7 : 0)); c.fillStyle = '#f7f7fa'; c.beginPath(); c.ellipse(0, -u * 0.22, u * 0.075, u * 0.27, 0, 0, 6.283); c.fill(); c.fillStyle = '#f5b9c8'; c.beginPath(); c.ellipse(0, -u * 0.22, u * 0.035, u * 0.19, 0, 0, 6.283); c.fill(); c.restore(); };
+            const hop = b.st === 'run' ? Math.abs(Math.sin(b.ph)) * u * 0.6 : 0, W0 = [196, 204, 220], W1 = [255, 255, 255];
+            lpPoly(c, 'rgba(55,80,125,0.22)', [[-u * 0.5, 0], [u * 0.6, 0], [u * 0.4, u * 0.14], [-u * 0.4, u * 0.14]]);
+            c.save(); c.translate(0, -hop); c.scale(b.dir, 1);
+            const ear = (x, rot) => { c.save(); c.translate(x * u, -u * 0.82); c.rotate(rot - (b.st === 'run' ? 0.7 : 0)); lpPoly(c, '#f2f3f8', [[-u * 0.08, 0], [0, -u * 0.52], [u * 0.08, 0]]); lpPoly(c, '#f2a6bb', [[-u * 0.035, -u * 0.04], [0, -u * 0.4], [u * 0.035, -u * 0.04]]); c.restore(); };
             ear(0.36, -0.15); ear(0.5, 0.1);
-            c.fillStyle = '#e4e7ee'; c.beginPath(); c.ellipse(-u * 0.12, -u * 0.12, u * 0.26, u * 0.14, 0, 0, 6.283); c.fill();
-            c.fillStyle = '#f6f6f9'; c.beginPath(); c.ellipse(0, -u * 0.36, u * 0.5, u * 0.32, -0.1, 0, 6.283); c.fill();
-            c.beginPath(); c.arc(-u * 0.52, -u * 0.4, u * 0.14, 0, 6.283); c.fill();
-            c.beginPath(); c.arc(u * 0.46, -u * 0.62, u * 0.22, 0, 6.283); c.fill();
-            c.fillStyle = '#20232b'; c.beginPath(); c.arc(u * 0.56, -u * 0.67, u * 0.035, 0, 6.283); c.fill();
-            c.fillStyle = '#f08aa4'; c.beginPath(); c.arc(u * 0.67, -u * 0.6, u * 0.03, 0, 6.283); c.fill();
+            lpBall(c, -u * 0.12, -u * 0.12, u * 0.26, u * 0.14, 5, 0, [190, 196, 212], W1);
+            lpBall(c, 0, -u * 0.36, u * 0.5, u * 0.32, 7, 0.3, W0, W1);
+            lpBall(c, -u * 0.52, -u * 0.4, u * 0.14, u * 0.14, 5, 0, W0, W1);
+            lpBall(c, u * 0.46, -u * 0.62, u * 0.22, u * 0.21, 6, 0.4, W0, W1);
+            lpPoly(c, '#20232b', [[u * 0.54, -u * 0.7], [u * 0.6, -u * 0.66], [u * 0.54, -u * 0.62]]); lpPoly(c, '#f08aa4', [[u * 0.64, -u * 0.64], [u * 0.7, -u * 0.6], [u * 0.64, -u * 0.56]]);
             c.restore();
         }
         function imBuildPicture() {
@@ -5788,7 +5810,9 @@ service cloud.firestore {
                 if (IM.state === 'ready' || IM.state === 'won') return;   // the start waits for the end of the tap (see onTap)
                 IM.drag = { x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY }; };
             // iOS gives sound and the tilt sensor only from the END of a tap (click / touchend), not from pointerdown
-            IM.onTap = e => { if (e.target.closest && e.target.closest('#im-x')) return; BWS.unlock(); if (IM.state === 'ready' || IM.state === 'won') imGo(); };
+            IM.onTap = e => { if (e.target.closest && e.target.closest('#im-x')) return; BWS.unlock();
+                if (imTapGift(e.clientX, e.clientY)) return;   // a tap on a gift: festive emoji fly out
+                if (IM.state === 'ready' || IM.state === 'won') imGo(); };
             IM.onMove = e => { if (IM.drag) { IM.drag.cx = e.clientX; IM.drag.cy = e.clientY; } };
             IM.onUp = () => { IM.drag = null; };
             IM.onKey = e => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) { IM.keys[e.key] = e.type === 'keydown'; e.preventDefault(); e.stopPropagation(); }
@@ -5966,6 +5990,7 @@ service cloud.firestore {
             // splashes and points
             IM.fx = IM.fx.filter(f => {
                 f.t += dt;
+                if (f.e) { if (f.t > f.life) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += lw * 10 * dt; c.save(); c.globalAlpha = Math.max(0, Math.min(1, (f.life - f.t) / 0.4)); c.font = `${Math.round(lw * s * f.sz)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.translate(ox + f.x * s, oy + f.y * s); c.rotate(f.rot * Math.max(0, f.t)); c.fillText(f.e, 0, 0); c.restore(); return true; }
                 if (f.p) { const L = f.life || 0.7; if (f.t > L) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; c.fillStyle = f.h != null ? `hsla(${f.h},95%,58%,${Math.max(0, 1 - f.t / L)})` : f.gold ? `rgba(255,214,107,${1 - f.t / L})` : f.tele ? `rgba(196,176,255,${1 - f.t / L})` : `rgba(255,255,255,${1 - f.t / L})`; c.beginPath(); c.arc(ox + f.x * s, oy + f.y * s, Math.max(1.2, lw * s * (f.h != null ? 0.05 : 0.035)), 0, 6.283); c.fill(); return true; }
                 if (f.t > 1.1) return false;
                 c.save(); c.globalAlpha = Math.min(1, (1.1 - f.t) / 0.4); c.fillStyle = f.gold ? '#ffd36b' : '#eaf4ff'; c.font = `700 ${Math.round(18 + (f.gold ? 6 : 0))}px "Google Sans Flex","Google Sans",system-ui,sans-serif`; c.textAlign = 'center';
