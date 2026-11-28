@@ -5725,58 +5725,103 @@ service cloud.firestore {
             const hx = cx - rx * 0.18, hy = cy - ry * 0.22;
             for (let i = 0; i < n; i++) { const a = rot + (i + 0.5) / n * 6.2832, l = 0.5 + 0.5 * Math.cos(a + 2.35); lpPoly(c, lpMix(dark, light, l), [[hx, hy], pts[i], pts[(i + 1) % n]]); }
         }
+        // ---- the scenery, drawn as careful low-poly: one light from the upper left, soft ground shadows, a small palette ----
+        const LP_LIGHT = 2.35;   // the facet that faces this way (upper left) is the brightest
+        function lpShadow(c, cx, cy, rx, ry, a) {   // a soft oval shadow on the snow, falling to the lower right
+            c.save(); c.translate(cx, cy); c.scale(1, ry / rx);
+            const g = c.createRadialGradient(0, 0, 0, 0, 0, rx); g.addColorStop(0, `rgba(58,84,132,${a})`); g.addColorStop(0.6, `rgba(58,84,132,${a * 0.55})`); g.addColorStop(1, 'rgba(58,84,132,0)');
+            c.fillStyle = g; c.beginPath(); c.arc(0, 0, rx, 0, 6.2832); c.fill(); c.restore();
+        }
+        function lpFan(c, pts, dark, light, cx, cy) {   // a polygon split into triangles from (cx, cy), each shaded by the way its outer edge faces
+            if (cx == null) { cx = 0; cy = 0; pts.forEach(p => { cx += p[0]; cy += p[1]; }); cx /= pts.length; cy /= pts.length; }
+            for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], ang = Math.atan2((a[1] + b[1]) / 2 - cy, (a[0] + b[0]) / 2 - cx), l = 0.5 + 0.5 * Math.cos(ang + LP_LIGHT);
+                lpPoly(c, lpMix(dark, light, l), [[cx, cy], a, b]); }
+        }
+        const lpLerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
         function imDrawDeco(c, kind, o, T) {   // all in world units, origin = the foot of the thing
-            const u = o.r, q = o.popT ? Math.max(0, 1 - (performance.now() - o.popT) / 450) : 0, jump = Math.sin(q * 3.1416) * u * 0.9 * (q > 0 ? 1 : 0);
+            const u = o.r, v = (o.seed | 0) & 3;
             if (kind === 'tree') {
-                lpPoly(c, 'rgba(55,80,125,0.2)', [[-u * 0.4, u * 0.02], [u * 1.5, u * 0.08], [u * 0.9, u * 0.3], [-u * 0.3, u * 0.2]]);
-                lpPoly(c, '#6a4529', [[-u * 0.14, -u * 0.4], [0, -u * 0.4], [0, u * 0.04], [-u * 0.17, u * 0.02]]); lpPoly(c, '#4f3320', [[0, -u * 0.4], [u * 0.14, -u * 0.4], [u * 0.17, u * 0.02], [0, u * 0.04]]);
-                const G = ['#0f4a33', '#17603f', '#23794d', '#2f9360'];
-                [[-0.2, 1.0, 1.1], [-0.85, 0.78, 1.05], [-1.5, 0.55, 1.0]].forEach(([by, hw, hh], ti) => {
-                    const A = [0, (by - hh) * u], yb = by * u, w = hw * u, L = [-w, yb], K = [-w * 0.42, yb + u * 0.12], F = [0, yb + u * 0.26], M = [w * 0.42, yb + u * 0.14], R = [w, yb];
-                    lpPoly(c, G[0], [A, L, K]); lpPoly(c, G[1], [A, K, F]); lpPoly(c, G[2], [A, F, M]); lpPoly(c, G[3], [A, M, R]);
-                    const my = A[1] + hh * u * 0.5, a = [-w * 0.5, my], bb = [w * 0.5, my], cc = [-w * 0.08, my + u * 0.18];   // snow on the tier: three white facets
-                    lpPoly(c, '#dfeaf7', [A, a, cc]); lpPoly(c, '#ffffff', [A, cc, bb]);
-                    for (let i = 0; i < 3; i++) { const lx = (-0.5 + (i + (ti % 2) * 0.5 + 0.25) / 3) * w * 1.3, ly = yb - u * (0.1 + ((i * 2 + ti) % 3) * 0.1), col = ['#ff4d6d', '#ffd23f', '#4dd0ff', '#7dff7a'][(i + ti * 2 + o.seed) & 3], al = 0.6 + 0.4 * Math.sin(T * 3 + i * 2 + ti + o.seed), z = u * 0.07;
-                        c.globalAlpha = al; lpPoly(c, col, [[lx, ly - z], [lx + z, ly], [lx, ly + z], [lx - z, ly]]); c.globalAlpha = 1; }
+                lpShadow(c, u * 0.45, u * 0.05, u * 1.25, u * 0.34, 0.3);
+                lpPoly(c, '#6e4a31', [[-u * 0.13, -u * 0.36], [0, -u * 0.36], [0, u * 0.03], [-u * 0.15, u * 0.01]]); lpPoly(c, '#4c3222', [[0, -u * 0.36], [u * 0.13, -u * 0.36], [u * 0.15, u * 0.01], [0, u * 0.03]]);
+                const tiers = v < 2 ? [[-0.28, 1.0, 0.95], [-0.8, 0.8, 0.9], [-1.28, 0.6, 0.85], [-1.7, 0.4, 0.8]] : [[-0.28, 0.96, 1.08], [-0.92, 0.72, 1.0], [-1.5, 0.47, 0.95]];
+                const G0 = [20, 66, 54], G1 = [64, 152, 106], ORN = [['#e0434f', '#ff9aa2'], ['#f2b632', '#ffe7a3'], ['#3f7fd8', '#a9c9f5'], ['#dfe6ef', '#ffffff']];
+                tiers.forEach(([by, hw, hh], ti) => {
+                    const w = hw * u, yb = by * u, A = [0, (by - hh) * u], jag = ti % 2 ? 1 : -1;
+                    const skirt = [[-w, yb], [-w * 0.62, yb + u * 0.13], [-w * 0.28, yb + u * (0.05 + 0.03 * jag)], [w * 0.08, yb + u * 0.15], [w * 0.46, yb + u * 0.06], [w * 0.74, yb + u * 0.12], [w, yb]];
+                    for (let i = 0; i < skirt.length - 1; i++) { const xm = (skirt[i][0] + skirt[i + 1][0]) / 2 / w, l = 0.88 - 0.62 * (xm + 1) / 2 + (i % 2 ? 0.05 : -0.04); lpPoly(c, lpMix(G0, G1, Math.max(0, Math.min(1, l))), [A, skirt[i], skirt[i + 1]]); }
+                    const f = ti === tiers.length - 1 ? 0.5 : 0.42, y1 = A[1] + hh * u * f, ws = w * f;   // snow lying on the tier
+                    const cap = [[-ws, y1], [-ws * 0.55, y1 + u * 0.1], [-ws * 0.15, y1 + u * 0.03], [ws * 0.25, y1 + u * 0.12], [ws * 0.6, y1 + u * 0.04], [ws, y1]];
+                    for (let i = 0; i < cap.length - 1; i++) { const xm = (cap[i][0] + cap[i + 1][0]) / 2 / ws; lpPoly(c, lpMix([206, 222, 240], [255, 255, 255], 0.95 - 0.6 * (xm + 1) / 2), [A, cap[i], cap[i + 1]]); }
+                    [[-0.5, 0], [0.42, 1]].forEach(([fx, k2]) => { const col = ORN[(ti + k2 + v) & 3], x = fx * w, y = yb - u * (0.05 + 0.04 * k2), r = u * 0.075;   // baubles
+                        c.fillStyle = col[0]; c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.fill(); c.fillStyle = col[1]; c.beginPath(); c.arc(x - r * 0.35, y - r * 0.35, r * 0.35, 0, 6.2832); c.fill(); });
                 });
-                const sy = -u * 2.55, z = u * 0.24; lpPoly(c, '#ffe27a', [[0, sy - z], [-z * 0.4, sy], [0, sy + z * 0.4]]); lpPoly(c, '#ffc83a', [[0, sy - z], [z * 0.4, sy], [0, sy + z * 0.4]]); lpPoly(c, '#ffd23f', [[-z, sy], [0, sy - z * 0.4], [z, sy], [0, sy + z * 0.4]]);
+                const top = tiers[tiers.length - 1], sy = (top[0] - top[2]) * u - u * 0.1, R1 = u * 0.21, R2 = u * 0.085;   // a faceted gold star
+                for (let i = 0; i < 5; i++) { const a0 = -1.5708 + i * 1.2566, a1 = a0 + 0.6283, a2 = a0 - 0.6283, P = [Math.cos(a0) * R1, sy + Math.sin(a0) * R1], Q1 = [Math.cos(a1) * R2, sy + Math.sin(a1) * R2], Q2 = [Math.cos(a2) * R2, sy + Math.sin(a2) * R2];
+                    lpPoly(c, '#ffd64d', [[0, sy], Q2, P]); lpPoly(c, '#eea51e', [[0, sy], P, Q1]); }
             } else if (kind === 'snowman') {
-                lpPoly(c, 'rgba(55,80,125,0.2)', [[-u * 0.6, u * 0.02], [u * 1.6, u * 0.06], [u * 0.9, u * 0.3], [-u * 0.5, u * 0.2]]);
-                const W0 = [176, 196, 224], W1 = [255, 255, 255];
-                c.strokeStyle = '#6b4a2e'; c.lineWidth = u * 0.07; c.lineCap = 'butt'; c.lineJoin = 'miter'; c.beginPath(); c.moveTo(-u * 0.4, -u * 1.5); c.lineTo(-u * 1.0, -u * 1.95); c.moveTo(-u * 0.75, -u * 1.75); c.lineTo(-u * 0.7, -u * 2.0); c.moveTo(u * 0.4, -u * 1.5); c.lineTo(u * 1.0, -u * 1.9); c.moveTo(u * 0.75, -u * 1.72); c.lineTo(u * 0.9, -u * 1.5); c.stroke();
-                lpBall(c, 0, -u * 0.6, u * 0.62, u * 0.6, 8, 0.2, W0, W1); lpBall(c, 0, -u * 1.45, u * 0.45, u * 0.44, 7, 0.5, W0, W1); lpBall(c, 0, -u * 2.1, u * 0.33, u * 0.32, 6, 0.1, W0, W1);
-                lpPoly(c, '#b82a42', [[-u * 0.38, -u * 1.86], [u * 0.38, -u * 1.86], [u * 0.3, -u * 1.74], [-u * 0.3, -u * 1.74]]); lpPoly(c, '#d9344f', [[u * 0.14, -u * 1.76], [u * 0.3, -u * 1.76], [u * 0.34, -u * 1.25], [u * 0.2, -u * 1.22]]);
-                lpPoly(c, '#14161b', [[-u * 0.44, -u * 2.37], [u * 0.44, -u * 2.37], [u * 0.3, -u * 2.3], [-u * 0.3, -u * 2.3]]); lpPoly(c, '#262a33', [[-u * 0.24, -u * 2.86], [0, -u * 2.86], [0, -u * 2.37], [-u * 0.24, -u * 2.37]]); lpPoly(c, '#1a1d24', [[0, -u * 2.86], [u * 0.24, -u * 2.86], [u * 0.24, -u * 2.37], [0, -u * 2.37]]); lpPoly(c, '#d9344f', [[-u * 0.24, -u * 2.52], [u * 0.24, -u * 2.52], [u * 0.24, -u * 2.42], [-u * 0.24, -u * 2.42]]);
-                c.fillStyle = '#16181d'; [[-0.11, -2.15], [0.11, -2.15], [0, -1.6], [0, -1.38], [0, -0.85], [0, -0.6]].forEach(([x, y]) => { const z = u * 0.045; lpPoly(c, '#16181d', [[x * u, y * u - z], [x * u + z, y * u], [x * u, y * u + z], [x * u - z, y * u]]); });
-                lpPoly(c, '#ff9a3c', [[0.02 * u, -2.12 * u], [0.42 * u, -2.04 * u], [0.02 * u, -2.04 * u]]); lpPoly(c, '#e0701a', [[0.02 * u, -2.04 * u], [0.42 * u, -2.04 * u], [0.02 * u, -1.97 * u]]);
-            } else if (kind === 'gift') {
-                const col = [['#e0405a', '#b32c44', '#f2687e', '#ffe08a'], ['#3b8be0', '#2a68ad', '#69a9ee', '#ffffff'], ['#35a86b', '#27804f', '#5cc78d', '#ffd23f'], ['#9a5be0', '#7640b0', '#b98af0', '#ffe08a']][o.seed & 3];
-                lpPoly(c, 'rgba(55,80,125,0.2)', [[-u * 0.8, u * 0.02], [u * 1.5, u * 0.06], [u * 0.9, u * 0.3], [-u * 0.6, u * 0.2]]);
-                c.save(); c.translate(0, -jump); c.rotate(q * Math.sin(q * 25) * 0.15);
-                lpPoly(c, col[0], [[-u * 0.8, -u * 1.0], [0, -u * 0.8], [0, 0], [-u * 0.8, -u * 0.2]]); lpPoly(c, col[1], [[0, -u * 0.8], [u * 0.8, -u * 1.0], [u * 0.8, -u * 0.2], [0, 0]]); lpPoly(c, col[2], [[-u * 0.8, -u * 1.0], [0, -u * 1.2], [u * 0.8, -u * 1.0], [0, -u * 0.8]]);
-                lpPoly(c, col[3], [[-u * 0.1, -u * 0.81], [u * 0.1, -u * 0.8], [u * 0.1, -u * 0.02], [-u * 0.1, 0]]); lpPoly(c, col[3], [[-u * 0.4, -u * 1.1], [0, -u * 0.95], [u * 0.4, -u * 1.1], [0, -u * 1.15]]);
-                lpPoly(c, col[3], [[0, -u * 1.0], [-u * 0.34, -u * 1.5], [-u * 0.06, -u * 1.1]]); lpPoly(c, col[3], [[0, -u * 1.0], [u * 0.34, -u * 1.5], [u * 0.06, -u * 1.1]]);   // the bow
-                lpPoly(c, '#ffffff', [[-u * 0.8, -u * 1.0], [-u * 0.3, -u * 1.12], [-u * 0.1, -u * 1.0], [-u * 0.5, -u * 0.9]]);   // a patch of snow
+                lpShadow(c, u * 0.4, u * 0.05, u * 1.15, u * 0.32, 0.3);
+                const S0 = [158, 181, 216], S1 = [255, 255, 255];
+                lpFan(c, [[-u * 0.8, 0], [-u * 0.55, -u * 0.12], [-u * 0.1, -u * 0.18], [u * 0.45, -u * 0.12], [u * 0.8, 0], [u * 0.3, u * 0.1], [-u * 0.4, u * 0.1]], S0, S1, 0, -u * 0.02);   // snow heaped at its foot
+                const twig = (x0, y0, x1, y1, w) => { const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy), nx = -dy / L * w, ny = dx / L * w; lpPoly(c, '#5a3b26', [[x0 + nx, y0 + ny], [x1, y1], [x0 - nx, y0 - ny]]); };
+                twig(-u * 0.38, -u * 1.48, -u * 1.05, -u * 1.95, u * 0.05); twig(-u * 0.82, -u * 1.79, -u * 0.86, -u * 2.08, u * 0.03); twig(-u * 0.95, -u * 1.88, -u * 1.15, -u * 1.86, u * 0.025);
+                twig(u * 0.38, -u * 1.48, u * 1.02, -u * 1.86, u * 0.05); twig(u * 0.8, -u * 1.73, u * 0.96, -u * 1.5, u * 0.03);
+                lpBall(c, 0, -u * 0.58, u * 0.62, u * 0.6, 9, 0.15, S0, S1); lpBall(c, 0, -u * 1.42, u * 0.46, u * 0.45, 8, 0.4, S0, S1); lpBall(c, 0, -u * 2.06, u * 0.34, u * 0.33, 7, 0.2, S0, S1);
+                // a knitted scarf, its tail hanging over the shoulder
+                lpPoly(c, '#d63b4c', [[-u * 0.36, -u * 1.8], [u * 0.36, -u * 1.8], [u * 0.32, -u * 1.68], [-u * 0.32, -u * 1.68]]); lpPoly(c, '#a72a3a', [[-u * 0.32, -u * 1.68], [u * 0.32, -u * 1.68], [u * 0.26, -u * 1.62], [-u * 0.26, -u * 1.62]]);
+                lpPoly(c, '#c33244', [[u * 0.12, -u * 1.7], [u * 0.3, -u * 1.7], [u * 0.36, -u * 1.24], [u * 0.2, -u * 1.22]]); lpPoly(c, '#f4f7fb', [[u * 0.19, -u * 1.45], [u * 0.33, -u * 1.46], [u * 0.34, -u * 1.39], [u * 0.2, -u * 1.38]]);
+                for (let i = 0; i < 3; i++) lpPoly(c, '#a72a3a', [[u * (0.2 + i * 0.055), -u * 1.22], [u * (0.24 + i * 0.055), -u * 1.22], [u * (0.22 + i * 0.055), -u * 1.13]]);
+                // a top hat, slightly tilted
+                c.save(); c.translate(0, -u * 2.33); c.rotate(-0.1);
+                lpPoly(c, '#2a2e37', [[-u * 0.44, 0], [u * 0.44, 0], [u * 0.36, u * 0.07], [-u * 0.36, u * 0.07]]);
+                lpPoly(c, '#353a45', [[-u * 0.25, -u * 0.5], [0, -u * 0.5], [0, 0], [-u * 0.25, 0]]); lpPoly(c, '#1d2027', [[0, -u * 0.5], [u * 0.25, -u * 0.5], [u * 0.25, 0], [0, 0]]);
+                lpPoly(c, '#d63b4c', [[-u * 0.25, -u * 0.14], [u * 0.25, -u * 0.14], [u * 0.25, -u * 0.04], [-u * 0.25, -u * 0.04]]); lpPoly(c, '#4a505d', [[-u * 0.25, -u * 0.5], [u * 0.25, -u * 0.5], [u * 0.2, -u * 0.54], [-u * 0.2, -u * 0.54]]);
                 c.restore();
-            } else if (kind === 'mound') {   // a low-poly snowdrift: facets lit from the upper left
-                const rx = u * 1.5, ry = u * 0.62, n = 7, pk = [-rx * 0.15, -ry * 1.15], arc = [];
-                for (let i = 0; i <= n; i++) { const a = Math.PI + i / n * Math.PI; arc.push([Math.cos(a) * rx, Math.sin(a) * ry * 0.55 + (i === 0 || i === n ? 0 : 0)]); }
-                lpPoly(c, 'rgba(70,100,150,0.16)', [[-rx, 0], [rx * 1.1, u * 0.02], [rx * 0.8, u * 0.26], [-rx * 0.8, u * 0.22]]);
-                for (let i = 0; i < n; i++) { const a = Math.PI + (i + 0.5) / n * Math.PI, l = 0.5 + 0.5 * Math.cos(a + 2.4); lpPoly(c, lpMix([196, 212, 234], [255, 255, 255], l), [pk, arc[i], arc[i + 1]]); }
-                lpPoly(c, '#c3d3e9', [arc[0], arc[n], [rx * 0.6, u * 0.14], [-rx * 0.6, u * 0.12]]);
+                const coal = (x, y, r) => { c.fillStyle = '#1b1e25'; c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.fill(); c.fillStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); c.arc(x - r * 0.35, y - r * 0.35, r * 0.3, 0, 6.2832); c.fill(); };
+                coal(-u * 0.12, -u * 2.14, u * 0.045); coal(u * 0.12, -u * 2.14, u * 0.045);
+                for (let i = 0; i < 5; i++) { const a = 0.45 + i * 0.56; coal(Math.cos(a) * u * 0.17, -u * 2.0 + Math.sin(a) * u * 0.08, u * 0.022); }
+                [-1.56, -1.38, -1.2].forEach(y => coal(0, y * u, u * 0.04));
+                lpPoly(c, '#ff9a3c', [[0, -u * 2.09], [u * 0.42, -u * 2.03], [0, -u * 2.03]]); lpPoly(c, '#e06d16', [[0, -u * 2.03], [u * 0.42, -u * 2.03], [0, -u * 1.98]]);   // the carrot
+            } else if (kind === 'gift') {
+                const P = [[[232, 80, 95], [204, 58, 74], [163, 44, 59], [255, 211, 107], [240, 185, 63], [211, 155, 42]],
+                           [[91, 155, 232], [61, 127, 208], [44, 98, 168], [255, 255, 255], [230, 237, 246], [201, 214, 230]],
+                           [[76, 191, 134], [51, 160, 107], [37, 124, 82], [242, 96, 109], [217, 68, 82], [179, 52, 63]],
+                           [[167, 123, 232], [138, 92, 208], [108, 68, 168], [255, 211, 107], [240, 185, 63], [211, 155, 42]]][v].map(a => `rgb(${a[0]},${a[1]},${a[2]})`);
+                lpShadow(c, u * 0.35, u * 0.02, u * 1.15, u * 0.34, 0.32);
+                const wx = u * 0.78, dy = wx * 0.5, hb = u * 0.82, F = [0, 0], Lb = [-wx, -dy], Rb = [wx, -dy], F2 = [0, -hb], L2 = [-wx, -dy - hb], R2 = [wx, -dy - hb], B2 = [0, -2 * dy - hb];
+                lpPoly(c, P[1], [Lb, F, F2, L2]); lpPoly(c, P[2], [F, Rb, R2, F2]); lpPoly(c, P[0], [L2, F2, R2, B2]);
+                const band = (a0, a1, b0, b1, col, w = 0.11) => lpPoly(c, col, [lpLerp(a0, a1, 0.5 - w), lpLerp(a0, a1, 0.5 + w), lpLerp(b0, b1, 0.5 + w), lpLerp(b0, b1, 0.5 - w)]);
+                band(Lb, F, L2, F2, P[4]); band(F, Rb, F2, R2, P[5]);   // the ribbon down the two sides
+                band(L2, F2, B2, R2, P[3]); band(F2, R2, L2, B2, P[3]);   // and crossing on the lid
+                const C = [0, -dy - hb];   // the bow: two folded loops, a knot and two tails
+                lpPoly(c, P[3], [C, [C[0] - u * 0.14, C[1] - u * 0.34], [C[0] - u * 0.44, C[1] - u * 0.26]]); lpPoly(c, P[5], [C, [C[0] - u * 0.44, C[1] - u * 0.26], [C[0] - u * 0.36, C[1] - u * 0.04]]);
+                lpPoly(c, P[4], [C, [C[0] + u * 0.14, C[1] - u * 0.34], [C[0] + u * 0.44, C[1] - u * 0.26]]); lpPoly(c, P[5], [C, [C[0] + u * 0.44, C[1] - u * 0.26], [C[0] + u * 0.36, C[1] - u * 0.04]]);
+                lpPoly(c, P[4], [C, [C[0] - u * 0.06, C[1] + u * 0.05], [C[0] - u * 0.2, C[1] + u * 0.24], [C[0] - u * 0.12, C[1] + u * 0.24]]); lpPoly(c, P[5], [C, [C[0] + u * 0.06, C[1] + u * 0.05], [C[0] + u * 0.22, C[1] + u * 0.22], [C[0] + u * 0.13, C[1] + u * 0.25]]);
+                lpPoly(c, P[3], [[C[0] - u * 0.07, C[1] - u * 0.02], [C[0], C[1] - u * 0.07], [C[0] + u * 0.07, C[1] - u * 0.02], [C[0], C[1] + u * 0.04]]);
+                            } else if (kind === 'mound') {   // a soft drift: two humps of faceted snow
+                lpShadow(c, u * 0.3, u * 0.05, u * 1.7, u * 0.35, 0.22);
+                const S0 = [214, 225, 241], S1 = [255, 255, 255], hump = (cx, rx, ry, n) => { const pts = []; for (let i = 0; i <= n; i++) { const a = Math.PI + i / n * Math.PI; pts.push([cx + Math.cos(a) * rx, Math.sin(a) * ry]); } pts.push([cx + rx * 0.6, u * 0.06], [cx - rx * 0.6, u * 0.06]); lpFan(c, pts, S0, S1, cx - rx * 0.15, -ry * 0.45); };
+                hump(u * 0.5, u * 0.75, u * 0.36, 9); hump(-u * 0.25, u * 0.95, u * 0.5, 10);
             }
         }
-        function imDrawBunny(c, b, u, T) {
-            const hop = b.st === 'run' ? Math.abs(Math.sin(b.ph)) * u * 0.6 : 0, W0 = [196, 204, 220], W1 = [255, 255, 255];
-            lpPoly(c, 'rgba(55,80,125,0.22)', [[-u * 0.5, 0], [u * 0.6, 0], [u * 0.4, u * 0.14], [-u * 0.4, u * 0.14]]);
-            c.save(); c.translate(0, -hop); c.scale(b.dir, 1);
-            const ear = (x, rot) => { c.save(); c.translate(x * u, -u * 0.82); c.rotate(rot - (b.st === 'run' ? 0.7 : 0)); lpPoly(c, '#f2f3f8', [[-u * 0.08, 0], [0, -u * 0.52], [u * 0.08, 0]]); lpPoly(c, '#f2a6bb', [[-u * 0.035, -u * 0.04], [0, -u * 0.4], [u * 0.035, -u * 0.04]]); c.restore(); };
-            ear(0.36, -0.15); ear(0.5, 0.1);
-            lpBall(c, -u * 0.12, -u * 0.12, u * 0.26, u * 0.14, 5, 0, [190, 196, 212], W1);
-            lpBall(c, 0, -u * 0.36, u * 0.5, u * 0.32, 7, 0.3, W0, W1);
-            lpBall(c, -u * 0.52, -u * 0.4, u * 0.14, u * 0.14, 5, 0, W0, W1);
-            lpBall(c, u * 0.46, -u * 0.62, u * 0.22, u * 0.21, 6, 0.4, W0, W1);
-            lpPoly(c, '#20232b', [[u * 0.54, -u * 0.7], [u * 0.6, -u * 0.66], [u * 0.54, -u * 0.62]]); lpPoly(c, '#f08aa4', [[u * 0.64, -u * 0.64], [u * 0.7, -u * 0.6], [u * 0.64, -u * 0.56]]);
+        function imDrawBunny(c, b, u, T) {   // a white hare in profile, faceted; stretched out while it runs
+            const run = b.st === 'run', hop = run ? Math.abs(Math.sin(b.ph)) * u * 0.55 : 0, F0 = [196, 204, 222], F1 = [255, 255, 255];
+            lpShadow(c, u * 0.05, u * 0.02, u * 0.6 * (1 - hop / u * 0.4), u * 0.16, 0.3);
+            c.save(); c.translate(0, -hop); c.scale(b.dir, 1); if (run) { c.rotate(-0.12 * Math.cos(b.ph)); c.scale(1.12, 0.92); }
+            const breathe = run ? 0 : Math.sin(T * 2.4 + b.seed) * u * 0.012;
+            const ear = (bx, by, tx, ty, w, inner) => { const dx = tx - bx, dy = ty - by, L = Math.hypot(dx, dy), nx = -dy / L * w, ny = dx / L * w;
+                lpPoly(c, '#eef1f7', [[bx - nx, by - ny], [bx + dx * 0.55 - nx * 1.1, by + dy * 0.55 - ny * 1.1], [tx, ty], [bx, by]]); lpPoly(c, '#d7dce8', [[bx, by], [tx, ty], [bx + dx * 0.55 + nx * 1.1, by + dy * 0.55 + ny * 1.1], [bx + nx, by + ny]]);
+                if (inner) lpPoly(c, '#f2b3c3', [[bx + dx * 0.15, by + dy * 0.15], [tx - dx * 0.1, ty - dy * 0.1], [bx + dx * 0.55 + nx * 0.5, by + dy * 0.55 + ny * 0.5]]); };
+            const back = run ? 0.25 : 0;
+            ear(u * 0.36, -u * 0.95, u * (0.12 - back), -u * (1.45 - back * 0.4), u * 0.075, false);
+            lpFan(c, [[-u * 0.47, -u * 0.06], [-u * 0.12, 0], [u * 0.06, -u * 0.03], [u * 0.02, -u * 0.22], [-u * 0.28, -u * 0.32]], F0, F1);   // hind leg
+            lpFan(c, [[-u * 0.56, -u * 0.24], [-u * 0.52, -u * 0.5 - breathe], [-u * 0.3, -u * 0.68 - breathe], [0, -u * 0.73 - breathe], [u * 0.22, -u * 0.63], [u * 0.36, -u * 0.45], [u * 0.38, -u * 0.22], [u * 0.3, -u * 0.05], [-u * 0.1, -u * 0.01], [-u * 0.45, -u * 0.06]], F0, F1);   // body
+            lpPoly(c, '#e3e7f0', [[u * 0.26, -u * 0.18], [u * 0.47, -u * 0.04], [u * 0.47, 0], [u * 0.28, 0]]);   // front paw
+            lpBall(c, -u * 0.58, -u * 0.44, u * 0.12, u * 0.12, 6, 0.2, F0, F1);   // tail
+            lpFan(c, [[u * 0.25, -u * 0.78], [u * 0.32, -u * 0.95], [u * 0.5, -u * 1.0], [u * 0.66, -u * 0.91], [u * 0.73, -u * 0.76], [u * 0.65, -u * 0.63], [u * 0.45, -u * 0.58], [u * 0.3, -u * 0.64]], F0, F1);   // head
+            ear(u * 0.46, -u * 0.98, u * (0.44 - back * 1.2), -u * (1.53 - back * 0.5), u * 0.08, true);
+            lpPoly(c, '#f5d7df', [[u * 0.5, -u * 0.72], [u * 0.62, -u * 0.7], [u * 0.55, -u * 0.64]]);   // cheek
+            c.fillStyle = '#1e2129'; c.beginPath(); c.arc(u * 0.56, -u * 0.84, u * 0.04, 0, 6.2832); c.fill(); c.fillStyle = '#ffffff'; c.beginPath(); c.arc(u * 0.548, -u * 0.852, u * 0.013, 0, 6.2832); c.fill();
+            lpPoly(c, '#ee8aa3', [[u * 0.7, -u * 0.79], [u * 0.75, -u * 0.76], [u * 0.7, -u * 0.73]]);
             c.restore();
         }
         function imBuildPicture() {
@@ -5796,8 +5841,7 @@ service cloud.firestore {
                 p.drawImage(T, 0, 0);
             };
             const bt = lw * 0.05;   // a hair-thin fence
-            grown(lw * 0.2, 'rgba(24,52,110,0.2)'); grown(lw * 0.12, 'rgba(24,52,110,0.38)'); grown(bt * 1.4, 'rgba(24,52,110,0.9)');   // a deep blue outline so the maze stands out from the snow
-            grown(bt, 'rgba(244,248,252,0.95)'); grown(bt * 0.45, 'rgba(206,70,78,0.85)');
+            grown(lw * 0.16, 'rgba(30,56,110,0.16)');   // the boards' contact shadow on the snow
             // the ice: frosted pale blue with a soft sheen across it
             const tile = mk(256, 256), tc = tile.getContext('2d'), ti = tc.createImageData(256, 256);
             for (let i = 0; i < 65536; i++) { const v = (bwHash(i * 7 + 3, 5) % 100) / 100 - 0.5; ti.data[i * 4] = 78 * (1 + v * 0.09); ti.data[i * 4 + 1] = 142 * (1 + v * 0.09); ti.data[i * 4 + 2] = Math.min(255, 208 * (1 + v * 0.09)); ti.data[i * 4 + 3] = 255; }
@@ -5823,6 +5867,15 @@ service cloud.firestore {
             t.filter = `blur(${Math.max(1, lw * k * 0.05)}px)`; t.drawImage(M, 0, 0); t.filter = 'none';
             t.globalCompositeOperation = 'destination-in'; t.drawImage(M, 0, 0); t.globalCompositeOperation = 'source-over';
             p.drawImage(T, 0, 0);
+            // the boards: a low wall standing on the edge of the ice, seen a little from the front - white panels, a red kick plate, a blue cap
+            { const wb = lw * 0.075 * k, hg = Math.max(3, lw * 0.2 * k), R = mk(), r = R.getContext('2d'), n = Math.max(12, Math.min(20, Math.ceil(wb * 0.8)));
+              for (let i = 0; i < n; i++) { const a = i / n * 6.2832; r.drawImage(M, Math.cos(a) * wb, Math.sin(a) * wb); }
+              r.globalCompositeOperation = 'destination-out'; r.drawImage(M, 0, 0);
+              const tint = col => { const C = mk(), cc = C.getContext('2d'); cc.drawImage(R, 0, 0); cc.globalCompositeOperation = 'source-in'; cc.fillStyle = col; cc.fillRect(0, 0, W, H); return C; };
+              const kick = tint('#c22f45'), side = tint('#dfe6f0'), sideLo = tint('#c9d3e2'), cap = tint('#2c4f96'), capHi = tint('#4a72c0');
+              p.drawImage(tint('rgba(20,40,80,0.35)'), 0, 1.5);
+              for (let i = 0; i <= hg; i += 1.2) p.drawImage(i < hg * 0.28 ? kick : i < hg * 0.4 ? sideLo : side, 0, -i);
+              p.drawImage(cap, 0, -hg - 1); p.drawImage(capHi, 0, -hg - 2); }
             IM.pic = P; IM.picK = k; IM.pc = p; IM.lsx = null;
         }
         function imMakeUI() {
@@ -6019,13 +6072,13 @@ service cloud.firestore {
                 D.bunnies.forEach(b => imBunnyStep(b, dt));
             }
             // the ice with a soft shadow
-            c.save(); c.shadowColor = 'rgba(15,35,90,0.7)'; c.shadowBlur = lw * s * 0.4; c.shadowOffsetY = lw * s * 0.12;
+            c.save(); c.shadowColor = 'rgba(15,35,90,0.28)'; c.shadowBlur = lw * s * 0.12; c.shadowOffsetY = lw * s * 0.04;
             c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.pic.width / IM.picK * s, IM.pic.height / IM.picK * s); c.restore();
             // skate marks: the puck's track scratched into the ice
             if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
             if (D) {
                 D.items.forEach(o => { if (o.x < vx0 - lw * 2 || o.x > vx1 + lw * 2 || o.y < vy0 || o.y > vy1 + lw * 4) return; imStamp(c, o, ox + o.x * s, oy + o.y * s, s, T0); });
-                D.bunnies.forEach(b => { if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1 + lw * 2) return; c.save(); c.translate(ox + b.x * s, oy + b.y * s); c.scale(s, s); imDrawBunny(c, b, lw * 1.1, T0); c.restore(); });
+                D.bunnies.forEach(b => { if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1 + lw * 2) return; c.save(); c.translate(ox + b.x * s, oy + b.y * s); c.scale(s, s); imDrawBunny(c, b, lw * 0.85, T0); c.restore(); });
             }
             if (D) {   // string lights: a dark wire on small posts, bulbs that chase and glow
                 const bl = (lw * s * 0.5);
