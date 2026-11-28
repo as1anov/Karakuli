@@ -5841,7 +5841,7 @@ service cloud.firestore {
                 p.drawImage(T, 0, 0);
             };
             const bt = lw * 0.05;   // a hair-thin fence
-            grown(lw * 0.2, 'rgba(24,52,110,0.2)'); grown(lw * 0.12, 'rgba(24,52,110,0.38)'); grown(bt * 1.4, 'rgba(24,52,110,0.9)');   // a deep blue outline so the maze stands out from the snow
+            grown(bt * 1.4, 'rgba(24,52,110,0.9)');   // a thin deep blue outline so the maze stands out from the snow, no shadow
             grown(bt, 'rgba(244,248,252,0.95)'); grown(bt * 0.45, 'rgba(206,70,78,0.85)');
             // the ice: frosted pale blue with a soft sheen across it
             const tile = mk(256, 256), tc = tile.getContext('2d'), ti = tc.createImageData(256, 256);
@@ -6064,7 +6064,7 @@ service cloud.firestore {
                 D.bunnies.forEach(b => imBunnyStep(b, dt));
             }
             // the ice with a soft shadow
-            c.save(); c.shadowColor = 'rgba(15,35,90,0.22)'; c.shadowBlur = lw * s * 0.1; c.shadowOffsetY = lw * s * 0.03;
+            c.save(); 
             c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.pic.width / IM.picK * s, IM.pic.height / IM.picK * s); c.restore();
             // skate marks: the puck's track scratched into the ice
             if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
