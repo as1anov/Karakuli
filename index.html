@@ -5841,7 +5841,8 @@ service cloud.firestore {
                 p.drawImage(T, 0, 0);
             };
             const bt = lw * 0.05;   // a hair-thin fence
-            grown(lw * 0.16, 'rgba(30,56,110,0.16)');   // the boards' contact shadow on the snow
+            grown(lw * 0.2, 'rgba(24,52,110,0.2)'); grown(lw * 0.12, 'rgba(24,52,110,0.38)'); grown(bt * 1.4, 'rgba(24,52,110,0.9)');   // a deep blue outline so the maze stands out from the snow
+            grown(bt, 'rgba(244,248,252,0.95)'); grown(bt * 0.45, 'rgba(206,70,78,0.85)');
             // the ice: frosted pale blue with a soft sheen across it
             const tile = mk(256, 256), tc = tile.getContext('2d'), ti = tc.createImageData(256, 256);
             for (let i = 0; i < 65536; i++) { const v = (bwHash(i * 7 + 3, 5) % 100) / 100 - 0.5; ti.data[i * 4] = 78 * (1 + v * 0.09); ti.data[i * 4 + 1] = 142 * (1 + v * 0.09); ti.data[i * 4 + 2] = Math.min(255, 208 * (1 + v * 0.09)); ti.data[i * 4 + 3] = 255; }
@@ -5867,15 +5868,6 @@ service cloud.firestore {
             t.filter = `blur(${Math.max(1, lw * k * 0.05)}px)`; t.drawImage(M, 0, 0); t.filter = 'none';
             t.globalCompositeOperation = 'destination-in'; t.drawImage(M, 0, 0); t.globalCompositeOperation = 'source-over';
             p.drawImage(T, 0, 0);
-            // the boards: a low wall standing on the edge of the ice, seen a little from the front - white panels, a red kick plate, a blue cap
-            { const wb = lw * 0.075 * k, hg = Math.max(3, lw * 0.2 * k), R = mk(), r = R.getContext('2d'), n = Math.max(12, Math.min(20, Math.ceil(wb * 0.8)));
-              for (let i = 0; i < n; i++) { const a = i / n * 6.2832; r.drawImage(M, Math.cos(a) * wb, Math.sin(a) * wb); }
-              r.globalCompositeOperation = 'destination-out'; r.drawImage(M, 0, 0);
-              const tint = col => { const C = mk(), cc = C.getContext('2d'); cc.drawImage(R, 0, 0); cc.globalCompositeOperation = 'source-in'; cc.fillStyle = col; cc.fillRect(0, 0, W, H); return C; };
-              const kick = tint('#c22f45'), side = tint('#dfe6f0'), sideLo = tint('#c9d3e2'), cap = tint('#2c4f96'), capHi = tint('#4a72c0');
-              p.drawImage(tint('rgba(20,40,80,0.35)'), 0, 1.5);
-              for (let i = 0; i <= hg; i += 1.2) p.drawImage(i < hg * 0.28 ? kick : i < hg * 0.4 ? sideLo : side, 0, -i);
-              p.drawImage(cap, 0, -hg - 1); p.drawImage(capHi, 0, -hg - 2); }
             IM.pic = P; IM.picK = k; IM.pc = p; IM.lsx = null;
         }
         function imMakeUI() {
@@ -6072,7 +6064,7 @@ service cloud.firestore {
                 D.bunnies.forEach(b => imBunnyStep(b, dt));
             }
             // the ice with a soft shadow
-            c.save(); c.shadowColor = 'rgba(15,35,90,0.28)'; c.shadowBlur = lw * s * 0.12; c.shadowOffsetY = lw * s * 0.04;
+            c.save(); c.shadowColor = 'rgba(15,35,90,0.22)'; c.shadowBlur = lw * s * 0.1; c.shadowOffsetY = lw * s * 0.03;
             c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.pic.width / IM.picK * s, IM.pic.height / IM.picK * s); c.restore();
             // skate marks: the puck's track scratched into the ice
             if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
