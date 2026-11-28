@@ -5601,7 +5601,7 @@ service cloud.firestore {
             const real = IM.holes.filter(h => !h.tele); if (real.length) real[(Math.random() * real.length) | 0].gold = true;
             IM.px = IM.sx; IM.py = IM.sy; IM.vx = IM.vy = 0; IM.score = 0; IM.time = 0; IM.state = 'ready'; IM.trail = []; IM.fx = []; IM.sink = null; IM.combo = 0; IM.tpCool = 0;
             IM.camX = IM.px; IM.camY = IM.py;
-            imHud(); imMsg('Tap to start', IM.tiltOK === false ? 'Drag to push the puck' : 'Lay the phone flat on a table and tilt it');
+            imHud(); imMsg('🎄 Ho-ho-ho! Tap to start', IM.tiltOK === false ? 'Drag to push the puck to the holes' : 'Lay the phone flat on a table and tilt it · tap the gifts!');
         }
         // the ice, drawn once: frosted pale blue, bright where the light runs round its edges
         // The picture is painted with vector paths at screen resolution, so every edge - rings inside and out included - is smooth.
@@ -5614,29 +5614,31 @@ service cloud.firestore {
             return true;
         }
         function imMakeDeco() {
-            const lw = IM.lw, M = lw * 9, X0 = IM.x0 - M, Y0 = IM.y0 - M, W = IM.x1 - IM.x0 + 2 * M, H = IM.y1 - IM.y0 + 2 * M, area = W * H / (lw * lw);
-            const items = [], T = { tree: { r: 0.55, h: 1.7 }, snowman: { r: 0.5, h: 1.6 }, gift: { r: 0.4, h: 0.7 }, heart: { r: 0.55, h: 0 } };
-            const caps = { tree: Math.round(Math.min(70, area / 12)), snowman: 3, gift: 5, heart: 3 };
-            const cnt = { tree: 0, snowman: 0, gift: 0, heart: 0 };
+            const lw = IM.lw, Mx = lw * 4.4, My = lw * 9, X0 = IM.x0 - Mx, Y0 = IM.y0 - My, W = IM.x1 - IM.x0 + 2 * Mx, H = IM.y1 - IM.y0 + 2 * My, area = W * H / (lw * lw);
+            const items = [], T = { tree: { r: 0.55, h: 1.7 }, snowman: { r: 0.5, h: 1.6 }, gift: { r: 0.4, h: 0.7 }, mound: { r: 0.9, h: 0 } };
+            const caps = { tree: Math.round(Math.min(110, area / 5)), snowman: 3, gift: Math.round(Math.min(26, area / 14)), mound: Math.round(Math.min(34, area / 11)) };
+            const cnt = { tree: 0, snowman: 0, gift: 0, mound: 0 };
+            const outside = (x, y) => x < IM.x0 - lw * 0.6 || x > IM.x1 + lw * 0.6 || y < IM.y0 - lw * 0.6 || y > IM.y1 + lw * 0.6;
             const tryPlace = kind => {
-                const d = T[kind], r = d.r * lw;
+                const d = T[kind], r = (kind === 'mound' ? 0.65 + Math.random() * 0.8 : d.r) * lw;
                 for (let tr = 0; tr < 60; tr++) {
                     const x = X0 + Math.random() * W, y = Y0 + Math.random() * H;
+                    if (kind === 'gift' && !outside(x, y)) continue;   // the gifts lie out in the snow round the maze
                     if (!imFree(x, y, r + lw * 0.35)) continue;
                     if (d.h && (!imFree(x, y - d.h * lw * 0.5, r * 0.9) || !imFree(x, y - d.h * lw, r * 0.7))) continue;
-                    if (items.some(o => Math.hypot(o.x - x, o.y - y) < (o.r + r) * 1.25)) continue;
+                    if (items.some(o => Math.hypot(o.x - x, o.y - y) < (o.r + r) * (kind === 'mound' || o.k === 'mound' ? 0.8 : 1.25))) continue;
                     items.push({ k: kind, x, y, r, seed: (Math.random() * 1e6) | 0 }); cnt[kind]++; return true;
                 }
                 return false;
             };
-            ['heart', 'snowman', 'heart', 'snowman'].forEach(tryPlace);
-            for (let i = 0; i < 400; i++) { const q = Math.random(), kind = q < 0.72 ? 'tree' : q < 0.84 ? 'gift' : q < 0.92 ? 'snowman' : 'heart'; if (cnt[kind] < caps[kind]) tryPlace(kind); }
+            ['snowman', 'snowman', 'gift', 'gift', 'gift', 'gift'].forEach(tryPlace);
+            for (let i = 0; i < 1400; i++) { const q = Math.random(), kind = q < 0.52 ? 'tree' : q < 0.7 ? 'gift' : q < 0.76 ? 'snowman' : 'mound'; if (cnt[kind] < caps[kind]) tryPlace(kind); }
             items.sort((a, b) => a.y - b.y);
             const drifts = [], sparks = [];
             for (let i = 0; i < Math.min(160, area / 3); i++) drifts.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, rx: lw * (1 + Math.random() * 2.4), ry: lw * (0.3 + Math.random() * 0.7), blue: Math.random() < 0.5 });
             for (let i = 0; i < Math.min(220, area / 2); i++) sparks.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, ph: Math.random() * 6.283, z: lw * (0.05 + Math.random() * 0.07) });
             const bunnies = []; let guard = 0;
-            while (bunnies.length < 5 && guard++ < 600) { const x = X0 + Math.random() * W, y = Y0 + Math.random() * H; if (imFree(x, y, lw * 0.7)) bunnies.push({ x, y, hx: x, hy: y, st: 'rest', t: Math.random() * 2, dir: Math.random() < 0.5 ? 1 : -1, ph: 0, tx: x, ty: y, seed: (Math.random() * 1e6) | 0 }); }
+            while (bunnies.length < 9 && guard++ < 1200) { const x = X0 + Math.random() * W, y = Y0 + Math.random() * H; if (imFree(x, y, lw * 0.7)) bunnies.push({ x, y, hx: x, hy: y, st: 'rest', t: Math.random() * 2, dir: Math.random() < 0.5 ? 1 : -1, ph: 0, tx: x, ty: y, seed: (Math.random() * 1e6) | 0 }); }
             IM.deco = { items, drifts, sparks, bunnies, prints: [] };
         }
         function imTapGift(cx, cy) {
@@ -5708,13 +5710,12 @@ service cloud.firestore {
                 lpPoly(c, col[3], [[0, -u * 1.0], [-u * 0.34, -u * 1.5], [-u * 0.06, -u * 1.1]]); lpPoly(c, col[3], [[0, -u * 1.0], [u * 0.34, -u * 1.5], [u * 0.06, -u * 1.1]]);   // the bow
                 lpPoly(c, '#ffffff', [[-u * 0.8, -u * 1.0], [-u * 0.3, -u * 1.12], [-u * 0.1, -u * 1.0], [-u * 0.5, -u * 0.9]]);   // a patch of snow
                 c.restore();
-            } else if (kind === 'heart') {
-                // a heart drawn by a finger in the snow: only the groove, wobbly, the ends not quite meeting
-                const sz = u * 0.075, N = 46, pts = [];
-                for (let i = 0; i <= N; i++) { const t = 0.15 + i / N * 6.1, w = 1 + 0.05 * Math.sin(t * 5 + o.seed) + 0.03 * Math.sin(t * 11 + o.seed * 0.3);
-                    pts.push([16 * Math.pow(Math.sin(t), 3) * sz * w, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * sz * w - u * 0.4]); }
-                const stroke = (dx, dy, col, wd) => { c.strokeStyle = col; c.lineWidth = wd; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x + dx, y + dy) : c.moveTo(x + dx, y + dy)); c.stroke(); };
-                stroke(u * 0.03, u * 0.04, 'rgba(96,128,178,0.5)', u * 0.2); stroke(0, 0, 'rgba(150,180,222,0.55)', u * 0.14); stroke(-u * 0.025, -u * 0.03, 'rgba(255,255,255,0.95)', u * 0.05);
+            } else if (kind === 'mound') {   // a low-poly snowdrift: facets lit from the upper left
+                const rx = u * 1.5, ry = u * 0.62, n = 7, pk = [-rx * 0.15, -ry * 1.15], arc = [];
+                for (let i = 0; i <= n; i++) { const a = Math.PI + i / n * Math.PI; arc.push([Math.cos(a) * rx, Math.sin(a) * ry * 0.55 + (i === 0 || i === n ? 0 : 0)]); }
+                lpPoly(c, 'rgba(70,100,150,0.16)', [[-rx, 0], [rx * 1.1, u * 0.02], [rx * 0.8, u * 0.26], [-rx * 0.8, u * 0.22]]);
+                for (let i = 0; i < n; i++) { const a = Math.PI + (i + 0.5) / n * Math.PI, l = 0.5 + 0.5 * Math.cos(a + 2.4); lpPoly(c, lpMix([196, 212, 234], [255, 255, 255], l), [pk, arc[i], arc[i + 1]]); }
+                lpPoly(c, '#c3d3e9', [arc[0], arc[n], [rx * 0.6, u * 0.14], [-rx * 0.6, u * 0.12]]);
             }
         }
         function imDrawBunny(c, b, u, T) {
@@ -5779,7 +5780,7 @@ service cloud.firestore {
             const el = document.createElement('div'); el.id = 'im-root';
             el.innerHTML = `<canvas id="im-cv"></canvas>
                 <button id="im-x" aria-label="Close the game"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-                <div id="im-hud"><div><span class="im-l">SCORE</span><b id="im-score">0</b></div><div class="im-mid"><span class="im-l">GOALS</span><b id="im-holes">0</b></div><div class="im-r"><span class="im-l">TIME</span><b id="im-time">0.0</b></div></div>
+                <div id="im-hud"><div><span class="im-l">CHEER</span><b id="im-score">0</b></div><div class="im-mid"><span class="im-l">HOLES</span><b id="im-holes">0</b></div><div class="im-r"><span class="im-l">TIME</span><b id="im-time">0.0</b></div></div>
                 <div id="im-msg"><b id="im-m1"></b><span id="im-m2"></span></div>`;
             document.body.appendChild(el);
             const st = document.createElement('style'); st.id = 'im-style';
@@ -5791,7 +5792,7 @@ service cloud.firestore {
                 #im-hud div{display:flex;flex-direction:column}#im-hud .im-mid{align-items:center}#im-hud .im-r{align-items:flex-end}
                 .im-l{font-size:11px;letter-spacing:.16em;color:rgba(20,35,63,.62)}#im-hud b{font-size:24px;font-weight:700;line-height:1.1}
                 #im-msg{position:absolute;left:0;right:0;bottom:16%;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;text-shadow:0 0 12px rgba(255,255,255,.95),0 0 4px rgba(255,255,255,.9);transition:opacity .25s}
-                #im-m1{font-size:28px;font-weight:700}#im-m2{font-size:16px;color:rgba(20,35,63,.8)}`;
+                #im-m1{font-size:28px;font-weight:700;color:#c8283f;text-align:center}#im-m2{font-size:16px;color:#1f6b45;text-align:center;padding:0 24px}`;
             document.head.appendChild(st);
             const cv = el.querySelector('#im-cv'); IM.cv = cv; IM.c = cv.getContext('2d');
             const fit = () => { const dpr = Math.min(2, devicePixelRatio || 1); cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); IM.dpr = dpr; IM.W = innerWidth; IM.H = innerHeight;
@@ -5898,14 +5899,14 @@ service cloud.firestore {
                     }
                     if (dl < IM.HR * 0.7) {
                         h.done = true; IM.combo++; const pts = (h.gold ? 500 : 100) * Math.min(4, IM.combo); IM.score += pts;
-                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: (h.gold ? 'GOLDEN GOAL! +' : 'GOAL! +') + pts, gold: h.gold });
+                        IM.fx.push({ x: h.x, y: h.y, t: 0, s: (h.gold ? '⭐ Golden gift! +' : '🎁 Merry goal! +') + pts, gold: h.gold });
                         for (let k = 0; k < 18; k++) { const a = Math.random() * 6.283, v = lw * (1 + Math.random() * 2.5); IM.fx.push({ x: h.x, y: h.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, p: 1, gold: h.gold }); }
                         imPlop(h.gold); imHorn(false);
                         IM.sink = { x: h.x, y: h.y, t: 0, gold: h.gold }; IM.vx = IM.vy = 0; IM.px = h.x; IM.py = h.y;   // the puck drops into the water and bobs back up
                         if (IM.holes.filter(q => !q.tele).every(q => q.done)) {
                             IM.state = 'won'; const tm = IM.time; const bonus = Math.max(0, Math.round(3000 - tm * 25)); IM.score += bonus;
                             if (!IM.best || tm < IM.best) { IM.best = tm; try { localStorage.setItem('kk-im-best', String(tm)); } catch (e) {} }
-                            imMsg('FINAL HORN! ' + tm.toFixed(1) + ' s', `Score ${IM.score} · best ${IM.best.toFixed(1)} s · tap for the next period`); BWS.win(); imHorn(true); BWS.musicStop();
+                            imMsg('🎆 Happy New Year! ' + tm.toFixed(1) + ' s', `Cheer ${IM.score} · best ${IM.best.toFixed(1)} s · tap for another round`); BWS.win(); imHorn(true); BWS.musicStop();
                             for (let bst = 0; bst < 4; bst++) { const bx = IM.camX + (Math.random() - 0.5) * IM.W / IM.s * 0.7, by = IM.camY + (Math.random() - 0.5) * IM.H / IM.s * 0.6, hh = Math.random() * 360;   // New Year fireworks
                                 for (let k = 0; k < 34; k++) { const an = k / 34 * 6.283, v = lw * (3 + Math.random() * 3); IM.fx.push({ x: bx, y: by, vx: Math.cos(an) * v, vy: Math.sin(an) * v, t: -bst * 0.25, p: 1, h: (hh + k * 3) % 360, life: 1.4 }); } }
                         }
@@ -5923,17 +5924,17 @@ service cloud.firestore {
         function imScratch(dt) {
             const p = IM.pc, k = IM.picK, lw = IM.lw, sp = Math.hypot(IM.vx, IM.vy);
             if (!p) return;
-            if (IM.lsx != null && sp > lw * 0.8 && Math.hypot(IM.px - IM.lsx, IM.py - IM.lsy) < lw * 3) {
+            if (IM.lsx != null && sp > lw * 0.4 && Math.hypot(IM.px - IM.lsx, IM.py - IM.lsy) < lw * 3) {
                 const nx = -IM.vy / sp, ny = IM.vx / sp, q = Math.min(1, sp / (lw * 7)), tt = IM.time * 3;
                 p.save(); p.globalCompositeOperation = 'source-atop'; p.lineCap = 'round';
-                [[-0.5, 0.3], [0, 0.4], [0.45, 0.3], [0.15, -0.2]].forEach(([o, a], i) => {
+                [[-0.62, 0.55], [-0.3, 0.45], [0, 0.65], [0.32, 0.45], [0.62, 0.55], [0.15, -0.3], [-0.45, -0.28]].forEach(([o, a], i) => {
                     const off = (o + Math.sin(tt + i * 2.1) * 0.08) * IM.R;
-                    p.strokeStyle = a > 0 ? `rgba(255,255,255,${a * (0.5 + 0.5 * q)})` : `rgba(70,110,160,${-a * (0.5 + 0.5 * q)})`;
-                    p.lineWidth = Math.max(0.7, IM.R * k * (a > 0 ? 0.05 : 0.04));
+                    p.strokeStyle = a > 0 ? `rgba(255,255,255,${a * (0.6 + 0.4 * q)})` : `rgba(50,90,150,${-a * (0.6 + 0.4 * q)})`;
+                    p.lineWidth = Math.max(1, IM.R * k * (a > 0 ? 0.085 : 0.07));
                     p.beginPath(); p.moveTo((IM.lsx + nx * off - IM.x0) * k, (IM.lsy + ny * off - IM.y0) * k); p.lineTo((IM.px + nx * off - IM.x0) * k, (IM.py + ny * off - IM.y0) * k); p.stroke();
                 });
                 p.restore();
-                if (sp > lw * 4 && Math.random() < 0.7) { const a = Math.atan2(IM.vy, IM.vx) + Math.PI + (Math.random() - 0.5) * 1.2; IM.fx.push({ x: IM.px, y: IM.py, vx: Math.cos(a) * lw * 1.5, vy: Math.sin(a) * lw * 1.5, t: 0.45, p: 1 }); }   // ice shavings
+                if (sp > lw * 3 && Math.random() < 0.9) { const a = Math.atan2(IM.vy, IM.vx) + Math.PI + (Math.random() - 0.5) * 1.2; IM.fx.push({ x: IM.px, y: IM.py, vx: Math.cos(a) * lw * 1.5, vy: Math.sin(a) * lw * 1.5, t: 0.45, p: 1 }); }   // ice shavings
             }
             IM.lsx = IM.px; IM.lsy = IM.py;
             IM.scr = (IM.scr || 0) - dt;   // the hiss of the blade on the ice
@@ -5962,7 +5963,6 @@ service cloud.firestore {
             if (D) {
                 D.drifts.forEach(d => { if (d.x < vx0 - d.rx || d.x > vx1 + d.rx || d.y < vy0 - d.ry || d.y > vy1 + d.ry) return; c.fillStyle = d.blue ? 'rgba(140,172,214,0.16)' : 'rgba(255,255,255,0.55)'; c.beginPath(); c.ellipse(ox + d.x * s, oy + d.y * s, d.rx * s, d.ry * s, 0, 0, 6.283); c.fill(); });
                 D.sparks.forEach(p => { if (p.x < vx0 || p.x > vx1 || p.y < vy0 || p.y > vy1) return; const a = Math.max(0, Math.sin(T0 * 2 + p.ph)); if (a < 0.2) return; const X = ox + p.x * s, Y = oy + p.y * s, z = p.z * s; c.strokeStyle = `rgba(255,255,255,${a})`; c.lineWidth = Math.max(0.8, z * 0.3); c.beginPath(); c.moveTo(X - z, Y); c.lineTo(X + z, Y); c.moveTo(X, Y - z); c.lineTo(X, Y + z); c.stroke(); });
-                D.items.forEach(o => { if (o.k === 'heart' && o.x > vx0 && o.x < vx1 && o.y > vy0 && o.y < vy1) { c.save(); c.translate(ox + o.x * s, oy + o.y * s); c.scale(s, s); imDrawDeco(c, 'heart', o, T0); c.restore(); } });
                 D.prints.forEach(p => { p.t += dt; }); while (D.prints.length && D.prints[0].t > 22) D.prints.shift();
                 D.prints.forEach(p => { c.save(); c.translate(ox + p.x * s, oy + p.y * s); c.rotate(p.a); c.fillStyle = `rgba(110,140,185,${0.38 * (1 - p.t / 22)})`; c.beginPath(); c.ellipse(0, -lw * s * 0.07, lw * s * 0.06, lw * s * 0.035, 0, 0, 6.283); c.ellipse(0, lw * s * 0.07, lw * s * 0.06, lw * s * 0.035, 0, 0, 6.283); c.fill(); c.restore(); });
                 D.bunnies.forEach(b => imBunnyStep(b, dt));
@@ -5973,7 +5973,7 @@ service cloud.firestore {
             // skate marks: the puck's track scratched into the ice
             if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
             if (D) {
-                D.items.forEach(o => { if (o.k === 'heart' || o.x < vx0 - lw * 2 || o.x > vx1 + lw * 2 || o.y < vy0 || o.y > vy1 + lw * 4) return; c.save(); c.translate(ox + o.x * s, oy + o.y * s); c.scale(s, s); imDrawDeco(c, o.k, o, T0); c.restore(); });
+                D.items.forEach(o => { if (o.x < vx0 - lw * 2 || o.x > vx1 + lw * 2 || o.y < vy0 || o.y > vy1 + lw * 4) return; c.save(); c.translate(ox + o.x * s, oy + o.y * s); c.scale(s, s); imDrawDeco(c, o.k, o, T0); c.restore(); });
                 D.bunnies.forEach(b => { if (b.x < vx0 || b.x > vx1 || b.y < vy0 || b.y > vy1 + lw * 2) return; c.save(); c.translate(ox + b.x * s, oy + b.y * s); c.scale(s, s); imDrawBunny(c, b, lw * 0.75, T0); c.restore(); });
             }
             // the holes: dark water in the ice, a snowy rim, a slow ripple; the golden one glints
