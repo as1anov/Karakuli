@@ -4471,7 +4471,7 @@ service cloud.firestore {
                 try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
                 this.init();
                 if (this.ctx) { try { const b = this.ctx.createBuffer(1, 1, 22050), s = this.ctx.createBufferSource(); s.buffer = b; s.connect(this.ctx.destination); s.start(0); } catch (e) {} }
-                if (!this.el) {
+                if (!this.el && !(navigator.audioSession)) {   // old iOS only: without the audioSession API a silent clip keeps Web Audio audible on silent mode
                     try {
                         const n = 800, u8 = new Uint8Array(44 + n), dv = new DataView(u8.buffer), w = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
                         w(0, 'RIFF'); dv.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, 8000, true); dv.setUint32(28, 8000, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); w(36, 'data'); dv.setUint32(40, n, true);
@@ -4480,6 +4480,38 @@ service cloud.firestore {
                     } catch (e) {}
                 }
                 if (this.el) { try { const pr = this.el.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {} }
+            },
+            // nothing may keep playing once the game is closed or the page is hidden: no lock-screen player, no music
+            stop() {
+                this.musicStop();
+                if (this.el) { try { this.el.pause(); } catch (e) {} }
+                try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch (e) {}
+            },
+            // hockey-arena music: a stadium-organ riff over a stomp-stomp-clap beat, scheduled a little ahead of the clock (all synthesised, nothing loaded)
+            musicStart() {
+                if (this.mOn || !BW.sound) return; this.init(); if (!this.ctx) return;
+                const c = this.ctx; this.mOn = true; this.mStep = 0; this.mNext = c.currentTime + 0.1;
+                this.mBus = c.createGain(); this.mBus.gain.value = 0.5; this.mBus.connect(c.destination);
+                const tick = () => {
+                    if (!this.mOn) return; if (!BW.sound) { this.musicStop(); return; }
+                    while (this.mNext < c.currentTime + 0.35) { this.musicStep(this.mStep++, this.mNext); this.mNext += 0.2344; }
+                };
+                tick(); this.mTimer = setInterval(tick, 100);
+            },
+            musicStop() { this.mOn = false; clearInterval(this.mTimer); if (this.mBus) { try { this.mBus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05); const b = this.mBus; setTimeout(() => { try { b.disconnect(); } catch (e) {} }, 400); } catch (e) {} this.mBus = null; } },
+            musicStep(n, t) {
+                const c = this.ctx, bus = this.mBus; if (!bus) return;
+                const st = n % 8, bar = ((n / 8) | 0) % 8, f = k => 440 * Math.pow(2, k / 12);
+                const LEAD = [[0, 0, 3, 0, 5, 5, 3, null], [7, 7, 5, 3, 5, null, null, null], [0, 0, 3, 0, 5, 5, 7, 8], [7, 5, 3, 0, -2, null, 0, null]];
+                const lead = bar === 7 ? [0, null, 0, null, 0, 0, null, null] : LEAD[bar % 4];
+                const ROOT = [-24, -28, -21, -26];   // A  F  C  G
+                const voice = (fr, type, vol, dur, cut) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = type; o.frequency.value = fr; lp.type = 'lowpass'; lp.frequency.value = cut;
+                    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.setValueAtTime(vol, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0005, t + dur); o.connect(lp).connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.03); };
+                const k = lead[st]; if (k != null) { voice(f(k), 'square', 0.035, 0.2, 2400); voice(f(k + 12) * 1.004, 'sawtooth', 0.012, 0.2, 3200); }   // the organ
+                if (st % 2 === 0) voice(f(ROOT[bar % 4]), 'triangle', 0.09, 0.22, 500);   // bass
+                if (st === 0 || st === 3) { voice(130, 'sine', 0.2, 0.16, 400); }   // stomp
+                if (st === 4) { const nn = Math.floor(c.sampleRate * 0.12), b = c.createBuffer(1, nn, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < nn; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nn, 2.5);
+                    const sr = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain(); sr.buffer = b; fl.type = 'bandpass'; fl.frequency.value = 1700; g.gain.value = 0.16; sr.connect(fl).connect(g).connect(bus); sr.start(t); }   // clap
             },
             tone(f0, f1, dur, type = 'sine', vol = 0.06, delay = 0) {
                 if (!BW.sound || !this.ctx) return;
@@ -4508,6 +4540,9 @@ service cloud.firestore {
             start() { this.seq([392, 523, 659], 0.07, 'sine', 0.05); }
         };
 
+        document.addEventListener('visibilitychange', () => { if (document.hidden) BWS.stop(); });
+        window.addEventListener('pagehide', () => BWS.stop());
+        setInterval(() => { if (!(isGameMode || (typeof IM !== 'undefined' && IM.on)) && (BWS.mOn || (BWS.el && !BWS.el.paused))) BWS.stop(); }, 700);   // the game closed: silence, and the lock-screen player goes away
         ['touchend', 'pointerup', 'click', 'keydown'].forEach(ev => window.addEventListener(ev, () => { if (isGameMode || (typeof IM !== 'undefined' && IM.on)) BWS.unlock(); }, true));
 
         // For the hanger only the plate is played: its hooks (everything below the anchor line) are left out
@@ -5642,7 +5677,7 @@ service cloud.firestore {
         }
         function imGo() {
             BWS.init();
-            const begin = () => { IM.b0 = null; IM.state = 'play'; IM.time = 0; imMsg('', ''); BWS.start(); };
+            const begin = () => { IM.b0 = null; IM.state = 'play'; IM.time = 0; imMsg('', ''); BWS.start(); BWS.musicStart(); };
             if (IM.state === 'won') { imBuildPicture(); imNewRound(); }   // fresh ice for the next period
             // iOS asks for permission to read the tilt, from inside the tap
             if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function' && IM.tiltOK == null) {
@@ -5722,7 +5757,7 @@ service cloud.firestore {
                         if (IM.holes.filter(q => !q.tele).every(q => q.done)) {
                             IM.state = 'won'; const tm = IM.time; const bonus = Math.max(0, Math.round(3000 - tm * 25)); IM.score += bonus;
                             if (!IM.best || tm < IM.best) { IM.best = tm; try { localStorage.setItem('kk-im-best', String(tm)); } catch (e) {} }
-                            imMsg('FINAL HORN! ' + tm.toFixed(1) + ' s', `Score ${IM.score} · best ${IM.best.toFixed(1)} s · tap for the next period`); BWS.win(); imHorn(true);
+                            imMsg('FINAL HORN! ' + tm.toFixed(1) + ' s', `Score ${IM.score} · best ${IM.best.toFixed(1)} s · tap for the next period`); BWS.win(); imHorn(true); BWS.musicStop();
                         }
                     }
                 });
@@ -5865,7 +5900,7 @@ service cloud.firestore {
             S.noise(0.4, 0.05, 1400, 0.05, 'bandpass'); S.tone(1500, 2400, 0.08, 'sine', 0.05, 0.58);
         }
         function exitIceMaze() {
-            if (!IM.on) return; IM.on = false; cancelAnimationFrame(IM.raf);
+            if (!IM.on) return; IM.on = false; cancelAnimationFrame(IM.raf); BWS.stop();
             removeEventListener('resize', IM.fit); removeEventListener('pointermove', IM.onMove); removeEventListener('pointerup', IM.onUp); removeEventListener('pointercancel', IM.onUp);
             removeEventListener('keydown', IM.onKey, true); removeEventListener('keyup', IM.onKey, true); removeEventListener('deviceorientation', IM.onOri);
             const r = document.getElementById('im-root'); if (r) r.remove(); const st = document.getElementById('im-style'); if (st) st.remove();
