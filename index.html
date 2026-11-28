@@ -5922,12 +5922,27 @@ service cloud.firestore {
             const cv = document.createElement('canvas'); cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const c = cv.getContext('2d'); c.scale(dpr, dpr);
             const m = Math.min(W, H), d = m * 0.1; let sd = 7; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
             [[0, 0, 0, d], [0, H, 0, H - d], [0, 0, d, 0], [W, 0, W - d, 0]].forEach(([x0, y0, x1, y1]) => { const g = c.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, 'rgba(232,245,255,0.6)'); g.addColorStop(0.45, 'rgba(225,242,255,0.2)'); g.addColorStop(1, 'rgba(225,242,255,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H); });
-            c.lineCap = 'round';
-            const fern = (x, y, a, len, dep) => { if (len < 4) return; const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len; c.lineWidth = Math.max(0.5, len * 0.06); c.beginPath(); c.moveTo(x, y); c.lineTo(x2, y2); c.stroke();
-                if (dep > 0) for (let i = 1; i <= 3; i++) { const f = i / 3.4, px = x + (x2 - x) * f, py = y + (y2 - y) * f; fern(px, py, a + 0.95, len * 0.4 * (1 - f * 0.4), dep - 1); fern(px, py, a - 0.95, len * 0.4 * (1 - f * 0.4), dep - 1); } };
-            const edge = (n, f) => { for (let i = 0; i < n; i++) { const t = rnd(), [x, y, a] = f(t), near = Math.min(t, 1 - t), len = d * (0.35 + rnd() * 0.5) * (1 + Math.max(0, 0.2 - near) * 2.5); c.strokeStyle = `rgba(255,255,255,${0.3 + rnd() * 0.3})`; fern(x, y, a + (rnd() - 0.5) * 0.6, len, 2); } };
-            const k = Math.round(m / 16);
-            edge(k, t => [t * W, 0, 1.5708]); edge(k, t => [t * W, H, -1.5708]); edge(k * 1.6, t => [0, t * H, 0]); edge(k * 1.6, t => [W, t * H, 3.1416]);
+            c.lineCap = 'round'; c.lineJoin = 'round';
+            // frost feathers: curved stems with barbs, growing in from the edge and fading
+            const feather = (x, y, a, len, al) => { const bend = (rnd() - 0.5) * 0.9, n = Math.round(len / 3.2); let px = x, py = y, ang = a;
+                for (let i = 0; i < n; i++) { const f = i / n, st = len / n, nx = px + Math.cos(ang) * st, ny = py + Math.sin(ang) * st, bl = len * 0.16 * (1 - f) + 1.2;
+                    c.strokeStyle = `rgba(255,255,255,${al * (1 - f * 0.7)})`; c.lineWidth = 1.1 * (1 - f * 0.6); c.beginPath(); c.moveTo(px, py); c.lineTo(nx, ny);
+                    if (i % 2 === 0) { c.moveTo(nx, ny); c.lineTo(nx + Math.cos(ang + 0.8) * bl, ny + Math.sin(ang + 0.8) * bl); c.moveTo(nx, ny); c.lineTo(nx + Math.cos(ang - 0.8) * bl, ny + Math.sin(ang - 0.8) * bl); }
+                    c.stroke(); px = nx; py = ny; ang += bend / n; } };
+            // a six-armed dendrite snowflake: arms with side branches, a small hexagon at the heart
+            const flake = (x, y, R, rot, al) => { c.save(); c.translate(x, y); c.rotate(rot); c.strokeStyle = `rgba(255,255,255,${al})`; c.shadowColor = 'rgba(110,165,230,0.7)'; c.shadowBlur = 3;
+                const kind = rnd(), lw0 = Math.max(0.8, R * 0.07);
+                for (let i = 0; i < 6; i++) { c.save(); c.rotate(i * Math.PI / 3); c.lineWidth = lw0; c.beginPath(); c.moveTo(0, 0); c.lineTo(R, 0);
+                    const br = kind < 0.5 ? [[0.32, 0.36], [0.55, 0.3], [0.76, 0.18]] : [[0.45, 0.42], [0.72, 0.22]];
+                    br.forEach(([p, l]) => { c.moveTo(R * p, 0); c.lineTo(R * (p + l * 0.5), -R * l * 0.866); c.moveTo(R * p, 0); c.lineTo(R * (p + l * 0.5), R * l * 0.866); });
+                    if (kind >= 0.5) { c.moveTo(R * 0.86, -R * 0.08); c.lineTo(R, 0); c.lineTo(R * 0.86, R * 0.08); }   // a small arrow-tip
+                    c.stroke(); c.restore(); }
+                c.lineWidth = lw0 * 0.8; c.beginPath(); for (let i = 0; i <= 6; i++) { const q = i * Math.PI / 3 + Math.PI / 6, rr = R * 0.17; i ? c.lineTo(Math.cos(q) * rr, Math.sin(q) * rr) : c.moveTo(Math.cos(q) * rr, Math.sin(q) * rr); } c.stroke();
+                c.restore(); };
+            const sides = [[t => [t * W, 0], 1.5708, W], [t => [t * W, H], -1.5708, W], [t => [0, t * H], 0, H], [t => [W, t * H], Math.PI, H]];
+            sides.forEach(([f, a, L]) => { const n = Math.round(L / 9); for (let i = 0; i < n; i++) { const t = rnd(), [x, y] = f(t), near = Math.min(t, 1 - t) * L; feather(x, y, a + (rnd() - 0.5) * 1.1, d * (0.3 + rnd() * 0.5) * (near < d * 1.5 ? 1.6 : 1), 0.22 + rnd() * 0.25); } });
+            sides.forEach(([f, a, L]) => { const n = Math.round(L / 42); for (let i = 0; i < n; i++) { const t = (i + 0.2 + rnd() * 0.6) / n, [x, y] = f(t), R = 6 + rnd() * 13, dd = R * (0.1 + rnd() * 1.2); flake(x + Math.cos(a) * dd, y + Math.sin(a) * dd, R, rnd(), 0.55 + rnd() * 0.35); } });
+            [[0, 0], [W, 0], [0, H], [W, H]].forEach(([x, y]) => { const ix = x ? -1 : 1, iy = y ? -1 : 1; flake(x + ix * d * 0.35, y + iy * d * 0.35, d * 0.42, rnd(), 0.85); flake(x + ix * d * 0.95, y + iy * d * 0.2, d * 0.22, rnd(), 0.7); flake(x + ix * d * 0.2, y + iy * d * 0.95, d * 0.2, rnd(), 0.7); });   // the corners: big flakes
             return cv;
         }
         // text made of snow: a body of packed snow, a heap of grains on top, and a sparkle
