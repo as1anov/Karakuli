@@ -5634,7 +5634,7 @@ service cloud.firestore {
             for (let i = 0; i < Math.min(300, area / 1.6); i++) drifts.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, rx: lw * (1 + Math.random() * 2.4), ry: lw * (0.3 + Math.random() * 0.7), blue: Math.random() < 0.5 });
             for (let i = 0; i < Math.min(360, area / 1.3); i++) sparks.push({ x: X0 + Math.random() * W, y: Y0 + Math.random() * H, ph: Math.random() * 6.283, z: lw * (0.05 + Math.random() * 0.07) });
             const bunnies = []; let guard = 0;
-            while (bunnies.length < 9 && guard++ < 1200) { const x = X0 + Math.random() * W, y = Y0 + Math.random() * H; if (imFree(x, y, lw * 0.7)) bunnies.push({ x, y, hx: x, hy: y, st: 'rest', t: Math.random() * 2, dir: Math.random() < 0.5 ? 1 : -1, ph: 0, tx: x, ty: y, seed: (Math.random() * 1e6) | 0 }); }
+            while (bunnies.length < 0 && guard++ < 1200) { const x = X0 + Math.random() * W, y = Y0 + Math.random() * H; if (imFree(x, y, lw * 0.7)) bunnies.push({ x, y, hx: x, hy: y, st: 'rest', t: Math.random() * 2, dir: Math.random() < 0.5 ? 1 : -1, ph: 0, tx: x, ty: y, seed: (Math.random() * 1e6) | 0 }); }
             // string lights round the pattern: swags between small posts, bulbs every half a line
             const garlands = [], cols = ['#ff4d6d', '#ffd23f', '#4dd0ff', '#7dff7a', '#ff9a3c', '#c58bff'];
             let bi = 0;
@@ -6035,7 +6035,7 @@ service cloud.firestore {
             // the camera follows the puck, smoothly, and stays over the drawing
             const vw = W / s, vh = H / s;
             const clampC = (v, a, b, span) => (b - a <= span) ? (a + b) / 2 : Math.max(a + span / 2, Math.min(b - span / 2, v));
-            const tx = clampC(IM.px + IM.vx * 0.12, IM.x0, IM.x1, vw), ty = clampC(IM.py + IM.vy * 0.12, IM.y0, IM.y1, vh);
+            const bx = IM.box || { x0: IM.x0, y0: IM.y0, x1: IM.x1, y1: IM.y1 }, ex = lw * 4.5, tx = clampC(IM.px + IM.vx * 0.12, bx.x0 - ex, bx.x1 + ex, vw), ty = clampC(IM.py + IM.vy * 0.12, bx.y0 - ex, bx.y1 + ex, vh);
             const kc = 1 - Math.exp(-dt * 3); IM.camX += (tx - IM.camX) * kc; IM.camY += (ty - IM.camY) * kc;
             const ox = W / 2 - IM.camX * s, oy = H / 2 - IM.camY * s;
             let shx = 0, shy = 0;
@@ -6099,52 +6099,34 @@ service cloud.firestore {
         }
         // an ice-fishing hole: a ring of packed snow and broken ice round dark, deep water; light plays on the water, rings spread, small floes drift.
         // The golden one has gold glinting under the water. Done: the water has frozen over.
-        function imHole(c, X, Y, r, h, T) {   // an ice hole: a frosted lip, the wall of the ice going down, deep clear water with light playing on it
-            const rnd = k => (bwHash(h.seed, k) % 1000) / 1000, TAU = 6.2832, circ = (x, y, rr) => { c.beginPath(); c.arc(x, y, rr, 0, TAU); };
-            const pal = h.gold ? { w0: '#7a5a1c', w1: '#3a2606', w2: '#120a01', lip: '#ffe2a0', glow: 'rgba(255,205,100,' } : h.tele ? { w0: '#5f6fd6', w1: '#2a2f86', w2: '#0b0c32', lip: '#e4dcff', glow: 'rgba(170,150,255,' } : { w0: '#2f9bc4', w1: '#0f4f80', w2: '#04172e', lip: '#ffffff', glow: 'rgba(150,215,255,' };
-            // frost spreading over the ice round it
-            let g = c.createRadialGradient(X, Y, r * 0.9, X, Y, r * 1.75); g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; circ(X, Y, r * 1.75); c.fill();
-            c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = Math.max(1, r * 0.03); c.lineCap = 'round';
-            for (let i = 0; i < 14; i++) { const a = i / 14 * TAU + rnd(5) * 0.4, d0 = r * 1.25, d1 = r * (1.4 + rnd(10 + i) * 0.28); c.beginPath(); c.moveTo(X + Math.cos(a) * d0, Y + Math.sin(a) * d0); c.lineTo(X + Math.cos(a) * d1, Y + Math.sin(a) * d1); c.stroke(); }   // frost crystals
-            // the raised lip: a soft shadow below it, then a ring lit from the upper left
-            c.save(); c.shadowColor = 'rgba(8,30,70,0.4)'; c.shadowBlur = r * 0.3; c.shadowOffsetY = r * 0.1; g = c.createLinearGradient(X - r, Y - r, X + r, Y + r); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#bcd4ec'); c.fillStyle = g; circ(X, Y, r * 1.22); c.fill(); c.restore();
-            if (h.done) {   // frozen over: smooth new ice and a star of cracks
-                g = c.createRadialGradient(X - r * 0.3, Y - r * 0.3, 0, X, Y, r); g.addColorStop(0, '#f4fbff'); g.addColorStop(1, '#a9cbe6'); c.fillStyle = g; circ(X, Y, r * 1.02); c.fill();
-                c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = Math.max(1, r * 0.04); c.beginPath(); for (let i = 0; i < 5; i++) { const a = rnd(70 + i) * TAU; c.moveTo(X, Y); c.lineTo(X + Math.cos(a) * r * 0.8, Y + Math.sin(a) * r * 0.8); } c.stroke();
-                return;
-            }
-            // the wall of the ice, sloping down into the water: dark under the lit lip, bright on the far side
-            g = c.createLinearGradient(X - r, Y - r, X + r, Y + r); g.addColorStop(0, '#6f9bc4'); g.addColorStop(0.5, '#a9cdea'); g.addColorStop(1, '#f2f9ff'); c.fillStyle = g; circ(X, Y, r * 1.02); c.fill();
-            // the water
-            c.save(); circ(X, Y, r * 0.86); c.clip();
-            g = c.createRadialGradient(X + r * 0.1, Y + r * 0.2, 0, X, Y, r * 0.9); g.addColorStop(0, pal.w0); g.addColorStop(0.55, pal.w1); g.addColorStop(1, pal.w2); c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2);
-            if (h.gold) for (let i = 0; i < 4; i++) { const a = T * 0.4 + i * 1.57 + h.t, d = r * 0.38, cx = X + Math.cos(a) * d, cy = Y + Math.sin(a) * d * 0.8, gl = 0.55 + 0.45 * Math.sin(T * 3 + i * 2), cg = c.createRadialGradient(cx, cy, 0, cx, cy, r * 0.22);   // coins glinting under the water
-                cg.addColorStop(0, `rgba(255,226,140,${0.95 * gl})`); cg.addColorStop(1, 'rgba(255,190,60,0)'); c.fillStyle = cg; circ(cx, cy, r * 0.22); c.fill(); }
-            c.globalCompositeOperation = 'lighter';
-            for (let i = 0; i < 3; i++) { const a = T * (0.45 + i * 0.15) + i * 2.1 + h.t; c.strokeStyle = pal.glow + (0.16 + 0.07 * Math.sin(T * 2 + i)) + ')'; c.lineWidth = Math.max(1, r * 0.055); c.beginPath(); c.arc(X + Math.cos(a) * r * 0.22, Y + Math.sin(a) * r * 0.22, r * (0.3 + i * 0.17), a, a + 1.25); c.stroke(); }   // light moving over the water
-            const rp = (T * 0.4 + h.t) % 1; c.strokeStyle = pal.glow + (0.4 * (1 - rp)) + ')'; c.lineWidth = Math.max(1, r * 0.045); c.beginPath(); c.ellipse(X, Y, r * (0.12 + 0.7 * rp), r * (0.1 + 0.6 * rp), 0, 0, TAU); c.stroke();   // a slow ripple
-            if (h.tele) { c.strokeStyle = 'rgba(200,180,255,0.3)'; c.lineWidth = Math.max(1, r * 0.05); c.beginPath(); for (let a = 0; a < 9; a += 0.2) { const rr = r * (0.1 + a * 0.085), ang = a + T * 0.7 + h.t; a ? c.lineTo(X + Math.cos(ang) * rr, Y + Math.sin(ang) * rr) : c.moveTo(X + Math.cos(ang) * rr, Y + Math.sin(ang) * rr); } c.stroke(); }
-            c.globalCompositeOperation = 'source-over';
-            g = c.createRadialGradient(X, Y, r * 0.55, X, Y, r * 0.88); g.addColorStop(0, 'rgba(0,8,20,0)'); g.addColorStop(1, 'rgba(0,8,20,0.55)'); c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2);   // the ice wall shades the water at the edge
+        function imHole(c, X, Y, r, h, T) {   // a plain round hole cut through the ice; the water lies well below the surface
+            const TAU = 6.2832, circ = (x, y, rr) => { c.beginPath(); c.arc(x, y, rr, 0, TAU); };
+            const pal = h.gold ? ['#6b5a2a', '#2a1f08', '#0c0803'] : h.tele ? ['#4a4fa8', '#1d2266', '#080a24'] : ['#1f7fa8', '#0c3f66', '#031526'];
+            let g;
+            if (h.done) { g = c.createRadialGradient(X - r * 0.3, Y - r * 0.3, 0, X, Y, r); g.addColorStop(0, '#f4fbff'); g.addColorStop(1, '#b4d2ea'); c.fillStyle = g; circ(X, Y, r); c.fill(); return; }
+            // the cut edge of the ice: a clean ring, thicker on the side we look into
+            c.fillStyle = 'rgba(10,40,90,0.35)'; circ(X, Y + r * 0.06, r * 1.04); c.fill();
+            g = c.createLinearGradient(X - r, Y - r, X + r, Y + r); g.addColorStop(0, '#f6fcff'); g.addColorStop(1, '#a9cbe6'); c.fillStyle = g; circ(X, Y, r); c.fill();
+            // the water, lower down: seen a little off-centre, so a band of the ice wall shows at the top-left
+            const wx = X + r * 0.07, wy = Y + r * 0.09, wr = r * 0.86;
+            c.save(); circ(wx, wy, wr); c.clip();
+            g = c.createRadialGradient(wx, wy, 0, wx, wy, wr); g.addColorStop(0, pal[0]); g.addColorStop(0.6, pal[1]); g.addColorStop(1, pal[2]); c.fillStyle = g; c.fillRect(X - r, Y - r, r * 2, r * 2);
+            c.fillStyle = 'rgba(0,8,20,0.5)'; c.beginPath(); c.arc(wx, wy, wr, 0, TAU); c.arc(wx + r * 0.3, wy + r * 0.34, wr, 0, TAU, true); c.fill();   // the rim throws a shadow on the water
+            const rp = (T * 0.3 + h.t) % 1; c.strokeStyle = `rgba(190,230,255,${0.22 * (1 - rp)})`; c.lineWidth = Math.max(1, r * 0.04); c.beginPath(); c.ellipse(wx + r * 0.1, wy + r * 0.12, r * (0.1 + 0.4 * rp), r * (0.08 + 0.32 * rp), 0, 0, TAU); c.stroke();   // a slow ripple
+            c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.ellipse(wx + r * 0.3, wy + r * 0.34, r * 0.22, r * 0.09, -0.7, 0, TAU); c.fill();   // sky in the water
+            if (h.gold) for (let i = 0; i < 3; i++) { const a = i * 2.1 + h.t * 3, gl = 0.5 + 0.5 * Math.sin(T * 3 + i * 2), cx = wx + Math.cos(a) * r * 0.3, cy = wy + Math.sin(a) * r * 0.25, cg = c.createRadialGradient(cx, cy, 0, cx, cy, r * 0.18); cg.addColorStop(0, `rgba(255,226,140,${0.9 * gl})`); cg.addColorStop(1, 'rgba(255,190,60,0)'); c.fillStyle = cg; circ(cx, cy, r * 0.18); c.fill(); }
             c.restore();
-            // a window highlight and the bright lip
-            c.fillStyle = 'rgba(255,255,255,0.4)'; c.beginPath(); c.ellipse(X - r * 0.34, Y - r * 0.4, r * 0.3, r * 0.14, -0.7, 0, TAU); c.fill();
-            c.strokeStyle = pal.lip; c.lineWidth = Math.max(1.5, r * 0.07); circ(X, Y, r * 0.86); c.stroke();
-            if (h.gold) {   // a warm glow and sparkles round the golden hole
-                c.save(); c.shadowColor = '#ffd36b'; c.shadowBlur = r * 0.6; c.strokeStyle = `rgba(255,214,107,${0.75 + 0.25 * Math.sin(T * 4 + h.t)})`; c.lineWidth = Math.max(1.5, r * 0.08); circ(X, Y, r * 1.2); c.stroke(); c.restore();
-                for (let i = 0; i < 4; i++) { const a = T * 0.8 + i * 1.57, d = r * 1.5, sx = X + Math.cos(a) * d, sy = Y + Math.sin(a) * d, z = r * (0.12 + 0.07 * Math.sin(T * 5 + i)); c.fillStyle = '#ffe9a8'; c.beginPath(); c.moveTo(sx, sy - z); c.lineTo(sx + z * 0.25, sy - z * 0.25); c.lineTo(sx + z, sy); c.lineTo(sx + z * 0.25, sy + z * 0.25); c.lineTo(sx, sy + z); c.lineTo(sx - z * 0.25, sy + z * 0.25); c.lineTo(sx - z, sy); c.lineTo(sx - z * 0.25, sy - z * 0.25); c.closePath(); c.fill(); }
-            }
+            c.strokeStyle = h.gold ? '#ffd36b' : 'rgba(40,90,150,0.55)'; c.lineWidth = Math.max(1, r * (h.gold ? 0.07 : 0.05)); circ(X, Y, r); c.stroke();   // the edge
         }
         // the puck falls in: a deep "bloop", a splash, bubbles rising; the golden hole adds a chime of bells
-        function imPlop(gold) {
+        function imPlop(gold) {   // a deep "bloop" and then bubbles rising and popping
             BWS.init(); const S = BWS; if (!S.ctx || !BW.sound) return;
             const c = S.ctx, t = c.currentTime;
-            { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(900, t + 0.09); o.frequency.exponentialRampToValueAtTime(380, t + 0.22);
-              g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.015); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.3); }
-            S.noise(0.32, 0.07, 900, 0.02, 'lowpass');     // the splash
-            S.noise(0.12, 0.04, 3200, 0.03);
-            for (let i = 0; i < 6; i++) { const f = 700 + Math.random() * 900, d = 0.14 + i * 0.07 + Math.random() * 0.03; S.tone(f, f * 1.8, 0.05, 'sine', 0.035 * (1 - i / 7), d); }   // bubbles
-            if (gold) S.seq([1568, 2093, 2637, 3136, 2637, 3136], 0.07, 'triangle', 0.045);
+            { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(520, t + 0.1); o.frequency.exponentialRampToValueAtTime(260, t + 0.26);
+              g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.2, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3); o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.32); }
+            S.noise(0.25, 0.06, 700, 0.02, 'lowpass');
+            let d = 0.2; for (let i = 0; i < 9; i++) { const f = 260 + Math.random() * 520, len = 0.05 + Math.random() * 0.05; S.tone(f, f * (1.8 + Math.random()), len, 'sine', 0.07 * (1 - i / 11), d); d += 0.05 + Math.random() * 0.09; }
+            if (gold) S.seq([1568, 2093, 2637, 3136, 2637, 3136], 0.07, 'triangle', 0.04);
         }
         // the teleport: a wobbling sweep down, then up (a "whoosh-pop")
         function imWhoosh() {
