@@ -5481,6 +5481,8 @@ service cloud.firestore {
             for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; if (el.isNode) rings.push([i * STEP, j * STEP]); if (el.isDiamond) dias.push([i * STEP, j * STEP + lw / 2]); }
             IM.rings = rings; IM.dias = dias; IM.groups = getPathGroups(true, segments);
             imPaintPattern(m, x0, y0, x1, y1, cell);
+            // a rhombus joins its line by a narrow neck (the line's square end meets the rhombus's pointed tip): the puck's track gets a rounded pocket there, so it can always roll in
+            m.fillStyle = '#000'; m.beginPath(); dias.forEach(([x, y]) => { m.moveTo(x + lw * 0.64, y); m.arc(x, y, lw * 0.64, 0, Math.PI * 2); }); m.fill();
             const md = m.getImageData(0, 0, gw, gh).data, N = gw * gh, A = new Uint8Array(N), ice = new Uint8Array(N);
             for (let i = 0; i < N; i++) { A[i] = md[i * 4 + 3]; ice[i] = A[i] >= 128 ? 1 : 0; }
             // distance (in cells) from every ice cell to the nearest snow: the puck's centre may go where it is at least its radius
@@ -5562,8 +5564,8 @@ service cloud.firestore {
                 t.globalCompositeOperation = 'source-in'; t.fillStyle = col; t.fillRect(0, 0, W, H); t.globalCompositeOperation = 'source-over';
                 p.drawImage(T, 0, 0);
             };
-            const bt = lw * 0.075;   // a thin fence
-            grown(bt, '#f3f6fa'); grown(bt * 0.52, '#d23a40'); grown(bt * 0.3, '#97a3b7');
+            const bt = lw * 0.05;   // a hair-thin fence
+            grown(bt, 'rgba(244,248,252,0.9)'); grown(bt * 0.45, 'rgba(206,70,78,0.85)');
             // the ice: frosted pale blue with a soft sheen across it
             const tile = mk(256, 256), tc = tile.getContext('2d'), ti = tc.createImageData(256, 256);
             for (let i = 0; i < 65536; i++) { const v = (bwHash(i * 7 + 3, 5) % 100) / 100 - 0.5; ti.data[i * 4] = 172 * (1 + v * 0.09); ti.data[i * 4 + 1] = 212 * (1 + v * 0.09); ti.data[i * 4 + 2] = Math.min(255, 238 * (1 + v * 0.09)); ti.data[i * 4 + 3] = 255; }
