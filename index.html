@@ -5590,14 +5590,16 @@ service cloud.firestore {
         function imNewRound() {
             const lw = IM.lw, area = IM.mids.length * IM.cell * IM.cell / (lw * lw), n = Math.max(7, Math.min(20, Math.round(area / 4.5))), nTele = Math.max(2, Math.round(n / 3));   // plenty of holes, and a few decoys that teleport
             IM.holes = [];
-            const pool = IM.mids.slice(); let guard = 0;
-            while (IM.holes.length < n + nTele && pool.length && guard++ < 8000) {
-                const i = pool[(Math.random() * pool.length) | 0], x = IM.x0 + (i % IM.gw + 0.5) * IM.cell, y = IM.y0 + (((i / IM.gw) | 0) + 0.5) * IM.cell;
-                if (Math.hypot(x - IM.sx, y - IM.sy) < lw * 2.6) continue;
-                if (IM.dias.some(d => Math.hypot(d[0] - x, d[1] - y) < lw * 3.8)) continue;   // never in or near a rhombus
-                if (IM.holes.some(h => Math.hypot(h.x - x, h.y - y) < lw * 2.4)) continue;
-                IM.holes.push({ x, y, gold: false, tele: IM.holes.length >= n, done: false, t: Math.random() * 6, seed: (Math.random() * 1e6) | 0 });
+            // spread evenly over the whole maze: every new hole is the best of many candidates - the one farthest from all the others (and from the start)
+            const total = n + nTele, pts = [[IM.sx, IM.sy]], cellXY = i => [IM.x0 + (i % IM.gw + 0.5) * IM.cell, IM.y0 + (((i / IM.gw) | 0) + 0.5) * IM.cell];
+            const ok = ([x, y]) => Math.hypot(x - IM.sx, y - IM.sy) > lw * 2.6 && !IM.dias.some(d => Math.hypot(d[0] - x, d[1] - y) < lw * 3.8);
+            for (let k = 0; k < total; k++) {
+                let best = null, bd = -1;
+                for (let c = 0; c < 140; c++) { const q = cellXY(IM.mids[(Math.random() * IM.mids.length) | 0]); if (!ok(q)) continue; let md = Infinity; for (const o of pts) md = Math.min(md, Math.hypot(o[0] - q[0], o[1] - q[1])); if (md > bd) { bd = md; best = q; } }
+                if (!best || bd < lw * 1.8) break; pts.push(best);
             }
+            pts.shift(); pts.sort(() => Math.random() - 0.5);
+            pts.forEach(([x, y], i) => IM.holes.push({ x, y, gold: false, tele: i < nTele, done: false, t: Math.random() * 6, seed: (Math.random() * 1e6) | 0 }));
             const real = IM.holes.filter(h => !h.tele); if (real.length) real[(Math.random() * real.length) | 0].gold = true;
             IM.px = IM.sx; IM.py = IM.sy; IM.vx = IM.vy = 0; IM.score = 0; IM.time = 0; IM.state = 'ready'; IM.trail = []; IM.fx = []; IM.sink = null; IM.combo = 0; IM.tpCool = 0;
             IM.camX = IM.px; IM.camY = IM.py;
@@ -5794,10 +5796,11 @@ service cloud.firestore {
                 p.drawImage(T, 0, 0);
             };
             const bt = lw * 0.05;   // a hair-thin fence
-            grown(bt, 'rgba(244,248,252,0.9)'); grown(bt * 0.45, 'rgba(206,70,78,0.85)');
+            grown(lw * 0.2, 'rgba(24,52,110,0.2)'); grown(lw * 0.12, 'rgba(24,52,110,0.38)'); grown(bt * 1.4, 'rgba(24,52,110,0.9)');   // a deep blue outline so the maze stands out from the snow
+            grown(bt, 'rgba(244,248,252,0.95)'); grown(bt * 0.45, 'rgba(206,70,78,0.85)');
             // the ice: frosted pale blue with a soft sheen across it
             const tile = mk(256, 256), tc = tile.getContext('2d'), ti = tc.createImageData(256, 256);
-            for (let i = 0; i < 65536; i++) { const v = (bwHash(i * 7 + 3, 5) % 100) / 100 - 0.5; ti.data[i * 4] = 140 * (1 + v * 0.09); ti.data[i * 4 + 1] = 192 * (1 + v * 0.09); ti.data[i * 4 + 2] = Math.min(255, 232 * (1 + v * 0.09)); ti.data[i * 4 + 3] = 255; }
+            for (let i = 0; i < 65536; i++) { const v = (bwHash(i * 7 + 3, 5) % 100) / 100 - 0.5; ti.data[i * 4] = 78 * (1 + v * 0.09); ti.data[i * 4 + 1] = 142 * (1 + v * 0.09); ti.data[i * 4 + 2] = Math.min(255, 208 * (1 + v * 0.09)); ti.data[i * 4 + 3] = 255; }
             tc.putImageData(ti, 0, 0);
             t.clearRect(0, 0, W, H); t.drawImage(M, 0, 0); t.globalCompositeOperation = 'source-in';
             t.fillStyle = t.createPattern(tile, 'repeat'); t.fillRect(0, 0, W, H);
@@ -6016,7 +6019,7 @@ service cloud.firestore {
                 D.bunnies.forEach(b => imBunnyStep(b, dt));
             }
             // the ice with a soft shadow
-            c.save(); c.shadowColor = 'rgba(0,0,0,0.55)'; c.shadowBlur = lw * s * 0.25; c.shadowOffsetY = lw * s * 0.08;
+            c.save(); c.shadowColor = 'rgba(15,35,90,0.7)'; c.shadowBlur = lw * s * 0.4; c.shadowOffsetY = lw * s * 0.12;
             c.imageSmoothingEnabled = true; c.drawImage(IM.pic, ox + IM.x0 * s, oy + IM.y0 * s, IM.pic.width / IM.picK * s, IM.pic.height / IM.picK * s); c.restore();
             // skate marks: the puck's track scratched into the ice
             if (false && IM.trail.length > 1) { c.save(); c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = Math.max(1, IM.R * s * 0.18); c.lineCap = 'round'; c.beginPath(); IM.trail.forEach(([x, y], i) => i ? c.lineTo(ox + x * s, oy + y * s) : c.moveTo(ox + x * s, oy + y * s)); c.stroke(); c.restore(); }
