@@ -5467,9 +5467,12 @@ service cloud.firestore {
             // ---- the drawing's bounds
             let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
             const grow = (a, b, c, d) => { x0 = Math.min(x0, a); y0 = Math.min(y0, b); x1 = Math.max(x1, c); y1 = Math.max(y1, d); };
-            segments.forEach(s => grow(Math.min(s.p1.x, s.p2.x) * STEP - lw, Math.min(s.p1.y, s.p2.y) * STEP - lw, Math.max(s.p1.x, s.p2.x) * STEP + lw, Math.max(s.p1.y, s.p2.y) * STEP + lw));
-            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; if (el.isNode) grow(i * STEP - RB - lw, j * STEP - RB - lw, i * STEP + RB + lw, j * STEP + RB + lw); }
-            if (!segments.length || x0 === Infinity) { showActionHint && showActionHint('Draw a pattern first'); return; }
+            // a hanger: only its plate is played - the long lines of the hooks (below the anchor line) are left out, as in Break Maze
+            const cutY = bwCutY(); IM.cutY = cutY;
+            const segsIn = segments.filter(s => Math.min(s.p1.y, s.p2.y) * STEP <= cutY);
+            segsIn.forEach(s => grow(Math.min(s.p1.x, s.p2.x) * STEP - lw, Math.min(s.p1.y, s.p2.y) * STEP - lw, Math.max(s.p1.x, s.p2.x) * STEP + lw, Math.min(cutY, Math.max(s.p1.y, s.p2.y) * STEP + lw)));
+            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; if (j * STEP > cutY) continue; if (el.isNode) grow(i * STEP - RB - lw, j * STEP - RB - lw, i * STEP + RB + lw, j * STEP + RB + lw); }
+            if (!segsIn.length || x0 === Infinity) { showActionHint && showActionHint('Draw a pattern first'); return; }
             const pad = lw * 1.5; x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
             // ---- the ice: the pattern painted the way the editor paints it, on a grid of small cells
             let cell = lw / 22; while ((x1 - x0) / cell * (y1 - y0) / cell > 5e6) cell *= 1.25;
@@ -5478,8 +5481,8 @@ service cloud.firestore {
             const m = mk.getContext('2d', { willReadFrequently: true });
             m.setTransform(1 / cell, 0, 0, 1 / cell, -x0 / cell, -y0 / cell);
             const rings = [], dias = [];
-            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; if (el.isNode) rings.push([i * STEP, j * STEP]); if (el.isDiamond) dias.push([i * STEP, j * STEP + lw / 2]); }
-            IM.rings = rings; IM.dias = dias; IM.groups = getPathGroups(true, segments);
+            for (const id in specialElements) { const [i, j] = id.split(',').map(Number), el = specialElements[id]; if (j * STEP > cutY) continue; if (el.isNode) rings.push([i * STEP, j * STEP]); if (el.isDiamond) dias.push([i * STEP, j * STEP + lw / 2]); }
+            IM.rings = rings; IM.dias = dias; IM.groups = getPathGroups(true, segsIn);
             imPaintPattern(m, x0, y0, x1, y1, cell);
             // a rhombus joins its line by a narrow neck (the line's square end meets the rhombus's pointed tip): the puck's track gets a rounded pocket there, so it can always roll in
             m.fillStyle = '#000'; m.beginPath(); dias.forEach(([x, y]) => { m.moveTo(x + lw * 0.64, y); m.arc(x, y, lw * 0.64, 0, Math.PI * 2); }); m.fill();
@@ -5523,7 +5526,7 @@ service cloud.firestore {
         // the pattern exactly as the editor paints it (joined lines with square ends and mitred corners, smooth rings, rhombi), in black
         function imPaintPattern(m, x0, y0, x1, y1, px) {
             const lw = LINE_WEIGHT, RB = BASE_STEP_VAL;
-            m.save(); m.beginPath(); m.rect(x0, y0, x1 - x0, y1 - y0); IM.rings.forEach(([x, y]) => { m.moveTo(x + RB + lw / 2 - px * 2, y); m.arc(x, y, RB + lw / 2 - px * 2, 0, Math.PI * 2, true); }); m.clip();
+            m.save(); m.beginPath(); m.rect(x0, y0, x1 - x0, Math.min(y1, IM.cutY) - y0); IM.rings.forEach(([x, y]) => { m.moveTo(x + RB + lw / 2 - px * 2, y); m.arc(x, y, RB + lw / 2 - px * 2, 0, Math.PI * 2, true); }); m.clip();
             m.strokeStyle = '#000'; m.lineWidth = lw; m.lineCap = 'butt'; m.lineJoin = 'miter'; m.miterLimit = 2;
             m.beginPath(); IM.groups.forEach(gr => { m.moveTo(gr[0].p1.x * STEP, gr[0].p1.y * STEP); gr.forEach(sg => m.lineTo(sg.p2.x * STEP, sg.p2.y * STEP)); }); m.stroke();
             m.restore();
@@ -5531,17 +5534,17 @@ service cloud.firestore {
             const dd = lw / Math.SQRT2; m.fillStyle = '#000'; m.beginPath(); IM.dias.forEach(([x, y]) => { m.moveTo(x, y - dd); m.lineTo(x + dd, y); m.lineTo(x, y + dd); m.lineTo(x - dd, y); m.closePath(); }); m.fill();
         }
         function imNewRound() {
-            const lw = IM.lw, n = Math.max(4, Math.min(10, Math.round(IM.mids.length * IM.cell * IM.cell / (lw * lw * 9))));
+            const lw = IM.lw, area = IM.mids.length * IM.cell * IM.cell / (lw * lw), n = Math.max(7, Math.min(20, Math.round(area / 4.5))), nTele = Math.max(2, Math.round(n / 3));   // plenty of holes, and a few decoys that teleport
             IM.holes = [];
             const pool = IM.mids.slice(); let guard = 0;
-            while (IM.holes.length < n && pool.length && guard++ < 4000) {
+            while (IM.holes.length < n + nTele && pool.length && guard++ < 8000) {
                 const i = pool[(Math.random() * pool.length) | 0], x = IM.x0 + (i % IM.gw + 0.5) * IM.cell, y = IM.y0 + (((i / IM.gw) | 0) + 0.5) * IM.cell;
-                if (Math.hypot(x - IM.sx, y - IM.sy) < lw * 3) continue;
-                if (IM.holes.some(h => Math.hypot(h.x - x, h.y - y) < lw * 3.2)) continue;
-                IM.holes.push({ x, y, gold: false, done: false, t: Math.random() * 6, seed: (Math.random() * 1e6) | 0 });
+                if (Math.hypot(x - IM.sx, y - IM.sy) < lw * 2.6) continue;
+                if (IM.holes.some(h => Math.hypot(h.x - x, h.y - y) < lw * 2.4)) continue;
+                IM.holes.push({ x, y, gold: false, tele: IM.holes.length >= n, done: false, t: Math.random() * 6, seed: (Math.random() * 1e6) | 0 });
             }
-            if (IM.holes.length) IM.holes[(Math.random() * IM.holes.length) | 0].gold = true;
-            IM.px = IM.sx; IM.py = IM.sy; IM.vx = IM.vy = 0; IM.score = 0; IM.time = 0; IM.state = 'ready'; IM.trail = []; IM.fx = []; IM.sink = null; IM.combo = 0;
+            const real = IM.holes.filter(h => !h.tele); if (real.length) real[(Math.random() * real.length) | 0].gold = true;
+            IM.px = IM.sx; IM.py = IM.sy; IM.vx = IM.vy = 0; IM.score = 0; IM.time = 0; IM.state = 'ready'; IM.trail = []; IM.fx = []; IM.sink = null; IM.combo = 0; IM.tpCool = 0;
             IM.camX = IM.px; IM.camY = IM.py;
             imHud(); imMsg('Tap to start', IM.tiltOK === false ? 'Drag to push the puck' : 'Lay the phone flat on a table and tilt it');
         }
@@ -5641,7 +5644,7 @@ service cloud.firestore {
         function imMsg(a, b) { const m = document.getElementById('im-msg'); if (!m) return; document.getElementById('im-m1').textContent = a; document.getElementById('im-m2').textContent = b; m.style.opacity = a ? 1 : 0; }
         function imHud() {
             const q = id => document.getElementById(id); if (!q('im-score')) return;
-            q('im-score').textContent = IM.score; const left = IM.holes.filter(h => !h.done).length; q('im-holes').textContent = `${IM.holes.length - left}/${IM.holes.length}`;
+            q('im-score').textContent = IM.score; const real = IM.holes.filter(h => !h.tele), left = real.filter(h => !h.done).length; q('im-holes').textContent = `${real.length - left}/${real.length}`;
             q('im-time').textContent = IM.time.toFixed(1);
         }
         // bilinear distance to the snow, in cells
@@ -5654,7 +5657,15 @@ service cloud.firestore {
             if (!IM.on) return;
             const dt = Math.min(0.04, (now - IM.last) / 1000); IM.last = now;
             const lw = IM.lw, Rc = IM.R / IM.cell;
-            if (IM.sink) { IM.sink.t += dt; if (IM.sink.t > 0.75) IM.sink = null; }
+            if (IM.tpCool > 0) IM.tpCool -= dt;
+            if (IM.sink) {
+                IM.sink.t += dt;
+                if (IM.sink.tele && !IM.sink.moved && IM.sink.t >= 0.35) {   // gone from here ... and out of another hole's water
+                    IM.sink.moved = true; IM.px = IM.sink.dx; IM.py = IM.sink.dy; IM.vx = IM.vy = 0; IM.trail = [];
+                    for (let k = 0; k < 16; k++) { const a = Math.random() * 6.283, v = IM.lw * (0.8 + Math.random() * 1.8); IM.fx.push({ x: IM.px, y: IM.py, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, p: 1, tele: 1 }); }
+                }
+                if (IM.sink.t > 0.75) IM.sink = null;
+            }
             if (IM.state === 'play' && !IM.sink) {
                 IM.time += dt;
                 // the push: tilt, or a finger (the farther it is dragged, the harder), or the keys
@@ -5681,16 +5692,26 @@ service cloud.firestore {
                 if (hitV > lw * 2.5) { const v = Math.min(1, hitV / (lw * 9)); BWS.noise(0.07, 0.05 + 0.07 * v, 380, 0, 'lowpass'); BWS.tone(95, 60, 0.07, 'sine', 0.03 + 0.05 * v); }   // a dull rubber knock on the boards, nothing metallic
                 // the holes: slide close enough and the puck is pulled in
                 IM.holes.forEach(h => {
-                    if (h.done) return;
+                    if (h.done || IM.sink) return;
                     const dx = h.x - IM.px, dy = h.y - IM.py, dl = Math.hypot(dx, dy);
                     if (dl < IM.HR * 1.6) { const pull = (1 - dl / (IM.HR * 1.6)) * lw * 22 * dt; IM.vx += dx / (dl || 1) * pull; IM.vy += dy / (dl || 1) * pull; }   // a little suction near the rim
+                    if (dl < IM.HR * 0.7 && h.tele) {
+                        if (IM.tpCool > 0) return;
+                        // a decoy: no points - the puck is whisked away to another place on the ice
+                        let dest = null; const pool2 = IM.mids;
+                        for (let tries = 0; tries < 400 && !dest; tries++) { const i = pool2[(Math.random() * pool2.length) | 0], x = IM.x0 + (i % IM.gw + 0.5) * IM.cell, y = IM.y0 + (((i / IM.gw) | 0) + 0.5) * IM.cell;
+                            if (Math.hypot(x - h.x, y - h.y) < IM.lw * 5 && tries < 300) continue; if (IM.holes.some(q => Math.hypot(q.x - x, q.y - y) < IM.lw * 1.8)) continue; dest = [x, y]; }
+                        if (!dest) return;
+                        IM.sink = { x: h.x, y: h.y, t: 0, tele: true, dx: dest[0], dy: dest[1] }; IM.vx = IM.vy = 0; IM.px = h.x; IM.py = h.y; IM.tpCool = 1.3; IM.combo = 0; imWhoosh();
+                        return;
+                    }
                     if (dl < IM.HR * 0.7) {
                         h.done = true; IM.combo++; const pts = (h.gold ? 500 : 100) * Math.min(4, IM.combo); IM.score += pts;
                         IM.fx.push({ x: h.x, y: h.y, t: 0, s: '+' + pts, gold: h.gold });
                         for (let k = 0; k < 18; k++) { const a = Math.random() * 6.283, v = lw * (1 + Math.random() * 2.5); IM.fx.push({ x: h.x, y: h.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, p: 1, gold: h.gold }); }
                         imPlop(h.gold);
                         IM.sink = { x: h.x, y: h.y, t: 0, gold: h.gold }; IM.vx = IM.vy = 0; IM.px = h.x; IM.py = h.y;   // the puck drops into the water and bobs back up
-                        if (IM.holes.every(q => q.done)) {
+                        if (IM.holes.filter(q => !q.tele).every(q => q.done)) {
                             IM.state = 'won'; const tm = IM.time; const bonus = Math.max(0, Math.round(3000 - tm * 25)); IM.score += bonus;
                             if (!IM.best || tm < IM.best) { IM.best = tm; try { localStorage.setItem('kk-im-best', String(tm)); } catch (e) {} }
                             imMsg('All holes! ' + tm.toFixed(1) + ' s', `Score ${IM.score} · best ${IM.best.toFixed(1)} s · tap to play again`); BWS.win();
@@ -5736,7 +5757,7 @@ service cloud.firestore {
             // splashes and points
             IM.fx = IM.fx.filter(f => {
                 f.t += dt;
-                if (f.p) { if (f.t > 0.7) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; c.fillStyle = f.gold ? `rgba(255,214,107,${1 - f.t / 0.7})` : `rgba(220,238,255,${1 - f.t / 0.7})`; c.beginPath(); c.arc(ox + f.x * s, oy + f.y * s, Math.max(1.2, lw * s * 0.035), 0, 6.283); c.fill(); return true; }
+                if (f.p) { if (f.t > 0.7) return false; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.92; f.vy *= 0.92; c.fillStyle = f.gold ? `rgba(255,214,107,${1 - f.t / 0.7})` : f.tele ? `rgba(196,176,255,${1 - f.t / 0.7})` : `rgba(220,238,255,${1 - f.t / 0.7})`; c.beginPath(); c.arc(ox + f.x * s, oy + f.y * s, Math.max(1.2, lw * s * 0.035), 0, 6.283); c.fill(); return true; }
                 if (f.t > 1.1) return false;
                 c.save(); c.globalAlpha = Math.min(1, (1.1 - f.t) / 0.4); c.fillStyle = f.gold ? '#ffd36b' : '#eaf4ff'; c.font = `700 ${Math.round(18 + (f.gold ? 6 : 0))}px "Google Sans Flex","Google Sans",system-ui,sans-serif`; c.textAlign = 'center';
                 c.shadowColor = 'rgba(0,0,0,0.6)'; c.shadowBlur = 6; c.fillText(f.s, ox + f.x * s, oy + f.y * s - lw * s * 0.4 - f.t * 30); c.restore(); return true;
@@ -5760,7 +5781,7 @@ service cloud.firestore {
             // the water: deep in the middle, an inner shadow under the ice edge
             c.save(); blob(r, 0.06, 20); c.clip();
             const wg = c.createRadialGradient(X + r * 0.1, Y + r * 0.15, 0, X, Y, r * 1.05);
-            if (h.gold) { wg.addColorStop(0, '#3d6f8a'); wg.addColorStop(0.55, '#12405e'); wg.addColorStop(1, '#03111f'); } else { wg.addColorStop(0, '#2a78a8'); wg.addColorStop(0.55, '#0e3a60'); wg.addColorStop(1, '#03111f'); }
+            if (h.gold) { wg.addColorStop(0, '#3d6f8a'); wg.addColorStop(0.55, '#12405e'); wg.addColorStop(1, '#03111f'); } else if (h.tele) { wg.addColorStop(0, '#3a6aa8'); wg.addColorStop(0.55, '#1c3466'); wg.addColorStop(1, '#0a1230'); } else { wg.addColorStop(0, '#2a78a8'); wg.addColorStop(0.55, '#0e3a60'); wg.addColorStop(1, '#03111f'); }
             c.fillStyle = wg; c.fillRect(X - r * 1.2, Y - r * 1.2, r * 2.4, r * 2.4);
             if (h.gold) {   // gold coins glinting under the water
                 for (let i = 0; i < 4; i++) { const a = T * 0.4 + i * 1.57 + h.t, d = r * 0.38, cx = X + Math.cos(a) * d, cy = Y + Math.sin(a) * d * 0.8, gl = 0.55 + 0.45 * Math.sin(T * 3 + i * 2);
@@ -5771,6 +5792,7 @@ service cloud.firestore {
             for (let i = 0; i < 3; i++) { const a = T * (0.5 + i * 0.17) + i * 2.1 + h.t; c.strokeStyle = `rgba(150,210,255,${0.16 + 0.08 * Math.sin(T * 2 + i)})`; c.lineWidth = Math.max(1, r * 0.06); c.beginPath(); c.arc(X + Math.cos(a) * r * 0.25, Y + Math.sin(a * 1.3) * r * 0.2, r * (0.3 + i * 0.12), a, a + 1.2); c.stroke(); }
             const rp = (T * 0.45 + h.t) % 1; c.strokeStyle = `rgba(210,235,255,${0.35 * (1 - rp)})`; c.lineWidth = Math.max(1, r * 0.05); c.beginPath(); c.ellipse(X, Y, r * (0.15 + 0.75 * rp), r * (0.13 + 0.65 * rp), 0, 0, 6.283); c.stroke();
             c.globalCompositeOperation = 'source-over';
+            if (h.tele) { c.strokeStyle = 'rgba(190,170,255,0.16)'; c.lineWidth = Math.max(1, r * 0.06); c.beginPath(); for (let a = 0; a < 9; a += 0.2) { const rr = r * (0.12 + a * 0.085), ang = a + T * 0.7 + h.t; a ? c.lineTo(X + Math.cos(ang) * rr, Y + Math.sin(ang) * rr) : c.moveTo(X + Math.cos(ang) * rr, Y + Math.sin(ang) * rr); } c.stroke(); }
             // a small floe drifting round
             { const a = T * 0.25 + h.t * 3, fx = X + Math.cos(a) * r * 0.45, fy = Y + Math.sin(a) * r * 0.4, z = r * 0.13; c.fillStyle = 'rgba(235,246,255,0.95)'; c.beginPath(); c.moveTo(fx - z, fy - z * 0.4); c.lineTo(fx + z * 0.3, fy - z); c.lineTo(fx + z, fy + z * 0.2); c.lineTo(fx - z * 0.2, fy + z * 0.8); c.closePath(); c.fill(); }
             const ig = c.createRadialGradient(X, Y, r * 0.6, X, Y, r * 1.05); ig.addColorStop(0, 'rgba(0,10,25,0)'); ig.addColorStop(1, 'rgba(0,10,25,0.75)'); c.fillStyle = ig; c.fillRect(X - r * 1.2, Y - r * 1.2, r * 2.4, r * 2.4);   // the ice edge throws the water's rim into shade
@@ -5792,6 +5814,15 @@ service cloud.firestore {
             S.noise(0.12, 0.04, 3200, 0.03);
             for (let i = 0; i < 6; i++) { const f = 700 + Math.random() * 900, d = 0.14 + i * 0.07 + Math.random() * 0.03; S.tone(f, f * 1.8, 0.05, 'sine', 0.035 * (1 - i / 7), d); }   // bubbles
             if (gold) S.seq([1568, 2093, 2637, 3136, 2637, 3136], 0.07, 'triangle', 0.045);
+        }
+        // the teleport: a wobbling sweep down, then up (a "whoosh-pop")
+        function imWhoosh() {
+            BWS.init(); const S = BWS; if (!S.ctx || !BW.sound) return;
+            const c = S.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain(), l = c.createOscillator(), lg = c.createGain();
+            o.type = 'sine'; o.frequency.setValueAtTime(700, t); o.frequency.exponentialRampToValueAtTime(160, t + 0.32); o.frequency.exponentialRampToValueAtTime(1100, t + 0.62);
+            l.frequency.value = 22; lg.gain.value = 50; l.connect(lg).connect(o.frequency);
+            g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 0.66); o.connect(g).connect(c.destination); o.start(t); l.start(t); o.stop(t + 0.7); l.stop(t + 0.7);
+            S.noise(0.4, 0.05, 1400, 0.05, 'bandpass'); S.tone(1500, 2400, 0.08, 'sine', 0.05, 0.58);
         }
         function exitIceMaze() {
             if (!IM.on) return; IM.on = false; cancelAnimationFrame(IM.raf);
